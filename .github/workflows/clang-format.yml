@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - develop
-      - feature/**
+      - 'feature/**'
   pull_request:
 
 jobs:
@@ -23,25 +23,43 @@ jobs:
 
       - name: Check clang-format
         run: |
-          # Find files to enforce formatting on (adjust paths as needed)
-          FILES=$(find src -type f \( -name "*.c" -o -name "*.cpp" -o -name "*.h" \))
+          set -euo pipefail
 
-          if [ -z "$FILES" ]; then
-            echo "No C/C++ files to format, skipping"
+          SEARCH_DIRS=(
+            "include"
+            "src"
+            "tests/c"
+            "examples/c"
+          )
+
+          EXISTING_SEARCH_DIRS=()
+          for dir in "${SEARCH_DIRS[@]}"; do
+            if [ -d "$dir" ]; then
+              EXISTING_SEARCH_DIRS+=("$dir")
+            fi
+          done
+
+          if [ ${#EXISTING_SEARCH_DIRS[@]} -eq 0 ]; then
+            echo "No source directories found, skipping clang-format check."
             exit 0
           fi
 
-          # Copy the repo, format in-place, then diff against original
-          cp -R . ../repo-copy
-          cd ../repo-copy
+          mapfile -d '' FILES < <(
+            find "${EXISTING_SEARCH_DIRS[@]}" -type f \( \
+              -name "*.c"   -o \
+              -name "*.cc"  -o \
+              -name "*.cpp" -o \
+              -name "*.cxx" -o \
+              -name "*.h"   -o \
+              -name "*.hh"  -o \
+              -name "*.hpp" -o \
+              -name "*.hxx" \
+            \) -print0
+          )
 
-          echo "$FILES" | xargs clang-format -i
-
-          # Show what would change
-          diff -ru ../${GITHUB_REPOSITORY##*/} . || true
-
-          # Fail if there were differences
-          if ! diff -qru ../${GITHUB_REPOSITORY##*/} . >/dev/null; then
-            echo "clang-format check failed. Please run clang-format and commit the changes."
-            exit 1
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "No C/C++ source or header files found, skipping clang-format check."
+            exit 0
           fi
+
+          clang-format --dry-run --Werror "${FILES[@]}"

@@ -1,4 +1,4 @@
-name: c-unit-tests
+name: c-integration-tests
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
   pull_request:
 
 jobs:
-  unit-tests:
+  integration-tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -35,12 +35,12 @@ jobs:
             -DHIL_RIG_PROTOCOL_ENABLE_WARNINGS=ON \
             -DHIL_RIG_PROTOCOL_WARNINGS_AS_ERRORS=ON
 
-      - name: Build unit tests
+      - name: Build integration tests
         run: |
-          cmake --build build --target hil_rig_protocol_unit_tests --verbose
+          cmake --build build --target hil_rig_protocol_integration_tests --verbose
 
-      - name: Run unit tests
+      - name: Run integration tests
         run: |
           ctest --test-dir build \
             --output-on-failure \
-            -R '^hil_rig_protocol_unit_tests$'
+            -R '^hil_rig_protocol_integration_tests$'

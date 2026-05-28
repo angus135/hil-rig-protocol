@@ -1,0 +1,88 @@
+name: c-build-options
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: library-only
+            build_type: Debug
+            cmake_args: >-
+              -DHIL_RIG_PROTOCOL_BUILD_TESTS=OFF
+              -DHIL_RIG_PROTOCOL_BUILD_EXAMPLES=OFF
+              -DHIL_RIG_PROTOCOL_ENABLE_WARNINGS=ON
+              -DHIL_RIG_PROTOCOL_WARNINGS_AS_ERRORS=ON
+            build_target: hil_rig_protocol
+            run_tests: false
+
+          - name: examples
+            build_type: Debug
+            cmake_args: >-
+              -DHIL_RIG_PROTOCOL_BUILD_TESTS=OFF
+              -DHIL_RIG_PROTOCOL_BUILD_EXAMPLES=ON
+              -DHIL_RIG_PROTOCOL_ENABLE_WARNINGS=ON
+              -DHIL_RIG_PROTOCOL_WARNINGS_AS_ERRORS=ON
+            build_target: all
+            run_tests: false
+
+          - name: sanitizers
+            build_type: Debug
+            cmake_args: >-
+              -DHIL_RIG_PROTOCOL_BUILD_TESTS=ON
+              -DHIL_RIG_PROTOCOL_BUILD_EXAMPLES=OFF
+              -DHIL_RIG_PROTOCOL_ENABLE_WARNINGS=ON
+              -DHIL_RIG_PROTOCOL_WARNINGS_AS_ERRORS=ON
+              -DHIL_RIG_PROTOCOL_ENABLE_SANITIZERS=ON
+            build_target: all
+            run_tests: true
+
+          - name: coverage
+            build_type: Debug
+            cmake_args: >-
+              -DHIL_RIG_PROTOCOL_BUILD_TESTS=ON
+              -DHIL_RIG_PROTOCOL_BUILD_EXAMPLES=OFF
+              -DHIL_RIG_PROTOCOL_ENABLE_WARNINGS=ON
+              -DHIL_RIG_PROTOCOL_WARNINGS_AS_ERRORS=OFF
+              -DHIL_RIG_PROTOCOL_ENABLE_COVERAGE=ON
+            build_target: all
+            run_tests: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build
+
+      - name: Configure CMake (${{ matrix.name }})
+        run: |
+          cmake -S . -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            ${{ matrix.cmake_args }}
+
+      - name: Build (${{ matrix.name }})
+        run: |
+          cmake --build build --target ${{ matrix.build_target }} --verbose
+
+      - name: Run tests (${{ matrix.name }})
+        if: ${{ matrix.run_tests }}
+        run: |
+          ctest --test-dir build --output-on-failure

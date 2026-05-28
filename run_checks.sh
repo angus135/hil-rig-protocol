@@ -1,40 +1,72 @@
 #!/bin/bash
 
-# Script to run clang-tidy or clang-format on Embedded C code
-# Usage: ./run-checks.sh [tidy|format]
+# Script to run clang-tidy or clang-format on HIL-RIG protocol C/C++ code.
+#
+# Usage:
+#   ./run_checks.sh tidy
+#   ./run_checks.sh format
+#
+# Checked directories:
+#   include/
+#   src/
+#   tests/c/
+#   examples/c/
+
+set -e
 
 if [ $# -eq 0 ]; then
   echo "Usage: $0 [tidy|format]"
-  echo "  tidy   - Run clang-tidy (analyzes code, gives warnings)"
-  echo "  format - Run clang-format (formats code in-place)"
+  echo "  tidy   - Run clang-tidy on C/C++ source and header files"
+  echo "  format - Run clang-format in-place"
   exit 1
 fi
 
 MODE=$1
 
-# Adjust this to your repo root if needed
-cd /hil-rig-protocol || exit 1
+# Move to repository root.
+# This assumes the script is located in the repository root.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
 
 SEARCH_DIRS=(
   "include"
   "src"
   "tests/c"
+  "examples/c"
 )
 
-echo "Collecting source files in:"
+EXISTING_SEARCH_DIRS=()
+
 for dir in "${SEARCH_DIRS[@]}"; do
+  if [ -d "$dir" ]; then
+    EXISTING_SEARCH_DIRS+=("$dir")
+  fi
+done
+
+if [ ${#EXISTING_SEARCH_DIRS[@]} -eq 0 ]; then
+  echo "No search directories exist."
+  exit 0
+fi
+
+echo "Collecting source files in:"
+for dir in "${EXISTING_SEARCH_DIRS[@]}"; do
   echo "  $dir/"
 done
 
-# Pick .c, .cpp, .h and .hpp files inside include/, src/ and tests/c/
-FILES=$(find "${SEARCH_DIRS[@]}" -type f \( \
-  -name "*.c" -o \
-  -name "*.cpp" -o \
-  -name "*.h" -o \
-  -name "*.hpp" \
-\) 2>/dev/null)
+mapfile -d '' FILES < <(
+  find "${EXISTING_SEARCH_DIRS[@]}" -type f \( \
+    -name "*.c"   -o \
+    -name "*.cc"  -o \
+    -name "*.cpp" -o \
+    -name "*.cxx" -o \
+    -name "*.h"   -o \
+    -name "*.hh"  -o \
+    -name "*.hpp" -o \
+    -name "*.hxx" \
+  \) -print0
+)
 
-if [ -z "$FILES" ]; then
+if [ ${#FILES[@]} -eq 0 ]; then
   echo "No C/C++ source or header files found."
   exit 0
 fi
@@ -42,8 +74,22 @@ fi
 case "$MODE" in
 
   tidy)
+    if [ ! -d "build" ]; then
+      echo "Error: build/ directory not found."
+      echo "Run CMake first so clang-tidy can use build/compile_commands.json:"
+      echo "  cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+      exit 1
+    fi
+
+    if [ ! -f "build/compile_commands.json" ]; then
+      echo "Error: build/compile_commands.json not found."
+      echo "Reconfigure with:"
+      echo "  cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+      exit 1
+    fi
+
     echo "Running clang-tidy on:"
-    for file in $FILES; do
+    for file in "${FILES[@]}"; do
       echo "  $file"
       clang-tidy -p build "$file"
     done
@@ -51,7 +97,7 @@ case "$MODE" in
 
   format)
     echo "Running clang-format on:"
-    for file in $FILES; do
+    for file in "${FILES[@]}"; do
       echo "  $file"
       clang-format -i "$file"
     done
@@ -66,9 +112,3 @@ case "$MODE" in
 esac
 
 echo "Done!"
-
-
-## Run with commands:
-# chmod +x run_checks.sh
-# ./run_checks.sh tidy    # for clang-tidy
-# ./run_checks.sh format  # for clang-format
