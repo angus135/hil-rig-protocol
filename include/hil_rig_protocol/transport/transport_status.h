@@ -11,7 +11,8 @@
 #define HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_STATUS_H
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 /**

@@ -15,7 +15,8 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 /**
@@ -23,7 +24,7 @@ extern "C" {
  *
  * @return Initial CRC32 value.
  */
-uint32_t HIL_TRANSPORT_CRC32_Init(void);
+uint32_t HIL_TRANSPORT_CRC32_Init( void );
 
 /**
  * @brief Update a CRC32 accumulator with bytes.
@@ -33,11 +34,7 @@ uint32_t HIL_TRANSPORT_CRC32_Init(void);
  * @param len Number of bytes in `data`.
  * @return Updated CRC32 accumulator.
  */
-uint32_t HIL_TRANSPORT_CRC32_Update(
-    uint32_t crc,
-    const uint8_t *data,
-    size_t len
-);
+uint32_t HIL_TRANSPORT_CRC32_Update( uint32_t crc, const uint8_t* data, size_t len );
 
 /**
  * @brief Finalize a CRC32 accumulator.
@@ -45,9 +42,7 @@ uint32_t HIL_TRANSPORT_CRC32_Update(
  * @param crc Current CRC32 accumulator.
  * @return Final CRC32 value.
  */
-uint32_t HIL_TRANSPORT_CRC32_Finish(
-    uint32_t crc
-);
+uint32_t HIL_TRANSPORT_CRC32_Finish( uint32_t crc );
 
 /**
  * @brief Compute CRC32 for a complete byte span.
@@ -56,10 +51,7 @@ uint32_t HIL_TRANSPORT_CRC32_Finish(
  * @param len Number of bytes in `data`.
  * @return Final CRC32 value.
  */
-uint32_t HIL_TRANSPORT_CRC32_Compute(
-    const uint8_t *data,
-    size_t len
-);
+uint32_t HIL_TRANSPORT_CRC32_Compute( const uint8_t* data, size_t len );
 
 #ifdef __cplusplus
 }

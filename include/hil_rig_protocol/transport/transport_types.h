@@ -20,47 +20,48 @@
 #include "hil_rig_protocol/transport/transport_status.h"
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 /** @brief Major version of the transport wire format currently targeted. */
-#define HIL_TRANSPORT_WIRE_VERSION_MAJOR (0u)
+#define HIL_TRANSPORT_WIRE_VERSION_MAJOR ( 0u )
 
 /** @brief Minor version of the transport wire format currently targeted. */
-#define HIL_TRANSPORT_WIRE_VERSION_MINOR (1u)
+#define HIL_TRANSPORT_WIRE_VERSION_MINOR ( 1u )
 
 /** @brief Default maximum opaque payload size accepted by the transport API. */
-#define HIL_TRANSPORT_DEFAULT_MAX_PAYLOAD_SIZE (1024u)
+#define HIL_TRANSPORT_DEFAULT_MAX_PAYLOAD_SIZE ( 1024u )
 
 /** @brief Default maximum encoded COBS-delimited frame size. */
-#define HIL_TRANSPORT_DEFAULT_MAX_ENCODED_FRAME_SIZE (1200u)
+#define HIL_TRANSPORT_DEFAULT_MAX_ENCODED_FRAME_SIZE ( 1200u )
 
 /** @brief Absolute placeholder maximum encoded frame size for static buffers. */
-#define HIL_TRANSPORT_MAX_ENCODED_FRAME_SIZE (4096u)
+#define HIL_TRANSPORT_MAX_ENCODED_FRAME_SIZE ( 4096u )
 
 /** @brief Transport flag requesting acknowledgement. */
-#define HIL_TRANSPORT_FLAG_ACK (1u << 0u)
+#define HIL_TRANSPORT_FLAG_ACK ( 1u << 0u )
 
 /** @brief Transport flag indicating a negative acknowledgement. */
-#define HIL_TRANSPORT_FLAG_NACK (1u << 1u)
+#define HIL_TRANSPORT_FLAG_NACK ( 1u << 1u )
 
 /** @brief Transport flag indicating reset/control intent. */
-#define HIL_TRANSPORT_FLAG_RST (1u << 2u)
+#define HIL_TRANSPORT_FLAG_RST ( 1u << 2u )
 
 /** @brief Transport flag indicating the final fragment in a sequence. */
-#define HIL_TRANSPORT_FLAG_FIN (1u << 3u)
+#define HIL_TRANSPORT_FLAG_FIN ( 1u << 3u )
 
 /** @brief Transport flag indicating keep-alive traffic. */
-#define HIL_TRANSPORT_FLAG_KEEP_ALIVE (1u << 4u)
+#define HIL_TRANSPORT_FLAG_KEEP_ALIVE ( 1u << 4u )
 
 /** @brief Transport flag indicating a requested state change. */
-#define HIL_TRANSPORT_FLAG_STATE_CHANGE (1u << 5u)
+#define HIL_TRANSPORT_FLAG_STATE_CHANGE ( 1u << 5u )
 
 /** @brief Transport flag acknowledging a state change. */
-#define HIL_TRANSPORT_FLAG_STATE_CHANGE_ACK (1u << 6u)
+#define HIL_TRANSPORT_FLAG_STATE_CHANGE_ACK ( 1u << 6u )
 
 /** @brief Transport flag indicating more fragments will follow. */
-#define HIL_TRANSPORT_FLAG_MORE_FRAGMENTS (1u << 7u)
+#define HIL_TRANSPORT_FLAG_MORE_FRAGMENTS ( 1u << 7u )
 
 /**
  * @brief Endpoint role for transport session behaviour.
@@ -107,14 +108,14 @@ typedef enum
  */
 typedef struct
 {
-    uint8_t version_major;
-    uint8_t version_minor;
+    uint8_t                    version_major;
+    uint8_t                    version_minor;
     HIL_Transport_Frame_Type_T frame_type;
-    uint16_t flags;
-    uint16_t sequence;
-    uint16_t ack_sequence;
-    size_t payload_len;
-    uint32_t crc32;
+    uint16_t                   flags;
+    uint16_t                   sequence;
+    uint16_t                   ack_sequence;
+    size_t                     payload_len;
+    uint32_t                   crc32;
 } HIL_Transport_Header_T;
 
 /**
@@ -126,8 +127,8 @@ typedef struct
 typedef struct
 {
     HIL_Transport_Header_T header;
-    const uint8_t *payload;
-    size_t payload_len;
+    const uint8_t*         payload;
+    size_t                 payload_len;
 } HIL_Transport_Frame_T;
 
 /**
@@ -169,11 +170,11 @@ typedef enum
 typedef struct
 {
     HIL_Transport_Event_Type_T type;
-    HIL_Transport_Status_T status;
+    HIL_Transport_Status_T     status;
     HIL_Transport_Frame_Type_T frame_type;
-    HIL_Transport_State_T state;
-    uint16_t sequence;
-    uint16_t flags;
+    HIL_Transport_State_T      state;
+    uint16_t                   sequence;
+    uint16_t                   flags;
 } HIL_Transport_Event_T;
 
 #ifdef __cplusplus

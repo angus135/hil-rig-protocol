@@ -20,7 +20,8 @@
 #include "hil_rig_protocol/transport/transport_types.h"
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 /**
@@ -33,9 +34,7 @@ extern "C" {
  * @return Required encoded size in bytes, or 0 when the size cannot be
  * determined.
  */
-size_t HIL_TRANSPORT_Encoded_Size(
-    const HIL_Transport_Frame_T *frame
-);
+size_t HIL_TRANSPORT_Encoded_Size( const HIL_Transport_Frame_T* frame );
 
 /**
  * @brief Encode a complete transport frame for the byte stream.
@@ -49,12 +48,9 @@ size_t HIL_TRANSPORT_Encoded_Size(
  * @param bytes_written Receives the number of bytes written.
  * @return Transport status code.
  */
-HIL_Transport_Status_T HIL_TRANSPORT_Encode_Frame(
-    const HIL_Transport_Frame_T *frame,
-    uint8_t *out_buffer,
-    size_t out_buffer_len,
-    size_t *bytes_written
-);
+HIL_Transport_Status_T HIL_TRANSPORT_Encode_Frame( const HIL_Transport_Frame_T* frame,
+                                                   uint8_t* out_buffer, size_t out_buffer_len,
+                                                   size_t* bytes_written );
 
 /**
  * @brief Decode one complete encoded transport frame.
@@ -72,14 +68,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_Encode_Frame(
  * @param payload_bytes_written Receives decoded payload length.
  * @return Transport status code.
  */
-HIL_Transport_Status_T HIL_TRANSPORT_Decode_Frame(
-    const uint8_t *encoded_frame,
-    size_t encoded_frame_len,
-    HIL_Transport_Frame_T *out_frame,
-    uint8_t *payload_buffer,
-    size_t payload_buffer_len,
-    size_t *payload_bytes_written
-);
+HIL_Transport_Status_T
+HIL_TRANSPORT_Decode_Frame( const uint8_t* encoded_frame, size_t encoded_frame_len,
+                            HIL_Transport_Frame_T* out_frame, uint8_t* payload_buffer,
+                            size_t payload_buffer_len, size_t* payload_bytes_written );
 
 #ifdef __cplusplus
 }

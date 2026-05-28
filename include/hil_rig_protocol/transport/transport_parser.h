@@ -20,7 +20,8 @@
 #include "hil_rig_protocol/transport/transport_types.h"
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 /**
@@ -40,10 +41,10 @@ typedef enum
  */
 typedef struct
 {
-    uint8_t *scratch_buffer;
-    size_t scratch_buffer_len;
-    size_t bytes_used;
-    uint8_t frame_ready;
+    uint8_t*               scratch_buffer;
+    size_t                 scratch_buffer_len;
+    size_t                 bytes_used;
+    uint8_t                frame_ready;
     HIL_Transport_Status_T last_status;
 } HIL_Transport_Parser_T;
 
@@ -55,11 +56,9 @@ typedef struct
  * @param scratch_buffer_len Length of `scratch_buffer` in bytes.
  * @return Transport status code.
  */
-HIL_Transport_Status_T HIL_TRANSPORT_Parser_Init(
-    HIL_Transport_Parser_T *parser,
-    uint8_t *scratch_buffer,
-    size_t scratch_buffer_len
-);
+HIL_Transport_Status_T HIL_TRANSPORT_Parser_Init( HIL_Transport_Parser_T* parser,
+                                                  uint8_t*                scratch_buffer,
+                                                  size_t                  scratch_buffer_len );
 
 /**
  * @brief Push one byte into the parser.
@@ -68,10 +67,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_Parser_Init(
  * @param byte Byte from the transport stream.
  * @return Parse result for the pushed byte.
  */
-HIL_Transport_Parse_Result_T HIL_TRANSPORT_Parser_Push_Byte(
-    HIL_Transport_Parser_T *parser,
-    uint8_t byte
-);
+HIL_Transport_Parse_Result_T HIL_TRANSPORT_Parser_Push_Byte( HIL_Transport_Parser_T* parser,
+                                                             uint8_t                 byte );
 
 /**
  * @brief Push multiple bytes into the parser.
@@ -82,12 +79,9 @@ HIL_Transport_Parse_Result_T HIL_TRANSPORT_Parser_Push_Byte(
  * @param bytes_consumed Receives the number of bytes consumed.
  * @return Parse result after consuming bytes.
  */
-HIL_Transport_Parse_Result_T HIL_TRANSPORT_Parser_Push_Bytes(
-    HIL_Transport_Parser_T *parser,
-    const uint8_t *data,
-    size_t data_len,
-    size_t *bytes_consumed
-);
+HIL_Transport_Parse_Result_T HIL_TRANSPORT_Parser_Push_Bytes( HIL_Transport_Parser_T* parser,
+                                                              const uint8_t* data, size_t data_len,
+                                                              size_t* bytes_consumed );
 
 /**
  * @brief Read the decoded frame after the parser reports frame readiness.
@@ -99,22 +93,18 @@ HIL_Transport_Parse_Result_T HIL_TRANSPORT_Parser_Push_Bytes(
  * @param payload_bytes_written Receives decoded payload length.
  * @return Transport status code.
  */
-HIL_Transport_Status_T HIL_TRANSPORT_Parser_Read_Frame(
-    HIL_Transport_Parser_T *parser,
-    HIL_Transport_Frame_T *out_frame,
-    uint8_t *payload_buffer,
-    size_t payload_buffer_len,
-    size_t *payload_bytes_written
-);
+HIL_Transport_Status_T HIL_TRANSPORT_Parser_Read_Frame( HIL_Transport_Parser_T* parser,
+                                                        HIL_Transport_Frame_T*  out_frame,
+                                                        uint8_t*                payload_buffer,
+                                                        size_t                  payload_buffer_len,
+                                                        size_t* payload_bytes_written );
 
 /**
  * @brief Reset parser state while retaining the caller-provided scratch buffer.
  *
  * @param parser Parser to reset.
  */
-void HIL_TRANSPORT_Parser_Reset(
-    HIL_Transport_Parser_T *parser
-);
+void HIL_TRANSPORT_Parser_Reset( HIL_Transport_Parser_T* parser );
 
 #ifdef __cplusplus
 }
