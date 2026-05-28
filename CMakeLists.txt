@@ -35,6 +35,10 @@ option(HIL_RIG_PROTOCOL_ENABLE_COVERAGE
 
 set(HIL_RIG_PROTOCOL_SOURCES
     src/version.c
+    src/transport/transport_crc.c
+    src/transport/transport_frame.c
+    src/transport/transport_parser.c
+    src/transport/transport_session.c
 )
 
 add_library(hil_rig_protocol ${HIL_RIG_PROTOCOL_SOURCES})
