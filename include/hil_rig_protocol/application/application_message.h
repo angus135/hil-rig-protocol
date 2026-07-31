@@ -32,32 +32,35 @@ extern "C"
  * may break firmware/Python compatibility and requires protocol-version review.
  * There is deliberately no Application sequence field: Transport supplies
  * reliable ordered delivery, while test ID/tick/scope correlate semantics.
+ * Python integration serializes response-requiring operations so only one is
+ * outstanding. The shared codec remains direction-neutral and does not store
+ * an endpoint role, request identity, or outstanding operation.
  */
 typedef enum
 {
     /** Invalid sentinel; also used to clear failed decode output. */
     HIL_APPLICATION_MESSAGE_TYPE_INVALID = 0,
-    /** Host request for minimal version/diagnostic information. */
+    /** Python-to-firmware request for minimal version/diagnostic information. */
     HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST = 1,
-    /** HIL-RIG response with minimal version/diagnostic information. */
+    /** Firmware-to-Python response with version/diagnostic information. */
     HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE = 2,
-    /** Host-to-HIL-RIG test-wide configuration. */
+    /** Python-to-firmware test-wide configuration. */
     HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION = 16,
-    /** Host-to-HIL-RIG fixed instruction for one tick. */
+    /** Python-to-firmware fixed instruction for one tick. */
     HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION = 17,
-    /** Host-to-HIL-RIG variable channel bytes for one tick. */
+    /** Python-to-firmware variable channel bytes for one tick. */
     HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA = 18,
-    /** Host-to-HIL-RIG test-scoped execution/abort request. */
+    /** Python-to-firmware test-scoped execution/abort request. */
     HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL = 19,
-    /** Host-to-HIL-RIG test-independent Application recovery request. */
+    /** Python-to-firmware test-independent Application recovery request. */
     HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL = 20,
-    /** One of exactly N fixed results after a successfully started N-tick test. */
+    /** Firmware-to-Python fixed result in an ordered N-tick result set. */
     HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT = 32,
-    /** HIL-RIG-to-host variable result bytes available after execution. */
+    /** Firmware-to-Python variable bytes declared by a preceding fixed result. */
     HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA = 33,
-    /** Application acceptance/rejection/completion outcome. */
+    /** Firmware-to-Python acceptance/rejection/completion outcome. */
     HIL_APPLICATION_MESSAGE_TYPE_RESPONSE = 48,
-    /** Broader Application fault report. */
+    /** Firmware-to-Python broader Application fault report. */
     HIL_APPLICATION_MESSAGE_TYPE_ERROR = 49,
     /** Reserved sentinel; never a valid message type. */
     HIL_APPLICATION_MESSAGE_TYPE_RESERVED = 255

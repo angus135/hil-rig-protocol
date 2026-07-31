@@ -2,8 +2,8 @@
  * @file application_test_config.h
  * @brief Test-wide configuration message body and peripheral records.
  *
- * @details Test Configuration is the first test-specific message, normally host
- * to HIL-RIG. It describes protocol-level requirements without exposing MCU
+ * @details Test Configuration is the first test-specific Python-to-firmware
+ * message. It describes protocol-level requirements without exposing MCU
  * registers, port addresses, driver handles, timers, or scheduling behavior.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_TEST_CONFIG_H
@@ -144,7 +144,7 @@ typedef struct
 } HIL_Application_Peripheral_Config_T;
 
 /**
- * @brief Host-to-HIL-RIG Test Configuration body.
+ * @brief Python-to-firmware Test Configuration body.
  *
  * @details The enclosing message must carry a test ID and be the first message
  * for that test. expected_tick_count must be nonzero and is authoritative: a

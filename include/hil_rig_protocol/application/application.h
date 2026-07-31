@@ -11,7 +11,17 @@
  * direction, correlation, exchange order, Response meaning, transaction
  * creation/completion/invalidation, and permitted follow-up actions. Firmware
  * and host integration implement that contract outside this codec. The codec
- * performs no semantic acceptance and tracks no transaction.
+ * performs no semantic acceptance and tracks no transaction. It is
+ * direction-neutral: endpoint integration, not encoding or decoding, enforces
+ * whether Python or firmware may send a structurally valid message family.
+ *
+ * The initial codec has one version named by
+ * HIL_APPLICATION_PROTOCOL_VERSION_MAJOR and
+ * HIL_APPLICATION_PROTOCOL_VERSION_MINOR. Encoding always produces that
+ * compiled-in version and decoding accepts only it. Callers cannot select or
+ * negotiate another encoding version through config, context, messages, or
+ * per-call arguments. The eventual common envelope must identify the version,
+ * but its complete wire layout remains undefined.
  *
  * Application never performs COBS framing, CRC, Transport sequencing,
  * acknowledgements, retransmission, fragmentation/reassembly, advertised-window
@@ -106,7 +116,9 @@ HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      c
  * fixed tick array, and adds explicit future envelope/body fields using checked
  * arithmetic. It does not mutate context or message and retains no pointer.
  *
- * Exact wire fields, widths, byte order, and protocol versioning remain TODO.
+ * A future envelope includes the compiled-in Application protocol version.
+ * Exact fields, widths, byte order, and layout remain TODO; callers cannot
+ * select an alternate version.
  *
  * @param[in] context Successfully initialized context providing local bounds.
  * @param[in] message Complete typed message borrowed for this call.
@@ -131,10 +143,11 @@ HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Con
  * @details The future implementation validates the tagged message, calculates
  * size with checked arithmetic, explicitly serializes approved fixed-width
  * fields, serializes all fixed tick-array elements in deterministic channel
- * order, copies every variable array/span, rejects inconsistent declarations,
- * and publishes output_size only after complete success. It never performs a
- * Global Control operation, Transport framing/fragmentation, or pointer
- * retention.
+ * order, writes the compiled-in Application protocol version into the future
+ * envelope, copies every variable array/span, rejects inconsistent
+ * declarations, and publishes output_size only after complete success. It never
+ * performs a Global Control operation, Transport framing/fragmentation, or
+ * pointer retention. No API parameter selects another encoding version.
  *
  * On OK output_size is the bytes copied. On BUFFER_TOO_SMALL it is the required
  * size and out_buffer remains unusable as a message. On other failures and
@@ -165,8 +178,9 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
  * @brief Calculate variable storage required to decode one complete message.
  *
  * @details The future implementation validates the complete encoded envelope
- * and body without publishing typed output, rejects missing/trailing bytes, and
- * totals storage required for every decoded array and byte span using checked
+ * and body without publishing typed output, accepts only the compiled-in
+ * Application protocol version, rejects missing/trailing bytes, and totals
+ * storage required for every decoded array and byte span using checked
  * arithmetic. The reported value is the required usable byte capacity assuming
  * storage begins at HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT. The query never
  * mutates context or input.
@@ -181,6 +195,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
  * @retval HIL_APPLICATION_STATUS_MALFORMED_MESSAGE Invalid envelope/body.
  * @retval HIL_APPLICATION_STATUS_TRUNCATED_MESSAGE Declared bytes are missing.
  * @retval HIL_APPLICATION_STATUS_INVALID_LENGTH Length arithmetic inconsistent.
+ * @retval HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE Version is incompatible.
  * @retval HIL_APPLICATION_STATUS_UNINITIALIZED Invalid context.
  * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Current intentional stub.
  */
@@ -194,10 +209,11 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
  *
  * @details Transport must supply exactly one complete reassembled Application
  * message. The future implementation validates envelope/type/subtype/test-ID
- * presence and exact length, calculates/reserves caller decode storage, copies
- * variable arrays and byte spans, decodes fixed tick arrays directly into the
- * typed output, decodes the selected union body, rejects trailing or missing
- * bytes, and publishes out_message only after complete success.
+ * presence, compiled-in Application protocol version, and exact length;
+ * calculates/reserves caller decode storage; copies variable arrays and byte
+ * spans; decodes fixed tick arrays directly into the typed output; decodes the
+ * selected union body; rejects trailing or missing bytes; and publishes
+ * out_message only after complete success.
  *
  * Variable pointers in out_message point into decode_storage and remain valid
  * until the caller modifies/releases that region. No pointer references
@@ -232,6 +248,7 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
  * @retval HIL_APPLICATION_STATUS_OK Message fully decoded.
  * @retval HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL Decode workspace insufficient.
  * @retval HIL_APPLICATION_STATUS_INVALID_ARGUMENT Invalid pointer combination.
+ * @retval HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE Version is incompatible.
  * @retval HIL_APPLICATION_STATUS_UNINITIALIZED Invalid context.
  * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Current intentional stub.
  * @return Other codec statuses documented by Decode_Storage_Size.
@@ -286,10 +303,11 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
  * @brief Structurally validate one complete encoded Application message.
  *
  * @details Future validation safely parses without publishing typed output,
- * checks exact encoded length and all internal declarations, rejects trailing
- * or missing bytes, and reports decode storage required for valid content. It
- * does not mutate context, consume Transport data, enforce sender/transaction
- * policy, or perform integration-workflow or hardware semantic validation.
+ * accepts only the compiled-in Application protocol version, checks exact
+ * encoded length and all internal declarations, rejects trailing or missing
+ * bytes, and reports decode storage required for valid content. It does not
+ * mutate context, consume Transport data, enforce sender/transaction policy, or
+ * perform integration-workflow or hardware semantic validation.
  *
  * @param[in] context Successfully initialized context.
  * @param[in] encoded_message Complete message bytes; NULL only when size is zero.
@@ -299,6 +317,7 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
  * @retval HIL_APPLICATION_STATUS_OK Encoded message is structurally valid.
  * @retval HIL_APPLICATION_STATUS_UNINITIALIZED Invalid context.
  * @retval HIL_APPLICATION_STATUS_INVALID_ARGUMENT Invalid pointer combination.
+ * @retval HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE Version is incompatible.
  * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Current intentional stub.
  * @return A specific malformed, truncated, type, subtype, length, or count status.
  */

@@ -1,6 +1,6 @@
 /**
  * @file application_result.h
- * @brief Fixed test-result and variable result-data message bodies.
+ * @brief Firmware-to-Python fixed and variable result message bodies.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_RESULT_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_RESULT_H
@@ -22,16 +22,25 @@ extern "C"
  */
 typedef enum
 {
-    /** No execution problem is reported for this tick. */
+    /**
+     * Every configured fixed capture is valid and every declaration identifies
+     * valid variable result data that follows this result.
+     */
     HIL_APPLICATION_RESULT_CONDITION_OK = 0,
-    /** Some data for this tick is valid; declarations name valid data to follow. */
+    /**
+     * Every configured fixed capture is valid, but one or more requested
+     * variable communication captures failed or are incomplete. Declarations
+     * identify only valid variable result data that follows this result.
+     */
     HIL_APPLICATION_RESULT_CONDITION_PARTIAL = 1,
     /**
-     * Execution or capture did not produce valid fixed values for this tick.
+     * At least one configured fixed capture cannot be trusted for this tick.
      *
-     * Every fixed captured-value field remains present for structural
-     * consistency but is semantically invalid and must be ignored. This does
-     * not replace an Application Error sent when the problem is detected.
+     * The complete set of fixed captured-value fields remains present for
+     * structural consistency but is semantically invalid and must be ignored.
+     * Declarations may still identify valid variable result data that follows.
+     * This condition does not replace an Application Error sent when the
+     * problem is detected.
      */
     HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM = 2,
     /** Reserved sentinel. */
@@ -39,7 +48,7 @@ typedef enum
 } HIL_Application_Result_Condition_T;
 
 /**
- * @brief One fixed HIL-RIG-to-host Test Result body.
+ * @brief One fixed firmware-to-Python Test Result body.
  *
  * @details The enclosing message carries the test ID. After a successfully
  * started test configured with expected_tick_count N, firmware produces exactly
@@ -59,22 +68,36 @@ typedef enum
  * tick rate. Multi-sample/higher-rate analogue capture is deferred.
  *
  * Firmware encodes deterministic zero values for fixed capture channels that
- * are disabled or not configured, and Python treats those elements as
- * semantically invalid. For EXECUTION_PROBLEM, Python ignores every fixed
- * captured-value field even though the fields remain present. Such a result has
- * no variable declarations unless valid variable data actually exists. PARTIAL
- * means some data for this specific tick is valid; its declarations identify
- * only valid variable messages that will follow.
+ * are disabled or not configured, and Python ignores those elements. Their
+ * presence does not cause PARTIAL or EXECUTION_PROBLEM. OK means every
+ * configured fixed capture is valid and every declaration identifies valid
+ * variable data. PARTIAL means every configured fixed capture remains valid,
+ * but one or more requested variable communication captures failed or are
+ * incomplete; declarations identify only the valid variable messages that
+ * follow. If any configured fixed capture cannot be trusted, firmware uses
+ * EXECUTION_PROBLEM. Python then ignores the complete set of fixed values;
+ * declarations may still identify valid variable data. The initial protocol
+ * cannot express selective validity among fixed digital, analogue, or PWM
+ * fields.
  *
  * Each declaration has nonzero byte_length and a unique (peripheral, channel)
  * pair within the fixed result. It identifies exactly one complete variable
- * result message; duplicate matching messages are invalid. Transport
- * fragmentation remains invisible.
+ * result message; duplicate matching messages are invalid. For tick T,
+ * firmware sends this fixed result first and then sends every declared variable
+ * result in declaration order. It completes all declarations before sending
+ * the fixed result for tick T + 1. Fixed results are sent in increasing order
+ * from tick 0 through N - 1, and variable data never precedes its declaring
+ * fixed result. Transport fragmentation remains invisible.
  *
  * For a test with N ticks, host integration considers result transfer complete
  * only after decoding every fixed result for ticks 0 through N - 1 and every
  * variable result declared by those fixed messages. The codec does not track
- * that progress. The initial protocol has no result-finalization or
+ * that progress. Result messages have no Application Response or
+ * Application-level stop-and-wait acknowledgement. Transport owns delivery
+ * acknowledgement and retransmission. Early execution failure and an optional
+ * Application Error do not replace or reorder the required result set. Future
+ * pipelining, interleaving, ranges, or out-of-order result delivery require a
+ * versioned extension. The initial protocol has no result-finalization or
  * result-summary message.
  */
 typedef struct
@@ -106,7 +129,8 @@ typedef struct
  * @brief Complete variable result-data body for one tick/channel.
  *
  * @details Correlation and caller decode-storage ownership match variable
- * instruction data.
+ * instruction data. Firmware sends each message after the fixed result that
+ * declares it, in declaration order, before sending the next fixed result.
  */
 typedef HIL_Application_Peripheral_Data_T HIL_Application_Variable_Result_Data_T;
 

@@ -2,9 +2,11 @@
  * @file application_system_info.h
  * @brief Minimal System Information request and response bodies.
  *
- * @details System Information is diagnostic Application data, normally sent as
- * a host request and HIL-RIG response. It is not associated with a test ID.
- * Capability negotiation and extensible feature discovery remain deferred.
+ * @details System Information Request is Python to firmware and System
+ * Information Response is firmware to Python. Neither is associated with a Test
+ * ID. The codec is direction-neutral; endpoint handlers enforce these
+ * directions after decoding. Capability negotiation and extensible feature
+ * discovery remain deferred.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_SYSTEM_INFO_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_SYSTEM_INFO_H
@@ -34,7 +36,7 @@ typedef enum
     HIL_APPLICATION_SYSTEM_INFO_QUERY_RESERVED = 255
 } HIL_Application_System_Info_Query_T;
 
-/** Host-to-HIL-RIG System Information request body. */
+/** Python-to-firmware System Information request body. */
 typedef struct
 {
     /** Requested diagnostic record; initially only BASIC is defined. */
@@ -48,11 +50,12 @@ typedef struct
 } HIL_Application_System_Info_Request_T;
 
 /**
- * @brief HIL-RIG-to-host System Information response body.
+ * @brief Firmware-to-Python System Information response body.
  *
- * @details Version fields are diagnostics rather than a complete compatibility
- * negotiation mechanism. git_hash and diagnostic_data are borrowed during
- * encoding and point into caller decode storage after successful decoding.
+ * @details Version fields are diagnostics rather than a compatibility
+ * negotiation mechanism. They do not select or change the codec's compiled-in
+ * Application protocol version. git_hash and diagnostic_data are borrowed
+ * during encoding and point into caller decode storage after successful decoding.
  * Integration may expose firmware-specific runtime diagnostics in
  * diagnostic_data, but those bytes do not define a shared protocol or firmware
  * state machine. Precise text/binary conventions and maximum wire lengths
@@ -60,9 +63,9 @@ typedef struct
  */
 typedef struct
 {
-    /** Application protocol major version reported by the peer. */
+    /** Diagnostic Application protocol major version reported by the peer. */
     uint16_t application_protocol_major;
-    /** Application protocol minor version reported by the peer. */
+    /** Diagnostic Application protocol minor version reported by the peer. */
     uint16_t application_protocol_minor;
     /** Firmware semantic-version major component. */
     uint16_t firmware_version_major;

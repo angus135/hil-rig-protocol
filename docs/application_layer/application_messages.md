@@ -29,7 +29,29 @@ delivery. Application correlation uses Test ID when applicable, Response scope,
 tick number, peripheral/channel, and the relevant control command. A Transport
 ACK confirms byte/frame delivery; an Application Response separately confirms a
 semantic outcome. Initial instruction upload uses stop-and-wait at tick
-granularity rather than an Application sequence field.
+granularity rather than an Application sequence field. More generally, Python
+serializes response-requiring operations so identical requests and Responses
+cannot become ambiguous; the codec stores no request identity or outstanding
+operation.
+
+The eventual common wire envelope must identify the Application protocol
+version. Its complete layout, fields, widths, byte order, and serialization
+remain undefined in this PR.
+
+### Compiled-in codec version
+
+The MVP library defines `HIL_APPLICATION_PROTOCOL_VERSION_MAJOR == 1` and
+`HIL_APPLICATION_PROTOCOL_VERSION_MINOR == 0`. Encoding always produces this
+compiled-in version, and decoding accepts only this version. An incompatible
+version produces `HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE`.
+
+Callers cannot select or negotiate another version through codec configuration,
+context, typed messages, or individual calls. System Information version fields
+are diagnostic only and do not negotiate or change the codec version. Python
+must not proceed with Test Configuration or execution after detecting an
+incompatible Application version. Multi-version encoding, backward-compatible
+decoding, and minor-version compatibility rules are deferred to a future
+versioned API.
 
 ### Message type identifiers
 
@@ -93,7 +115,7 @@ Presence rules:
 "Protocol prerequisite" is a cross-message integration rule. Codec functions
 do not retain a transaction and therefore do not enforce it.
 
-| Message | Normal sender | Normal receiver | Correlation | Protocol prerequisite | Response/effect |
+| Message | Sender | Receiver | Correlation | Protocol prerequisite | Response/effect |
 | --- | --- | --- | --- | --- | --- |
 | System Information Request | Python | Firmware | No Test ID | None | System Information Response |
 | System Information Response | Firmware | Python | No Test ID | Matching request as defined by integration | Diagnostic data only; no transaction effect |
@@ -103,10 +125,15 @@ do not retain a transaction and therefore do not enforce it.
 | Execution Control START | Python | Firmware | Accepted Test ID and START | Complete Test `ACCEPTED` | Execution-Control Response reports actual operation outcome |
 | Execution Control ABORT | Python | Firmware | Identified active Test ID and ABORT | Matching active transaction/operation | `COMPLETED` prevents previous transaction continuing normally |
 | Global Control RESET_APPLICATION | Python | Firmware | No Test ID | None | `COMPLETED` clears active Application transaction data/conditions; Transport unchanged |
-| Test Result | Firmware | Python | Accepted Test ID and tick | START completed; execution completed or stopped early and result set is available | Exactly one fixed result for every configured tick; no per-result Response |
-| Variable Result Data | Firmware | Python | Test ID, tick, peripheral, channel | Matching declaration in fixed result | No per-result Response in initial model |
-| Application Response | Usually firmware | Usually Python | Scope-dependent | A correlated request/data acceptance decision | Carries semantic outcome and transaction effect |
-| Application Error | Usually firmware | Usually Python | Optional Test ID/tick | Broader fault rather than one request rejection | Integration-dependent recovery |
+| Test Result | Firmware | Python | Accepted Test ID and tick | START completed; execution completed or stopped early and result set is available | Exactly one fixed result for every configured tick in increasing order; no per-result Response |
+| Variable Result Data | Firmware | Python | Test ID, tick, peripheral, channel | Matching preceding declaration in the current fixed result | Sent in declaration order before the next fixed result; no per-result Response |
+| Application Response | Firmware | Python | Scope-dependent | A correlated request/data acceptance decision | Carries semantic outcome and transaction effect |
+| Application Error | Firmware | Python | Optional Test ID/tick | Broader fault rather than one request rejection | Integration-dependent recovery |
+
+These directions are normative. The codec remains direction-neutral and
+stateless: encoding or decoding a structurally valid message does not determine
+which endpoint is using it. Firmware and Python handlers enforce direction
+after decoding. `HIL_Application_Context_T` contains no endpoint role.
 
 ## Decode storage alignment
 
@@ -213,8 +240,9 @@ flag requesting an optional firmware Git hash.
 diagnostics, firmware semantic version, optional Git hash bytes, and optional
 diagnostic bytes. Firmware-specific state may appear as opaque diagnostic data,
 but it does not define a shared protocol or firmware state machine. Hash and
-diagnostic schemas, limits, capability discovery, and negotiation remain
-deferred.
+diagnostic schemas, limits, and capability discovery remain deferred. Reported
+versions do not negotiate or select the codec version; Python does not proceed
+with configuration or execution after detecting incompatibility.
 
 ## Test Configuration
 
@@ -397,20 +425,31 @@ ticks, firmware produces exactly one fixed Test Result for every tick `0..N-1`.
 
 Problems detected while executing are Application Error messages. A non-OK
 fixed-result condition records that tick's result quality. An Error may be sent
-when a problem is detected, but it never replaces the complete fixed result set.
+when a problem is detected, but it never replaces or reorders the complete fixed
+result set.
 
-If execution stops or fails before all ticks execute, firmware still produces a
-fixed result for every remaining tick. A tick without valid execution/capture
-data uses `EXECUTION_PROBLEM`; its captured-value fields remain structurally
-present but are semantically invalid and Python ignores them. It has no variable
-declarations unless valid variable data exists. Fixed capture channels disabled
-or absent from configuration are encoded as deterministic zero and ignored by
-Python. Fixed fields in an `EXECUTION_PROBLEM` result are likewise ignored.
+The MVP conditions have exact meanings:
 
-`PARTIAL` means some data for that specific tick is valid. Its declarations
-identify only the valid variable data that will follow. Without a declaration,
-no empty variable-result message is sent. No validity masks or additional
-capture messages are introduced.
+- `OK`: every configured fixed capture represented by the result is valid;
+  every variable declaration identifies valid variable data that follows.
+- `PARTIAL`: every configured fixed capture remains valid, but one or more
+  requested variable communication captures failed or are incomplete;
+  declarations identify only the valid variable results that follow.
+- `EXECUTION_PROBLEM`: the complete set of fixed captured values is semantically
+  invalid and Python ignores it. Valid variable data may still be declared if
+  any exists.
+
+If any configured fixed capture cannot be trusted, firmware uses
+`EXECUTION_PROBLEM`. The MVP cannot represent selective validity among fixed
+digital, analogue, or PWM fields. If execution stops or fails before all ticks
+execute, firmware still produces a fixed result for every remaining tick; ticks
+without valid fixed execution/capture data use `EXECUTION_PROBLEM`.
+
+Fixed capture channels disabled or absent from configuration are encoded as
+deterministic zero and ignored by Python. Their presence alone causes neither
+`PARTIAL` nor `EXECUTION_PROBLEM`. Without a declaration, no empty variable-
+result message is sent. No validity masks or additional capture messages are
+introduced.
 
 ## Variable Result Data and completion
 
@@ -424,6 +463,14 @@ Each fixed-result declaration has nonzero length and a unique
 Variable Result Data message correlated by Test ID, tick, peripheral, and
 channel. Duplicate matching variable messages are invalid.
 
+Firmware sends fixed Test Results in increasing tick order from 0 through
+N - 1. For tick T, it sends the fixed result first and then every declared
+Variable Result Data message in declaration order. It completes all declared
+variable results before sending the fixed result for tick T + 1. A variable
+result never precedes its declaring fixed result. Early execution failure does
+not change this ordering, and an Application Error neither replaces nor
+reorders the required sequence.
+
 For a test with N ticks, Python considers result transfer complete only after
 successfully decoding every fixed Test Result for ticks `0..N-1` and every
 variable message declared by those results.
@@ -432,21 +479,23 @@ Firmware considers all result messages handed off according to its surrounding
 Transport integration after every complete encoded result message has been
 accepted for delivery. Whether retained results wait for a Transport delivery
 acknowledgement is firmware/Transport policy. Application defines no simultaneous
-endpoint state change, per-result Response, result-finalization message, or
-result-summary message.
+endpoint state change, per-result Response, Application-level stop-and-wait
+acknowledgement, result-finalization message, or result-summary message.
+Transport owns acknowledgement, retransmission, and fragmentation.
 
 Transport/session loss, reset, or inability to communicate is the exception:
 the complete set cannot be guaranteed and integration reports recovery is
 required. Result ranges, resume after reconnect, Application-level
 retransmission, higher-rate/multi-sample analogue capture, and result summaries
-are deferred.
+are deferred. Future result pipelining, interleaving, ranges, or out-of-order
+delivery require a versioned extension.
 
 ## Application Response
 
 - Type: `RESPONSE`
 - Subtype: `NONE`
 - Test ID: required for test scopes; forbidden for Global Control scope
-- Direction: primarily firmware to Python
+- Direction: firmware to Python
 
 `HIL_Application_Response_T` contains:
 
@@ -481,12 +530,27 @@ the current fixed-plus-variable tick may await semantic acceptance. Later ticks
 are not submitted until the current Tick Response is `ACCEPTED`; later delivery
 of messages for an invalidated outstanding tick does not revive the upload.
 
+The initial protocol has no Application request ID or sequence number. Python
+may have only one response-requiring operation outstanding at a time. A fixed
+Test Instruction and all of its Variable Instruction Data collectively count as
+one Tick operation. While awaiting a Response, Python does not repeat an
+indistinguishable System Information Request, Test Configuration, START, ABORT,
+or RESET_APPLICATION request. After the final Tick Response, automatic
+whole-test validation remains outstanding until its Complete Test Response;
+Python receives that Response before submitting START.
+
+If Transport/session failure makes the operation's outcome uncertain, Python
+enters recovery rather than blindly retrying. Once it explicitly abandons that
+operation, it may send RESET_APPLICATION and ignores any subsequently received
+Response for the abandoned operation. This serialization is implemented by
+endpoint integration and adds no request tracking to the codec context.
+
 ## Application Error
 
 - Type: `ERROR`
 - Subtype: `NONE`
 - Test ID: optional
-- Direction: primarily firmware to Python
+- Direction: firmware to Python
 
 Initial categories are Hardware, Execution, Timeout, Retained Data, Protocol,
 and Internal. A test-specific error carries the Test ID when known; a global
@@ -504,6 +568,7 @@ recovery and internal state transitions.
 
 Future typed and encoded codec validation checks:
 
+- the encoded envelope uses the compiled-in Application protocol version;
 - valid supported type and correct subtype;
 - exact type/scope-specific test-ID presence;
 - selected union member;
@@ -673,12 +738,31 @@ Transport remains connected and is not reset
 
 ```text
 Firmware execution for A completes and results become available
-Firmware -> Python: Test Result(A, tick 0, declares CAN0 length 8)
+Firmware -> Python: Test Result(A, tick 0, OK,
+                                declares CAN0 length 8 then UART1 length 3)
 Firmware -> Python: Variable Result Data(A, tick 0, CAN0, 8 bytes)
-...fixed results for every tick and every declared variable result...
+Firmware -> Python: Variable Result Data(A, tick 0, UART1, 3 bytes)
+Only after tick 0 variable results:
+Firmware -> Python: Test Result(A, tick 1, OK, no declarations)
+...fixed results continue in increasing order through tick N-1...
 Python successfully decodes the complete set for ticks 0..N-1
 Python considers result transfer complete
 Firmware releases retained results according to its Transport/storage policy
+```
+
+No Application Response is sent for any result message. A variable result never
+precedes its declaring fixed result, and Transport ACKs do not change the
+Application ordering contract.
+
+### Partial variable capture with valid fixed captures
+
+```text
+Firmware has valid configured digital, analogue and PWM captures for tick T
+One requested SPI capture failed; a requested CAN capture is valid
+Firmware -> Python: Test Result(A, tick T, PARTIAL, declares only CAN0)
+Firmware -> Python: Variable Result Data(A, tick T, CAN0, declared bytes)
+Python treats every configured fixed capture as valid
+Python does not expect a variable result for the failed SPI capture
 ```
 
 ### Early execution failure with deterministic remaining results
@@ -694,6 +778,41 @@ Firmware -> Python: Test Result(A, tick 2, EXECUTION_PROBLEM,
 Python decodes all 3 fixed results and all declared variable data
 Python considers normal result transfer complete despite the reported problem
 ```
+
+The optional Error does not replace a fixed result or permit tick 2 to be sent
+before tick 1. If valid variable data exists for an `EXECUTION_PROBLEM` tick, it
+is declared and sent after that fixed result in declaration order.
+
+### Serialized response-requiring operations
+
+```text
+Python -> Firmware: System Information Request
+Python waits; it does not repeat that indistinguishable request
+Firmware -> Python: System Information Response
+Python -> Firmware: Test Configuration(A)
+Firmware -> Python: Response(Configuration, ACCEPTED, A)
+...Python uploads ticks one at a time...
+Python waits for Response(Complete Test, ACCEPTED, A)
+Only then does Python -> Firmware: Execution Control(START, A)
+```
+
+If Transport loss makes START's outcome uncertain, Python does not blindly
+retry START. It abandons that pending operation, enters recovery, may request
+test-independent RESET_APPLICATION, and ignores a late Response for the
+abandoned START.
+
+### Incompatible Application version
+
+```text
+Library compiled-in Application version is 1.0
+Received envelope identifies an incompatible Application version
+Codec reports HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE
+Python does not submit Test Configuration or START
+Python reports protocol mismatch/recovery required
+```
+
+System Information version diagnostics cannot select or negotiate a different
+encoding version.
 
 ### Transport session loss during upload
 
@@ -711,7 +830,7 @@ Python restarts with Test Configuration and a fresh Test ID B
 
 - final common envelope and body field order;
 - fixed wire widths and byte order;
-- compatibility/version negotiation and unknown-field behavior;
+- final unknown-field behavior;
 - extension-data and diagnostic schemas;
 - communication flag bit assignments;
 - higher-rate or multi-sample analogue capture;
@@ -721,6 +840,9 @@ Python restarts with Test Configuration and a fresh Test ID B
 - upload/result resumption and result ranges;
 - Application-level retransmission;
 - result summary/finalization mechanisms, if ever required;
+- multi-version encoding, backward-compatible decoding, and minor-version
+  compatibility rules;
+- versioned result pipelining, interleaving, and out-of-order delivery;
 - production codec limits;
 - golden wire vectors; and
 - executable codec, firmware, and Python conformance tests.

@@ -389,45 +389,32 @@ Location:
 
 ```text
 include/hil_rig_protocol/version.h
+include/hil_rig_protocol/application/application_types.h
 ```
 
-The protocol should define both:
+The repository distinguishes:
 
-- Library/package version
-- Wire protocol version
+- the library/package version; and
+- the Application protocol version used by the shared message codec.
 
-These are related but not necessarily identical.
+These are related but not necessarily identical. The library version describes
+this repository. The Application protocol version describes the Application
+messages exchanged by the Python and firmware integrations.
 
-The library version describes the version of this repository. The wire protocol version describes the binary format spoken between the Python API and the MCU firmware.
+The MVP Application codec defines
+`HIL_APPLICATION_PROTOCOL_VERSION_MAJOR == 1` and
+`HIL_APPLICATION_PROTOCOL_VERSION_MINOR == 0` in
+`application/application_types.h`. Encoding always produces that compiled-in
+version; decoding accepts only it. System Information reports protocol versions
+for diagnostics and compatibility checking, but it does not negotiate or change
+the codec version. Python must not upload or execute a test after detecting an
+incompatible Application version.
 
 ### TODO
 
-Define final version macros in `version.h`.
-
-Potential structure:
-
-```c
-#define HIL_RIG_PROTOCOL_VERSION_MAJOR 0
-#define HIL_RIG_PROTOCOL_VERSION_MINOR 1
-#define HIL_RIG_PROTOCOL_VERSION_PATCH 0
-
-#define HIL_RIG_PROTOCOL_WIRE_VERSION_MAJOR 0
-#define HIL_RIG_PROTOCOL_WIRE_VERSION_MINOR 1
-```
-
-### TODO
-
-Define compatibility rules.
-
-Recommended behaviour:
-
-```text
-Python API connects to device
-Python API requests firmware/protocol version
-MCU returns supported protocol version
-Python API checks compatibility
-Python API rejects unsupported versions before uploading tests
-```
+Define the final common wire envelope and its version field encoding. The MVP
+supports no caller-selected version, negotiation, multi-version encoding,
+backward-compatible decoding, or minor-version compatibility rules.
 
 ---
 

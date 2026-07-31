@@ -1,6 +1,6 @@
 /**
  * @file application_instruction.h
- * @brief Fixed tick instruction and variable instruction-data bodies.
+ * @brief Python-to-firmware fixed and variable instruction bodies.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_INSTRUCTION_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_INSTRUCTION_H
@@ -16,7 +16,7 @@ extern "C"
 #endif
 
 /**
- * @brief One fixed host-to-HIL-RIG Test Instruction body.
+ * @brief One fixed Python-to-firmware Test Instruction body.
  *
  * @details Each message describes exactly one zero-based tick. The enclosing
  * message carries the test ID. digital_outputs, analog_outputs, and pwm_outputs

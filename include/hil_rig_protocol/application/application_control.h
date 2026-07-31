@@ -1,6 +1,6 @@
 /**
  * @file application_control.h
- * @brief Test-scoped execution and global Application-control message bodies.
+ * @brief Python-to-firmware execution and global-control message bodies.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_CONTROL_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_CONTROL_H
