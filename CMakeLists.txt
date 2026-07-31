@@ -33,8 +33,13 @@ option(HIL_RIG_PROTOCOL_ENABLE_COVERAGE
     OFF
 )
 
+include(src/transport/transport_profiles.cmake)
+
 set(HIL_RIG_PROTOCOL_SOURCES
     src/version.c
+    src/transport/transport.c
+    ${HIL_RIG_PROTOCOL_TRANSPORT_COMMON_SOURCES}
+    ${HIL_RIG_PROTOCOL_TRANSPORT_PROFILE_SOURCES}
 )
 
 add_library(hil_rig_protocol ${HIL_RIG_PROTOCOL_SOURCES})
