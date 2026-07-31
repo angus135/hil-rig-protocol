@@ -7,6 +7,8 @@
  * Responses, and Transport delivery/corruption/connection failures. Transport
  * handles Transport-invalid data before Application decoding and reports
  * session events to integration; it does not synthesize this message.
+ * Application Error direction is firmware to Python. The codec remains
+ * direction-neutral and endpoint handlers enforce this after decoding.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_ERROR_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_ERROR_H

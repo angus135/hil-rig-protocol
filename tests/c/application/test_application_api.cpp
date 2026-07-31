@@ -13,6 +13,40 @@ constexpr std::array<HIL_Application_Control_Command_T, 2u> kInitialExecutionCon
     HIL_APPLICATION_CONTROL_ABORT,
 };
 
+constexpr std::array<HIL_Application_Message_Type_T, 6u> kPythonToFirmwareMessageTypes{
+    HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST,
+    HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION,
+    HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION,
+    HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA,
+    HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL,
+    HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL,
+};
+
+constexpr std::array<HIL_Application_Message_Type_T, 5u> kFirmwareToPythonMessageTypes{
+    HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE,
+    HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT,
+    HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA,
+    HIL_APPLICATION_MESSAGE_TYPE_RESPONSE,
+    HIL_APPLICATION_MESSAGE_TYPE_ERROR,
+};
+
+template <std::size_t LeftSize, std::size_t RightSize> constexpr bool
+DirectionSetsAreDisjoint( const std::array<HIL_Application_Message_Type_T, LeftSize>&  left,
+                          const std::array<HIL_Application_Message_Type_T, RightSize>& right )
+{
+    for ( const auto left_type : left )
+    {
+        for ( const auto right_type : right )
+        {
+            if ( left_type == right_type )
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 HIL_Application_Test_Id_T ExampleTestId()
 {
     HIL_Application_Test_Id_T test_id{};
@@ -82,9 +116,11 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
     messages[1].type        = HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE;
     messages[1].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
     messages[1].has_test_id = 0u;
-    messages[1].body.system_info_response.application_protocol_major = 0u;
-    messages[1].body.system_info_response.application_protocol_minor = 1u;
-    messages[1].body.system_info_response.firmware_version_major     = 1u;
+    messages[1].body.system_info_response.application_protocol_major =
+        HIL_APPLICATION_PROTOCOL_VERSION_MAJOR;
+    messages[1].body.system_info_response.application_protocol_minor =
+        HIL_APPLICATION_PROTOCOL_VERSION_MINOR;
+    messages[1].body.system_info_response.firmware_version_major = 1u;
     messages[1].body.system_info_response.firmware_git_hash =
         HIL_Application_Byte_Span_T{ git_hash.data(), git_hash.size() };
     messages[1].body.system_info_response.diagnostic_data =
@@ -186,6 +222,8 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
 }  // namespace
 
 static_assert( HIL_APPLICATION_TEST_ID_SIZE == 16u );
+static_assert( HIL_APPLICATION_PROTOCOL_VERSION_MAJOR == 1u );
+static_assert( HIL_APPLICATION_PROTOCOL_VERSION_MINOR == 0u );
 static_assert( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT > 0u );
 static_assert( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT >= alignof( std::uint8_t ) );
 static_assert( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT
@@ -218,6 +256,11 @@ static_assert( std::is_standard_layout_v<HIL_Application_Context_T> );
 static_assert( sizeof( HIL_Application_Test_Id_T ) == HIL_APPLICATION_TEST_ID_SIZE );
 static_assert( kInitialExecutionControlCommands.size() == 2u );
 static_assert( HIL_APPLICATION_CONTROL_START != HIL_APPLICATION_CONTROL_ABORT );
+static_assert( kPythonToFirmwareMessageTypes.size() == 6u );
+static_assert( kFirmwareToPythonMessageTypes.size() == 5u );
+static_assert( kPythonToFirmwareMessageTypes.size() + kFirmwareToPythonMessageTypes.size() == 11u );
+static_assert( DirectionSetsAreDisjoint( kPythonToFirmwareMessageTypes,
+                                         kFirmwareToPythonMessageTypes ) );
 
 TEST( ApplicationApiDesign, EveryRequiredMessageFamilyIsConstructible )
 {
@@ -229,4 +272,8 @@ TEST( ApplicationApiDesign, EveryRequiredMessageFamilyIsConstructible )
     EXPECT_EQ( messages[2].body.test_configuration.peripherals[2].value.communication.flags, 0u );
     EXPECT_EQ( messages[5].body.execution_control.flags, 0u );
     EXPECT_EQ( messages[6].body.global_control.flags, 0u );
+    EXPECT_EQ( messages[1].body.system_info_response.application_protocol_major,
+               HIL_APPLICATION_PROTOCOL_VERSION_MAJOR );
+    EXPECT_EQ( messages[1].body.system_info_response.application_protocol_minor,
+               HIL_APPLICATION_PROTOCOL_VERSION_MINOR );
 }

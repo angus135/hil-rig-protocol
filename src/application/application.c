@@ -33,7 +33,9 @@ HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      c
      * after all validation/copying succeeds. Retain no config pointer, allocate
      * no memory, and store no caller buffers, messages, test IDs, ticks,
      * active Test ID, upload/tick/result progress, outstanding declarations,
-     * retention ownership, execution state, statistics, or test data.
+     * retention ownership, execution state, endpoint role, protocol-version
+     * selection, request identity, outstanding operations, statistics, or test
+     * data.
      * Application integration separately owns transaction bookkeeping and must
      * ensure Transport's maximum Application-message size is at least
      * max_encoded_message_size; this codec has no Transport dependency. On

@@ -2,9 +2,10 @@
  * @file application_response.h
  * @brief Application acceptance, rejection, retention, and control outcomes.
  *
- * @details Responses are ordinary complete Application messages, normally
- * HIL-RIG to host. They are distinct from Transport delivery ACKs and local
- * HIL_Application_Status_T values.
+ * @details Responses are firmware-to-Python complete Application messages.
+ * They are distinct from Transport delivery ACKs and local
+ * HIL_Application_Status_T values. The codec is direction-neutral; endpoint
+ * handlers enforce the direction after decoding.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_RESPONSE_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_RESPONSE_H
@@ -137,6 +138,20 @@ typedef enum
  * scope, tick number, and relevant control command rather than a new sequence
  * field. This rule is independent of Transport flow control and firmware
  * execution-manager state.
+ *
+ * More generally, the initial protocol has no Application request ID or
+ * sequence number. Python may have only one response-requiring Application
+ * operation outstanding at a time. While awaiting its Response, it must not
+ * repeat an indistinguishable System Information Request, Test Configuration,
+ * START, ABORT, or RESET_APPLICATION request. After the final Tick Response,
+ * automatic whole-test validation remains outstanding until its Complete Test
+ * Response; Python must receive that Response before submitting START. If
+ * Transport/session failure makes an outcome uncertain, Python enters recovery
+ * instead of blindly retrying. After explicitly abandoning the previous
+ * operation, Python may request RESET_APPLICATION and must ignore a
+ * subsequently received Response for the abandoned operation. These are
+ * endpoint-integration rules; the stateless codec retains no request or
+ * outstanding-operation information.
  *
  * A Response is semantic Application acceptance. It is distinct from a
  * Transport ACK, which confirms reliable byte/frame delivery but says nothing

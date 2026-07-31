@@ -15,11 +15,12 @@ HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Con
      * nonzero expected_tick_count, zero reserved flags, empty unsupported Test
      * Configuration extension_data, and configured bounds. Calculate explicit
      * future envelope/body bytes using checked multiplication/addition/alignment,
-     * including the fixed number of signal elements without serializing C
-     * padding. Return UNSUPPORTED_MESSAGE for nonzero reserved flags or
-     * nonempty unsupported extension_data. Do not use native struct sizes as
-     * wire sizes, mutate or retain context/message, or publish encoded_size
-     * before all validation and arithmetic succeeds.
+     * including the compiled-in Application protocol version and fixed number
+     * of signal elements without serializing C padding. Return
+     * UNSUPPORTED_MESSAGE for nonzero reserved flags or nonempty unsupported
+     * extension_data. Do not use native struct sizes as wire sizes, mutate or
+     * retain context/message, or publish encoded_size before all validation and
+     * arithmetic succeeds.
      */
     if ( encoded_size != NULL )
     {
@@ -42,14 +43,15 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
      * calculate the exact complete-message size with checked arithmetic; report
      * required size without writing when capacity is insufficient; explicitly
      * serialize approved fixed-width envelope/type/subtype/test-ID/body fields
-     * in approved byte order; encode Global Control without a Test ID; encode
-     * every fixed signal array in index/channel order; copy every variable
-     * record/span; reject zero or duplicate declarations/configurations and
-     * invalid initial flags/extensions; and publish output_size only after
-     * complete success. Leave partial bytes unusable, retain no pointer, and
-     * perform no reset, Transport behavior, semantic acceptance, transaction
-     * mutation, test retention, execution-manager interaction, or hardware
-     * behavior.
+     * in approved byte order; write the compiled-in Application protocol
+     * version without caller selection; encode Global Control without a Test
+     * ID; encode every fixed signal array in index/channel order; copy every
+     * variable record/span; reject zero or duplicate
+     * declarations/configurations and invalid initial flags/extensions; and
+     * publish output_size only after complete success. Leave partial bytes
+     * unusable, retain no pointer, and perform no reset, Transport behavior,
+     * semantic acceptance, transaction mutation, test retention,
+     * execution-manager interaction, or hardware behavior.
      */
     if ( output_size != NULL )
     {
@@ -70,7 +72,9 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
 {
     /*
      * TODO: Validate context and complete input pointer-size pair; parse the
-     * future fixed-width envelope safely without reading past input; validate
+     * future fixed-width envelope safely without reading past input; accept
+     * only the compiled-in Application protocol version and return
+     * UNSUPPORTED_MESSAGE for an incompatible version; validate
      * type/subtype/test-ID presence, Global Control correlation rules, exact
      * body fields, fixed tick-array lengths, nonzero/unique variable
      * declarations, unique peripheral configurations, initial flags and
@@ -100,7 +104,9 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
     /*
      * TODO: Validate context, complete input, output, and decode-storage
      * pointer-size pairs; validate exact envelope/body length, type/subtype and
-     * test-ID presence; require every non-NULL decode-storage address to meet
+     * test-ID presence; accept only the compiled-in Application protocol
+     * version and return UNSUPPORTED_MESSAGE for an incompatible version;
+     * require every non-NULL decode-storage address to meet
      * HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT; calculate/reserve aligned
      * storage before publication; decode explicit fixed-width fields in
      * approved byte order; decode Global Control and fixed signal arrays into
@@ -148,15 +154,21 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
      * extension_data, duty/range/count constraints, and checked size arithmetic.
      * Return UNSUPPORTED_MESSAGE for reserved flags or extension data. Do not
      * compare tick_number with an active Test Configuration, match variable
-     * messages across calls, or enforce increasing stop-and-wait upload order.
+     * messages across calls, enforce endpoint direction, serialize outstanding
+     * operations, or enforce increasing stop-and-wait upload order.
      * Integration owns those checks, rejects duplicate variable messages, and
      * invalidates rejected ticks. Integration accepts each complete tick only
      * after taking responsibility for retaining its fixed and declared variable
      * data, automatically performs whole-test validation after all N ticks and
      * data arrive, and makes exactly N fixed results available after a
-     * successfully started test. Early execution failure uses
-     * EXECUTION_PROBLEM for remaining fixed results unless communication/reset
-     * prevents delivery. Do not evaluate retention medium/queue policy,
+     * successfully started test. Firmware integration sends fixed results in
+     * increasing tick order, each followed by its variable results in
+     * declaration order. Early execution failure uses EXECUTION_PROBLEM for
+     * remaining fixed results unless communication/reset prevents delivery.
+     * Result-condition selection and cross-message result ordering are
+     * integration-owned enforcement of the shared transaction contract, not
+     * single-message structural validation. Do not evaluate retention
+     * medium/queue policy,
      * firmware electrical/hardware/execution-manager policy, execute
      * recovery/control, mutate anything, or retain a pointer.
      */
@@ -172,8 +184,10 @@ HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
 {
     /*
      * TODO: Safely parse one complete message without publishing typed data;
-     * validate future envelope/version, type/subtype/test-ID presence including
-     * Global Control rules, exact fixed-array and body lengths,
+     * validate the future envelope and accept only the compiled-in Application
+     * protocol version, returning UNSUPPORTED_MESSAGE for an incompatible
+     * version; validate type/subtype/test-ID presence including Global Control
+     * rules, exact fixed-array and body lengths,
      * enum/count/channel/declaration relationships including nonzero and unique
      * declarations/configurations, initial zero flags/empty extension data, and
      * configured bounds; reject missing and trailing bytes; calculate variable

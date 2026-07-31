@@ -54,7 +54,7 @@ typedef enum
     /** An element count is invalid or exceeds configured policy. */
     HIL_APPLICATION_STATUS_INVALID_COUNT = 9,
 
-    /** The message is well formed but not supported by this library version. */
+    /** Message feature or Application protocol version is unsupported. */
     HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE = 10,
 
     /** Test-ID presence is inconsistent with the selected message structure. */

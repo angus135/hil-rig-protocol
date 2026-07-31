@@ -21,6 +21,12 @@ extern "C"
 /** Number of opaque bytes in every HIL-RIG test identifier. */
 #define HIL_APPLICATION_TEST_ID_SIZE ( 16u )
 
+/** Compiled-in Application protocol major version produced and accepted. */
+#define HIL_APPLICATION_PROTOCOL_VERSION_MAJOR ( 1u )
+
+/** Compiled-in Application protocol minor version produced and accepted. */
+#define HIL_APPLICATION_PROTOCOL_VERSION_MINOR ( 0u )
+
 /**
  * @brief Minimum alignment required for caller-provided decode storage.
  *
@@ -230,11 +236,14 @@ typedef struct
  * @brief One captured PWM input measurement at its fixed array index.
  *
  * @details Array index i identifies external HIL-RIG PWM_INPUT channel i. A
- * zero period reports that no valid capture was recorded for this tick.
+ * disabled or unconfigured channel is encoded as deterministic zero and
+ * ignored by Python. For configured channels, the enclosing result condition
+ * determines validity for the complete fixed capture set; there is no
+ * per-channel validity representation in the initial protocol.
  */
 typedef struct
 {
-    /** Captured period in nanoseconds; zero indicates no valid capture. */
+    /** Captured period in nanoseconds; zero for disabled/unconfigured input. */
     uint32_t period_nanoseconds;
     /** Captured duty in 1/10000 units; values above 10000 are invalid. */
     uint16_t duty_cycle_permyriad;
@@ -296,7 +305,9 @@ typedef struct
  * upload is complete. Firmware and host Application logic own those tasks.
  *
  * Zero disables the corresponding capacity until integration deliberately
- * configures it. This design does not invent production defaults.
+ * configures it. This design does not invent production defaults. Configuration
+ * does not select an Application protocol version; encoding and decoding use
+ * the library's compiled-in version.
  */
 typedef struct
 {
@@ -332,8 +343,10 @@ typedef struct
  * initialization. It does not retain caller storage, messages, encoded output,
  * decode storage, an active Test ID, upload/tick progress, outstanding variable
  * declarations, retained ticks, result-transfer progress, storage ownership,
- * execution state, or statistics. Per-call input/output pointers are borrowed
- * only for their documented synchronous call.
+ * execution state, endpoint role, protocol-version selection, Application
+ * request identity, outstanding operations, or statistics. Per-call
+ * input/output pointers are borrowed only for their documented synchronous
+ * call.
  *
  * Fields are exposed so firmware and bindings may allocate the context without
  * heap allocation or a private-size query, but remain library-private. Callers

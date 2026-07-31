@@ -254,11 +254,15 @@ void CompileSuccessfulResultConformanceScenario()
 {
     const HIL_Application_Test_Id_T    test_a = ExampleTestId( 0x41u );
     const std::array<std::uint8_t, 4u> can_bytes{ 0x10u, 0x20u, 0x30u, 0x40u };
+    const std::array<std::uint8_t, 3u> uart_bytes{ 0x50u, 0x60u, 0x70u };
 
-    HIL_Application_Data_Declaration_T result_declaration{};
-    result_declaration.channel.peripheral = HIL_APPLICATION_PERIPHERAL_CAN;
-    result_declaration.channel.channel    = 0u;
-    result_declaration.byte_length        = can_bytes.size();
+    const std::array<HIL_Application_Data_Declaration_T, 2u> result_declarations{
+        HIL_Application_Data_Declaration_T{
+            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_CAN, 0u }, can_bytes.size() },
+        HIL_Application_Data_Declaration_T{
+            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 1u },
+            uart_bytes.size() },
+    };
 
     HIL_Application_Message_T fixed_result_0{};
     fixed_result_0.type                         = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
@@ -268,8 +272,8 @@ void CompileSuccessfulResultConformanceScenario()
     fixed_result_0.body.test_result.tick_number = 0u;
     fixed_result_0.body.test_result.analog_inputs[0].microvolts = 125000;
     fixed_result_0.body.test_result.analog_inputs[1].microvolts = 250000;
-    fixed_result_0.body.test_result.variable_data               = &result_declaration;
-    fixed_result_0.body.test_result.variable_data_count         = 1u;
+    fixed_result_0.body.test_result.variable_data               = result_declarations.data();
+    fixed_result_0.body.test_result.variable_data_count         = result_declarations.size();
     fixed_result_0.body.test_result.condition = HIL_APPLICATION_RESULT_CONDITION_OK;
 
     HIL_Application_Message_T variable_result_0{};
@@ -278,9 +282,19 @@ void CompileSuccessfulResultConformanceScenario()
     variable_result_0.has_test_id = 1u;
     variable_result_0.test_id     = test_a;
     variable_result_0.body.variable_result_data.tick_number = 0u;
-    variable_result_0.body.variable_result_data.channel     = result_declaration.channel;
+    variable_result_0.body.variable_result_data.channel     = result_declarations[0].channel;
     variable_result_0.body.variable_result_data.data =
         HIL_Application_Byte_Span_T{ can_bytes.data(), can_bytes.size() };
+
+    HIL_Application_Message_T variable_result_1{};
+    variable_result_1.type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA;
+    variable_result_1.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    variable_result_1.has_test_id = 1u;
+    variable_result_1.test_id     = test_a;
+    variable_result_1.body.variable_result_data.tick_number = 0u;
+    variable_result_1.body.variable_result_data.channel     = result_declarations[1].channel;
+    variable_result_1.body.variable_result_data.data =
+        HIL_Application_Byte_Span_T{ uart_bytes.data(), uart_bytes.size() };
 
     HIL_Application_Message_T fixed_result_1                    = fixed_result_0;
     fixed_result_1.body.test_result.tick_number                 = 1u;
@@ -289,13 +303,56 @@ void CompileSuccessfulResultConformanceScenario()
     fixed_result_1.body.test_result.variable_data               = nullptr;
     fixed_result_1.body.test_result.variable_data_count         = 0u;
 
-    /* For N=2, host completion requires both fixed results and declared CAN data. */
-    const std::array<HIL_Application_Message_T, 3u> complete_result_set{
+    /*
+     * Shared order for N=2: fixed tick 0, variables in declaration order, then
+     * fixed tick 1. Result messages have no Application Response.
+     */
+    const std::array<HIL_Application_Message_T, 4u> complete_result_set{
         fixed_result_0,
         variable_result_0,
+        variable_result_1,
         fixed_result_1,
     };
     ( void )complete_result_set;
+}
+
+void CompilePartialVariableResultScenario()
+{
+    const HIL_Application_Test_Id_T          test_a = ExampleTestId( 0x43u );
+    const std::array<std::uint8_t, 2u>       valid_can_bytes{ 0x11u, 0x22u };
+    const HIL_Application_Data_Declaration_T valid_can_declaration{
+        HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_CAN, 0u },
+        valid_can_bytes.size(),
+    };
+
+    HIL_Application_Message_T partial_result{};
+    partial_result.type                         = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
+    partial_result.subtype                      = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    partial_result.has_test_id                  = 1u;
+    partial_result.test_id                      = test_a;
+    partial_result.body.test_result.tick_number = 0u;
+    partial_result.body.test_result.digital_inputs[0].high      = 1u;
+    partial_result.body.test_result.analog_inputs[0].microvolts = 125000;
+    partial_result.body.test_result.variable_data               = &valid_can_declaration;
+    partial_result.body.test_result.variable_data_count         = 1u;
+    partial_result.body.test_result.condition = HIL_APPLICATION_RESULT_CONDITION_PARTIAL;
+
+    HIL_Application_Message_T valid_variable_result{};
+    valid_variable_result.type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA;
+    valid_variable_result.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    valid_variable_result.has_test_id = 1u;
+    valid_variable_result.test_id     = test_a;
+    valid_variable_result.body.variable_result_data.tick_number = 0u;
+    valid_variable_result.body.variable_result_data.channel     = valid_can_declaration.channel;
+    valid_variable_result.body.variable_result_data.data =
+        HIL_Application_Byte_Span_T{ valid_can_bytes.data(), valid_can_bytes.size() };
+
+    /* All configured fixed captures remain valid; only failed variable data is omitted. */
+    const std::array<HIL_Application_Message_T, 2u> ordered_partial_result{
+        partial_result,
+        valid_variable_result,
+    };
+    ( void )ordered_partial_result;
 }
 
 void CompileEarlyExecutionFailureResultScenario()
@@ -336,15 +393,93 @@ void CompileEarlyExecutionFailureResultScenario()
     execution_error.body.error.has_tick_number = 1u;
     execution_error.body.error.tick_number     = 1u;
 
-    /* The Error is optional and does not replace fixed results 1 and 2. */
+    /* The Error is optional and does not replace or reorder fixed results 1 and 2. */
     ( void )fixed_results;
     ( void )execution_error;
+}
+
+void CompileSerializedOperationScenario()
+{
+    const HIL_Application_Test_Id_T test_a = ExampleTestId( 0x44u );
+
+    HIL_Application_Message_T system_info_request{};
+    system_info_request.type        = HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST;
+    system_info_request.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
+    system_info_request.has_test_id = 0u;
+    system_info_request.body.system_info_request.query = HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC;
+
+    HIL_Application_Message_T system_info_response{};
+    system_info_response.type        = HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE;
+    system_info_response.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
+    system_info_response.has_test_id = 0u;
+    system_info_response.body.system_info_response.application_protocol_major =
+        HIL_APPLICATION_PROTOCOL_VERSION_MAJOR;
+    system_info_response.body.system_info_response.application_protocol_minor =
+        HIL_APPLICATION_PROTOCOL_VERSION_MINOR;
+
+    HIL_Application_Message_T configuration{};
+    configuration.type        = HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION;
+    configuration.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    configuration.has_test_id = 1u;
+    configuration.test_id     = test_a;
+    configuration.body.test_configuration.tick_duration.nanoseconds = 1000000u;
+    configuration.body.test_configuration.expected_tick_count       = 1u;
+    configuration.body.test_configuration.flags                     = 0u;
+    configuration.body.test_configuration.extension_data =
+        HIL_Application_Byte_Span_T{ nullptr, 0u };
+
+    const HIL_Application_Message_T configuration_accepted = TestResponse(
+        test_a, HIL_APPLICATION_RESPONSE_SCOPE_TEST_CONFIGURATION,
+        HIL_APPLICATION_RESPONSE_OUTCOME_ACCEPTED, HIL_APPLICATION_RESPONSE_REASON_NONE );
+
+    HIL_Application_Message_T tick{};
+    tick.type                              = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
+    tick.subtype                           = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    tick.has_test_id                       = 1u;
+    tick.test_id                           = test_a;
+    tick.body.test_instruction.tick_number = 0u;
+
+    const HIL_Application_Message_T tick_accepted = TestResponse(
+        test_a, HIL_APPLICATION_RESPONSE_SCOPE_TICK, HIL_APPLICATION_RESPONSE_OUTCOME_ACCEPTED,
+        HIL_APPLICATION_RESPONSE_REASON_NONE, 0u );
+    const HIL_Application_Message_T complete_test_accepted = TestResponse(
+        test_a, HIL_APPLICATION_RESPONSE_SCOPE_COMPLETE_TEST,
+        HIL_APPLICATION_RESPONSE_OUTCOME_ACCEPTED, HIL_APPLICATION_RESPONSE_REASON_NONE );
+
+    HIL_Application_Message_T start{};
+    start.type                           = HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL;
+    start.subtype                        = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    start.has_test_id                    = 1u;
+    start.test_id                        = test_a;
+    start.body.execution_control.command = HIL_APPLICATION_CONTROL_START;
+    start.body.execution_control.flags   = 0u;
+    const HIL_Application_Message_T start_completed =
+        TestResponse( test_a, HIL_APPLICATION_RESPONSE_SCOPE_EXECUTION_CONTROL,
+                      HIL_APPLICATION_RESPONSE_OUTCOME_COMPLETED,
+                      HIL_APPLICATION_RESPONSE_REASON_NONE, 0u, HIL_APPLICATION_CONTROL_START );
+
+    /*
+     * Each response-requiring operation completes before the next request.
+     * The automatic Complete Test Response precedes START. No request ID or
+     * Application sequence field is needed by this serialized MVP exchange.
+     */
+    const std::array<HIL_Application_Message_T, 9u> serialized_exchange{
+        system_info_request, system_info_response,   configuration, configuration_accepted, tick,
+        tick_accepted,       complete_test_accepted, start,         start_completed,
+    };
+    ( void )serialized_exchange;
 }
 
 void CompileRecoveryConformanceScenarios()
 {
     const HIL_Application_Test_Id_T invalidated_test = ExampleTestId( 0x51u );
     const HIL_Application_Test_Id_T restarted_test   = ExampleTestId( 0x52u );
+
+    /* A Transport failure made the prior operation uncertain; Python abandons it. */
+    const HIL_Application_Message_T late_abandoned_start_response =
+        TestResponse( invalidated_test, HIL_APPLICATION_RESPONSE_SCOPE_EXECUTION_CONTROL,
+                      HIL_APPLICATION_RESPONSE_OUTCOME_COMPLETED,
+                      HIL_APPLICATION_RESPONSE_REASON_NONE, 0u, HIL_APPLICATION_CONTROL_START );
 
     HIL_Application_Message_T reset{};
     reset.type                        = HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL;
@@ -381,6 +516,8 @@ void CompileRecoveryConformanceScenarios()
     restarted_configuration.body.test_configuration.extension_data =
         HIL_Application_Byte_Span_T{ nullptr, 0u };
 
+    /* RESET is sent only after abandonment; a later prior Response is ignored. */
+    ( void )late_abandoned_start_response;
     ( void )reset;
     ( void )reset_completed;
     ( void )in_flight_rejected;
@@ -398,12 +535,14 @@ TEST( ApplicationFacadeApiDesign, IntentionalStubsRemainExplicit )
 
 TEST( ApplicationFacadeApiDesign, DocumentedTransactionScenariosCompile )
 {
-    const std::array<void ( * )(), 6u> scenarios{
+    const std::array<void ( * )(), 8u> scenarios{
         &CompileCodecFacadeUsage,
         &CompileUploadConformanceScenarios,
         &CompileControlConformanceScenarios,
         &CompileSuccessfulResultConformanceScenario,
+        &CompilePartialVariableResultScenario,
         &CompileEarlyExecutionFailureResultScenario,
+        &CompileSerializedOperationScenario,
         &CompileRecoveryConformanceScenarios,
     };
 
