@@ -1,0 +1,47 @@
+flowchart TD
+
+Caller["Single owning execution context"]
+
+subgraph Startup["Explicit setup"]
+    A["Zero-initialize context<br/>and configuration"]
+    B["HIL_TRANSPORT_Default_Config"]
+    C["Apply caller overrides<br/>including valid host seed"]
+    D["HIL_TRANSPORT_Required_Storage_Size<br/>role-independent validation"]
+    Da["Allocate/retain zeroed context<br/>and aligned workspace"]
+    Db["HIL_TRANSPORT_Init<br/>role-specific validation"]
+end
+
+subgraph Runtime["Caller-driven service loop"]
+    E{"External link changed?"}
+    F["HIL_TRANSPORT_Notify_Link_State"]
+    G{"Session ESTABLISHED and<br/>complete Application message ready?"}
+    H["HIL_TRANSPORT_Submit_Application_Data"]
+    I{"Raw received bytes available?"}
+    J["HIL_TRANSPORT_Receive_Bytes"]
+    Ja{"All bytes consumed?"}
+    Jb["Retain and later retry exact suffix"]
+    K["HIL_TRANSPORT_Process<br/>monotonic time + local Transport mode"]
+    L["HIL_TRANSPORT_Peek_Output"]
+    M{"Complete output available?"}
+    N["Offer opaque bytes to external I/O"]
+    O{"External I/O accepted all bytes?"}
+    P["HIL_TRANSPORT_Commit_Output"]
+    Q["Drain complete Application messages"]
+    R["Drain high-level events and status"]
+end
+
+Caller --> A --> B --> C --> D --> Da --> Db --> E
+E -- Yes --> F --> G
+E -- No --> G
+G -- Yes --> H --> I
+G -- No / NOT_READY --> I
+I -- Yes --> J --> Ja
+I -- No --> K
+Ja -- Yes --> K
+Ja -- No --> Jb --> K
+K --> L --> M
+M -- Yes --> N --> O
+O -- Yes --> P --> L
+O -- No, busy --> Q
+M -- No --> Q
+Q --> R --> E
