@@ -40,6 +40,8 @@ set(HIL_RIG_PROTOCOL_SOURCES
 add_library(hil_rig_protocol ${HIL_RIG_PROTOCOL_SOURCES})
 add_library(hil_rig_protocol::hil_rig_protocol ALIAS hil_rig_protocol)
 
+add_subdirectory(src/application)
+
 target_include_directories(hil_rig_protocol
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

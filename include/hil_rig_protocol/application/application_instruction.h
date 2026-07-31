@@ -1,0 +1,72 @@
+/**
+ * @file application_instruction.h
+ * @brief Fixed tick instruction and variable instruction-data bodies.
+ */
+#ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_INSTRUCTION_H
+#define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_INSTRUCTION_H
+
+#include <stddef.h>
+#include <stdint.h>
+
+#include "hil_rig_protocol/application/application_types.h"
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+/**
+ * @brief One fixed host-to-HIL-RIG Test Instruction body.
+ *
+ * @details Each message describes exactly one zero-based tick. The enclosing
+ * message carries the test ID. digital_outputs, analog_outputs, and pwm_outputs
+ * are inline fixed-size arrays containing the complete state for every physical
+ * HIL-RIG output channel. Index i maps deterministically to logical channel i.
+ * There are no channel IDs, element counts, sparse entries, duplicates, omitted
+ * channels, or implicit "retain the previous value" semantics.
+ *
+ * Each nonzero variable_data declaration requires a following
+ * HIL_Application_Variable_Instruction_Data_T message with matching test ID,
+ * tick, peripheral, channel, and byte count. A zero declaration requires no
+ * following message. The fixed tick is complete only after all declarations are
+ * satisfied and integration accepts responsibility for retaining it. Retention
+ * may use NAND, RAM, or an accepted storage-manager queue; it is not required to
+ * be a completed NAND write. The codec can validate the fixed values and
+ * declaration structure, but only integration with the active Test
+ * Configuration can verify tick order and tick_number < expected_tick_count.
+ * Under the initial transaction contract, rejection of the fixed tick or any
+ * associated variable data invalidates the upload and requires restart from
+ * Test Configuration.
+ */
+typedef struct
+{
+    /** Zero-based tick identity; integration requires 0 <= value < configured N. */
+    uint32_t tick_number;
+    /** Complete digital-output state; element i is DIGITAL_OUTPUT channel i. */
+    HIL_Application_Digital_Output_Value_T
+        digital_outputs[HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT];
+    /** Complete analogue-output state; element i is ANALOG_OUTPUT channel i. */
+    HIL_Application_Analog_Output_Value_T
+        analog_outputs[HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT];
+    /** Complete PWM-output state; element i is PWM_OUTPUT channel i. */
+    HIL_Application_Pwm_Output_Value_T pwm_outputs[HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT];
+    /** Declared UART/SPI/I2C/CAN byte transfers for this tick. */
+    const HIL_Application_Data_Declaration_T* variable_data;
+    /** Number of declarations at variable_data. */
+    size_t variable_data_count;
+} HIL_Application_Test_Instruction_T;
+
+/**
+ * @brief Complete variable instruction-data body for one tick/channel.
+ *
+ * @details This aliases the common correlation/data representation to make the
+ * message family explicit. data contains one complete Application value even
+ * when Transport later fragments its encoded message.
+ */
+typedef HIL_Application_Peripheral_Data_T HIL_Application_Variable_Instruction_Data_T;
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_INSTRUCTION_H */
