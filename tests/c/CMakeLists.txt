@@ -68,3 +68,5 @@ add_test(
     NAME hil_rig_protocol_integration_tests
     COMMAND hil_rig_protocol_integration_tests
 )
+
+add_subdirectory(application)
