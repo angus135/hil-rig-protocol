@@ -24,13 +24,14 @@ typedef enum
 {
     /** No execution problem is reported for this tick. */
     HIL_APPLICATION_RESULT_CONDITION_OK = 0,
-    /** Some capture data is valid but the result is incomplete. */
+    /** Some data for this tick is valid; declarations name valid data to follow. */
     HIL_APPLICATION_RESULT_CONDITION_PARTIAL = 1,
     /**
-     * Reporting-stage summary that execution/capture failed for this tick.
+     * Execution or capture did not produce valid fixed values for this tick.
      *
-     * This does not replace the Application Error sent when the execution
-     * problem is detected.
+     * Every fixed captured-value field remains present for structural
+     * consistency but is semantically invalid and must be ignored. This does
+     * not replace an Application Error sent when the problem is detected.
      */
     HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM = 2,
     /** Reserved sentinel. */
@@ -40,21 +41,41 @@ typedef enum
 /**
  * @brief One fixed HIL-RIG-to-host Test Result body.
  *
- * @details The enclosing message carries the test ID. Firmware may make normal
- * Test Results available after execution completes. Execution-time problems use
- * Application Error instead of ordinary results. The codec documents but does
- * not enforce this transaction prerequisite.
+ * @details The enclosing message carries the test ID. After a successfully
+ * started test configured with expected_tick_count N, firmware produces exactly
+ * one fixed Test Result for every tick 0 through N - 1. If execution stops or
+ * fails early, every remaining tick still has a fixed result with condition
+ * EXECUTION_PROBLEM. An Application Error may report the problem when detected,
+ * but never replaces this complete fixed result set. Transport/session loss,
+ * reset, or inability to communicate is the exception: integration cannot
+ * guarantee completion and reports that recovery is required. The codec
+ * documents but does not enforce these transaction rules.
  *
  * digital_inputs, analog_inputs, and pwm_inputs are inline fixed-size arrays.
  * Index i maps deterministically to logical input channel i; no channel IDs,
- * counts, sparse entries, duplicates, or omitted-channel semantics exist.
- * Variable declarations remain pointer/count data and identify complete result
- * messages that follow. Transport fragmentation remains invisible.
+ * counts, sparse entries, duplicates, or omitted-channel structures exist.
+ * The analogue array has exactly one value slot per physical analogue input;
+ * each configured input contributes one sample in this fixed result at the test
+ * tick rate. Multi-sample/higher-rate analogue capture is deferred.
+ *
+ * Firmware encodes deterministic zero values for fixed capture channels that
+ * are disabled or not configured, and Python treats those elements as
+ * semantically invalid. For EXECUTION_PROBLEM, Python ignores every fixed
+ * captured-value field even though the fields remain present. Such a result has
+ * no variable declarations unless valid variable data actually exists. PARTIAL
+ * means some data for this specific tick is valid; its declarations identify
+ * only valid variable messages that will follow.
+ *
+ * Each declaration has nonzero byte_length and a unique (peripheral, channel)
+ * pair within the fixed result. It identifies exactly one complete variable
+ * result message; duplicate matching messages are invalid. Transport
+ * fragmentation remains invisible.
  *
  * For a test with N ticks, host integration considers result transfer complete
  * only after decoding every fixed result for ticks 0 through N - 1 and every
  * variable result declared by those fixed messages. The codec does not track
- * that progress.
+ * that progress. The initial protocol has no result-finalization or
+ * result-summary message.
  */
 typedef struct
 {
@@ -63,11 +84,11 @@ typedef struct
     /** Complete digital-input state; element i is DIGITAL_INPUT channel i. */
     HIL_Application_Digital_Input_Value_T
         digital_inputs[HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT];
-    /** Complete analogue-input state; element i is ANALOG_INPUT channel i. */
+    /** One tick-rate sample per analogue input; element i is channel i. */
     HIL_Application_Analog_Input_Value_T analog_inputs[HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT];
     /** Complete PWM-input state; element i is PWM_INPUT channel i. */
     HIL_Application_Pwm_Input_Value_T pwm_inputs[HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT];
-    /** Declared UART/SPI/I2C/CAN result transfers. */
+    /** Unique, nonzero UART/SPI/I2C/CAN result transfers. */
     const HIL_Application_Data_Declaration_T* variable_data;
     /** Number of result declarations at variable_data. */
     size_t variable_data_count;

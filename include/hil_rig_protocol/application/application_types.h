@@ -22,6 +22,21 @@ extern "C"
 #define HIL_APPLICATION_TEST_ID_SIZE ( 16u )
 
 /**
+ * @brief Minimum alignment required for caller-provided decode storage.
+ *
+ * @details The value is a C11/C++ constant expression and is sufficient for
+ * every public typed object that the decoder may place in caller storage.
+ * HIL_APPLICATION_Decode_Storage_Size() reports usable byte capacity assuming
+ * the supplied storage begins at this alignment. The requirement is
+ * intentionally independent of the future wire representation.
+ */
+#if defined( __cplusplus )
+#define HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ( alignof( max_align_t ) )
+#else
+#define HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ( _Alignof( max_align_t ) )
+#endif
+
+/**
  * @name Fixed signal-channel counts
  *
  * @details These extents deliberately describe the current physical HIL-RIG
@@ -228,11 +243,16 @@ typedef struct
 /**
  * @brief Declared variable-data transfer associated with one fixed tick.
  *
- * @details A zero byte_length means no following variable-data message exists
- * for this channel. Under the initial protocol design, integration requires a
- * nonzero declaration to have exactly one matching variable instruction/result
- * message; the codec does not track that relationship. Multi-part Application
- * transfers are deferred; Transport fragmentation is transparent.
+ * @details byte_length must be nonzero; a channel with no variable data is
+ * omitted from the declaration array. Within one fixed instruction or result,
+ * each (peripheral, channel) pair may be declared at most once. The future
+ * codec validates those rules from the complete fixed message.
+ *
+ * Under the initial transaction contract, each declaration has exactly one
+ * matching variable instruction/result message. A duplicate variable message
+ * for the same declaration is invalid. Endpoint integration tracks that
+ * cross-message relationship; the stateless codec does not. Multi-part
+ * Application transfers are deferred; Transport fragmentation is transparent.
  */
 typedef struct
 {
@@ -248,7 +268,9 @@ typedef struct
  * @details The enclosing message envelope supplies the test ID. tick_number,
  * channel, and data.size provide Application correlation without a separate
  * sequence number. Encoding borrows data during the call; decoding copies it
- * into caller-provided storage and points data there.
+ * into caller-provided storage and points data there. data.size must be
+ * nonzero because channels without variable data are omitted rather than sent
+ * as empty variable-data messages.
  */
 typedef struct
 {

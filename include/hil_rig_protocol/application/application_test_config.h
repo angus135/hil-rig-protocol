@@ -31,7 +31,7 @@ typedef enum
     HIL_APPLICATION_PERIPHERAL_CONFIG_INVALID = 0,
     /** Digital input/output electrical configuration. */
     HIL_APPLICATION_PERIPHERAL_CONFIG_DIGITAL = 1,
-    /** Analogue input/output range and sampling configuration. */
+    /** Analogue input/output range configuration. */
     HIL_APPLICATION_PERIPHERAL_CONFIG_ANALOG = 2,
     /** PWM generation or capture configuration. */
     HIL_APPLICATION_PERIPHERAL_CONFIG_PWM = 3,
@@ -63,10 +63,15 @@ typedef struct
 } HIL_Application_Digital_Config_T;
 
 /**
- * @brief Analogue channel range and sample configuration.
+ * @brief Analogue channel range configuration.
  *
- * @details Hardware-specific gain, ADC/DAC selection, calibration, and
- * achievable sample rate remain firmware responsibilities.
+ * @details The initial protocol does not select an independent sample rate or
+ * sample count. Each fixed Test Result has one analogue input element per
+ * physical channel; for each configured ANALOG_INPUT it is one sample for that
+ * tick, produced at the configured test tick rate. Hardware-specific gain,
+ * ADC/DAC selection, calibration, and achievable timing remain firmware
+ * responsibilities. Higher-rate or multi-sample capture requires a future
+ * versioned extension.
  */
 typedef struct
 {
@@ -76,10 +81,6 @@ typedef struct
     int32_t minimum_microvolts;
     /** Maximum requested/supported signal in microvolts. */
     int32_t maximum_microvolts;
-    /** Requested capture sample rate in hertz; zero disables periodic capture. */
-    uint32_t sample_rate_hz;
-    /** Maximum samples retained per tick; zero requests no sample series. */
-    uint32_t samples_per_tick;
 } HIL_Application_Analog_Config_T;
 
 /** Protocol-level PWM generation or capture configuration. */
@@ -98,8 +99,10 @@ typedef struct
 /**
  * @brief Protocol-level serial/bus channel configuration.
  *
- * @details flags are family-specific protocol options whose exact bit
- * assignments remain TODO. They must not contain MCU register values.
+ * @details The flags field reserves family-specific protocol options whose
+ * exact bit assignments remain TODO. It must be zero in the initial protocol
+ * and must not contain MCU register values. A nonzero value is structurally
+ * unsupported.
  */
 typedef struct
 {
@@ -107,7 +110,7 @@ typedef struct
     HIL_Application_Channel_Id_T channel;
     /** Requested communication rate in bits per second. */
     uint32_t bit_rate;
-    /** Future protocol option bits; zero requests the base mode. */
+    /** Reserved protocol option bits; must be zero in the initial protocol. */
     uint32_t flags;
     /** Maximum captured bytes per tick; zero disables result capture. */
     size_t capture_limit_bytes;
@@ -116,9 +119,11 @@ typedef struct
 /**
  * @brief Tagged peripheral configuration record.
  *
- * @details type selects exactly one union member. The codec validates tag/member
- * structural consistency but firmware decides channel support and electrical
- * feasibility.
+ * @details type selects exactly one union member. Within one Test
+ * Configuration, each (peripheral, channel) pair may appear at most once;
+ * duplicate records are structurally invalid rather than first-wins or
+ * last-wins. The codec validates tag/member and uniqueness rules, but firmware
+ * decides channel support and electrical feasibility.
  */
 typedef struct
 {
@@ -142,15 +147,15 @@ typedef struct
  * @brief Host-to-HIL-RIG Test Configuration body.
  *
  * @details The enclosing message must carry a test ID and be the first message
- * for that test. expected_tick_count is authoritative: a test with N ticks has
- * exactly ticks 0 through N - 1, uploaded in increasing order. Integration
- * automatically performs whole-test validation after all N fixed instructions
- * and their declared variable data have been accepted; no finalize command is
- * required. Successful whole-test validation produces a Complete Test Response
- * whose ACCEPTED outcome makes the identified test available for a subsequent
- * START request. There is no ARM or FINALIZE_TEST command. The codec can bound
- * expected_tick_count structurally but cannot compare later messages against an
- * active configuration.
+ * for that test. expected_tick_count must be nonzero and is authoritative: a
+ * test with N ticks has exactly ticks 0 through N - 1, uploaded in increasing
+ * stop-and-wait order. Integration automatically performs whole-test validation
+ * after all N fixed instructions and their declared variable data have been
+ * accepted; no finalize command is required. Successful whole-test validation
+ * produces a Complete Test Response whose ACCEPTED outcome makes the identified
+ * test available for a subsequent START request. There is no ARM or
+ * FINALIZE_TEST command. The codec can bound expected_tick_count structurally
+ * but cannot compare later messages against an active configuration.
  *
  * A configuration-scoped ACCEPTED Response creates the active upload
  * transaction. A negative Response creates no transaction; host integration
@@ -160,23 +165,24 @@ typedef struct
  * validation/encoding; after decoding it points into caller-owned decode
  * storage.
  *
- * extension_data reserves an explicitly length-delimited area for test-wide
- * settings approved later. A nonempty extension is unsupported until its
- * schema is versioned; it must not be used to smuggle hardware mappings.
+ * flags must be zero and extension_data must be empty in the initial protocol.
+ * They reserve versioned test-wide settings approved later. A nonzero flag or
+ * nonempty extension produces HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE and
+ * must not be used to smuggle hardware mappings.
  */
 typedef struct
 {
     /** Unit-explicit duration represented by one instruction tick. */
     HIL_Application_Tick_Duration_T tick_duration;
-    /** Exact upload length N, defining valid zero-based ticks 0 through N - 1. */
+    /** Nonzero upload length N, defining valid ticks 0 through N - 1. */
     uint32_t expected_tick_count;
-    /** Future test-wide option bits; zero selects the base behavior. */
+    /** Reserved test-wide option bits; must be zero in the initial protocol. */
     uint32_t flags;
     /** Peripheral/channel configuration records. */
     const HIL_Application_Peripheral_Config_T* peripherals;
     /** Number of readable records at peripherals. */
     size_t peripheral_count;
-    /** Reserved versioned settings bytes; normally empty in the initial API. */
+    /** Reserved versioned settings bytes; must be empty in the initial protocol. */
     HIL_Application_Byte_Span_T extension_data;
 } HIL_Application_Test_Configuration_T;
 

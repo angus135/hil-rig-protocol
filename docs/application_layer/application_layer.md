@@ -85,8 +85,8 @@ Firmware and bindings include:
 | `HIL_APPLICATION_Init` | Validate and copy structural codec bounds into a lightweight context. |
 | `HIL_APPLICATION_Encoded_Size` | Validate typed structure and report exact future encoded size. |
 | `HIL_APPLICATION_Encode_Message` | Produce one complete Application message in caller output. |
-| `HIL_APPLICATION_Decode_Storage_Size` | Validate complete encoded structure and report caller decode workspace. |
-| `HIL_APPLICATION_Decode_Message` | Decode one complete message into typed caller-owned storage. |
+| `HIL_APPLICATION_Decode_Storage_Size` | Validate complete encoded structure and report usable caller decode capacity, assuming the required alignment. |
+| `HIL_APPLICATION_Decode_Message` | Decode one complete message into aligned, caller-owned storage. |
 | `HIL_APPLICATION_Validate_Message` | Perform typed codec-level structural validation. |
 | `HIL_APPLICATION_Validate_Encoded_Message` | Validate complete encoded structure without publishing typed output. |
 
@@ -146,6 +146,11 @@ production limits. A future `Default_Config` initializes every field without
 inventing policy. A future `Init` validates limit relationships and copies the
 configuration without allocation or pointer retention.
 
+Within a Test Configuration, `expected_tick_count` must nevertheless be
+nonzero. Codec configuration limits and message-field validity are separate:
+zero may disable `max_expected_tick_count`, while a Test Configuration accepted
+by a configured codec always carries `expected_tick_count >= 1`.
+
 Fixed GPIO, analogue, and PWM arrays are protocol-sized rather than
 caller-configured. Their named channel counts and deterministic index mappings
 are described in [Application messages](application_messages.md).
@@ -184,6 +189,28 @@ Future decoding copies every variable array/span into caller-owned
 not the encoded input. The Transport receive item can therefore be released
 after successful decode. The codec retains neither pointer.
 
+Non-null decode storage must begin at an address aligned to
+`HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT`. The constant is a C11/C++ constant
+expression sufficient for every public typed object the decoder may place in
+that storage. `HIL_APPLICATION_Decode_Storage_Size` reports required usable byte
+capacity on the assumption that this base alignment is satisfied. A future
+decoder returns `HIL_APPLICATION_STATUS_INVALID_ARGUMENT` for misaligned
+storage; the intentional stubs do not yet perform that runtime check.
+
+C11 callers can declare static storage as:
+
+```c
+_Alignas(HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT)
+static uint8_t decode_storage[2048u];
+```
+
+C++ callers can use:
+
+```cpp
+alignas(HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT)
+static uint8_t decode_storage[2048u];
+```
+
 Decoding a configuration, control, reset, Response, Error, or result never
 accepts data, performs an operation, creates or invalidates a transaction,
 changes firmware state, or generates a reply. Those are endpoint-integration
@@ -208,8 +235,13 @@ The future codec checks:
 - required fields and enum values;
 - every element of fixed GPIO, analogue, and PWM arrays;
 - variable pointer/count and NULL/zero combinations;
+- nonzero, unique variable-data declarations within each fixed tick;
+- unique `(peripheral, channel)` records within a Test Configuration;
 - configured codec bounds;
 - declared-length consistency;
+- nonzero `expected_tick_count`;
+- zero values for every currently reserved `flags` field;
+- empty Test Configuration `extension_data` until a schema is defined;
 - channel-family consistency;
 - checked size arithmetic; and
 - safe decoding without trailing or missing bytes.
@@ -217,6 +249,9 @@ The future codec checks:
 Failures are local `HIL_Application_Status_T` values. They are not serialized as
 Application Responses or Errors. The codec has no active Test Configuration and
 cannot compare a later Test ID/tick against an active transaction.
+
+Nonzero reserved flags and nonempty unsupported Test Configuration extension
+data specifically produce `HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE`.
 
 ### 3. Structurally valid but semantically unacceptable data
 
@@ -257,11 +292,11 @@ The following table replaces any shared protocol-phase or firmware-state model.
 | Exchange | Sender -> receiver | Required correlation | Protocol prerequisite | Successful Response and transaction effect | Rejection/failure and recovery | Integration-owned decisions |
 | --- | --- | --- | --- | --- | --- | --- |
 | Test Configuration | Python -> firmware | Fresh Test ID; no tick | No active upload being continued; exactly one configuration starts a new upload attempt | Configuration `ACCEPTED` creates the active upload transaction for that Test ID | `REJECTED`/`FAILED` creates no transaction; host starts a new upload from Test Configuration with a fresh Test ID | Hardware support, safety, timing, and retention capacity |
-| Test Instruction plus declared Variable Instruction Data | Python -> firmware | Active Test ID, zero-based tick, and peripheral/channel for each variable message | Configuration accepted; ticks sent in increasing order; each nonzero declaration has one separate matching variable message | Tick `ACCEPTED` means the complete fixed-plus-variable tick was validated and accepted for retention, so the host may continue | Any rejected tick or associated variable data invalidates the upload; restart from Test Configuration; in-flight messages may be rejected | Active-ID/tick tracking, completeness, retention mechanism, and cleanup |
+| Test Instruction plus declared Variable Instruction Data | Python -> firmware | Active Test ID, zero-based tick, and peripheral/channel for each variable message | Configuration accepted; tick T - 1 accepted before T is submitted; each unique nonzero declaration has one separate matching variable message | Tick `ACCEPTED` means the complete fixed-plus-variable tick was validated and accepted for retention, so the host may submit tick T + 1 | Any rejected tick or associated variable data invalidates the upload; restart from Test Configuration; remaining messages for that outstanding tick may be rejected and no later tick may already have been submitted | Active-ID/tick tracking, completeness, duplicate-message detection, retention mechanism, and cleanup |
 | Automatic whole-test validation | Firmware -> Python Response | Active Test ID; Complete Test scope; no tick | Every tick `0..N-1` and all declared variable data accepted | Complete Test `ACCEPTED` means the complete test was retained, validated, and is available for a later START request; upload is complete | `REJECTED`/`FAILED` invalidates the transaction; restart from Test Configuration | Whole-test consistency and release of invalid retained data |
 | START | Python -> firmware | Accepted test's Test ID and START command | Complete Test `ACCEPTED` was received for that Test ID | Execution Control START `COMPLETED` means firmware performed the start request | `REJECTED` means execution did not start; `FAILED` requires recovery and the host must not assume execution status | Execution-manager permission, hardware readiness, actual firmware transitions, and whether retry is safe |
 | ABORT | Python -> firmware | Identified active Test ID and ABORT command | A matching upload, accepted test, execution, or result transaction exists | Execution Control ABORT `COMPLETED` means safe stop/abandonment was performed and the previous transaction cannot continue normally; a new upload starts from Test Configuration | `REJECTED` means abort was not performed; `FAILED` requires firmware-specific recovery and no assumed cleanup | Execution-manager transitions, safe stop, retained-data cleanup, and firmware recovery |
-| Test Result plus declared Variable Result Data | Firmware -> Python | Accepted Test ID, zero-based tick, and peripheral/channel for variable messages | Firmware execution completed and corresponding results are available | No initial per-result Application Response; successful decode contributes to host result completion | Structural decode failure is local; protocol mismatch or session loss requires recovery because result resume is undefined | Result availability, ordering/handoff, retention, and release policy |
+| Test Result plus declared Variable Result Data | Firmware -> Python | Accepted Test ID, zero-based tick, and peripheral/channel for variable messages | START completed; firmware execution completed or stopped early and results are available | Exactly one fixed result is produced for every tick `0..N-1`; successful decode of all N fixed results and every declared variable result completes normal transfer | Early execution failure uses `EXECUTION_PROBLEM` fixed results for remaining ticks; session loss, reset, or inability to communicate instead reports recovery required because completion cannot be guaranteed | Capture validity, Error generation, result ordering/handoff, retention, and release policy |
 | RESET_APPLICATION | Python -> firmware | No Test ID; Global Control scope | May be requested independently of a known test | Global Control `COMPLETED` means active Application transaction data and recoverable Application protocol conditions were cleared | `REJECTED`/`FAILED` means the host cannot assume cleanup and must follow firmware recovery policy | Mapping to internal firmware state, cleanup, and whether reset can be completed |
 | Application Error | Usually firmware -> Python | Test ID/tick present only when known and relevant | A broader fault exists rather than rejection of one request | No implicit transaction success; integration interprets category/recoverability | Host follows indicated recovery, commonly ABORT or RESET_APPLICATION | Error generation, firmware state, hardware response, and diagnostics |
 
@@ -274,12 +309,13 @@ The initial contract is:
 3. Firmware structurally decodes it, performs firmware-specific semantic checks,
    and returns a configuration-scoped Response.
 4. Configuration `ACCEPTED` creates the active upload transaction.
-5. The host sends fixed Test Instructions in increasing zero-based tick order.
-6. Each nonzero variable-data declaration is followed by its separately encoded
-   Variable Instruction Data message with matching Test ID, tick, peripheral,
-   and channel.
+5. The host sends the fixed Test Instruction for zero-based tick T.
+6. Each declaration, all of which is nonzero and unique by channel, is followed
+   by its one separately encoded Variable Instruction Data message with matching
+   Test ID, tick, peripheral, and channel.
 7. Firmware returns a Tick Response only after the complete fixed-plus-variable
-   tick was received, validated, and accepted for retention.
+   tick was received, validated, and accepted for retention. The host submits
+   tick T + 1 only after receiving Tick T `ACCEPTED`.
 8. After ticks `0..N-1` and all declared variable data are accepted, firmware
    automatically performs whole-test validation.
 9. Complete Test `ACCEPTED` means the test was retained, validated, and is
@@ -287,11 +323,21 @@ The initial contract is:
 10. The host sends START separately.
 11. Firmware asks its execution manager whether execution can begin, performs
     the request if allowed, and reports the actual outcome.
-12. Firmware may make results available after execution completes.
+12. Firmware makes exactly N fixed results available after execution completes
+    or stops early, using `EXECUTION_PROBLEM` for ticks without valid execution
+    or capture data, except when communication/reset prevents complete transfer.
 
 There is no Begin Upload, ARM, or FINALIZE_TEST command. Test Configuration
 acceptance starts upload; Complete Test acceptance completes upload; START is a
 separate request whose success is never predicted by the codec or host.
+
+Only one tick may await semantic acceptance. Its fixed message and associated
+variable messages collectively form that outstanding tick. Transport ACKs and
+fragmentation remain independent: a Transport ACK confirms reliable frame/byte
+delivery, while Tick `ACCEPTED` confirms semantic acceptance and retention of
+the complete tick. Stop-and-wait is an initial Application transaction rule,
+not Transport state or firmware execution-manager state. Versioned capability
+negotiation may permit future pipelining.
 
 ## Transaction invalidation and recovery
 
@@ -303,9 +349,10 @@ The initial recovery rules are normative:
 - failed whole-test validation invalidates the active transaction;
 - after invalidation, the host must restart from Test Configuration with a fresh
   random Test ID;
-- messages already in flight for the invalidated Test ID may be rejected with
-  `INCONSISTENT_TEST_ID`, `INVALID_TICK`, or `OPERATION_NOT_ALLOWED` as
-  appropriate; and
+- remaining fixed/variable messages for the one outstanding invalidated tick
+  may be rejected with `INCONSISTENT_TEST_ID`, `INVALID_TICK`, or
+  `OPERATION_NOT_ALLOWED` as appropriate; no later tick may already have been
+  submitted; and
 - firmware decides how retained data is released and whether its internal state
   or execution manager needs any recovery action.
 
@@ -338,11 +385,29 @@ reset maps to its own internal state and whether it can be completed.
 
 ## Result-transfer completion
 
-For a test with `N` ticks, the Python host considers result transfer complete
-only after it has successfully decoded:
+After START is successfully completed for a test with `N` ticks, firmware
+produces exactly one fixed Test Result for every tick `0..N-1`. The Python host
+considers normal result transfer complete only after it has successfully
+decoded:
 
 - one fixed Test Result for every tick `0..N-1`; and
 - every Variable Result Data message declared by those fixed results.
+
+If execution stops or fails before all ticks execute, firmware still produces
+the remaining fixed results. Each tick without valid execution/capture data uses
+`HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM`; all fixed captured-value
+fields remain present for structural consistency but are semantically invalid
+and Python ignores them. Such a result declares no variable data unless valid
+variable data actually exists. An Application Error may be sent when the
+problem is detected, but it does not replace any of the N fixed results.
+
+`PARTIAL` means that some data for that specific tick is valid. Its variable
+declarations describe only valid data messages that will follow. Fixed capture
+channels disabled or absent from configuration are encoded deterministically as
+zero and treated as semantically invalid by Python. Each configured analogue
+input contributes exactly one sample per fixed result at the test tick rate.
+There is no independent analogue sample rate, multi-sample result, validity
+mask, result-finalization message, or result-summary message in the MVP.
 
 The host correlates all result messages by Test ID, tick, peripheral, and
 channel. No shared phase transition or simultaneous endpoint state change
@@ -355,21 +420,27 @@ delivery acknowledgement before releasing retained results is Transport and
 firmware policy, not an Application codec rule. The initial Application design
 has no per-result Response or completion message.
 
-Result ranges, resume after reconnect, Application-level retransmission, and
-partial-result recovery remain deferred.
+Transport/session loss, reset, or inability to communicate is the exception to
+the complete-set guarantee. Integration reports recovery is required rather
+than claiming normal completion. Result ranges, resume after reconnect,
+Application-level retransmission, higher-rate analogue capture, result
+summaries, and partial-result recovery remain deferred.
 
 ## Transport session loss
 
 Transport does not directly create, complete, or invalidate Application data.
 It reports session loss/reset to endpoint integration. Under the initial
 Application integration policy, session loss during upload invalidates the
-active upload; in-flight messages may be rejected, and the Python host starts a
-new upload from Test Configuration with a fresh Test ID after reconnect.
+active upload; remaining messages for its one outstanding tick may be rejected,
+and the Python host starts a new upload from Test Configuration with a fresh
+Test ID after reconnect. No later tick may already have been submitted.
 
-If session loss interrupts result transfer, resumption is not defined by this
-version. The client reports recovery is required rather than assuming which
-results firmware retained. `RESET_APPLICATION` remains an Application request
-and does not reset or reconnect Transport.
+If session loss interrupts result transfer, the N-result guarantee cannot be
+met and resumption is not defined by this version. The client reports recovery
+is required rather than assuming which results firmware retained.
+`RESET_APPLICATION` likewise ends any guarantee that a pending complete result
+set can be communicated; it remains an Application request and does not reset or
+reconnect Transport.
 
 ## Future firmware integration
 
@@ -393,6 +464,11 @@ execution manager's authoritative firmware state. This repository must not add
 execution-manager headers, callbacks, state enums, or firmware-specific
 dependencies.
 
+For a successfully started N-tick test, that handler also ensures the result
+transaction contains N fixed results even after early execution failure, plus
+exactly the variable messages declared by those fixed results. This is handler
+bookkeeping around the codec, not mutable codec state.
+
 ## Future Python integration
 
 The intended Python boundary is:
@@ -404,8 +480,9 @@ The intended Python boundary is:
 3. Python submits that message through its Transport integration.
 4. Received complete Application messages are decoded through the same codec.
 5. The client correlates Responses using Test ID, scope, tick, and command.
-6. It tracks client-side progress such as accepted configuration, sent and
-   accepted ticks, Complete Test acceptance, START outcome, and received results.
+6. It tracks client-side progress such as accepted configuration, the one
+   outstanding upload tick, Complete Test acceptance, START outcome, all N fixed
+   results, and every variable result declared by them.
 7. It exposes success, rejection, protocol mismatch, and recovery requirements
    to the API user.
 

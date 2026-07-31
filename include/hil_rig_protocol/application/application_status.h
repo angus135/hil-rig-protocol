@@ -27,7 +27,7 @@ typedef enum
     /** Operation completed successfully. */
     HIL_APPLICATION_STATUS_OK = 0,
 
-    /** A pointer, enum, count, or argument combination is invalid. */
+    /** A pointer, alignment, enum, count, or argument combination is invalid. */
     HIL_APPLICATION_STATUS_INVALID_ARGUMENT = 1,
 
     /** The supplied context has not completed successful initialization. */

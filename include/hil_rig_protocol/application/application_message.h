@@ -51,7 +51,7 @@ typedef enum
     HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL = 19,
     /** Host-to-HIL-RIG test-independent Application recovery request. */
     HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL = 20,
-    /** HIL-RIG-to-host fixed captured result available after execution. */
+    /** One of exactly N fixed results after a successfully started N-tick test. */
     HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT = 32,
     /** HIL-RIG-to-host variable result bytes available after execution. */
     HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA = 33,

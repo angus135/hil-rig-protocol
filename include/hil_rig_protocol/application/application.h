@@ -100,9 +100,11 @@ HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      c
  * @details The future implementation performs codec-level structural
  * validation, checks message/subtype/test-ID presence rules (including
  * test-independent Global Control), validates every variable pointer/count and
- * declared length, includes every element of each fixed tick array, and adds
- * explicit future envelope/body fields using checked arithmetic. It does not
- * mutate context or message and retains no pointer.
+ * declared length, rejects zero/duplicate declarations and duplicate
+ * peripheral/channel configuration records, requires nonzero tick count and
+ * zero reserved flags/empty extension data, includes every element of each
+ * fixed tick array, and adds explicit future envelope/body fields using checked
+ * arithmetic. It does not mutate context or message and retains no pointer.
  *
  * Exact wire fields, widths, byte order, and protocol versioning remain TODO.
  *
@@ -164,8 +166,10 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
  *
  * @details The future implementation validates the complete encoded envelope
  * and body without publishing typed output, rejects missing/trailing bytes, and
- * totals aligned storage required for every decoded array and byte span using
- * checked arithmetic. The query never mutates context or input.
+ * totals storage required for every decoded array and byte span using checked
+ * arithmetic. The reported value is the required usable byte capacity assuming
+ * storage begins at HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT. The query never
+ * mutates context or input.
  *
  * @param[in] context Successfully initialized context.
  * @param[in] encoded_message Complete reassembled Application bytes; NULL only
@@ -205,6 +209,10 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
  * all other failure and NOT_IMPLEMENTED it is zero and out_message is INVALID.
  * NULL storage with zero capacity is a size query when required storage is
  * nonzero. A zero-storage fixed message may decode with that combination.
+ * Every non-NULL decode_storage pointer must be aligned to
+ * HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT. A future implementation returns
+ * HIL_APPLICATION_STATUS_INVALID_ARGUMENT for a misaligned pointer; the current
+ * intentional stub performs no runtime alignment check.
  *
  * Decoding RESET_APPLICATION never performs recovery or affects Transport.
  * Decoding also never creates, completes, or invalidates a transaction;
@@ -215,7 +223,8 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
  * @param[in] encoded_message Complete reassembled bytes, borrowed for this call.
  * @param[in] encoded_message_size Exact complete-message bytes.
  * @param[out] decode_storage Caller workspace for variable arrays/spans; NULL
- *             only when decode_storage_capacity is zero.
+ *             only when decode_storage_capacity is zero. A non-NULL pointer
+ *             must satisfy HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT.
  * @param[in] decode_storage_capacity Writable workspace capacity.
  * @param[out] out_message Typed output; set to INVALID on failure.
  * @param[out] decode_storage_size Used, required, or zero bytes per result.
@@ -226,6 +235,18 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
  * @retval HIL_APPLICATION_STATUS_UNINITIALIZED Invalid context.
  * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Current intentional stub.
  * @return Other codec statuses documented by Decode_Storage_Size.
+ *
+ * @par C11 static storage
+ * @code{.c}
+ * _Alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT )
+ * static uint8_t decode_storage[2048u];
+ * @endcode
+ *
+ * @par C++ static storage
+ * @code{.cpp}
+ * alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT )
+ * static uint8_t decode_storage[2048u];
+ * @endcode
  */
 HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
     const HIL_Application_Context_T* context, const uint8_t* encoded_message,
@@ -237,9 +258,13 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
  *
  * @details Future validation covers type/subtype/test-ID presence, enum values,
  * variable pointer/count pairs, configured bounds, fixed-array element values,
- * channel-family consistency, variable declaration rules, and checked size
- * relationships. It enforces that Global Control forbids a Test ID and that
- * test-scoped messages require one. It does not check sender direction,
+ * channel-family consistency, nonzero and unique variable declarations, unique
+ * peripheral/channel configuration records, nonzero expected_tick_count, zero
+ * reserved flags, empty unsupported extension data, and checked size
+ * relationships. Nonzero reserved flags or nonempty Test Configuration
+ * extension_data return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE. Validation
+ * enforces that Global Control forbids a Test ID and that test-scoped messages
+ * require one. It does not check sender direction,
  * tick_number against an active Test Configuration, transaction prerequisites,
  * hardware support/electrical limits, retention availability, upload
  * completion, execution-manager permission, or whole-test consistency.

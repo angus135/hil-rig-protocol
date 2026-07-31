@@ -55,7 +55,10 @@ typedef enum
  * diagnostic_data is borrowed for encoding and points into caller decode
  * storage after decoding. A host can respond to a global or unidentified
  * recoverable fault with test-independent RESET_APPLICATION; the codec does not
- * perform that recovery and the operation does not reset Transport.
+ * perform that recovery and the operation does not reset Transport. An Error
+ * detected during a successfully started test does not replace the required
+ * fixed Test Result for any tick; communication/session loss or reset may make
+ * completing that result set impossible.
  */
 typedef struct
 {

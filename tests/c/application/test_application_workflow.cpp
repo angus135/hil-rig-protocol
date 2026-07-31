@@ -7,6 +7,13 @@
 #include "hil_rig_protocol/application/application.h"
 
 namespace {
+struct alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ) AlignedDecodeStorageBuffer
+{
+    std::array<std::uint8_t, 2048u> bytes{};
+};
+
+static_assert( alignof( AlignedDecodeStorageBuffer ) >= HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT );
+
 HIL_Application_Test_Id_T ExampleTestId( std::uint8_t discriminator )
 {
     HIL_Application_Test_Id_T test_id{};
@@ -41,7 +48,7 @@ void CompileCodecFacadeUsage()
     HIL_Application_Config_T  config{};
 
     std::array<std::uint8_t, 2048u> encoded_message{};
-    std::array<std::uint8_t, 2048u> decode_storage{};
+    AlignedDecodeStorageBuffer      decode_storage{};
     std::size_t                     encoded_size            = 0u;
     std::size_t                     required_decode_storage = 0u;
     HIL_Application_Message_T       decoded{};
@@ -61,6 +68,9 @@ void CompileCodecFacadeUsage()
     configuration.test_id     = ExampleTestId( 0x11u );
     configuration.body.test_configuration.tick_duration.nanoseconds = 1000000u;
     configuration.body.test_configuration.expected_tick_count       = 2u;
+    configuration.body.test_configuration.flags                     = 0u;
+    configuration.body.test_configuration.extension_data =
+        HIL_Application_Byte_Span_T{ nullptr, 0u };
 
     ( void )HIL_APPLICATION_Validate_Message( &context, &configuration );
     ( void )HIL_APPLICATION_Encoded_Size( &context, &configuration, &encoded_size );
@@ -71,9 +81,9 @@ void CompileCodecFacadeUsage()
                                                       encoded_size, &required_decode_storage );
     ( void )HIL_APPLICATION_Decode_Storage_Size( &context, encoded_message.data(), encoded_size,
                                                  &required_decode_storage );
-    ( void )HIL_APPLICATION_Decode_Message( &context, encoded_message.data(), encoded_size,
-                                            decode_storage.data(), decode_storage.size(), &decoded,
-                                            &required_decode_storage );
+    ( void )HIL_APPLICATION_Decode_Message(
+        &context, encoded_message.data(), encoded_size, decode_storage.bytes.data(),
+        decode_storage.bytes.size(), &decoded, &required_decode_storage );
 
     /* Context remains codec-only; endpoint transaction data is never supplied. */
 }
@@ -83,6 +93,7 @@ void CompileUploadConformanceScenarios()
     const HIL_Application_Test_Id_T    test_a = ExampleTestId( 0x21u );
     const HIL_Application_Test_Id_T    test_b = ExampleTestId( 0x22u );
     const std::array<std::uint8_t, 6u> uart_bytes{ 1u, 2u, 3u, 4u, 5u, 6u };
+    const std::array<std::uint8_t, 4u> spi_bytes{ 7u, 8u, 9u, 10u };
 
     HIL_Application_Message_T configuration{};
     configuration.type        = HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION;
@@ -91,6 +102,9 @@ void CompileUploadConformanceScenarios()
     configuration.test_id     = test_a;
     configuration.body.test_configuration.tick_duration.nanoseconds = 1000000u;
     configuration.body.test_configuration.expected_tick_count       = 2u;
+    configuration.body.test_configuration.flags                     = 0u;
+    configuration.body.test_configuration.extension_data =
+        HIL_Application_Byte_Span_T{ nullptr, 0u };
 
     /* ACCEPTED creates upload A; REJECTED configuration B creates no transaction. */
     const HIL_Application_Message_T configuration_accepted = TestResponse(
@@ -101,10 +115,13 @@ void CompileUploadConformanceScenarios()
                       HIL_APPLICATION_RESPONSE_OUTCOME_REJECTED,
                       HIL_APPLICATION_RESPONSE_REASON_HARDWARE_NOT_READY );
 
-    HIL_Application_Data_Declaration_T declaration{};
-    declaration.channel.peripheral = HIL_APPLICATION_PERIPHERAL_UART;
-    declaration.channel.channel    = 0u;
-    declaration.byte_length        = uart_bytes.size();
+    const std::array<HIL_Application_Data_Declaration_T, 2u> declarations{
+        HIL_Application_Data_Declaration_T{
+            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },
+            uart_bytes.size() },
+        HIL_Application_Data_Declaration_T{
+            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_SPI, 1u }, spi_bytes.size() },
+    };
 
     HIL_Application_Message_T fixed_tick{};
     fixed_tick.type                                = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
@@ -112,8 +129,8 @@ void CompileUploadConformanceScenarios()
     fixed_tick.has_test_id                         = 1u;
     fixed_tick.test_id                             = test_a;
     fixed_tick.body.test_instruction.tick_number   = 0u;
-    fixed_tick.body.test_instruction.variable_data = &declaration;
-    fixed_tick.body.test_instruction.variable_data_count = 1u;
+    fixed_tick.body.test_instruction.variable_data = declarations.data();
+    fixed_tick.body.test_instruction.variable_data_count = declarations.size();
 
     HIL_Application_Message_T variable_tick{};
     variable_tick.type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA;
@@ -121,15 +138,26 @@ void CompileUploadConformanceScenarios()
     variable_tick.has_test_id = 1u;
     variable_tick.test_id     = test_a;
     variable_tick.body.variable_instruction_data.tick_number = 0u;
-    variable_tick.body.variable_instruction_data.channel     = declaration.channel;
+    variable_tick.body.variable_instruction_data.channel     = declarations[0].channel;
     variable_tick.body.variable_instruction_data.data =
         HIL_Application_Byte_Span_T{ uart_bytes.data(), uart_bytes.size() };
+
+    HIL_Application_Message_T second_variable_tick{};
+    second_variable_tick.type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA;
+    second_variable_tick.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    second_variable_tick.has_test_id = 1u;
+    second_variable_tick.test_id     = test_a;
+    second_variable_tick.body.variable_instruction_data.tick_number = 0u;
+    second_variable_tick.body.variable_instruction_data.channel     = declarations[1].channel;
+    second_variable_tick.body.variable_instruction_data.data =
+        HIL_Application_Byte_Span_T{ spi_bytes.data(), spi_bytes.size() };
 
     /* Tick ACCEPTED represents the complete fixed-plus-variable acceptance. */
     const HIL_Application_Message_T tick_accepted = TestResponse(
         test_a, HIL_APPLICATION_RESPONSE_SCOPE_TICK, HIL_APPLICATION_RESPONSE_OUTCOME_ACCEPTED,
         HIL_APPLICATION_RESPONSE_REASON_NONE, 0u );
 
+    /* Stop-and-wait: tick 1 is constructed as permitted only after this ACCEPTED. */
     HIL_Application_Message_T fixed_tick_1                 = fixed_tick;
     fixed_tick_1.body.test_instruction.tick_number         = 1u;
     fixed_tick_1.body.test_instruction.variable_data       = nullptr;
@@ -137,6 +165,10 @@ void CompileUploadConformanceScenarios()
     const HIL_Application_Message_T tick_1_accepted        = TestResponse(
         test_a, HIL_APPLICATION_RESPONSE_SCOPE_TICK, HIL_APPLICATION_RESPONSE_OUTCOME_ACCEPTED,
         HIL_APPLICATION_RESPONSE_REASON_NONE, 1u );
+
+    const std::array<HIL_Application_Message_T, 5u> stop_and_wait_sequence{
+        fixed_tick, variable_tick, second_variable_tick, tick_accepted, fixed_tick_1,
+    };
 
     HIL_Application_Message_T out_of_order_tick         = fixed_tick;
     out_of_order_tick.body.test_instruction.tick_number = 2u;
@@ -164,9 +196,11 @@ void CompileUploadConformanceScenarios()
     ( void )configuration_rejected;
     ( void )fixed_tick;
     ( void )variable_tick;
+    ( void )second_variable_tick;
     ( void )tick_accepted;
     ( void )fixed_tick_1;
     ( void )tick_1_accepted;
+    ( void )stop_and_wait_sequence;
     ( void )out_of_order_tick;
     ( void )tick_rejected;
     ( void )wrong_test_id_tick;
@@ -186,6 +220,7 @@ void CompileControlConformanceScenarios()
     start.has_test_id                    = 1u;
     start.test_id                        = test_a;
     start.body.execution_control.command = HIL_APPLICATION_CONTROL_START;
+    start.body.execution_control.flags   = 0u;
 
     const HIL_Application_Message_T start_completed =
         TestResponse( test_a, HIL_APPLICATION_RESPONSE_SCOPE_EXECUTION_CONTROL,
@@ -215,7 +250,7 @@ void CompileControlConformanceScenarios()
     ( void )abort_completed;
 }
 
-void CompileResultConformanceScenario()
+void CompileSuccessfulResultConformanceScenario()
 {
     const HIL_Application_Test_Id_T    test_a = ExampleTestId( 0x41u );
     const std::array<std::uint8_t, 4u> can_bytes{ 0x10u, 0x20u, 0x30u, 0x40u };
@@ -226,14 +261,16 @@ void CompileResultConformanceScenario()
     result_declaration.byte_length        = can_bytes.size();
 
     HIL_Application_Message_T fixed_result_0{};
-    fixed_result_0.type                                 = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
-    fixed_result_0.subtype                              = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
-    fixed_result_0.has_test_id                          = 1u;
-    fixed_result_0.test_id                              = test_a;
-    fixed_result_0.body.test_result.tick_number         = 0u;
-    fixed_result_0.body.test_result.variable_data       = &result_declaration;
-    fixed_result_0.body.test_result.variable_data_count = 1u;
-    fixed_result_0.body.test_result.condition           = HIL_APPLICATION_RESULT_CONDITION_OK;
+    fixed_result_0.type                         = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
+    fixed_result_0.subtype                      = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    fixed_result_0.has_test_id                  = 1u;
+    fixed_result_0.test_id                      = test_a;
+    fixed_result_0.body.test_result.tick_number = 0u;
+    fixed_result_0.body.test_result.analog_inputs[0].microvolts = 125000;
+    fixed_result_0.body.test_result.analog_inputs[1].microvolts = 250000;
+    fixed_result_0.body.test_result.variable_data               = &result_declaration;
+    fixed_result_0.body.test_result.variable_data_count         = 1u;
+    fixed_result_0.body.test_result.condition = HIL_APPLICATION_RESULT_CONDITION_OK;
 
     HIL_Application_Message_T variable_result_0{};
     variable_result_0.type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA;
@@ -245,10 +282,12 @@ void CompileResultConformanceScenario()
     variable_result_0.body.variable_result_data.data =
         HIL_Application_Byte_Span_T{ can_bytes.data(), can_bytes.size() };
 
-    HIL_Application_Message_T fixed_result_1            = fixed_result_0;
-    fixed_result_1.body.test_result.tick_number         = 1u;
-    fixed_result_1.body.test_result.variable_data       = nullptr;
-    fixed_result_1.body.test_result.variable_data_count = 0u;
+    HIL_Application_Message_T fixed_result_1                    = fixed_result_0;
+    fixed_result_1.body.test_result.tick_number                 = 1u;
+    fixed_result_1.body.test_result.analog_inputs[0].microvolts = 126000;
+    fixed_result_1.body.test_result.analog_inputs[1].microvolts = 251000;
+    fixed_result_1.body.test_result.variable_data               = nullptr;
+    fixed_result_1.body.test_result.variable_data_count         = 0u;
 
     /* For N=2, host completion requires both fixed results and declared CAN data. */
     const std::array<HIL_Application_Message_T, 3u> complete_result_set{
@@ -257,6 +296,49 @@ void CompileResultConformanceScenario()
         fixed_result_1,
     };
     ( void )complete_result_set;
+}
+
+void CompileEarlyExecutionFailureResultScenario()
+{
+    constexpr std::uint32_t                                    expected_tick_count = 3u;
+    const HIL_Application_Test_Id_T                            test_a = ExampleTestId( 0x42u );
+    std::array<HIL_Application_Message_T, expected_tick_count> fixed_results{};
+
+    fixed_results[0].type                         = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
+    fixed_results[0].subtype                      = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    fixed_results[0].has_test_id                  = 1u;
+    fixed_results[0].test_id                      = test_a;
+    fixed_results[0].body.test_result.tick_number = 0u;
+    fixed_results[0].body.test_result.analog_inputs[0].microvolts = 125000;
+    fixed_results[0].body.test_result.analog_inputs[1].microvolts = 250000;
+    fixed_results[0].body.test_result.condition = HIL_APPLICATION_RESULT_CONDITION_OK;
+
+    for ( std::uint32_t tick = 1u; tick < expected_tick_count; ++tick )
+    {
+        auto& result                                = fixed_results[tick];
+        result.type                                 = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
+        result.subtype                              = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+        result.has_test_id                          = 1u;
+        result.test_id                              = test_a;
+        result.body.test_result.tick_number         = tick;
+        result.body.test_result.variable_data       = nullptr;
+        result.body.test_result.variable_data_count = 0u;
+        result.body.test_result.condition = HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM;
+        /* Zero-initialized fixed captures are present but Python must ignore them. */
+    }
+
+    HIL_Application_Message_T execution_error{};
+    execution_error.type                       = HIL_APPLICATION_MESSAGE_TYPE_ERROR;
+    execution_error.subtype                    = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    execution_error.has_test_id                = 1u;
+    execution_error.test_id                    = test_a;
+    execution_error.body.error.category        = HIL_APPLICATION_ERROR_CATEGORY_EXECUTION;
+    execution_error.body.error.has_tick_number = 1u;
+    execution_error.body.error.tick_number     = 1u;
+
+    /* The Error is optional and does not replace fixed results 1 and 2. */
+    ( void )fixed_results;
+    ( void )execution_error;
 }
 
 void CompileRecoveryConformanceScenarios()
@@ -269,6 +351,7 @@ void CompileRecoveryConformanceScenarios()
     reset.subtype                     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     reset.has_test_id                 = 0u;
     reset.body.global_control.command = HIL_APPLICATION_GLOBAL_CONTROL_RESET_APPLICATION;
+    reset.body.global_control.flags   = 0u;
 
     HIL_Application_Message_T reset_completed{};
     reset_completed.type                          = HIL_APPLICATION_MESSAGE_TYPE_RESPONSE;
@@ -294,6 +377,9 @@ void CompileRecoveryConformanceScenarios()
     restarted_configuration.test_id     = restarted_test;
     restarted_configuration.body.test_configuration.tick_duration.nanoseconds = 1000000u;
     restarted_configuration.body.test_configuration.expected_tick_count       = 2u;
+    restarted_configuration.body.test_configuration.flags                     = 0u;
+    restarted_configuration.body.test_configuration.extension_data =
+        HIL_Application_Byte_Span_T{ nullptr, 0u };
 
     ( void )reset;
     ( void )reset_completed;
@@ -312,11 +398,12 @@ TEST( ApplicationFacadeApiDesign, IntentionalStubsRemainExplicit )
 
 TEST( ApplicationFacadeApiDesign, DocumentedTransactionScenariosCompile )
 {
-    const std::array<void ( * )(), 5u> scenarios{
+    const std::array<void ( * )(), 6u> scenarios{
         &CompileCodecFacadeUsage,
         &CompileUploadConformanceScenarios,
         &CompileControlConformanceScenarios,
-        &CompileResultConformanceScenario,
+        &CompileSuccessfulResultConformanceScenario,
+        &CompileEarlyExecutionFailureResultScenario,
         &CompileRecoveryConformanceScenarios,
     };
 
