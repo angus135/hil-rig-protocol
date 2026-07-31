@@ -1,0 +1,71 @@
+flowchart TD
+
+Caller["Caller<br/>(Python binding or firmware Application handler)"]
+
+subgraph Startup["Codec Initialisation"]
+    A["Allocate Application context"]
+    B["HIL_APPLICATION_Default_Config"]
+    C["Set explicit structural codec limits"]
+    D["HIL_APPLICATION_Init"]
+end
+
+E["Construct one typed Application message"]
+
+subgraph Outbound["Encode One Outbound Message"]
+    F["HIL_APPLICATION_Encoded_Size"]
+    G["Provide caller-owned output storage"]
+    H["HIL_APPLICATION_Encode_Message"]
+end
+
+subgraph TransportBoundary["Transport Handoff"]
+    I["Submit one complete encoded<br/>Application message to Transport"]
+    Wire["Transport fragmentation, framing, and reliable delivery<br/>over the USB CDC integration"]
+    J["Receive one complete reassembled<br/>Application message from Transport"]
+end
+
+subgraph Inbound["Decode One Inbound Message"]
+    K["HIL_APPLICATION_Decode_Storage_Size"]
+    L["Provide caller-owned decode storage"]
+    M["HIL_APPLICATION_Decode_Message"]
+end
+
+subgraph Integration["Endpoint Protocol Handling"]
+    N["Examine the typed message and apply<br/>the Application transaction contract"]
+    O["When required, construct the typed<br/>Response, Error, or next protocol message"]
+end
+
+Status["For any codec call, handle HIL_Application_Status_T locally<br/>Structural failures are not Application Responses"]
+
+subgraph Ownership["Operation Ownership"]
+    OwnerEndpoint["Endpoint integration<br/>(Python or firmware owned)"]
+    OwnerApplication["Shared Application Layer<br/>(stateless codec)"]
+    OwnerTransport["Transport Layer / USB CDC boundary"]
+end
+
+Caller --> A
+A --> B
+B --> C
+C --> D
+D --> E
+E --> F
+F --> G
+G --> H
+H --> I
+I --> Wire
+Wire --> J
+J --> K
+K --> L
+L --> M
+M --> N
+N --> O
+O --> F
+
+Caller -.-> Status
+
+classDef endpointOwned fill:#e8f1ff,stroke:#2b6cb0,stroke-width:2px,color:#1a365d
+classDef applicationOwned fill:#e6fffa,stroke:#2c7a7b,stroke-width:2px,color:#234e52
+classDef transportOwned fill:#fff5f5,stroke:#c53030,stroke-width:2px,color:#742a2a
+
+class Caller,A,C,E,G,L,N,O,Status,OwnerEndpoint endpointOwned
+class B,D,F,H,K,M,OwnerApplication applicationOwned
+class I,Wire,J,OwnerTransport transportOwned
