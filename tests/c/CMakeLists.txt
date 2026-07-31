@@ -13,11 +13,11 @@ if(NOT TARGET GTest::gtest OR NOT TARGET GTest::gmock OR NOT TARGET GTest::gtest
 endif()
 
 set(HIL_RIG_PROTOCOL_UNIT_TEST_SOURCES
-    unit/test_placeholder.cpp
+    unit/test_transport.cpp
 )
 
 set(HIL_RIG_PROTOCOL_INTEGRATION_TEST_SOURCES
-    integration/test_placeholder.cpp
+    integration/test_transport_facade.cpp
 )
 
 add_executable(hil_rig_protocol_unit_tests
@@ -30,6 +30,10 @@ target_link_libraries(hil_rig_protocol_unit_tests
         GTest::gtest
         GTest::gmock
         GTest::gtest_main
+)
+target_include_directories(hil_rig_protocol_unit_tests
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src
 )
 
 add_executable(hil_rig_protocol_integration_tests
@@ -44,19 +48,31 @@ target_link_libraries(hil_rig_protocol_integration_tests
         GTest::gtest_main
 )
 
+add_executable(hil_rig_protocol_c_api_compile_test
+    integration/test_transport_public_c.c
+)
+target_compile_features(hil_rig_protocol_c_api_compile_test PRIVATE c_std_11)
+target_link_libraries(hil_rig_protocol_c_api_compile_test
+    PRIVATE
+        hil_rig_protocol::hil_rig_protocol
+)
+
 if(COMMAND hil_rig_protocol_apply_warnings)
     hil_rig_protocol_apply_warnings(hil_rig_protocol_unit_tests)
     hil_rig_protocol_apply_warnings(hil_rig_protocol_integration_tests)
+    hil_rig_protocol_apply_warnings(hil_rig_protocol_c_api_compile_test)
 endif()
 
 if(COMMAND hil_rig_protocol_apply_sanitizers)
     hil_rig_protocol_apply_sanitizers(hil_rig_protocol_unit_tests)
     hil_rig_protocol_apply_sanitizers(hil_rig_protocol_integration_tests)
+    hil_rig_protocol_apply_sanitizers(hil_rig_protocol_c_api_compile_test)
 endif()
 
 if(COMMAND hil_rig_protocol_apply_coverage)
     hil_rig_protocol_apply_coverage(hil_rig_protocol_unit_tests)
     hil_rig_protocol_apply_coverage(hil_rig_protocol_integration_tests)
+    hil_rig_protocol_apply_coverage(hil_rig_protocol_c_api_compile_test)
 endif()
 
 add_test(
@@ -67,6 +83,11 @@ add_test(
 add_test(
     NAME hil_rig_protocol_integration_tests
     COMMAND hil_rig_protocol_integration_tests
+)
+
+add_test(
+    NAME hil_rig_protocol_c_api_compile_test
+    COMMAND hil_rig_protocol_c_api_compile_test
 )
 
 add_subdirectory(application)
