@@ -130,10 +130,13 @@ typedef enum
  * EXECUTION_CONTROL scope, and global_control_command only for GLOBAL_CONTROL;
  * both must otherwise be INVALID.
  *
- * Responses do not create mandatory stop-and-wait. Multiple instruction/data
- * messages may be in flight subject to Transport flow control. Correlation uses
- * test ID when applicable, scope, tick number, and relevant control command—not
- * an Application sequence.
+ * Upload uses Application-level stop-and-wait at tick granularity. The fixed
+ * Test Instruction and all separately encoded variable messages for tick T
+ * collectively form the one tick awaiting semantic acceptance. Python must not
+ * submit tick T + 1 before receiving Tick T ACCEPTED. Correlation uses Test ID,
+ * scope, tick number, and relevant control command rather than a new sequence
+ * field. This rule is independent of Transport flow control and firmware
+ * execution-manager state.
  *
  * A Response is semantic Application acceptance. It is distinct from a
  * Transport ACK, which confirms reliable byte/frame delivery but says nothing

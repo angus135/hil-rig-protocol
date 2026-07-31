@@ -30,15 +30,36 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
     static const std::array<std::uint8_t, 5u> variable_bytes{ 9u, 8u, 7u, 6u, 5u };
     static const std::array<std::uint8_t, 2u> error_bytes{ 0xaau, 0x55u };
 
-    static const std::array<HIL_Application_Peripheral_Config_T, 1u> peripherals{ [] {
-        HIL_Application_Peripheral_Config_T peripheral{};
-        peripheral.type                              = HIL_APPLICATION_PERIPHERAL_CONFIG_DIGITAL;
-        peripheral.value.digital.channel.peripheral  = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
-        peripheral.value.digital.channel.channel     = 2u;
-        peripheral.value.digital.output_millivolts   = 3300u;
-        peripheral.value.digital.initial_output_high = 0u;
-        return peripheral;
-    }() };
+    static const std::array<HIL_Application_Peripheral_Config_T, 3u> peripherals{
+        [] {
+            HIL_Application_Peripheral_Config_T peripheral{};
+            peripheral.type                             = HIL_APPLICATION_PERIPHERAL_CONFIG_DIGITAL;
+            peripheral.value.digital.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
+            peripheral.value.digital.channel.channel    = 2u;
+            peripheral.value.digital.output_millivolts  = 3300u;
+            peripheral.value.digital.initial_output_high = 0u;
+            return peripheral;
+        }(),
+        [] {
+            HIL_Application_Peripheral_Config_T peripheral{};
+            peripheral.type                            = HIL_APPLICATION_PERIPHERAL_CONFIG_ANALOG;
+            peripheral.value.analog.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT;
+            peripheral.value.analog.channel.channel    = 0u;
+            peripheral.value.analog.minimum_microvolts = -1000000;
+            peripheral.value.analog.maximum_microvolts = 1000000;
+            return peripheral;
+        }(),
+        [] {
+            HIL_Application_Peripheral_Config_T peripheral{};
+            peripheral.type = HIL_APPLICATION_PERIPHERAL_CONFIG_COMMUNICATION;
+            peripheral.value.communication.channel.peripheral  = HIL_APPLICATION_PERIPHERAL_UART;
+            peripheral.value.communication.channel.channel     = 0u;
+            peripheral.value.communication.bit_rate            = 115200u;
+            peripheral.value.communication.flags               = 0u;
+            peripheral.value.communication.capture_limit_bytes = variable_bytes.size();
+            return peripheral;
+        }(),
+    };
 
     static const std::array<HIL_Application_Data_Declaration_T, 1u> instruction_data{
         HIL_Application_Data_Declaration_T{
@@ -75,8 +96,10 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
     messages[2].test_id     = test_id;
     messages[2].body.test_configuration.tick_duration.nanoseconds = 1000000u;
     messages[2].body.test_configuration.expected_tick_count       = 100u;
+    messages[2].body.test_configuration.flags                     = 0u;
     messages[2].body.test_configuration.peripherals               = peripherals.data();
     messages[2].body.test_configuration.peripheral_count          = peripherals.size();
+    messages[2].body.test_configuration.extension_data = HIL_Application_Byte_Span_T{ nullptr, 0u };
 
     messages[3].type                              = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
     messages[3].subtype                           = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
@@ -105,11 +128,13 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
     messages[5].has_test_id                    = 1u;
     messages[5].test_id                        = test_id;
     messages[5].body.execution_control.command = HIL_APPLICATION_CONTROL_START;
+    messages[5].body.execution_control.flags   = 0u;
 
     messages[6].type                        = HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL;
     messages[6].subtype                     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     messages[6].has_test_id                 = 0u;
     messages[6].body.global_control.command = HIL_APPLICATION_GLOBAL_CONTROL_RESET_APPLICATION;
+    messages[6].body.global_control.flags   = 0u;
 
     messages[7].type                                    = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
     messages[7].subtype                                 = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
@@ -161,6 +186,14 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
 }  // namespace
 
 static_assert( HIL_APPLICATION_TEST_ID_SIZE == 16u );
+static_assert( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT > 0u );
+static_assert( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT >= alignof( std::uint8_t ) );
+static_assert( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT
+                   % alignof( HIL_Application_Data_Declaration_T )
+               == 0u );
+static_assert( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT
+                   % alignof( HIL_Application_Peripheral_Config_T )
+               == 0u );
 static_assert( HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT == 10u );
 static_assert( HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT == 10u );
 static_assert( HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT == 6u );
@@ -191,4 +224,9 @@ TEST( ApplicationApiDesign, EveryRequiredMessageFamilyIsConstructible )
     const auto messages = ConstructEveryMessageFamily();
     EXPECT_EQ( messages.front().type, HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST );
     EXPECT_EQ( messages.back().type, HIL_APPLICATION_MESSAGE_TYPE_ERROR );
+    EXPECT_EQ( messages[2].body.test_configuration.flags, 0u );
+    EXPECT_EQ( messages[2].body.test_configuration.extension_data.size, 0u );
+    EXPECT_EQ( messages[2].body.test_configuration.peripherals[2].value.communication.flags, 0u );
+    EXPECT_EQ( messages[5].body.execution_control.flags, 0u );
+    EXPECT_EQ( messages[6].body.global_control.flags, 0u );
 }

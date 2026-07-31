@@ -60,8 +60,8 @@ typedef struct
     /**
      * Reserved command option bits.
      *
-     * Zero selects base behavior. Exact options remain a future versioned
-     * protocol decision.
+     * Must be zero in the initial protocol. Nonzero values are structurally
+     * unsupported until exact options are defined by a future version.
      */
     uint32_t flags;
 } HIL_Application_Execution_Control_T;
@@ -95,7 +95,10 @@ typedef struct
 {
     /** Requested global operation; never automatically executed by the codec. */
     HIL_Application_Global_Control_Command_T command;
-    /** Reserved versioned option bits; zero selects base reset behavior. */
+    /**
+     * Reserved option bits; must be zero in the initial protocol.
+     * Nonzero values are structurally unsupported.
+     */
     uint32_t flags;
 } HIL_Application_Global_Control_T;
 
