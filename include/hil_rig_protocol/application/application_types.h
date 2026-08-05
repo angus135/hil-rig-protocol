@@ -69,6 +69,11 @@ extern "C"
 
 /** Number of physical HIL-RIG PWM-input channels in every result. */
 #define HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT ( 2u )
+
+#define HIL_APPLICATION_CAN_CHANNEL_COUNT ( 2u )
+#define HIL_APPLICATION_UART_CHANNEL_COUNT ( 2u )
+#define HIL_APPLICATION_SPI_CHANNEL_COUNT ( 2u )
+#define HIL_APPLICATION_I2C_CHANNEL_COUNT ( 2u )
 /** @} */
 
 /**
@@ -105,7 +110,7 @@ typedef struct
     const uint8_t* data;
 
     /** Number of readable bytes at data. */
-    size_t size;
+    uint8_t size;
 } HIL_Application_Byte_Span_T;
 
 /**
@@ -166,7 +171,7 @@ typedef struct
 typedef struct
 {
     /** Requested duration of one tick; zero is structurally invalid. */
-    uint32_t nanoseconds;
+    uint32_t useconds;
 } HIL_Application_Tick_Duration_T;
 
 /**
@@ -202,7 +207,7 @@ typedef struct
 typedef struct
 {
     /** Requested signed output in microvolts. */
-    int32_t microvolts;
+    uint32_t microvolts;
 } HIL_Application_Analog_Output_Value_T;
 
 /**
@@ -213,7 +218,7 @@ typedef struct
 typedef struct
 {
     /** Captured signed input in microvolts. */
-    int32_t microvolts;
+    uint32_t microvolts;
 } HIL_Application_Analog_Input_Value_T;
 
 /**
@@ -269,7 +274,7 @@ typedef struct
     /** UART, SPI, I2C, or CAN channel carrying the variable bytes. */
     HIL_Application_Channel_Id_T channel;
     /** Exact bytes expected in the matching variable-data message. */
-    size_t byte_length;
+    HIL_Application_Byte_Span_T data;
 } HIL_Application_Data_Declaration_T;
 
 /**

@@ -1,211 +1,92 @@
-#include "hil_rig_protocol/application/application.h"
+
+#include "hil_rig_protocol/application/application_control.h"
+#include "hil_rig_protocol/application/application_error.h"
+#include "hil_rig_protocol/application/application_instruction.h"
+#include "hil_rig_protocol/application/application_response.h"
+#include "hil_rig_protocol/application/application_result.h"
+#include "hil_rig_protocol/application/application_status.h"
+#include "hil_rig_protocol/application/application_system_info.h"
+#include "hil_rig_protocol/application/application_test_config.h"
+#include "hil_rig_protocol/application/application_types.h"
+#include "hil_rig_protocol/application/application_message.h"
 
 #include <string.h>
 
-HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Context_T* context,
-                                                       const HIL_Application_Message_T* message,
-                                                       size_t* encoded_size )
-{
-    /*
-     * TODO: Validate initialized bounds and the complete tagged typed message:
-     * type/subtype, exact test-ID presence (including test-independent Global
-     * Control), enum values, union member, every fixed tick-array element,
-     * variable pointer/count pairs, channel families, nonzero declaration
-     * lengths, unique declaration and peripheral-configuration channel pairs,
-     * nonzero expected_tick_count, zero reserved flags, empty unsupported Test
-     * Configuration extension_data, and configured bounds. Calculate explicit
-     * future envelope/body bytes using checked multiplication/addition/alignment,
-     * including the compiled-in Application protocol version and fixed number
-     * of signal elements without serializing C padding. Return
-     * UNSUPPORTED_MESSAGE for nonzero reserved flags or nonempty unsupported
-     * extension_data. Do not use native struct sizes as wire sizes, mutate or
-     * retain context/message, or publish encoded_size before all validation and
-     * arithmetic succeeds.
-     */
-    if ( encoded_size != NULL )
-    {
-        *encoded_size = 0u;
-    }
-    ( void )context;
-    ( void )message;
+/**
+ ________________________________________________
+ |                     |                        |
+ |   Has Test ID {1}   |      Test ID {16}      |
+ |_____________________|________________________|
+ |                     |                        |
+ |   Message Type {4}  |  Message Sub-Type {4}  |
+ |_____________________|________________________|
+ |                                              |
+ |          Payload Size (Bytes) {4}            |
+ |______________________________________________|
+ |                                              |
+ |                  Payload                     |
+ |______________________________________________|
+ |                                              |
+ |            End Payload Flag {1}              |
+ |______________________________________________|
+*/
 
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+HIL_Application_Status_T HIL_APPLICATION_Header_Encoding( const HIL_Application_Message_T* message,
+                                                          uint8_t*                         dest )
+{
+    /**
+     *
+     *
+     */
+    // Test ID
+    size_t running_total = 0;
+    memcpy( dest, &( message->has_test_id ), sizeof( message->has_test_id ) );
+    running_total += sizeof( message->has_test_id );
+    if ( message->has_test_id != 0 )
+    {
+        memcpy( &( dest[running_total] ), &( message->test_id ), sizeof( message->test_id ) );
+    }
+    else
+    {
+        for ( size_t i = running_total; i < running_total + sizeof( message->test_id ); i++ )
+        {
+            dest[i] = 0U;
+        }
+    }
+    running_total += sizeof( message->test_id );
+    // Message Type
+    memcpy( &( dest[running_total] ), &( message->type ), sizeof( message->type ) );
+    running_total += sizeof( message->type );
+    // Message sub-Type
+    memcpy( &( dest[running_total] ), &( message->subtype ), sizeof( message->subtype ) );
+    running_total += sizeof( message->subtype );
+    // We don't know the size of the payload yet so leave it blank but store the pointer
+    return HIL_APPLICATION_STATUS_OK;
 }
 
-HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_Context_T* context,
-                                                         const HIL_Application_Message_T* message,
-                                                         uint8_t* out_buffer,
-                                                         size_t   out_buffer_size,
-                                                         size_t*  output_size )
+HIL_Application_Status_T HIL_APPLICATION_Header_decoding( HIL_Application_Message_T* new_message,
+                                                          const uint8_t* encoded_message,
+                                                          size_t*        payload_size )
 {
-    /*
-     * TODO: Validate context, output pointer-size pair, and tagged message;
-     * calculate the exact complete-message size with checked arithmetic; report
-     * required size without writing when capacity is insufficient; explicitly
-     * serialize approved fixed-width envelope/type/subtype/test-ID/body fields
-     * in approved byte order; write the compiled-in Application protocol
-     * version without caller selection; encode Global Control without a Test
-     * ID; encode every fixed signal array in index/channel order; copy every
-     * variable record/span; reject zero or duplicate
-     * declarations/configurations and invalid initial flags/extensions; and
-     * publish output_size only after complete success. Leave partial bytes
-     * unusable, retain no pointer, and perform no reset, Transport behavior,
-     * semantic acceptance, transaction mutation, test retention,
-     * execution-manager interaction, or hardware behavior.
-     */
-    if ( output_size != NULL )
-    {
-        *output_size = 0u;
-    }
-    ( void )context;
-    ( void )message;
-    ( void )out_buffer;
-    ( void )out_buffer_size;
+    // Test ID
 
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
-HIL_Application_Status_T
-HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
-                                     const uint8_t* encoded_message, size_t encoded_message_size,
-                                     size_t* required_storage_size )
-{
-    /*
-     * TODO: Validate context and complete input pointer-size pair; parse the
-     * future fixed-width envelope safely without reading past input; accept
-     * only the compiled-in Application protocol version and return
-     * UNSUPPORTED_MESSAGE for an incompatible version; validate
-     * type/subtype/test-ID presence, Global Control correlation rules, exact
-     * body fields, fixed tick-array lengths, nonzero/unique variable
-     * declarations, unique peripheral configurations, initial flags and
-     * extension rules, and configured bounds; reject missing or trailing bytes;
-     * and calculate caller storage only for variable arrays/spans with checked
-     * arithmetic, assuming its base address meets
-     * HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT. Fixed arrays decode inline and
-     * require no separate storage. Publish required_storage_size only after
-     * complete success and neither mutate nor retain context/input.
-     */
-    if ( required_storage_size != NULL )
-    {
-        *required_storage_size = 0u;
-    }
-    ( void )context;
-    ( void )encoded_message;
-    ( void )encoded_message_size;
-
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
-    const HIL_Application_Context_T* context, const uint8_t* encoded_message,
-    size_t encoded_message_size, uint8_t* decode_storage, size_t decode_storage_capacity,
-    HIL_Application_Message_T* out_message, size_t* decode_storage_size )
-{
-    /*
-     * TODO: Validate context, complete input, output, and decode-storage
-     * pointer-size pairs; validate exact envelope/body length, type/subtype and
-     * test-ID presence; accept only the compiled-in Application protocol
-     * version and return UNSUPPORTED_MESSAGE for an incompatible version;
-     * require every non-NULL decode-storage address to meet
-     * HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT; calculate/reserve aligned
-     * storage before publication; decode explicit fixed-width fields in
-     * approved byte order; decode Global Control and fixed signal arrays into
-     * the typed output; copy every variable array/span into caller storage;
-     * point typed spans only there; reject unsupported, truncated, malformed,
-     * inconsistent, or trailing data; and publish out_message and storage-used
-     * atomically after complete success. A future misaligned-storage check
-     * returns INVALID_ARGUMENT; do not implement that check in this stub. On
-     * small storage report the required size without partial typed output.
-     * Retain no input/storage pointer, apply no integration workflow policy,
-     * execute no reset/control, generate no Response, and perform no Transport
-     * or hardware behavior.
-     */
-    if ( decode_storage_size != NULL )
-    {
-        *decode_storage_size = 0u;
-    }
-    if ( out_message != NULL )
-    {
-        ( void )memset( out_message, 0, sizeof( *out_message ) );
-        out_message->type = HIL_APPLICATION_MESSAGE_TYPE_INVALID;
-    }
-    ( void )context;
-    ( void )encoded_message;
-    ( void )encoded_message_size;
-    ( void )decode_storage;
-    ( void )decode_storage_capacity;
-
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
-HIL_Application_Status_T
-HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
-                                  const HIL_Application_Message_T* message )
-{
-    /*
-     * TODO: Perform typed codec validation only: initialized bounds,
-     * type/subtype/test-ID rules (Global Control absent, test controls present),
-     * active union member, enum validity (Execution Control supports only START
-     * and ABORT, with no ARM or FINALIZE_TEST command), every fixed signal array
-     * element, variable pointer/count combinations, nonzero declaration/data
-     * lengths, unique (peripheral, channel) pairs within declaration and
-     * configuration arrays, channel-family consistency, nonzero
-     * expected_tick_count, zero reserved flags, empty Test Configuration
-     * extension_data, duty/range/count constraints, and checked size arithmetic.
-     * Return UNSUPPORTED_MESSAGE for reserved flags or extension data. Do not
-     * compare tick_number with an active Test Configuration, match variable
-     * messages across calls, enforce endpoint direction, serialize outstanding
-     * operations, or enforce increasing stop-and-wait upload order.
-     * Integration owns those checks, rejects duplicate variable messages, and
-     * invalidates rejected ticks. Integration accepts each complete tick only
-     * after taking responsibility for retaining its fixed and declared variable
-     * data, automatically performs whole-test validation after all N ticks and
-     * data arrive, and makes exactly N fixed results available after a
-     * successfully started test. Firmware integration sends fixed results in
-     * increasing tick order, each followed by its variable results in
-     * declaration order. Early execution failure uses EXECUTION_PROBLEM for
-     * remaining fixed results unless communication/reset prevents delivery.
-     * Result-condition selection and cross-message result ordering are
-     * integration-owned enforcement of the shared transaction contract, not
-     * single-message structural validation. Do not evaluate retention
-     * medium/queue policy,
-     * firmware electrical/hardware/execution-manager policy, execute
-     * recovery/control, mutate anything, or retain a pointer.
-     */
-    ( void )context;
-    ( void )message;
-
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
-    const HIL_Application_Context_T* context, const uint8_t* encoded_message,
-    size_t encoded_message_size, size_t* required_decode_storage )
-{
-    /*
-     * TODO: Safely parse one complete message without publishing typed data;
-     * validate the future envelope and accept only the compiled-in Application
-     * protocol version, returning UNSUPPORTED_MESSAGE for an incompatible
-     * version; validate type/subtype/test-ID presence including Global Control
-     * rules, exact fixed-array and body lengths,
-     * enum/count/channel/declaration relationships including nonzero and unique
-     * declarations/configurations, initial zero flags/empty extension data, and
-     * configured bounds; reject missing and trailing bytes; calculate variable
-     * decode storage using checked arithmetic and the public alignment contract;
-     * and publish it only for a fully valid message.
-     * Do not infer active-configuration tick range/order, transaction
-     * prerequisites/completion/invalidation, or reset/result behavior.
-     * Transport session events are reported to integration and never mutate an
-     * Application transaction here. Do not mutate context, consume or retain
-     * input, or perform integration-semantic, hardware, or Transport behavior.
-     */
-    if ( required_decode_storage != NULL )
-    {
-        *required_decode_storage = 0u;
-    }
-    ( void )context;
-    ( void )encoded_message;
-    ( void )encoded_message_size;
-
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    size_t running_total = 0;
+    memcpy( &( new_message->has_test_id ), encoded_message, sizeof( new_message->has_test_id ) );
+    running_total += sizeof( new_message->has_test_id );
+    memcpy( &( new_message->test_id ), &( encoded_message[running_total] ),
+            sizeof( new_message->test_id ) );
+    running_total += sizeof( new_message->test_id );
+    // Message Type
+    memcpy( &( new_message->type ), &( encoded_message[running_total] ),
+            sizeof( new_message->type ) );
+    running_total += sizeof( new_message->type );
+    // Message sub-Type
+    memcpy( &( new_message->subtype ), &( encoded_message[running_total] ),
+            sizeof( new_message->subtype ) );
+    running_total += sizeof( new_message->subtype );
+    // the expected payload size
+    memcpy( payload_size, &( encoded_message[running_total] ),
+            HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES );
+    running_total += HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES;
+    return HIL_APPLICATION_STATUS_OK;
 }

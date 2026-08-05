@@ -28,6 +28,28 @@ extern "C"
 typedef enum
 {
     /** Invalid sentinel. */
+    HIL_APPLICATION_PERIPHERAL_CONFIG_VOLTAGE_INVALID = 0,
+    /** Peripheral is set to 3v3 voltage level. */
+    HIL_APPLICATION_PERIPHERAL_CONFIG_3V3 = 1,
+    /** Peripheral is set to 5v voltage level. */
+    HIL_APPLICATION_PERIPHERAL_CONFIG_5V = 2,
+    /** Peripheral is set to 12v voltage level. */
+    HIL_APPLICATION_PERIPHERAL_CONFIG_12V = 3,
+    /** Peripheral is set to 24v voltage level. */
+    HIL_APPLICATION_PERIPHERAL_CONFIG_24V = 4,
+    /** Reserved sentinel. */
+    HIL_APPLICATION_PERIPHERAL_CONFIG_VOLTAGE_RESERVED = 255
+} HIL_Application_Peripheral_Config_Voltage_Level_T;
+
+/**
+ * @brief Peripheral configuration record category.
+ *
+ * @warning Values may become wire identifiers and require compatibility review
+ * if changed after publication.
+ */
+typedef enum
+{
+    /** Invalid sentinel. */
     HIL_APPLICATION_PERIPHERAL_CONFIG_INVALID = 0,
     /** Digital input/output electrical configuration. */
     HIL_APPLICATION_PERIPHERAL_CONFIG_DIGITAL = 1,
@@ -52,14 +74,9 @@ typedef struct
 {
     /** Protocol-level digital input or output channel. */
     HIL_Application_Channel_Id_T channel;
-    /** Nominal output level in millivolts; zero for input-only channels. */
-    uint32_t output_millivolts;
-    /** Input-high threshold in millivolts; zero for output-only channels. */
-    uint32_t input_threshold_millivolts;
-    /** Initial output state; zero for input channels. */
-    uint8_t initial_output_high;
-    /** Nonzero requests capture of input state for result reporting. */
-    uint8_t capture_enabled;
+    /** Nominal output level */
+    HIL_Application_Peripheral_Config_Voltage_Level_T voltage_level;
+
 } HIL_Application_Digital_Config_T;
 
 /**
@@ -77,10 +94,8 @@ typedef struct
 {
     /** Protocol-level ANALOG_INPUT or ANALOG_OUTPUT channel. */
     HIL_Application_Channel_Id_T channel;
-    /** Minimum requested/supported signal in microvolts. */
-    int32_t minimum_microvolts;
-    /** Maximum requested/supported signal in microvolts. */
-    int32_t maximum_microvolts;
+    /** Maximum requested/supported voltage. */
+    HIL_Application_Peripheral_Config_Voltage_Level_T voltage_level;
 } HIL_Application_Analog_Config_T;
 
 /** Protocol-level PWM generation or capture configuration. */
@@ -92,8 +107,8 @@ typedef struct
     uint32_t period_nanoseconds;
     /** Initial duty cycle in 1/10000 units for PWM output. */
     uint16_t initial_duty_cycle_permyriad;
-    /** Nonzero requests period/duty capture in fixed result messages. */
-    uint8_t capture_enabled;
+    /** Maximum requested/supported voltage. */
+    HIL_Application_Peripheral_Config_Voltage_Level_T voltage_level;
 } HIL_Application_Pwm_Config_T;
 
 /**
@@ -115,6 +130,90 @@ typedef struct
     /** Maximum captured bytes per tick; zero disables result capture. */
     size_t capture_limit_bytes;
 } HIL_Application_Communication_Config_T;
+
+/**
+ * @brief Protocol-level serial/bus channel configuration.
+ *
+ * @details The flags field reserves family-specific protocol options whose
+ * exact bit assignments remain TODO. It must be zero in the initial protocol
+ * and must not contain MCU register values. A nonzero value is structurally
+ * unsupported.
+ */
+typedef struct
+{
+    // TODO CREATE STRUCT FIELDS
+    /** UART, SPI, I2C, or CAN logical channel. */
+    HIL_Application_Channel_Id_T channel;
+    /** Requested communication rate in bits per second. */
+    uint32_t bit_rate;
+    /** Reserved protocol option bits; must be zero in the initial protocol. */
+    uint32_t flags;
+    /** Maximum captured bytes per tick; zero disables result capture. */
+    size_t capture_limit_bytes;
+} HIL_Application_Can_Config_T;
+
+/**
+ * @brief Protocol-level serial/bus channel configuration.
+ *
+ * @details The flags field reserves family-specific protocol options whose
+ * exact bit assignments remain TODO. It must be zero in the initial protocol
+ * and must not contain MCU register values. A nonzero value is structurally
+ * unsupported.
+ */
+typedef struct
+{
+    // TODO CREATE STRUCT FIELDS
+    /** UART, SPI, I2C, or CAN logical channel. */
+    HIL_Application_Channel_Id_T channel;
+    /** Requested communication rate in bits per second. */
+    uint32_t bit_rate;
+    /** Reserved protocol option bits; must be zero in the initial protocol. */
+    uint32_t flags;
+    /** Maximum captured bytes per tick; zero disables result capture. */
+    size_t capture_limit_bytes;
+} HIL_Application_I2c_Config_T;
+
+/**
+ * @brief Protocol-level serial/bus channel configuration.
+ *
+ * @details The flags field reserves family-specific protocol options whose
+ * exact bit assignments remain TODO. It must be zero in the initial protocol
+ * and must not contain MCU register values. A nonzero value is structurally
+ * unsupported.
+ */
+typedef struct
+{
+    // TODO CREATE STRUCT FIELDS
+    /** UART, SPI, I2C, or CAN logical channel. */
+    HIL_Application_Channel_Id_T channel;
+    /** Requested communication rate in bits per second. */
+    uint32_t bit_rate;
+    /** Reserved protocol option bits; must be zero in the initial protocol. */
+    uint32_t flags;
+    /** Maximum captured bytes per tick; zero disables result capture. */
+    size_t capture_limit_bytes;
+} HIL_Application_Uart_Config_T;
+
+/**
+ * @brief Protocol-level serial/bus channel configuration.
+ *
+ * @details The flags field reserves family-specific protocol options whose
+ * exact bit assignments remain TODO. It must be zero in the initial protocol
+ * and must not contain MCU register values. A nonzero value is structurally
+ * unsupported.
+ */
+typedef struct
+{
+    // TODO CREATE STRUCT FIELDS
+    /** UART, SPI, I2C, or CAN logical channel. */
+    HIL_Application_Channel_Id_T channel;
+    /** Requested communication rate in bits per second. */
+    uint32_t bit_rate;
+    /** Reserved protocol option bits; must be zero in the initial protocol. */
+    uint32_t flags;
+    /** Maximum captured bytes per tick; zero disables result capture. */
+    size_t capture_limit_bytes;
+} HIL_Application_Spi_Config_T;
 
 /**
  * @brief Tagged peripheral configuration record.
@@ -139,7 +238,7 @@ typedef struct
         /** Valid when type is PWM. */
         HIL_Application_Pwm_Config_T pwm;
         /** Valid when type is COMMUNICATION. */
-        HIL_Application_Communication_Config_T communication;
+        // HIL_Application_Communication_Config_T communication;
     } value;
 } HIL_Application_Peripheral_Config_T;
 
@@ -173,16 +272,32 @@ typedef struct
 typedef struct
 {
     /** Unit-explicit duration represented by one instruction tick. */
-    HIL_Application_Tick_Duration_T tick_duration;
+    HIL_Application_Tick_Duration_T tick_duration_us;
     /** Nonzero upload length N, defining valid ticks 0 through N - 1. */
     uint32_t expected_tick_count;
     /** Reserved test-wide option bits; must be zero in the initial protocol. */
     uint32_t flags;
-    /** Peripheral/channel configuration records. */
-    const HIL_Application_Peripheral_Config_T* peripherals;
-    /** Number of readable records at peripherals. */
-    size_t peripheral_count;
-    /** Reserved versioned settings bytes; must be empty in the initial protocol. */
+
+    HIL_Application_Digital_Config_T digital_out[HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT];
+
+    HIL_Application_Digital_Config_T digital_in[HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT];
+
+    HIL_Application_Analog_Config_T analog_out[HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT];
+
+    HIL_Application_Analog_Config_T analog_in[HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT];
+
+    HIL_Application_Pwm_Config_T pwm_out[HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT];
+
+    HIL_Application_Pwm_Config_T pwm_in[HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT];
+
+    // HIL_Application_Can_Config_T can[HIL_APPLICATION_CAN_CHANNEL_COUNT];
+
+    // HIL_Application_Spi_Config_T spi[HIL_APPLICATION_SPI_CHANNEL_COUNT];
+
+    // HIL_Application_Uart_Config_T uart[HIL_APPLICATION_UART_CHANNEL_COUNT];
+
+    // HIL_Application_I2c_Config_T i2c[HIL_APPLICATION_I2C_CHANNEL_COUNT];
+
     HIL_Application_Byte_Span_T extension_data;
 } HIL_Application_Test_Configuration_T;
 
