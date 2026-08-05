@@ -5,6 +5,7 @@
  * @details Callers construct and receive this C-compatible representation
  * rather than reinterpreting raw body bytes. It is an API structure, not a
  * packed wire header. A future codec explicitly serializes approved fields.
+
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_MESSAGE_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_MESSAGE_H
@@ -12,6 +13,8 @@
 #include <stdint.h>
 
 #include "hil_rig_protocol/application/application_control.h"
+#include "hil_rig_protocol/application/application_types.h"
+#include "hil_rig_protocol/application/application_status.h"
 #include "hil_rig_protocol/application/application_error.h"
 #include "hil_rig_protocol/application/application_instruction.h"
 #include "hil_rig_protocol/application/application_response.h"
@@ -23,6 +26,84 @@
 extern "C"
 {
 #endif
+
+#define HIL_APPLICATION_VALID_TICK_PERIODS_NS                                                      \
+    {                                                                                              \
+        10000000, 1000000, 100000, 10000                                                           \
+    }  // 100 Hz 1kHz 10kHz 100kHz
+
+#define HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE                                                    \
+    255U  // Largest allowable # of bytes (bytespan size = uint8_t)
+#define HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE                                            \
+    HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE  // Byte Span Limit
+// CAN {2}, I2C {2}, SPI {2}, UART {2} = .
+#define HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK 8U  // variable_data_count = uint8_t
+// DIO {20}, AIO {12}, PWMIO {4} + HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK =
+#define HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT 24U
+// Test Instruction
+/**
+    What is written to the wire:
+
+    ________________________________________________
+    |                                              |
+    |               Has Test ID {1}                |
+    |______________________________________________|
+    |                                              |
+    |                Test ID {16}                  |
+    |______________________________________________|
+    |                     |                        |
+    |   Message Type {4}  |  Message Sub-Type {4}  |
+    |_____________________|________________________|
+    |                                              |
+    |           Payload Size (Bytes) {4}           |
+    |______________________________________________|
+    |                                              |
+    |                Payload {X}                   |
+    |______________________________________________|
+    |                                              |
+    |            Payload end flag {1}              |
+    |______________________________________________|
+
+    i.e. 30 bytes plus payload bytes
+
+    The largest payload at the moment (4/09/2026) is configuration:
+
+    _______________________________________________________
+    |                         |                            |
+    |    tick duration {4}    |  expected tick count {4}   |
+    |_________________________|____________________________|
+    |                         |                            |
+    |        flags {4}        |   digital out [10] {10}    |
+    |_________________________|____________________________|
+    |                         |                            |
+    |  digital in [10] {10}   |    analog out [6] {10}     |
+    |_________________________|____________________________|
+    |                         |                            |
+    |    analog in [2] {10}   |       pwm out [2] {16}     |
+    |_________________________|____________________________|
+    |                         |                            |
+    |    pwm in [2] {16}      |     extension data {X}     |
+    |_________________________|____________________________|
+
+    extension data has a max size of 255 (defined by HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE)
+
+    meaning the max payload message size is: 611
+    and the max message size is: 641
+
+*/
+#define HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE                                                  \
+    641U  // as calculated by HIL_APPLICATION_Test_Instructions_encode
+#define HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT 1000000U  // Arbitrarily selected
+
+// Header defines
+#define HIL_APPLICATION_MESSAGE_HAS_ID_SIZE_BYTES 1
+#define HIL_APPLICATION_MESSAGE_TYPE_SIZE_BYTES 4
+#define HIL_APPLICATION_MESSAGE_SUB_TYPE_SIZE_BYTES 4
+#define HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES 4
+#define HIL_APPLICATION_HEADER_SIZE_BYTES                                                          \
+    ( HIL_APPLICATION_MESSAGE_HAS_ID_SIZE_BYTES + HIL_APPLICATION_TEST_ID_SIZE                     \
+      + HIL_APPLICATION_MESSAGE_TYPE_SIZE_BYTES + HIL_APPLICATION_MESSAGE_SUB_TYPE_SIZE_BYTES      \
+      + HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES )
 
 /**
  * @brief Semantic family of one complete Application message.
@@ -138,6 +219,13 @@ typedef struct
         HIL_Application_Error_T error;
     } body;
 } HIL_Application_Message_T;
+
+HIL_Application_Status_T HIL_APPLICATION_Header_Encoding( const HIL_Application_Message_T* message,
+                                                          uint8_t*                         dest );
+
+HIL_Application_Status_T HIL_APPLICATION_Header_decoding( HIL_Application_Message_T* new_message,
+                                                          const uint8_t* encoded_message,
+                                                          size_t*        payload_size );
 
 #ifdef __cplusplus
 }

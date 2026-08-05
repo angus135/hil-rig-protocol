@@ -2,4 +2,8 @@ target_sources(hil_rig_protocol
     PRIVATE
         application.c
         application_message.c
+        application_encoding.c
+        application_decoding.c
+        application_validation.c
+        application_size.c
 )
