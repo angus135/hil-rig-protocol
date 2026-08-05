@@ -1,4 +1,12 @@
 #include "hil_rig_protocol/application/application.h"
+#include "hil_rig_protocol/application/application_control.h"
+#include "hil_rig_protocol/application/application_error.h"
+#include "hil_rig_protocol/application/application_instruction.h"
+#include "hil_rig_protocol/application/application_response.h"
+#include "hil_rig_protocol/application/application_result.h"
+#include "hil_rig_protocol/application/application_system_info.h"
+#include "hil_rig_protocol/application/application_test_config.h"
+#include "hil_rig_protocol/application/application_types.h"
 
 #include <string.h>
 
@@ -13,12 +21,71 @@ HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_
      * after every field is initialized. Fixed GPIO, analogue, and PWM array
      * extents are protocol constants and must not become configurable limits.
      */
-    if ( config != NULL )
-    {
-        ( void )memset( config, 0, sizeof( *config ) );
+
+    /**
+     * Largest complete encoded Application message accepted or produced.
+     *
+     * Integration must configure Transport's maximum Application-message size
+     * to at least this value. The codec does not inspect Transport configuration.
+     */
+    size_t max_encoded_message_size=0U;
+    if (max_encoded_message_size > HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE){
+        return HIL_APPLICATION_STATUS_INVALID_COUNT;
+    }
+    /** Largest byte span in one variable instruction/result/error field. */
+    size_t max_variable_data_size=0U;
+    if (max_variable_data_size > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE){
+        return HIL_APPLICATION_STATUS_INVALID_COUNT;
+    }
+    /** Maximum peripheral configuration records in one typed configuration. */
+    size_t max_peripheral_config_count=0U;
+    if (max_peripheral_config_count > HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT){
+        return HIL_APPLICATION_STATUS_INVALID_COUNT;
+    }
+    /** Maximum variable-data declarations in one typed tick body. */
+    size_t max_variable_transfers_per_tick=0U;
+    if (max_variable_transfers_per_tick > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK){
+        return HIL_APPLICATION_STATUS_INVALID_COUNT;
+    }
+    /**
+     * Largest expected_tick_count value accepted structurally.
+     *
+     * This is not retained upload capacity and causes no per-tick allocation.
+     */
+    uint32_t max_expected_tick_count=0U;
+    if (max_expected_tick_count > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT){
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
     }
 
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    if ( config != NULL )
+    {
+    if (config->max_encoded_message_size > HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE){
+        return HIL_APPLICATION_STATUS_INVALID_COUNT;
+    }
+    /** Largest byte span in one variable instruction/result/error field. */
+    if (config->max_variable_data_size > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE){
+        return HIL_APPLICATION_STATUS_INVALID_COUNT;
+    }
+    /** Maximum peripheral configuration records in one typed configuration. */
+    if (config->max_peripheral_config_count > HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT){
+        return HIL_APPLICATION_STATUS_INVALID_COUNT;
+    }
+    /** Maximum variable-data declarations in one typed tick body. */
+    if (config->max_variable_transfers_per_tick > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK){
+        return HIL_APPLICATION_STATUS_INVALID_COUNT;
+    }
+    /**
+     * Largest expected_tick_count value accepted structurally.
+     *
+     * This is not retained upload capacity and causes no per-tick allocation.
+     */
+    if (config->max_expected_tick_count > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT){
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    return HIL_APPLICATION_STATUS_OK;
+    }
+
+    return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      context,
