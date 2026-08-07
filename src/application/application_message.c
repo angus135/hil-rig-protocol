@@ -10,4 +10,3 @@
 #include "hil_rig_protocol/application/application_types.h"
 
 #include <string.h>
-

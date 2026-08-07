@@ -6,24 +6,6 @@
  * rather than reinterpreting raw body bytes. It is an API structure, not a
  * packed wire header. A future codec explicitly serializes approved fields.
 
- These sizes are defined in application_types.h
- HIL_APPLICATION_TEST_ID_SIZE
- HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE
- ________________________________________________
- |                                              |
- |                Test ID {16}                  |
- |______________________________________________|
- |                     |                        |
- |   Message Type {1}  |  Message Sub-Type {1}  |
- |_____________________|________________________|
- |                                              |
- |            Payload Size (Bytes)              |
- |______________________________________________|
- |                                              |
- |                  Payload                     |
- |______________________________________________|
-
-
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_MESSAGE_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_MESSAGE_H
@@ -42,6 +24,14 @@
 extern "C"
 {
 #endif
+
+#define HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE_BYTES ( 65536u )
+#define HIL_APPLICATION_MESSAGE_TYPE_SIZE_BYTES 1
+#define HIL_APPLICATION_MESSAGE_SUB_TYPE_SIZE_BYTES 1
+#define HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES 16
+#define HIL_APPLICATION_HEADER_SIZE_BYTES                                                          \
+    ( HIL_APPLICATION_TEST_ID_SIZE + HIL_APPLICATION_MESSAGE_TYPE_SIZE_BYTES                       \
+      + HIL_APPLICATION_MESSAGE_SUB_TYPE_SIZE_BYTES + HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES )
 
 /**
  * @brief Semantic family of one complete Application message.
