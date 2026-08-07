@@ -114,7 +114,7 @@ typedef struct
     /** Unique, nonzero UART/SPI/I2C/CAN result transfers. */
     const HIL_Application_Data_Declaration_T* variable_data;
     /** Number of result declarations at variable_data. */
-    size_t variable_data_count;
+    uint32_t variable_data_count;
     /** Recorded condition reported after execution; not an execution-time Error. */
     HIL_Application_Result_Condition_T condition;
     /**

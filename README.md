@@ -155,6 +155,18 @@ Normal Application integrations include only:
 
 ```c
 #include "hil_rig_protocol/application/application.h"
+HIL_Status HIL_EncodeInstruction(
+    const HIL_Instruction *instruction,
+    uint8_t *out_buffer,
+    uint32_t out_buffer_len,
+    uint32_t *bytes_written
+);
+
+HIL_Status HIL_DecodeInstruction(
+    const uint8_t *buffer,
+    uint32_t buffer_len,
+    HIL_Instruction *out_instruction
+);
 ```
 
 The public context holds structural codec bounds only. Callers own encoded

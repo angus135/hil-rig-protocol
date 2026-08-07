@@ -141,7 +141,7 @@ HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      c
  */
 HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Context_T* context,
                                                        const HIL_Application_Message_T* message,
-                                                       size_t* encoded_size );
+                                                       uint32_t* encoded_size );
 
 /**
  * @brief Encode typed data into one complete Application message.
@@ -176,9 +176,9 @@ HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Con
  */
 HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_Context_T* context,
                                                          const HIL_Application_Message_T* message,
-                                                         uint8_t* out_buffer,
-                                                         size_t   out_buffer_size,
-                                                         size_t*  output_size );
+                                                         uint8_t*  out_buffer,
+                                                         uint32_t  out_buffer_size,
+                                                         uint32_t* output_size );
 
 /**
  * @brief Calculate variable storage required to decode one complete message.
@@ -207,8 +207,8 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
  */
 HIL_Application_Status_T
 HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
-                                     const uint8_t* encoded_message, size_t encoded_message_size,
-                                     size_t* required_storage_size );
+                                     const uint8_t* encoded_message, uint32_t encoded_message_size,
+                                     uint32_t* required_storage_size );
 
 /**
  * @brief Decode one complete Application message into typed caller storage.
@@ -273,8 +273,8 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
  */
 HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
     const HIL_Application_Context_T* context, const uint8_t* encoded_message,
-    size_t encoded_message_size, uint8_t* decode_storage, size_t decode_storage_capacity,
-    HIL_Application_Message_T* out_message, size_t* decode_storage_size );
+    uint32_t encoded_message_size, uint8_t* decode_storage, uint32_t decode_storage_capacity,
+    HIL_Application_Message_T* out_message, uint32_t* decode_storage_size );
 
 /**
  * @brief Structurally validate one typed tagged message.
@@ -329,7 +329,7 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
  */
 HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
     const HIL_Application_Context_T* context, const uint8_t* encoded_message,
-    size_t encoded_message_size, size_t* required_decode_storage );
+    uint32_t encoded_message_size, uint32_t* required_decode_storage );
 
 #ifdef __cplusplus
 }

@@ -9,7 +9,7 @@ byte order, compatibility behavior, and all codec algorithms remain TODO. Every
 current `.c` function is an intentional `NOT_IMPLEMENTED` stub.
 
 The structures below are C API representations, not packed wire layouts.
-`size_t`, enum representation, padding, unions, and pointers must never be
+`uint32_t`, enum representation, padding, unions, and pointers must never be
 copied directly onto the wire.
 
 ## Common envelope
