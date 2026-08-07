@@ -5,6 +5,25 @@
  * @details Callers construct and receive this C-compatible representation
  * rather than reinterpreting raw body bytes. It is an API structure, not a
  * packed wire header. A future codec explicitly serializes approved fields.
+
+ These sizes are defined in application_types.h
+ HIL_APPLICATION_TEST_ID_SIZE
+ HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE
+ ________________________________________________
+ |                                              |
+ |                Test ID {16}                  |
+ |______________________________________________|
+ |                     |                        |
+ |   Message Type {1}  |  Message Sub-Type {1}  |
+ |_____________________|________________________|
+ |                                              |
+ |            Payload Size (Bytes)              |
+ |______________________________________________|
+ |                                              |
+ |                  Payload                     |
+ |______________________________________________|
+
+
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_MESSAGE_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_MESSAGE_H
