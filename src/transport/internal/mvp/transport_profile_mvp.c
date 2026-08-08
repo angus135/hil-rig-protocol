@@ -1,17 +1,97 @@
 /**
  * @file transport_profile_mvp.c
- * @brief Intentional stubs for the default minimal Transport profile.
+ * @brief MVP wire storage integration and remaining runtime stubs.
  *
  * @details The eventual MVP uses simple session establishment, one complete
  * Application message per frame, framing plus integrity, and one outstanding
- * reliable transmission. It does not provide fragmentation, reliable
- * pipelining, flow control, or multiple queued messages. Every operation remains
- * deliberately non-functional in this API/source-architecture change.
+ * reliable transmission. Workspace sizing and initialization support the
+ * implemented codec/parser path. Session progression, reliability, and public
+ * message orchestration remain deliberately non-functional.
  */
 #include "../transport_profile.h"
 
 #include "../transport_internal.h"
+#include "transport_frame_codec_mvp.h"
 #include "transport_types_mvp.h"
+
+#include <stdint.h>
+#include <string.h>
+
+static int HIL_TRANSPORT_MVP_Checked_Add( size_t left, size_t right, size_t* result )
+{
+    if ( ( result == NULL ) || ( left > ( SIZE_MAX - right ) ) )
+    {
+        return 0;
+    }
+    *result = left + right;
+    return 1;
+}
+
+static int HIL_TRANSPORT_MVP_Storage_Overlaps( const void* object, size_t object_size,
+                                               const HIL_Transport_Storage_T* storage )
+{
+    const uintptr_t object_start    = ( uintptr_t )object;
+    const uintptr_t workspace_start = ( uintptr_t )storage->workspace;
+    uintptr_t       object_end;
+    uintptr_t       workspace_end;
+
+    if ( ( object_start > ( UINTPTR_MAX - object_size ) )
+         || ( workspace_start > ( UINTPTR_MAX - storage->workspace_size ) ) )
+    {
+        return 1;
+    }
+    object_end    = object_start + object_size;
+    workspace_end = workspace_start + storage->workspace_size;
+    return ( object_start < workspace_end ) && ( workspace_start < object_end );
+}
+
+static HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Validate_Config_And_Size( const HIL_Transport_Config_T* config,
+                                            size_t*                       required_size )
+{
+    size_t encoded_minimum;
+    size_t raw_scratch_size;
+    size_t total_size;
+
+    if ( ( config == NULL ) || ( required_size == NULL )
+         || ( config->max_application_message_size == 0u )
+         || ( config->max_encoded_frame_size == 0u ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( config->connection_timeout_ms != 0u )
+    {
+        return HIL_TRANSPORT_STATUS_UNSUPPORTED_CONFIGURATION;
+    }
+
+    encoded_minimum = HIL_TRANSPORT_MVP_Max_Encoded_Size( config->max_application_message_size );
+    if ( ( encoded_minimum == 0u ) || ( config->max_encoded_frame_size < encoded_minimum ) )
+    {
+        return HIL_TRANSPORT_STATUS_UNSUPPORTED_CONFIGURATION;
+    }
+    if ( !HIL_TRANSPORT_MVP_Checked_Add( config->max_application_message_size,
+                                         HIL_TRANSPORT_MVP_RAW_OVERHEAD, &raw_scratch_size ) )
+    {
+        return HIL_TRANSPORT_STATUS_UNSUPPORTED_CONFIGURATION;
+    }
+
+    total_size = sizeof( HIL_Transport_Mvp_Root_T );
+    if ( !HIL_TRANSPORT_MVP_Checked_Add( total_size, config->max_application_message_size,
+                                         &total_size )
+         || !HIL_TRANSPORT_MVP_Checked_Add( total_size, config->max_encoded_frame_size,
+                                            &total_size )
+         || !HIL_TRANSPORT_MVP_Checked_Add( total_size, config->max_encoded_frame_size - 1u,
+                                            &total_size )
+         || !HIL_TRANSPORT_MVP_Checked_Add( total_size, raw_scratch_size, &total_size )
+         || !HIL_TRANSPORT_MVP_Checked_Add( total_size, config->max_application_message_size,
+                                            &total_size ) )
+    {
+        return HIL_TRANSPORT_STATUS_UNSUPPORTED_CONFIGURATION;
+    }
+
+    *required_size = total_size;
+    return HIL_TRANSPORT_STATUS_OK;
+}
 
 void HIL_TRANSPORT_PROFILE_Default_Config( HIL_Transport_Config_T* config )
 {
@@ -33,24 +113,12 @@ HIL_Transport_Status_T
 HIL_TRANSPORT_PROFILE_Required_Storage_Size( const HIL_Transport_Config_T* config,
                                              size_t*                       required_size )
 {
-    /*
-     * TODO: Clear required_size; require nonzero message/frame limits; validate
-     * role-independent numeric policy without deciding whether session_seed is
-     * valid for a host or rig; return UNSUPPORTED_CONFIGURATION when
-     * connection_timeout_ms is nonzero because the MVP has no idle-liveness
-     * traffic; reject a relationship in which one complete message cannot fit
-     * one MVP frame; and use checked aligned arithmetic for
-     * HIL_Transport_Mvp_Root_T plus one submitted message, one stable
-     * encoded/retry item, parser scratch, and one received message. Assume the
-     * public HIL_TRANSPORT_WORKSPACE_ALIGNMENT contract and expose no private
-     * partition offsets.
-     */
-    ( void )config;
-    if ( required_size != NULL )
+    if ( required_size == NULL )
     {
-        *required_size = 0u;
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    *required_size = 0u;
+    return HIL_TRANSPORT_MVP_Validate_Config_And_Size( config, required_size );
 }
 
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*       context,
@@ -58,26 +126,97 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
                                                    const HIL_Transport_Config_T*  config,
                                                    const HIL_Transport_Storage_T* storage )
 {
-    /*
-     * TODO: Require a completely zero-initialized facade and reject an already
-     * initialized context without changing it. Validate all other inputs and the
-     * required non-NULL configuration. Require nonzero message/frame limits;
-     * require HOST seed to be neither INVALID nor RESERVED; require RIG seed to
-     * be exactly INVALID; return UNSUPPORTED_CONFIGURATION for nonzero
-     * connection_timeout_ms; and reject a relationship requiring fragmentation.
-     * Require workspace alignment/capacity, partition with checked arithmetic,
-     * copy configuration, and initialize MVP root/session atomically. Publish
-     * facade fields and the initialization cookie only after every check and
-     * write succeeds; a failed first initialization must leave every context
-     * field zero. A rig later adopts a valid host-proposed identity. Never
-     * replace a working context's role, configuration, or workspace, and perform
-     * no I/O or allocation.
-     */
-    ( void )context;
-    ( void )role;
-    ( void )config;
-    ( void )storage;
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    HIL_Transport_Status_T    status;
+    HIL_Transport_Mvp_Root_T* root;
+    uint8_t*                  next_region;
+    size_t                    required_size = 0u;
+    size_t                    raw_scratch_size;
+
+    if ( ( context == NULL ) || ( config == NULL ) || ( storage == NULL ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( ( context->implementation != NULL ) || ( context->implementation_size != 0u )
+         || ( context->initialization_cookie != 0u ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( ( role != HIL_TRANSPORT_ROLE_HOST ) && ( role != HIL_TRANSPORT_ROLE_RIG ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( ( ( role == HIL_TRANSPORT_ROLE_HOST )
+           && ( ( config->session_seed == HIL_TRANSPORT_SESSION_SEED_INVALID )
+                || ( config->session_seed == HIL_TRANSPORT_SESSION_SEED_RESERVED ) ) )
+         || ( ( role == HIL_TRANSPORT_ROLE_RIG )
+              && ( config->session_seed != HIL_TRANSPORT_SESSION_SEED_INVALID ) ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+
+    status = HIL_TRANSPORT_MVP_Validate_Config_And_Size( config, &required_size );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    if ( ( storage->workspace == NULL )
+         || ( ( ( uintptr_t )storage->workspace % HIL_TRANSPORT_WORKSPACE_ALIGNMENT ) != 0u ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( storage->workspace_size < required_size )
+    {
+        return HIL_TRANSPORT_STATUS_BUFFER_TOO_SMALL;
+    }
+    if ( HIL_TRANSPORT_MVP_Storage_Overlaps( context, sizeof( *context ), storage )
+         || HIL_TRANSPORT_MVP_Storage_Overlaps( config, sizeof( *config ), storage )
+         || HIL_TRANSPORT_MVP_Storage_Overlaps( storage, sizeof( *storage ), storage ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+
+    raw_scratch_size = config->max_application_message_size + HIL_TRANSPORT_MVP_RAW_OVERHEAD;
+    memset( storage->workspace, 0, required_size );
+    root        = ( HIL_Transport_Mvp_Root_T* )storage->workspace;
+    next_region = storage->workspace + sizeof( *root );
+
+    root->base.config         = *config;
+    root->base.role           = role;
+    root->base.link_state     = HIL_TRANSPORT_LINK_STATE_DISCONNECTED;
+    root->base.session_state  = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
+    root->base.operating_mode = HIL_TRANSPORT_OPERATING_MODE_NORMAL;
+
+    root->session.role                         = role;
+    root->session.link_state                   = HIL_TRANSPORT_LINK_STATE_DISCONNECTED;
+    root->session.state                        = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
+    root->session.handshake_phase              = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE;
+    root->session.next_host_session_identifier = config->session_seed;
+    root->session.initial_reliable_sequence    = config->initial_reliable_sequence;
+    root->session.next_transmit_sequence       = config->initial_reliable_sequence;
+    root->session.expected_receive_sequence    = config->initial_reliable_sequence;
+    root->session.reliable_state               = HIL_TRANSPORT_MVP_RELIABLE_IDLE;
+
+    root->submitted_message = next_region;
+    next_region += config->max_application_message_size;
+    root->encoded_output = next_region;
+    next_region += config->max_encoded_frame_size;
+    status = HIL_TRANSPORT_Parser_Init( &root->parser, next_region,
+                                        config->max_encoded_frame_size - 1u );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        memset( storage->workspace, 0, required_size );
+        return status;
+    }
+    next_region += config->max_encoded_frame_size - 1u;
+    root->codec_scratch      = next_region;
+    root->codec_scratch_size = raw_scratch_size;
+    next_region += raw_scratch_size;
+    root->received_message = next_region;
+
+    context->implementation        = root;
+    context->implementation_size   = required_size;
+    context->initialization_cookie = HIL_TRANSPORT_INTERNAL_INITIALIZATION_COOKIE;
+    return HIL_TRANSPORT_STATUS_OK;
 }
 
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* context )

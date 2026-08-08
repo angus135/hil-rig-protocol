@@ -77,11 +77,11 @@ TEST( TransportStorageQuery, DoesNotRequireAnEndpointRoleOrHostSeed )
     HIL_TRANSPORT_Default_Config( &config );
     ASSERT_EQ( config.session_seed, HIL_TRANSPORT_SESSION_SEED_INVALID );
     EXPECT_EQ( HIL_TRANSPORT_Required_Storage_Size( &config, &required_size ),
-               HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED );
-    EXPECT_EQ( required_size, 0u );
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_GT( required_size, 0u );
 }
 
-TEST( TransportContextLifecycle, FailedFirstStubInitializationLeavesZeroContext )
+TEST( TransportContextLifecycle, InsufficientFirstInitializationLeavesZeroContext )
 {
     HIL_Transport_Context_T                                                      context{};
     HIL_Transport_Config_T                                                       config{};
@@ -92,12 +92,12 @@ TEST( TransportContextLifecycle, FailedFirstStubInitializationLeavesZeroContext 
     config.session_seed = UINT64_C( 0x1234 );
 
     EXPECT_EQ( HIL_TRANSPORT_Init( &context, HIL_TRANSPORT_ROLE_HOST, &config, &storage ),
-               HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED );
+               HIL_TRANSPORT_STATUS_BUFFER_TOO_SMALL );
     EXPECT_EQ( context.implementation, nullptr );
     EXPECT_EQ( context.implementation_size, 0u );
     EXPECT_EQ( context.initialization_cookie, 0u );
 
-    /* A real successful context would be reset, never passed to Init again. */
+    /* A successful context would be reset, never passed to Init again. */
 }
 
 TEST( TransportStubs, DefensivelyClearStructuredOutputs )

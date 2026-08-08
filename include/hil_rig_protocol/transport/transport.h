@@ -23,9 +23,10 @@
  * re-entrancy protection.
  *
  * @par Current implementation status
- * This branch defines an API and source architecture. Profile functions remain
- * intentional HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED stubs; no framing,
- * reliability, timer, session, or message algorithm is claimed to work yet.
+ * MVP workspace sizing, initialization, CRC, COBS framing, frame codec, and
+ * bounded stream parsing are implemented. Session establishment, reliability,
+ * timing, and public message orchestration remain intentional
+ * HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED stubs.
  */
 #ifndef HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
 #define HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
@@ -171,7 +172,7 @@ void HIL_TRANSPORT_Default_Config( HIL_Transport_Config_T* config );
 /**
  * @brief Query workspace required by the selected build profile.
  *
- * @details The future implementation validates only role-independent
+ * @details The implementation validates only role-independent
  * configuration and the selected profile's capacity relationships because this
  * operation does not receive an endpoint role. It does not decide whether the
  * configured session seed is valid for a host or rig; that role-specific check
@@ -192,7 +193,6 @@ void HIL_TRANSPORT_Default_Config( HIL_Transport_Config_T* config );
  * @retval HIL_TRANSPORT_STATUS_INVALID_ARGUMENT A pointer/value is invalid.
  * @retval HIL_TRANSPORT_STATUS_UNSUPPORTED_CONFIGURATION The selected profile
  * cannot provide the requested contract.
- * @retval HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED Current stub result.
  */
 HIL_Transport_Status_T HIL_TRANSPORT_Required_Storage_Size( const HIL_Transport_Config_T* config,
                                                             size_t* required_size );
@@ -207,7 +207,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_Required_Storage_Size( const HIL_Transport_
  * leaves the context deterministically uninitialized.
  *
  * Configuration is mandatory; passing NULL never requests implicit defaults.
- * The future implementation requires both capacity limits to be nonzero;
+ * The implementation requires both capacity limits to be nonzero;
  * requires a usable HOST seed and exactly INVALID for a RIG; validates timing
  * policy, workspace pointer/size/alignment, checked storage arithmetic, and
  * profile support before copying configuration into private state. The MVP
@@ -231,7 +231,6 @@ HIL_Transport_Status_T HIL_TRANSPORT_Required_Storage_Size( const HIL_Transport_
  * @retval HIL_TRANSPORT_STATUS_UNSUPPORTED_CONFIGURATION Profile cannot support
  * the requested message/frame relationship or another valid option.
  * @retval HIL_TRANSPORT_STATUS_BUFFER_TOO_SMALL Workspace is insufficient.
- * @retval HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED Current stub result.
  */
 HIL_Transport_Status_T HIL_TRANSPORT_Init( HIL_Transport_Context_T*       context,
                                            HIL_Transport_Role_T           role,
