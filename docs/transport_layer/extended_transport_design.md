@@ -7,15 +7,16 @@ contract, does not describe implemented behavior, and does not require the MVP
 to provide these features. A decision becomes normative only after approval and
 promotion into the public contract and relevant private implementation design.
 
-Open wire decisions include field widths, byte order, reserved values, framing,
-integrity algorithm and coverage, version negotiation, sequence width/wrap,
-control delivery classes, reset encoding, and crossed-session behavior.
+The MVP wire representation is now defined in `transport_layer.md`. Any future
+extended wire representation still requires explicit decisions about additional
+fields, version compatibility, control delivery classes, and crossed-session
+behavior; this document does not override the implemented MVP format.
 
 ## MVP-private three-message handshake choice
 
-The compiled MVP skeleton retains an explicit private phase model independent of
-public operating mode and every Application lifecycle. No behavior is
-implemented and the phase is not public API:
+The compiled MVP retains an explicit private phase model independent of public
+operating mode and every Application lifecycle. The wire frame types are
+implemented, but handshake progression remains a stub and is not public API:
 
 1. host sends reliable `INITIATE` carrying a fresh caller-seeded Transport
    session identity and host initial sequence information;
@@ -43,9 +44,11 @@ retries abandons the incomplete handshake and restarts establishment; the host
 uses its next deterministically derived identity. It produces no Application
 `DELIVERY_FAILED` event because no Application message was accepted.
 Incompatible identities also cause complete abandonment and recovery rather
-than partial handshake continuation. Exact handshake binary encoding remains
-open. A future extended profile may reuse or replace this private choice without
-a public API change.
+than partial handshake continuation. The normative MVP wire format defines the
+binary representation of `INITIATE`, `RESPONSE`, `CONFIRM`, and `ACK`.
+Handshake progression, state transitions, retry handling, and duplicate
+behavior remain separate implementation work. A future extended profile may
+define a different versioned representation without changing the public API.
 
 The library never creates random identities. Host configuration supplies the
 starting seed. A future deterministic progression skips invalid/reserved values,

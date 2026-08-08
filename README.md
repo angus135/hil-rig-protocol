@@ -50,16 +50,18 @@ The layer boundary is deliberate:
 
 ## Current status
 
-This repository is at the API, contract, and source-architecture stage. It is
-not yet a working wire protocol.
-
 Application encoding, decoding, and structural validation are intentional
 `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` stubs, and the common Application wire
-envelope is not defined. Transport runtime algorithms—including framing,
-integrity, parsing, session establishment, acknowledgements, retransmission,
-and recovery—are intentional `HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs.
-The Transport default-configuration helper is implemented, but it does not make
-the runtime operational.
+envelope is not defined. The MVP Transport wire path is implemented: versioned
+little-endian frames use CRC-32/ISO-HDLC for accidental-corruption detection,
+standard COBS encoding, and a trailing `0x00` stream delimiter. Workspace
+sizing, initialization, and the bounded stream parser are also implemented.
+
+The broader Transport runtime—session establishment, acknowledgements,
+retransmission, recovery, and Application-message orchestration—remains as
+intentional `HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs. The implemented codec
+therefore defines and tests the wire representation without yet making the
+public send/receive workflow operational end to end.
 
 The default MVP Transport profile is designed for one complete Application
 message per frame and one outstanding reliable transmission. Extended
@@ -119,6 +121,11 @@ Each Transport context has one owning execution context and one aligned,
 caller-owned workspace. The caller reports link state and monotonic time, feeds
 arbitrary received byte chunks, and performs external writes using the
 facade's peek/commit ownership model.
+
+The MVP transmits `COBS(decoded frame) || 0x00`. Each decoded frame has a
+14-byte fixed header, one optional complete opaque Application message, and a
+four-byte CRC. See the normative Transport document for byte offsets, frame
+types, field rules, integrity coverage, and size bounds.
 
 - [Normative public facade contract](docs/transport_layer/transport_layer.md)
 - [Transport caller workflow](docs/transport_layer/transport_api_usage.mmd)
