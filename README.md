@@ -57,11 +57,19 @@ little-endian frames use CRC-32/ISO-HDLC for accidental-corruption detection,
 standard COBS encoding, and a trailing `0x00` stream delimiter. Workspace
 sizing, initialization, and the bounded stream parser are also implemented.
 
-The broader Transport runtime—session establishment, acknowledgements,
-retransmission, recovery, and Application-message orchestration—remains as
-intentional `HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs. The implemented codec
-therefore defines and tests the wire representation without yet making the
-public send/receive workflow operational end to end.
+The MVP also implements the private one-item reliable output lifecycle: an
+already encoded frame can be published, repeatedly peeked, committed, retained
+byte-for-byte across timed retransmissions, completed by an exact ACK, exhausted
+without choosing recovery policy, or abandoned by reset. Public
+`Peek_Output()`, `Commit_Output()`, `Get_Status()`, and `Reset()` use that
+primitive. Dedicated tests drive it directly with opaque sentinel bytes because
+the later handshake and Application submission paths do not yet publish frames.
+
+The broader Transport runtime—session handshake, received-ACK dispatch,
+receive-side duplicate handling, ACK generation, Application submission and
+delivery, delivery events, and session recovery—remains as intentional
+`HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs. The public send/receive workflow
+is therefore not operational end to end yet.
 
 The default MVP Transport profile is designed for one complete Application
 message per frame and one outstanding reliable transmission. Extended

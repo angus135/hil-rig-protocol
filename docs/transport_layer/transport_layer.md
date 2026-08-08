@@ -8,9 +8,11 @@ do not constrain the MVP unless they are later promoted here or into public
 header contracts.
 
 The MVP wire codec, CRC, COBS framing, bounded stream parser, workspace sizing,
-and initialization are implemented. The broader public runtime operations for
-session establishment, reliability, timing, and Application-message
-orchestration remain intentional stubs unless stated otherwise below.
+initialization, and private one-item reliable encoded-output lifecycle are
+implemented. Public peek, commit, status, and reset delegate to that lifecycle.
+Session establishment, received-ACK dispatch, ACK generation, receive-side
+duplicate handling, Application-message orchestration, delivery events, and
+session recovery remain intentional stubs unless stated otherwise below.
 
 Transport is HIL-RIG-specific but communication-medium-agnostic. It maps opaque,
 complete Application messages to opaque encoded output and received raw bytes
@@ -270,22 +272,26 @@ Transport delivery acknowledgement is not Application acceptance. Application
 validation and responses belong to Application integrations; their messages are
 ordinary opaque payloads through this same API.
 
-The MVP has one stop-and-wait reliable slot. `max_retries` counts
-retransmissions after the initial committed transmission, and every retry uses
-the same encoded bytes, session identity, and sequence. A matching ACK completes
-delivery and advances the sequence once; stale or unexpected ACKs do not. If an
-accepted Application message exhausts retries, Transport reports
-`DELIVERY_FAILED`, queues a `DELIVERY_FAILED` event for that accepted message,
-abandons every item belonging to the now-uncertain session, and enters recovery
-to establish a completely new session. It cannot accept or send another
-Application message under the old session or sequence state. Retry exhaustion
-is normal recovery, not terminal `FAULT`.
+The MVP has one stop-and-wait reliable slot. The implemented primitive retains
+one already encoded reliable frame; later handshake and Application paths will
+both publish through it. `max_retries` counts retransmissions successfully
+committed to external I/O after the initial committed transmission. Merely
+scheduling or peeking a retry does not increase the count. Every retry exposes
+the exact original encoded bytes, session identity, and sequence without
+re-running framing, CRC, or COBS processing.
 
-Reliable private handshake work uses the same timeout and retry policy. If it
-exhausts retries, Transport abandons the incomplete handshake, queues no
-Application delivery event, and restarts establishment; the host uses its next
-deterministically derived session identity. Retry exhaustion never skips or
-reuses an uncertain sequence for another message in the same session.
+An exact ACK received while the item is awaiting acknowledgement completes the
+item and advances its candidate transmit sequence once, including natural
+`uint16_t` wrap. Stale, duplicate, or out-of-state ACKs change nothing. ACK frame
+validation and receive-path dispatch are not implemented yet; unit tests call
+the private completion seam after supplying a logically validated sequence.
+
+Retry exhaustion retains the frame type, sequence, encoded bytes, and ownership
+in `EXHAUSTED`, exposes no reliable output, and returns a private outcome to the
+future session owner. It does not publish an event, reset the session, classify
+handshake versus Application policy, advance the sequence, or report a public
+protocol error. Those policy decisions remain for the later session and
+Application-delivery work.
 
 ## Exact receive consumption
 
@@ -301,10 +307,12 @@ receive stub report zero. No return may silently discard an unreported suffix.
 
 Malformed, integrity-invalid, stale-session, or incompatible-sequence input is
 consumed only through the appropriate implementation resynchronization boundary
-and maps to `PROTOCOL_ERROR`. Capacity maps to `CAPACITY_EXHAUSTED`, exhausted
-reliable delivery to `DELIVERY_FAILED`, configured deadline expiry to `TIMEOUT`,
-and a private invariant failure to `INTERNAL_ERROR`. Detailed classifications
-remain private; no private status numeric value crosses the profile boundary.
+and will map to `PROTOCOL_ERROR`. Capacity will map to `CAPACITY_EXHAUSTED`, and
+configured deadline expiry to `TIMEOUT`. The implemented reliability primitive
+returns retry exhaustion privately; later owner policy will decide when it maps
+to `DELIVERY_FAILED`. A private invariant failure already maps to
+`INTERNAL_ERROR`. Detailed classifications remain private; no private status
+numeric value crosses the profile boundary.
 
 ## Peek and commit
 
@@ -320,9 +328,47 @@ A low-level output-buffer-too-small condition is retryable and cannot discard a
 valid item.
 
 The caller commits only after external I/O accepts the complete item. Commit
-records that time but performs no I/O. Private reliable ownership may continue
-after commit until matching acknowledgement, failure, or reset; an uncommitted
-reliable item cannot be silently replaced.
+records that time but performs no I/O. The acknowledgement timer therefore
+starts at commit, not publication or peek. Initial commit leaves the committed
+retransmission count at zero; retransmission commit increases it exactly once.
+Private reliable ownership continues after commit until matching
+acknowledgement, owner-directed recovery, or reset. An uncommitted or awaiting
+item cannot be replaced.
+
+The reliable lifecycle is:
+
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> READY: publish encoded frame
+    READY --> PEEKED: successful peek
+    PEEKED --> AWAITING_ACK: commit initial transmission
+    AWAITING_ACK --> IDLE: exact matching ACK
+    AWAITING_ACK --> RETRANSMIT_READY: timeout; retry available
+    AWAITING_ACK --> EXHAUSTED: timeout; no retry available
+    RETRANSMIT_READY --> IDLE: exact late ACK
+    RETRANSMIT_READY --> RETRANSMIT_PEEKED: successful retry peek
+    RETRANSMIT_PEEKED --> AWAITING_ACK: commit retransmission
+    READY --> IDLE: reset
+    PEEKED --> IDLE: reset
+    AWAITING_ACK --> IDLE: reset
+    RETRANSMIT_READY --> IDLE: reset
+    RETRANSMIT_PEEKED --> IDLE: reset
+    EXHAUSTED --> IDLE: reset
+```
+
+Only `AWAITING_ACK` has an active timer. Elapsed time is calculated with
+unsigned `uint32_t` subtraction, which deliberately supports monotonic timer
+wrap. A zero retransmission timeout disables timer progression and leaves the
+item owned until ACK, reset, link loss, or later session abandonment.
+
+A timeout makes retry bytes available but does not invalidate acknowledgement
+of the previous committed transmission. An exact ACK in `RETRANSMIT_READY`
+therefore completes the item and cancels the unpinned retry; a wrong ACK changes
+nothing. After a successful retry peek, `RETRANSMIT_PEEKED` preserves the
+pin-until-commit-or-reset ownership rule and ignores ACKs until commit returns
+the item to `AWAITING_ACK`. `EXHAUSTED` remains owned by later session policy and
+does not accept a late ACK.
 
 ## Link, reset, events, and status
 
@@ -340,18 +386,26 @@ disconnected link or `RECOVERING` for a connected link. A later `Process` may
 then start a fresh session. Automatic or peer-driven abandonment may still
 enqueue `SESSION_RESET`. Reset does not operate hardware or Application state.
 
+Reliable reset invalidates ownership and encoded size but does not clear the
+full encoded buffer. With size zero and state `IDLE`, stale bytes are
+inaccessible, and avoiding a full-buffer `memset` saves bounded MCU work. The
+same region can then receive a newly encoded item.
+
 A private invariant failure returns `INTERNAL_ERROR`, enters public `FAULT`, and
 records `HIL_TRANSPORT_FAILURE_INTERNAL`. `FAULT` stops new Application
 submission and normal protocol progress. Explicit `Reset` is the only supported
 way to clear it on an initialized context.
 
-`HIL_TRANSPORT_Read_Event()` exposes high-level establishment, reset, delivery,
+`HIL_TRANSPORT_Read_Event()` will expose high-level establishment, reset, delivery,
 protocol, capacity, and link conditions. It never asks the caller to build a
-control frame. `HIL_TRANSPORT_Get_Status()` exposes only role, link, high-level
-session state, local operating mode, pending-work indicators, and a high-level
-failure. Handshake phases, parser states, sequence numbers and ACK scheduling are
-private. Any future extended fragmentation, reassembly, window, keepalive or
-queueing metadata also remains private.
+control frame. `HIL_TRANSPORT_Get_Status()` is implemented: `output_pending` is
+set while reliable initial/retry bytes are ready or peeked, and
+`reliable_delivery_pending` remains set in every non-IDLE reliable state,
+including `EXHAUSTED`. The remaining fields expose role, link, high-level
+session state, local operating mode, received-message/event indicators, and
+high-level failure. Handshake phases, parser states, sequence numbers and retry
+counts remain private. Any future extended fragmentation, reassembly, window,
+keepalive or queueing metadata also remains private.
 
 ## Public and private headers
 
@@ -385,11 +439,12 @@ ordinary COBS implementation, and delimited-body parser. The vendored
 `cmcqueen/cobs-c` source is MIT-licensed and pinned to commit
 `7afcc42cf7a7efa84f77360ec27bfc979e3cf93d`; only ordinary COBS is included.
 The MVP owns its minimal frame codec, private
-INITIATE/RESPONSE/CONFIRM session choice, sequence/ACK state and one-item
-stop-and-wait storage model. Handshake and data retries share the public
-`retransmit_timeout_ms` and `max_retries`. The MVP has no fragment, reassembly,
-advertised-window, keepalive, flow-policy or multi-message queue types. Those
-concepts and their uncompiled frame codec live only under `internal/extended`.
+INITIATE/RESPONSE/CONFIRM session choice, sequence/ACK state and implemented
+one-item stop-and-wait byte-retention model. Handshake and data work will share
+the public `retransmit_timeout_ms` and `max_retries` when their owners are
+implemented. The MVP has no fragment, reassembly, advertised-window, keepalive,
+flow-policy or multi-message queue types. Those concepts and their uncompiled
+frame codec live only under `internal/extended`.
 
 The private MVP handshake completes asymmetrically: the rig enters ESTABLISHED
 after a valid CONFIRM and makes its ACK available, while the host enters
