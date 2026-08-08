@@ -11,6 +11,11 @@
 
 #include "transport_types_mvp.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief Initialize minimal MVP session state.
  *
@@ -42,10 +47,16 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Reset( HIL_Transport_Mvp_Sessio
 /**
  * @brief Reserve, without advancing, the sole reliable transmit sequence.
  *
- * @details This succeeds only with an IDLE reliable slot and either an
- * appropriate private handshake phase or public ESTABLISHED state, after all
- * required byte storage is reserved. Handshake and Application work share this
- * one slot. The matching ACK advances the retained sequence exactly once.
+ * @details This operation checks only sequence ownership: it succeeds with an
+ * IDLE reliable slot, copies next_transmit_sequence, and changes no state. The
+ * owning handshake/Application path remains responsible for phase eligibility,
+ * encoding into reserved storage, and atomic reliability publication. A failed
+ * encode or publication therefore creates no sequence gap. Successful
+ * publication retains the candidate, and only an exact ACK advances it.
+ *
+ * @param[in] session Initialized private session metadata.
+ * @param[out] sequence Current unconsumed transmit sequence.
+ * @return OK, NOT_READY, INVALID_ARGUMENT, or INTERNAL_ERROR.
  */
 HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Session_Reserve_Sequence( HIL_Transport_Mvp_Session_T* session,
@@ -66,12 +77,27 @@ HIL_TRANSPORT_MVP_Session_Classify_Sequence( HIL_Transport_Mvp_Session_T*       
 /**
  * @brief Classify an ACK against the sole committed reliable item.
  *
- * @details The private result distinguishes one matching ACK from stale or
- * unexpected input. Only a match may advance/release reliable ownership.
+ * @details The private result reports MATCHED when state is AWAITING_ACK or
+ * RETRANSMIT_READY and sequence equals retained_transmit_sequence. Timeout only
+ * authorizes an unpinned retry, so an ACK for the preceding commit remains
+ * valid in RETRANSMIT_READY. It never mutates or advances the session. The
+ * root-level reliability helper uses this classification to release retained
+ * bytes and advance sequence atomically. ACKs in READY, PEEKED,
+ * RETRANSMIT_PEEKED, EXHAUSTED, or IDLE are stale/unexpected; the peeked retry
+ * remains pinned until commit or reset.
+ *
+ * @param[in] session Initialized private session metadata.
+ * @param[in] sequence Validated received acknowledgement sequence.
+ * @param[out] result MATCHED or STALE_OR_UNEXPECTED.
+ * @return OK, INVALID_ARGUMENT, or INTERNAL_ERROR for an invalid private state.
  */
 HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Session_Classify_Acknowledgement( HIL_Transport_Mvp_Session_T*    session,
                                                     uint16_t                        sequence,
                                                     HIL_Transport_Mvp_Ack_Result_T* result );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* HIL_RIG_PROTOCOL_TRANSPORT_INTERNAL_MVP_TRANSPORT_SESSION_MVP_H */

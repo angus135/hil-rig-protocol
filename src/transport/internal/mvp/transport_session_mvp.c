@@ -40,17 +40,35 @@ HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Session_Reserve_Sequence( HIL_Transport_Mvp_Session_T* session,
                                             uint16_t*                    sequence )
 {
-    /*
-     * TODO: Require an appropriate INITIATE/RESPONSE/CONFIRM handshake phase or
-     * ESTABLISHED Application session plus an IDLE reliable slot after the
-     * profile has reserved message/output capacity. Copy the relevant next
-     * sequence without advancing and mark READY. Any preparation failure
-     * restores IDLE without a sequence gap; every non-IDLE state forbids a
-     * second reliable frame.
-     */
-    ( void )session;
-    ( void )sequence;
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    if ( sequence == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    *sequence = 0u;
+    if ( session == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( ( session->reliable_state < HIL_TRANSPORT_MVP_RELIABLE_IDLE )
+         || ( session->reliable_state > HIL_TRANSPORT_MVP_RELIABLE_EXHAUSTED ) )
+    {
+        return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    }
+    if ( session->reliable_state != HIL_TRANSPORT_MVP_RELIABLE_IDLE )
+    {
+        return HIL_TRANSPORT_STATUS_NOT_READY;
+    }
+    if ( ( session->retained_reliable_frame_type != HIL_TRANSPORT_MVP_FRAME_INVALID )
+         || ( session->retained_transmit_sequence != 0u )
+         || ( session->retransmissions_committed != 0u )
+         || ( session->reliable_last_committed_ms != 0u ) )
+    {
+        return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    }
+
+    /* The candidate is neither published nor consumed until encoding and ACK succeed. */
+    *sequence = session->next_transmit_sequence;
+    return HIL_TRANSPORT_STATUS_OK;
 }
 
 HIL_Transport_Status_T
@@ -76,16 +94,31 @@ HIL_TRANSPORT_MVP_Session_Classify_Acknowledgement( HIL_Transport_Mvp_Session_T*
                                                     uint16_t                        sequence,
                                                     HIL_Transport_Mvp_Ack_Result_T* result )
 {
+    if ( result == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    *result = HIL_TRANSPORT_MVP_ACK_STALE_OR_UNEXPECTED;
+    if ( session == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( ( session->reliable_state < HIL_TRANSPORT_MVP_RELIABLE_IDLE )
+         || ( session->reliable_state > HIL_TRANSPORT_MVP_RELIABLE_EXHAUSTED ) )
+    {
+        return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    }
+
     /*
-     * TODO: Require AWAITING_ACK and compare the retained sequence. A matching
-     * ACK advances exactly once and releases reliable ownership only after the
-     * profile can release matching bytes. If the retained item is the host's
-     * CONFIRM, only this matching ACK moves the host to ESTABLISHED. A stale or
-     * unexpected ACK changes nothing. Transport acknowledgement confirms byte
-     * delivery, never Application semantic acceptance.
+     * A timeout authorizes an unpinned retry; it does not invalidate the ACK
+     * for the previously committed transmission. Once retry bytes are peeked,
+     * pin-until-commit/reset ownership takes precedence for this MVP.
      */
-    ( void )session;
-    ( void )sequence;
-    ( void )result;
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    if ( ( ( session->reliable_state == HIL_TRANSPORT_MVP_RELIABLE_AWAITING_ACK )
+           || ( session->reliable_state == HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_READY ) )
+         && ( sequence == session->retained_transmit_sequence ) )
+    {
+        *result = HIL_TRANSPORT_MVP_ACK_MATCHED;
+    }
+    return HIL_TRANSPORT_STATUS_OK;
 }
