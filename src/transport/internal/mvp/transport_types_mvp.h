@@ -19,15 +19,6 @@
 #include "../common/transport_parser.h"
 #include "../transport_internal.h"
 
-/** Private MVP handshake message category. */
-typedef enum
-{
-    HIL_TRANSPORT_MVP_HANDSHAKE_INVALID = 0,
-    HIL_TRANSPORT_MVP_HANDSHAKE_INITIATE,
-    HIL_TRANSPORT_MVP_HANDSHAKE_RESPONSE,
-    HIL_TRANSPORT_MVP_HANDSHAKE_CONFIRM
-} HIL_Transport_Mvp_Handshake_Type_T;
-
 /** Explicit private MVP progress through session establishment. */
 typedef enum
 {
@@ -41,14 +32,16 @@ typedef enum
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED
 } HIL_Transport_Mvp_Handshake_Phase_T;
 
-/** Minimal private MVP frame categories. */
+/** MVP wire frame type values. Values not listed here are reserved. */
 typedef enum
 {
-    HIL_TRANSPORT_MVP_FRAME_INVALID = 0,
-    HIL_TRANSPORT_MVP_FRAME_HANDSHAKE,
-    HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE,
-    HIL_TRANSPORT_MVP_FRAME_ACK,
-    HIL_TRANSPORT_MVP_FRAME_RESET
+    HIL_TRANSPORT_MVP_FRAME_INVALID             = 0x00,
+    HIL_TRANSPORT_MVP_FRAME_INITIATE            = 0x01,
+    HIL_TRANSPORT_MVP_FRAME_RESPONSE            = 0x02,
+    HIL_TRANSPORT_MVP_FRAME_CONFIRM             = 0x03,
+    HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE = 0x04,
+    HIL_TRANSPORT_MVP_FRAME_ACK                 = 0x05,
+    HIL_TRANSPORT_MVP_FRAME_RESET               = 0x06
 } HIL_Transport_Mvp_Frame_Type_T;
 
 /** Ownership state of the sole MVP reliable transmission. */
@@ -77,7 +70,7 @@ typedef enum
     HIL_TRANSPORT_MVP_ACK_STALE_OR_UNEXPECTED
 } HIL_Transport_Mvp_Ack_Result_T;
 
-/** Private structural classification produced by the future MVP decoder. */
+/** Private structural classification produced by the MVP decoder. */
 typedef enum
 {
     HIL_TRANSPORT_MVP_DECODE_VALID = 0,
@@ -86,18 +79,15 @@ typedef enum
     HIL_TRANSPORT_MVP_DECODE_SESSION_INCOMPATIBLE
 } HIL_Transport_Mvp_Decode_Result_T;
 
-/** Minimal semantic frame passed only between MVP profile and codec stubs. */
+/** Minimal semantic frame passed only between the MVP profile and codec. */
 typedef struct
 {
-    HIL_Transport_Mvp_Frame_Type_T     type;
-    HIL_Transport_Role_T               source_role;
-    uint64_t                           session_identifier;
-    uint16_t                           sequence;
-    uint16_t                           acknowledgement_sequence;
-    HIL_Transport_Mvp_Handshake_Type_T handshake_type;
-    uint16_t                           initial_reliable_sequence;
-    const uint8_t*                     payload;
-    size_t                             payload_size;
+    HIL_Transport_Mvp_Frame_Type_T type;
+    uint64_t                       session_identifier;
+    uint16_t                       sequence;
+    uint16_t                       acknowledgement_sequence;
+    const uint8_t*                 payload;
+    size_t                         payload_size;
 } HIL_Transport_Mvp_Frame_T;
 
 /** Private MVP session and stop-and-wait state. */
@@ -127,9 +117,9 @@ typedef struct
  * @brief Private root object placed at the aligned start of MVP workspace.
  *
  * @details Byte pointers identify single retained regions, not queues: one
- * submitted message, one stable encoded output/retry copy, one parser body, and
- * one complete received message. A future workspace-sizing implementation
- * reserves and aligns these regions with checked arithmetic.
+ * submitted message, one stable encoded output/retry copy, one parser body, one
+ * decoded-frame scratch region, and one complete received message. Workspace
+ * sizing reserves these non-overlapping regions with checked arithmetic.
  */
 typedef struct
 {
@@ -142,6 +132,8 @@ typedef struct
     uint8_t*                       encoded_output;
     size_t                         encoded_output_size;
     uint8_t                        output_pinned;
+    uint8_t*                       codec_scratch;
+    size_t                         codec_scratch_size;
     uint8_t*                       received_message;
     size_t                         received_message_size;
     uint8_t                        received_message_pending;
