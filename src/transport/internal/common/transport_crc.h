@@ -2,14 +2,16 @@
  * @file transport_crc.h
  * @brief Internal integrity-check boundary for transport frame codecs.
  *
- * @details The frame encoder/decoder will use these helpers to calculate the
- * integrity field selected for a HIL-RIG wire protocol. This private seam may
- * be included by internal tests without creating a public compatibility promise.
+ * @details The MVP frame encoder and decoder use these helpers to calculate the
+ * implemented wire integrity field. This private seam may be included by
+ * internal tests without creating a public compatibility promise.
  *
- * @note The polynomial, accumulator width/initial value, reflection behavior,
- * final XOR, wire byte order, and exact coverage remain TODO. The CRC name is a
- * design placeholder until those choices are approved. Public callers never
- * provide a calculated integrity value.
+ * @details The MVP uses CRC-32/ISO-HDLC: reflected polynomial 0xEDB88320,
+ * initial value 0xFFFFFFFF, reflected input/output, and final XOR 0xFFFFFFFF.
+ * The frame codec covers the decoded header and payload, excluding the CRC,
+ * COBS overhead, and trailing delimiter. Public callers never provide a
+ * calculated integrity value. This detects accidental corruption and is not
+ * authentication.
  */
 #ifndef HIL_RIG_PROTOCOL_TRANSPORT_INTERNAL_COMMON_TRANSPORT_CRC_H
 #define HIL_RIG_PROTOCOL_TRANSPORT_INTERNAL_COMMON_TRANSPORT_CRC_H
@@ -25,11 +27,10 @@ extern "C"
 /**
  * @brief Create the initial accumulator for a new integrity calculation.
  *
- * @details A future implementation will return the selected algorithm's exact
- * initial value. Use this rather than embedding that value so incremental and
+ * @details Use this rather than embedding the initial value so incremental and
  * complete calculations remain consistent.
  *
- * @return Initial accumulator. The current design-only stub returns zero.
+ * @return Initial CRC-32/ISO-HDLC accumulator.
  */
 uint32_t HIL_TRANSPORT_CRC32_Init( void );
 
@@ -44,32 +45,31 @@ uint32_t HIL_TRANSPORT_CRC32_Init( void );
  * @param[in] data Bytes to incorporate; may be NULL only when len is zero.
  * @param[in] len Number of bytes at data.
  *
- * @return Updated accumulator. The current design-only stub preserves crc.
+ * @return Accumulator after incorporating the supplied bytes.
  */
 uint32_t HIL_TRANSPORT_CRC32_Update( uint32_t crc, const uint8_t* data, size_t len );
 
 /**
  * @brief Convert an incremental accumulator to its final integrity value.
  *
- * @details A future implementation will apply the selected final XOR and any
- * other finalization exactly once.
+ * @details Applies the CRC-32/ISO-HDLC final XOR exactly once.
  *
  * @param[in] crc Accumulator after the final Update.
  *
- * @return Final host-order value. The current design-only stub preserves crc.
+ * @return Final host-order value after applying the final XOR.
  */
 uint32_t HIL_TRANSPORT_CRC32_Finish( uint32_t crc );
 
 /**
  * @brief Calculate the finalized integrity value for one contiguous byte span.
  *
- * @details The future implementation should be equivalent to Init, one Update,
- * and Finish. It is a convenience for complete raw-frame regions and tests.
+ * @details Equivalent to Init, one Update, and Finish. It is a convenience for
+ * complete raw-frame regions and tests.
  *
  * @param[in] data Bytes to incorporate; may be NULL only when len is zero.
  * @param[in] len Number of bytes at data.
  *
- * @return Final integrity value. The current design-only stub returns zero.
+ * @return Final integrity value from the complete CRC-32/ISO-HDLC calculation.
  */
 uint32_t HIL_TRANSPORT_CRC32_Compute( const uint8_t* data, size_t len );
 
