@@ -7,9 +7,10 @@ Details in `extended_transport_design.md` are non-normative planning notes and
 do not constrain the MVP unless they are later promoted here or into public
 header contracts.
 
-All current Transport `.c` files are intentional stubs. This document specifies
-future behavior at the API boundary; it does not claim framing, parsing,
-reliability, session, timing, or message handling is implemented.
+The MVP wire codec, CRC, COBS framing, bounded stream parser, workspace sizing,
+and initialization are implemented. The broader public runtime operations for
+session establishment, reliability, timing, and Application-message
+orchestration remain intentional stubs unless stated otherwise below.
 
 Transport is HIL-RIG-specific but communication-medium-agnostic. It maps opaque,
 complete Application messages to opaque encoded output and received raw bytes
@@ -122,6 +123,102 @@ setup, the caller discards the old context and creates a different
 zero-initialized context. Reinitialization, workspace replacement, and a Destroy
 operation are deliberately not defined.
 
+## MVP wire format
+
+An MVP transmission is one ordinary COBS body followed by one zero delimiter:
+
+```text
+COBS(decoded frame) || 0x00
+```
+
+The delimiter is not part of the COBS body or CRC coverage. COBS guarantees
+that an otherwise valid encoded body contains no zero byte, allowing the
+bounded stream parser to recognize a complete frame without interpreting its
+fields.
+
+After COBS decoding, the byte layout is:
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 byte | Protocol version (`0x01`) |
+| 1 | 1 byte | Frame type |
+| 2 | 8 bytes | Session ID, little-endian |
+| 10 | 2 bytes | Sequence number, little-endian |
+| 12 | 2 bytes | Acknowledgement sequence, little-endian |
+| 14 | Variable | Payload |
+| End - 4 | 4 bytes | CRC-32, little-endian |
+
+The decoded size is `18 + payload size`. There is no magic value, explicit
+payload-length field, padding, variable-length integer, optional header, or
+separate header checksum. The decoder derives payload size from the complete
+decoded length and rejects any decoded frame shorter than 18 bytes. Fields are
+serialized byte by byte; public or private C structures are never copied to or
+cast over wire storage.
+
+The six frame types and structural rules are:
+
+| Value | Frame | Sequence | Acknowledgement | Payload |
+| ---: | --- | --- | --- | --- |
+| `0x01` | `INITIATE` | Valid sequence | Zero | Empty |
+| `0x02` | `RESPONSE` | Valid sequence | INITIATE sequence | Empty |
+| `0x03` | `CONFIRM` | Valid sequence | RESPONSE sequence | Empty |
+| `0x04` | `APPLICATION` | Valid sequence | Zero | One nonempty complete Application message |
+| `0x05` | `ACK` | Zero | Acknowledged sequence | Empty |
+| `0x06` | `RESET` | Zero | Zero | Empty |
+
+Frame type `0x00` and `0x07` through `0xFF` are reserved and rejected. A valid
+encoded frame always has a nonzero session ID. Every `uint16_t` sequence value,
+including zero and `0xFFFF`, is representable; deciding whether it is currently
+expected belongs to session logic rather than structural decoding. Similarly,
+the codec does not decide whether a nonzero session ID belongs to the current
+session. An Application payload is limited by
+`max_application_message_size`; control frames have exactly zero payload bytes.
+
+### CRC integrity
+
+The four-byte integrity field is CRC-32/ISO-HDLC with polynomial `0x04C11DB7`
+(reflected polynomial `0xEDB88320`), initial value `0xFFFFFFFF`, reflected input
+and output, and final XOR `0xFFFFFFFF`. The check value for `123456789` is
+`0xCBF43926`.
+
+CRC coverage is the decoded 14-byte header followed by the payload. It excludes
+the CRC field itself, COBS overhead, and trailing delimiter. The CRC detects
+accidental transmission corruption; it provides no authentication, tamper
+resistance, confidentiality, or peer identity.
+
+### COBS size and stream recovery
+
+For a nonempty decoded frame of `N` bytes, the maximum complete transmission is:
+
+```text
+N + ceil(N / 254) + 1
+```
+
+The last byte is the delimiter. With a 512-byte Application payload, the raw
+frame is 530 bytes, the maximum COBS body is 533 bytes, and the complete
+transmission is 534 bytes. The default 640-byte encoded-frame limit therefore
+has sufficient capacity.
+
+The decoder bounds raw-frame expansion to the configured maximum Application
+message size plus the fixed 18-byte raw overhead. A complete delimited COBS body
+that expands beyond this bound is malformed wire input, not a request to enlarge
+caller workspace and retry. It is rejected without exposing a partial frame or
+Application message.
+
+The parser accepts arbitrary chunk boundaries and retains an incomplete COBS
+body in caller-owned workspace. It ignores leading or consecutive delimiters,
+stops before overwriting an unread complete body, and excludes the delimiter
+from the body given to the decoder. If a body exceeds configured capacity, the
+parser discards through the next `0x00`; that delimiter is the resynchronization
+boundary and the following byte begins a clean body. A malformed body is
+consumed as one complete delimited item, so a following valid frame can be
+parsed independently.
+
+One MVP `APPLICATION` frame always carries exactly one complete opaque
+Application message. Fragmentation, reassembly, session acceptance, duplicate
+classification, acknowledgement scheduling, retransmission, and recovery are
+outside the codec.
+
 ## Caller workflow
 
 ```text
@@ -199,8 +296,8 @@ input is borrowed only during the call.
 `bytes_consumed` is required and always identifies the exact accepted prefix.
 On complete consumption it equals `data_len`. When bounded capacity temporarily
 prevents further acceptance, the caller preserves and retries only the suffix
-starting at `data + bytes_consumed`. Invalid arguments and the current stub
-report zero. No return may silently discard an unreported suffix.
+starting at `data + bytes_consumed`. Invalid arguments and the current public
+receive stub report zero. No return may silently discard an unreported suffix.
 
 Malformed, integrity-invalid, stale-session, or incompatible-sequence input is
 consumed only through the appropriate implementation resynchronization boundary
@@ -283,8 +380,11 @@ runtime profile enum exists.
 it produces a clear CMake configuration error rather than linking incomplete
 behavior.
 
-The compiled `common` directory contains only the integrity seam and opaque
-delimited-body parser. The MVP owns its minimal frame codec, private
+The compiled `common` directory contains the CRC, private COBS adapter, vendored
+ordinary COBS implementation, and delimited-body parser. The vendored
+`cmcqueen/cobs-c` source is MIT-licensed and pinned to commit
+`7afcc42cf7a7efa84f77360ec27bfc979e3cf93d`; only ordinary COBS is included.
+The MVP owns its minimal frame codec, private
 INITIATE/RESPONSE/CONFIRM session choice, sequence/ACK state and one-item
 stop-and-wait storage model. Handshake and data retries share the public
 `retransmit_timeout_ms` and `max_retries`. The MVP has no fragment, reassembly,
