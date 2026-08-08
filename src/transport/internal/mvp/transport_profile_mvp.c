@@ -1,17 +1,18 @@
 /**
  * @file transport_profile_mvp.c
- * @brief MVP wire storage integration and remaining runtime stubs.
+ * @brief MVP wire storage and reliable-output integration plus remaining stubs.
  *
  * @details The eventual MVP uses simple session establishment, one complete
  * Application message per frame, framing plus integrity, and one outstanding
- * reliable transmission. Workspace sizing and initialization support the
- * implemented codec/parser path. Session progression, reliability, and public
- * message orchestration remain deliberately non-functional.
+ * reliable transmission. Workspace sizing, initialization, the wire path, and
+ * the independently driven reliable encoded-output lifecycle are implemented.
+ * Handshake progression and Application-message orchestration remain stubs.
  */
 #include "../transport_profile.h"
 
 #include "../transport_internal.h"
 #include "transport_frame_codec_mvp.h"
+#include "transport_reliability_mvp.h"
 #include "transport_types_mvp.h"
 
 #include <stdint.h>
@@ -43,6 +44,18 @@ static int HIL_TRANSPORT_MVP_Storage_Overlaps( const void* object, size_t object
     object_end    = object_start + object_size;
     workspace_end = workspace_start + storage->workspace_size;
     return ( object_start < workspace_end ) && ( workspace_start < object_end );
+}
+
+static HIL_Transport_Mvp_Root_T*
+HIL_TRANSPORT_MVP_Root_From_Context( const HIL_Transport_Context_T* context )
+{
+    if ( ( context == NULL ) || ( context->implementation == NULL )
+         || ( context->implementation_size < sizeof( HIL_Transport_Mvp_Root_T ) )
+         || ( context->initialization_cookie != HIL_TRANSPORT_INTERNAL_INITIALIZATION_COOKIE ) )
+    {
+        return NULL;
+    }
+    return ( HIL_Transport_Mvp_Root_T* )context->implementation;
 }
 
 static HIL_Transport_Status_T
@@ -198,7 +211,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
 
     root->submitted_message = next_region;
     next_region += config->max_application_message_size;
-    root->encoded_output = next_region;
+    root->encoded_output          = next_region;
+    root->encoded_output_capacity = config->max_encoded_frame_size;
     next_region += config->max_encoded_frame_size;
     status = HIL_TRANSPORT_Parser_Init( &root->parser, next_region,
                                         config->max_encoded_frame_size - 1u );
@@ -221,19 +235,48 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
 
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* context )
 {
-    /*
-     * TODO: Validate ownership; clear every previously queued event without
-     * enqueuing SESSION_RESET for this caller-initiated action; abandon the
-     * single submitted/received message, parser body, sequence/ACK/retry state,
-     * pinned output, and encoded bytes. Retain configuration, workspace, role,
-     * link observation, and advanced host identity cursor. Record LOCAL_RESET;
-     * enter DISCONNECTED when the link is disconnected or RECOVERING when it is
-     * connected so a later Process starts a fresh session. This explicit reset
-     * is the only supported operation that clears terminal FAULT on an
-     * initialized context; it never changes configuration, role, or workspace.
-     */
-    ( void )context;
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    HIL_Transport_Mvp_Root_T* root = HIL_TRANSPORT_MVP_Root_From_Context( context );
+    HIL_Transport_Status_T    status;
+
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    status = HIL_TRANSPORT_MVP_Reliability_Reset( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+
+    HIL_TRANSPORT_Parser_Reset( &root->parser );
+    root->submitted_message_size                  = 0u;
+    root->submitted_message_pending               = 0u;
+    root->received_message_size                   = 0u;
+    root->received_message_pending                = 0u;
+    root->pending_event                           = ( HIL_Transport_Event_T ){ 0 };
+    root->event_pending                           = 0u;
+    root->session.session_identifier              = 0u;
+    root->session.session_identifier_valid        = 0u;
+    root->session.handshake_phase                 = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE;
+    root->session.next_transmit_sequence          = root->session.initial_reliable_sequence;
+    root->session.expected_receive_sequence       = root->session.initial_reliable_sequence;
+    root->session.last_accepted_receive_sequence  = 0u;
+    root->session.accepted_receive_sequence_valid = 0u;
+    root->session.last_valid_receive_ms           = 0u;
+    root->session.last_failure                    = HIL_TRANSPORT_FAILURE_LOCAL_RESET;
+    root->base.last_failure                       = HIL_TRANSPORT_FAILURE_LOCAL_RESET;
+
+    if ( root->base.link_state == HIL_TRANSPORT_LINK_STATE_DISCONNECTED )
+    {
+        root->base.session_state = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
+    }
+    else
+    {
+        root->base.session_state = HIL_TRANSPORT_SESSION_STATE_RECOVERING;
+    }
+    root->session.link_state = root->base.link_state;
+    root->session.state      = root->base.session_state;
+    return HIL_TRANSPORT_STATUS_OK;
 }
 
 HIL_Transport_Status_T
@@ -333,36 +376,32 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Peek_Output( HIL_Transport_Context_
                                                           size_t                   out_buffer_size,
                                                           size_t*                  output_size )
 {
-    /*
-     * TODO: Clear and require output_size, validate size-query combinations,
-     * preserve an existing pinned selection, report required bytes without
-     * consuming on insufficient capacity, and copy/pin a complete item only
-     * after success. Repeated peeks return identical bytes until commit. Do not
-     * start timing or release the sole reliable ownership slot.
-     */
-    ( void )context;
-    ( void )out_buffer;
-    ( void )out_buffer_size;
-    if ( output_size != NULL )
+    HIL_Transport_Mvp_Root_T* root;
+
+    if ( output_size == NULL )
     {
-        *output_size = 0u;
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    *output_size = 0u;
+    root         = HIL_TRANSPORT_MVP_Root_From_Context( context );
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    return HIL_TRANSPORT_MVP_Reliability_Peek_Output( root, out_buffer, out_buffer_size,
+                                                      output_size );
 }
 
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Commit_Output( HIL_Transport_Context_T* context,
                                                             uint32_t                 now_ms )
 {
-    /*
-     * TODO: Require successfully pinned complete output, record external
-     * acceptance time once, release explicitly unreliable output, and retain
-     * reliable bytes until matching acknowledgement, failure, or reset. Commit
-     * must not permit another reliable item to replace retained output. Perform
-     * no hardware call and never commit a partial item.
-     */
-    ( void )context;
-    ( void )now_ms;
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    HIL_Transport_Mvp_Root_T* root = HIL_TRANSPORT_MVP_Root_From_Context( context );
+
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    return HIL_TRANSPORT_MVP_Reliability_Commit_Output( root, now_ms );
 }
 
 HIL_Transport_Status_T
@@ -405,18 +444,37 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Read_Event( HIL_Transport_Context_T
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Get_Status( const HIL_Transport_Context_T*   context,
                                                          HIL_Transport_Status_Snapshot_T* status )
 {
-    /*
-     * TODO: Validate initialized ownership and non-NULL status, then copy one
-     * consistent high-level snapshot. FAULT must expose session state FAULT and
-     * INTERNAL failure; explicit reset exposes LOCAL_RESET and the link-derived
-     * DISCONNECTED/RECOVERING state. Expose no private pointers, parser/session
-     * substates, handshake phases, or sequences. The current stub defensively
-     * clears a non-NULL destination.
-     */
-    ( void )context;
-    if ( status != NULL )
+    HIL_Transport_Mvp_Root_T* root;
+    HIL_Transport_Status_T    result;
+    uint8_t                   output_pending;
+    uint8_t                   delivery_pending;
+
+    if ( status == NULL )
     {
-        *status = ( HIL_Transport_Status_Snapshot_T ){ 0 };
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    *status = ( HIL_Transport_Status_Snapshot_T ){ 0 };
+    root    = HIL_TRANSPORT_MVP_Root_From_Context( context );
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    result = HIL_TRANSPORT_MVP_Reliability_Get_Pending_Status( root, &output_pending,
+                                                               &delivery_pending );
+    if ( result != HIL_TRANSPORT_STATUS_OK )
+    {
+        return result;
+    }
+
+    status->role                        = root->base.role;
+    status->link_state                  = root->base.link_state;
+    status->session_state               = root->base.session_state;
+    status->operating_mode              = root->base.operating_mode;
+    status->operating_mode_valid        = root->base.operating_mode_valid;
+    status->output_pending              = output_pending;
+    status->application_message_pending = root->received_message_pending;
+    status->event_pending               = root->event_pending;
+    status->reliable_delivery_pending   = delivery_pending;
+    status->last_failure                = root->base.last_failure;
+    return HIL_TRANSPORT_STATUS_OK;
 }

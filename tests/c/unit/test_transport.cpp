@@ -100,7 +100,7 @@ TEST( TransportContextLifecycle, InsufficientFirstInitializationLeavesZeroContex
     /* A successful context would be reset, never passed to Init again. */
 }
 
-TEST( TransportStubs, DefensivelyClearStructuredOutputs )
+TEST( TransportStructuredOutputs, DefensivelyClearInvalidContextOutputs )
 {
     HIL_Transport_Context_T         context{};
     HIL_Transport_Event_T           event{};
@@ -124,7 +124,7 @@ TEST( TransportStubs, DefensivelyClearStructuredOutputs )
 
     EXPECT_EQ( HIL_TRANSPORT_Read_Event( &context, &event ), HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED );
     EXPECT_EQ( HIL_TRANSPORT_Get_Status( &context, &snapshot ),
-               HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED );
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
 
     EXPECT_EQ( event.type, HIL_TRANSPORT_EVENT_NONE );
     EXPECT_EQ( event.status, HIL_TRANSPORT_STATUS_OK );

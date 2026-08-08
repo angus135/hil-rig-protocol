@@ -76,7 +76,7 @@ int main( void )
 
     if ( HIL_TRANSPORT_Peek_Output( &context, encoded_output, sizeof( encoded_output ),
                                     &output_size )
-             != HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED
+             != HIL_TRANSPORT_STATUS_NOT_READY
          || output_size != 0u )
     {
         return 4;

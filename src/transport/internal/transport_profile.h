@@ -24,6 +24,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
                                                    const HIL_Transport_Config_T*  config,
                                                    const HIL_Transport_Storage_T* storage );
 
+/** Clear session-scoped work, including all reliable byte ownership and pins. */
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* context );
 
 HIL_Transport_Status_T
@@ -42,11 +43,26 @@ HIL_Transport_Status_T
 HIL_TRANSPORT_PROFILE_Process( HIL_Transport_Context_T* context, uint32_t now_ms,
                                HIL_Transport_Operating_Mode_T operating_mode );
 
+/**
+ * @brief Query or copy one complete encoded output without marking it accepted.
+ *
+ * @details The MVP pins a reliable selection only after a complete successful
+ * copy. Size queries and insufficient buffers leave lifecycle state unchanged;
+ * repeated successful peeks return identical retained bytes and do not start
+ * timing.
+ */
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Peek_Output( HIL_Transport_Context_T* context,
                                                           uint8_t*                 out_buffer,
                                                           size_t                   out_buffer_size,
                                                           size_t*                  output_size );
 
+/**
+ * @brief Record external acceptance of the complete last-peeked output.
+ *
+ * @details For MVP reliable output this records the ACK timer origin, retains
+ * exact bytes, and increments the retry counter only for a committed retry.
+ * The operation performs no I/O or encoding.
+ */
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Commit_Output( HIL_Transport_Context_T* context,
                                                             uint32_t                 now_ms );
 
