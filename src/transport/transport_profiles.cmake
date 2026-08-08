@@ -11,6 +11,8 @@ string(TOUPPER "${HIL_RIG_PROTOCOL_TRANSPORT_PROFILE}"
 )
 
 set(HIL_RIG_PROTOCOL_TRANSPORT_COMMON_SOURCES
+    src/transport/internal/third_party/cobs/cobs.c
+    src/transport/internal/common/transport_cobs.c
     src/transport/internal/common/transport_crc.c
     src/transport/internal/common/transport_parser.c
 )

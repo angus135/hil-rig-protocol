@@ -1,0 +1,159 @@
+/*****************************************************************************
+ * Vendored from cmcqueen/cobs-c. See README.md and LICENSE.txt in this folder.
+ ****************************************************************************/
+#include "cobs.h"
+
+cobs_encode_result HIL_TRANSPORT_THIRD_PARTY_COBS_Encode( void* dst_buf_ptr, size_t dst_buf_len,
+                                                          const void* src_ptr, size_t src_len )
+{
+    cobs_encode_result result             = { 0u, COBS_ENCODE_OK };
+    const uint8_t*     src_read_ptr       = src_ptr;
+    const uint8_t*     src_end_ptr        = src_read_ptr + src_len;
+    uint8_t*           dst_buf_start_ptr  = dst_buf_ptr;
+    uint8_t*           dst_buf_end_ptr    = dst_buf_start_ptr + dst_buf_len;
+    uint8_t*           dst_code_write_ptr = dst_buf_start_ptr;
+    uint8_t*           dst_write_ptr      = dst_code_write_ptr + 1u;
+    uint8_t            src_byte           = 0u;
+    uint8_t            search_len         = 1u;
+
+    if ( ( dst_buf_ptr == NULL ) || ( src_ptr == NULL ) )
+    {
+        result.status = COBS_ENCODE_NULL_POINTER;
+        return result;
+    }
+
+    if ( src_len != 0u )
+    {
+        for ( ;; )
+        {
+            if ( dst_write_ptr >= dst_buf_end_ptr )
+            {
+                result.status =
+                    ( cobs_encode_status )( result.status | COBS_ENCODE_OUT_BUFFER_OVERFLOW );
+                break;
+            }
+
+            src_byte = *src_read_ptr++;
+            if ( src_byte == 0u )
+            {
+                *dst_code_write_ptr = search_len;
+                dst_code_write_ptr  = dst_write_ptr++;
+                search_len          = 1u;
+                if ( src_read_ptr >= src_end_ptr )
+                {
+                    break;
+                }
+            }
+            else
+            {
+                *dst_write_ptr++ = src_byte;
+                search_len++;
+                if ( src_read_ptr >= src_end_ptr )
+                {
+                    break;
+                }
+                if ( search_len == 0xFFu )
+                {
+                    *dst_code_write_ptr = search_len;
+                    dst_code_write_ptr  = dst_write_ptr++;
+                    search_len          = 1u;
+                }
+            }
+        }
+    }
+
+    if ( dst_code_write_ptr >= dst_buf_end_ptr )
+    {
+        result.status = ( cobs_encode_status )( result.status | COBS_ENCODE_OUT_BUFFER_OVERFLOW );
+        dst_write_ptr = dst_buf_end_ptr;
+    }
+    else
+    {
+        *dst_code_write_ptr = search_len;
+    }
+
+    result.out_len = ( size_t )( dst_write_ptr - dst_buf_start_ptr );
+    return result;
+}
+
+cobs_decode_result HIL_TRANSPORT_THIRD_PARTY_COBS_Decode( void* dst_buf_ptr, size_t dst_buf_len,
+                                                          const void* src_ptr, size_t src_len )
+{
+    cobs_decode_result result            = { 0u, COBS_DECODE_OK };
+    const uint8_t*     src_read_ptr      = src_ptr;
+    const uint8_t*     src_end_ptr       = src_read_ptr + src_len;
+    uint8_t*           dst_buf_start_ptr = dst_buf_ptr;
+    uint8_t*           dst_buf_end_ptr   = dst_buf_start_ptr + dst_buf_len;
+    uint8_t*           dst_write_ptr     = dst_buf_start_ptr;
+    size_t             remaining_bytes;
+    uint8_t            src_byte;
+    uint8_t            i;
+    uint8_t            len_code;
+
+    if ( ( dst_buf_ptr == NULL ) || ( src_ptr == NULL ) )
+    {
+        result.status = COBS_DECODE_NULL_POINTER;
+        return result;
+    }
+
+    if ( src_len != 0u )
+    {
+        for ( ;; )
+        {
+            len_code = *src_read_ptr++;
+            if ( len_code == 0u )
+            {
+                result.status =
+                    ( cobs_decode_status )( result.status | COBS_DECODE_ZERO_BYTE_IN_INPUT );
+                break;
+            }
+            len_code--;
+
+            remaining_bytes = ( size_t )( src_end_ptr - src_read_ptr );
+            if ( len_code > remaining_bytes )
+            {
+                result.status =
+                    ( cobs_decode_status )( result.status | COBS_DECODE_INPUT_TOO_SHORT );
+                len_code = ( uint8_t )remaining_bytes;
+            }
+
+            remaining_bytes = ( size_t )( dst_buf_end_ptr - dst_write_ptr );
+            if ( len_code > remaining_bytes )
+            {
+                result.status =
+                    ( cobs_decode_status )( result.status | COBS_DECODE_OUT_BUFFER_OVERFLOW );
+                len_code = ( uint8_t )remaining_bytes;
+            }
+
+            for ( i = len_code; i != 0u; i-- )
+            {
+                src_byte = *src_read_ptr++;
+                if ( src_byte == 0u )
+                {
+                    result.status =
+                        ( cobs_decode_status )( result.status | COBS_DECODE_ZERO_BYTE_IN_INPUT );
+                }
+                *dst_write_ptr++ = src_byte;
+            }
+
+            if ( src_read_ptr >= src_end_ptr )
+            {
+                break;
+            }
+
+            if ( len_code != 0xFEu )
+            {
+                if ( dst_write_ptr >= dst_buf_end_ptr )
+                {
+                    result.status =
+                        ( cobs_decode_status )( result.status | COBS_DECODE_OUT_BUFFER_OVERFLOW );
+                    break;
+                }
+                *dst_write_ptr++ = 0u;
+            }
+        }
+    }
+
+    result.out_len = ( size_t )( dst_write_ptr - dst_buf_start_ptr );
+    return result;
+}
