@@ -2,7 +2,7 @@
  * @file transport_parser.h
  * @brief Private profile-independent delimited-body accumulator.
  *
- * @details This seam recognizes boundaries in an opaque encoded byte stream.
+ * @details This seam recognizes 0x00 boundaries in a COBS-encoded byte stream.
  * It does not decode frame fields and has no dependency on MVP or extended
  * frame, session, fragmentation, window, queue, or reassembly types. A selected
  * profile reads a complete opaque body and passes it to its own codec.
@@ -61,9 +61,9 @@ typedef struct
 /**
  * @brief Initialize opaque-body accumulation over caller-workspace scratch.
  *
- * @details A future implementation validates the pointer/size combination,
- * retains the scratch region, and clears length, ready, and discard state. It
- * neither allocates nor interprets the bytes.
+ * @details Validates the pointer/size combination, retains the scratch region,
+ * and clears length, ready, and discard state. It neither allocates nor
+ * interprets COBS fields.
  */
 HIL_Transport_Status_T HIL_TRANSPORT_Parser_Init( HIL_Transport_Parser_T* parser,
                                                   uint8_t*                scratch_buffer,
@@ -72,8 +72,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_Parser_Init( HIL_Transport_Parser_T* parser
 /**
  * @brief Accept one raw stream byte.
  *
- * @details A future implementation ignores empty delimiters, completes a
- * nonempty body at a delimiter, refuses to overwrite an unread body, appends
+ * @details Ignores empty delimiters, completes a nonempty body at a delimiter,
+ * refuses to overwrite an unread body, appends
  * within capacity, and discards an oversized body through the next delimiter.
  */
 HIL_Transport_Parser_Result_T HIL_TRANSPORT_Parser_Push_Byte( HIL_Transport_Parser_T* parser,
@@ -83,7 +83,7 @@ HIL_Transport_Parser_Result_T HIL_TRANSPORT_Parser_Push_Byte( HIL_Transport_Pars
  * @brief Accept an exact prefix of an arbitrary raw byte chunk.
  *
  * @details bytes_consumed reports precisely how many input bytes changed or
- * advanced parser ownership. A future implementation stops when a body becomes
+ * advanced parser ownership. The implementation stops when a body becomes
  * ready, discard completion must be reported, or capacity is unavailable. The
  * profile may retry only the remaining suffix.
  */
@@ -97,8 +97,8 @@ HIL_Transport_Parser_Result_T HIL_TRANSPORT_Parser_Push_Bytes( HIL_Transport_Par
  *
  * @details On OK body_size is bytes copied and the ready body is consumed. On
  * BUFFER_TOO_SMALL it is required bytes and parser state is unchanged. On
- * NOT_READY it is zero. NULL output with zero capacity is a size query. The
- * current stub clears body_size and returns NOT_IMPLEMENTED.
+ * NOT_READY it is zero. NULL output with zero capacity is a size query.
+ * out_buffer may overlap the parser scratch region, including exact aliasing.
  */
 HIL_Transport_Status_T HIL_TRANSPORT_Parser_Read_Body( HIL_Transport_Parser_T* parser,
                                                        uint8_t* out_buffer, size_t out_buffer_size,
