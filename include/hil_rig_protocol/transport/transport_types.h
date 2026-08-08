@@ -29,6 +29,9 @@
  */
 #if defined( __cplusplus )
 #define HIL_TRANSPORT_WORKSPACE_ALIGNMENT ( alignof( max_align_t ) )
+#elif defined( _MSC_VER )
+/* MSVC's C standard library does not currently provide C11 max_align_t. */
+#define HIL_TRANSPORT_WORKSPACE_ALIGNMENT ( __alignof( long double ) )
 #else
 #define HIL_TRANSPORT_WORKSPACE_ALIGNMENT ( _Alignof( max_align_t ) )
 #endif

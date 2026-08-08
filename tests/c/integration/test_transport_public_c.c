@@ -3,8 +3,13 @@
 
 #include "hil_rig_protocol/transport/transport.h"
 
+#if defined( _MSC_VER )
+_Static_assert( HIL_TRANSPORT_WORKSPACE_ALIGNMENT >= __alignof( long double ),
+                "Transport workspace alignment must satisfy MSVC C scalar alignment" );
+#else
 _Static_assert( HIL_TRANSPORT_WORKSPACE_ALIGNMENT >= _Alignof( max_align_t ),
                 "Transport workspace alignment must satisfy max_align_t" );
+#endif
 _Static_assert( ( HIL_TRANSPORT_WORKSPACE_ALIGNMENT & ( HIL_TRANSPORT_WORKSPACE_ALIGNMENT - 1u ) )
                     == 0u,
                 "Transport workspace alignment must be a power of two" );
@@ -38,14 +43,14 @@ int main( void )
     config.max_retries                  = 0u;
 
     if ( HIL_TRANSPORT_Required_Storage_Size( &config, &required_workspace )
-             != HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED
-         || required_workspace != 0u )
+             != HIL_TRANSPORT_STATUS_OK
+         || required_workspace == 0u || required_workspace > sizeof( workspace ) )
     {
         return 1;
     }
 
     if ( HIL_TRANSPORT_Init( &context, HIL_TRANSPORT_ROLE_HOST, &config, &storage )
-         != HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED )
+         != HIL_TRANSPORT_STATUS_OK )
     {
         return 2;
     }
