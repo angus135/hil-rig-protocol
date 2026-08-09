@@ -132,7 +132,7 @@ HIL_APPLICATION_Channel_Id_encode( const HIL_Application_Channel_Id_T* data, uin
 
 HIL_Application_Status_T
 HIL_APPLICATION_Peripheral_Config_encode( const HIL_Application_Peripheral_Config_T* data,
-                                          uint8_t*                                   payload )
+                                          uint8_t* payload, uint32_t* size )
 {
     /**
     Payload:
@@ -246,6 +246,7 @@ HIL_APPLICATION_Peripheral_Config_encode( const HIL_Application_Peripheral_Confi
         default:
             return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
     }
+    *size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }
 
@@ -275,12 +276,35 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
 
 
     */
-    uint32_t payload_size = 10 + data->firmware_git_hash.size + data->diagnostic_data.size;
-    if ( max_payload_size < payload_size )
+    // TODO payload_size
+    // uint32_t payload_size = 10 + data->firmware_git_hash.size + data->diagnostic_data.size;
+    // if ( max_payload_size < payload_size )
+    // {
+    //     return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    // }
+    memcpy( payload, &( data->tick_duration ), sizeof( data->tick_duration ) );
+    uint8_t running_total = sizeof( data->tick_duration );
+    memcpy( &( payload[running_total] ), &( data->expected_tick_count ),
+            sizeof( data->expected_tick_count ) );
+    running_total += sizeof( data->expected_tick_count );
+    memcpy( &( payload[running_total] ), &( data->flags ), sizeof( data->flags ) );
+    running_total += sizeof( data->flags );
+    uint32_t var_size = 0;
+    for ( uint32_t i = 0; i < data->peripheral_count; i++ )
     {
-        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+        HIL_APPLICATION_Peripheral_Config_encode( &( data->peripherals[i] ),
+                                                  &( payload[running_total] ), &var_size );
+        running_total += var_size;
+        var_size = 0;
     }
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    memcpy( &( payload[running_total] ), &( data->peripheral_count ),
+            sizeof( data->peripheral_count ) );
+    running_total += sizeof( data->peripheral_count );
+    memcpy( &( payload[running_total] ), &( data->flags ), sizeof( data->flags ) );
+    running_total += sizeof( data->flags );
+    HIL_APPLICATION_Byte_Span_encode( &( data->extension_data ), &( payload[running_total] ) );
+    running_total += data->extension_data.size;
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
