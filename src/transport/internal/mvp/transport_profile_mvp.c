@@ -1,16 +1,18 @@
 /**
  * @file transport_profile_mvp.c
- * @brief MVP wire storage and reliable-output integration plus remaining stubs.
+ * @brief MVP wire storage and private output lifecycles plus remaining stubs.
  *
  * @details The eventual MVP uses simple session establishment, one complete
  * Application message per frame, framing plus integrity, and one outstanding
- * reliable transmission. Workspace sizing, initialization, the wire path, and
- * the independently driven reliable encoded-output lifecycle are implemented.
- * Handshake progression and Application-message orchestration remain stubs.
+ * reliable transmission. Workspace sizing, initialization, the wire path, the
+ * reliable encoded-output lifecycle, and separate private one-item control
+ * storage are implemented. Public control-output arbitration, handshake
+ * progression, and Application-message orchestration remain stubs.
  */
 #include "../transport_profile.h"
 
 #include "../transport_internal.h"
+#include "transport_control_output_mvp.h"
 #include "transport_frame_codec_mvp.h"
 #include "transport_reliability_mvp.h"
 #include "transport_types_mvp.h"
@@ -208,6 +210,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
     root->session.next_transmit_sequence       = config->initial_reliable_sequence;
     root->session.expected_receive_sequence    = config->initial_reliable_sequence;
     root->session.reliable_state               = HIL_TRANSPORT_MVP_RELIABLE_IDLE;
+    root->control_output_state                 = HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE;
+    root->control_output_size                  = 0u;
 
     root->submitted_message = next_region;
     next_region += config->max_application_message_size;
@@ -243,6 +247,11 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* con
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
     status = HIL_TRANSPORT_MVP_Reliability_Reset( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    status = HIL_TRANSPORT_MVP_Control_Output_Reset( root );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
         return status;
