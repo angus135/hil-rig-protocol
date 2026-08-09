@@ -24,8 +24,12 @@
  *
  * @par Current implementation status
  * MVP workspace sizing, initialization, CRC, COBS framing, frame codec, and
- * bounded stream parsing are implemented. Session establishment, reliability,
- * timing, and public message orchestration remain intentional
+ * bounded stream parsing are implemented. The one-item reliable output
+ * lifecycle, its timing/accounting primitive, public reliable peek/commit,
+ * status, and reset are implemented. A separate private one-item control slot
+ * is implemented but is not yet exposed through public output arbitration.
+ * Session establishment, received-frame dispatch, ACK generation, and public
+ * Application-message orchestration remain intentional
  * HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED stubs.
  */
 #ifndef HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H

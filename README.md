@@ -65,9 +65,16 @@ without choosing recovery policy, or abandoned by reset. Public
 primitive. Dedicated tests drive it directly with opaque sentinel bytes because
 the later handshake and Application submission paths do not yet publish frames.
 
+A separate private one-item control-output lifecycle is also implemented. It
+retains up to 20 already encoded bytes independently of reliable output, making
+room for a future ACK while a reliable frame remains owned. No code generates
+ACKs yet, and public output selection still exposes only reliable output; public
+control/reliable arbitration remains later work.
+
 The broader Transport runtime—session handshake, received-ACK dispatch,
-receive-side duplicate handling, ACK generation, Application submission and
-delivery, delivery events, and session recovery—remains as intentional
+receive-side duplicate handling, ACK generation and public output arbitration,
+Application submission and delivery, delivery events, and session recovery—
+remains as intentional
 `HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs. The public send/receive workflow
 is therefore not operational end to end yet.
 

@@ -8,11 +8,13 @@ do not constrain the MVP unless they are later promoted here or into public
 header contracts.
 
 The MVP wire codec, CRC, COBS framing, bounded stream parser, workspace sizing,
-initialization, and private one-item reliable encoded-output lifecycle are
-implemented. Public peek, commit, status, and reset delegate to that lifecycle.
-Session establishment, received-ACK dispatch, ACK generation, receive-side
-duplicate handling, Application-message orchestration, delivery events, and
-session recovery remain intentional stubs unless stated otherwise below.
+initialization, private one-item reliable encoded-output lifecycle, and separate
+private one-item control-output lifecycle are implemented. Public peek, commit,
+and status still expose reliable output only; reset clears both private slots.
+Session establishment, received-ACK dispatch, ACK generation, public output
+arbitration, receive-side duplicate handling, Application-message orchestration,
+delivery events, and session recovery remain intentional stubs unless stated
+otherwise below.
 
 Transport is HIL-RIG-specific but communication-medium-agnostic. It maps opaque,
 complete Application messages to opaque encoded output and received raw bytes
@@ -370,6 +372,42 @@ pin-until-commit-or-reset ownership rule and ignores ACKs until commit returns
 the item to `AWAITING_ACK`. `EXHAUSTED` remains owned by later session policy and
 does not accept a late ACK.
 
+### Private control-output slot
+
+Control output needs separate storage because a future ACK may need to wait for
+external I/O while an INITIATE, RESPONSE, CONFIRM, or APPLICATION frame remains
+retained for acknowledgement and possible retransmission. The MVP root embeds
+one fixed control slot; it is independent of the full-size reliable region and
+is not a queue.
+
+The slot holds at most 20 complete encoded bytes. ACK and RESET have a 14-byte
+header, no payload, and a four-byte CRC, so their decoded size is 18 bytes.
+Ordinary COBS needs at most 19 bytes for that input, and the trailing zero
+delimiter brings the complete maximum to 20 bytes.
+
+| State | Meaning | Permitted progress |
+| --- | --- | --- |
+| `IDLE` | No control bytes are owned; valid size is zero. | Publish one already encoded item. |
+| `READY` | One complete item is retained but has not been copied successfully. | Query size or peek the whole item. |
+| `PEEKED` | The item was copied and is pinned. | Repeat the same peek or commit/reset. |
+
+Publication copies the complete opaque item before entering `READY`; the source
+pointer is never retained. Publishing identical size and bytes again in
+`READY` or `PEEKED` succeeds without changing or unpinning the item. A different
+item cannot replace occupied storage and returns `NOT_READY`.
+
+A null destination with zero capacity queries the complete size. Too-small
+destinations receive no partial copy and leave state unchanged. A successful
+peek enters `PEEKED`, and repeated peeks return the same bytes. Commit releases
+the item immediately by returning to `IDLE` and setting its valid size to zero;
+the array need not be cleared because stale bytes are then inaccessible. Control
+output has no timer, acknowledgement, retry, sequence ownership, or event.
+
+This lifecycle supplies only private storage. No producer generates ACKs or
+RESET output yet, and no public arbiter selects control versus reliable output.
+Consequently public `Peek_Output()`, `Commit_Output()`, and `Get_Status()` remain
+reliable-only until that arbitration is implemented.
+
 ## Link, reset, events, and status
 
 `HIL_TRANSPORT_Notify_Link_State()` records caller-owned link availability.
@@ -387,9 +425,11 @@ then start a fresh session. Automatic or peer-driven abandonment may still
 enqueue `SESSION_RESET`. Reset does not operate hardware or Application state.
 
 Reliable reset invalidates ownership and encoded size but does not clear the
-full encoded buffer. With size zero and state `IDLE`, stale bytes are
-inaccessible, and avoiding a full-buffer `memset` saves bounded MCU work. The
-same region can then receive a newly encoded item.
+full encoded buffer. Control reset likewise enters `IDLE` and invalidates its
+size without clearing the embedded 20-byte array, including when repairing
+corrupted private lifecycle metadata. With size zero and state `IDLE`, stale
+bytes are inaccessible, and avoiding buffer `memset` work is useful on an MCU.
+The same regions can then receive newly encoded items.
 
 A private invariant failure returns `INTERNAL_ERROR`, enters public `FAULT`, and
 records `HIL_TRANSPORT_FAILURE_INTERNAL`. `FAULT` stops new Application
@@ -404,7 +444,8 @@ set while reliable initial/retry bytes are ready or peeked, and
 including `EXHAUSTED`. The remaining fields expose role, link, high-level
 session state, local operating mode, received-message/event indicators, and
 high-level failure. Handshake phases, parser states, sequence numbers and retry
-counts remain private. Any future extended fragmentation, reassembly, window,
+counts remain private. Private control ownership is deliberately omitted until
+public peek can return it. Any future extended fragmentation, reassembly, window,
 keepalive or queueing metadata also remains private.
 
 ## Public and private headers
@@ -414,10 +455,10 @@ Normal integrations use only:
 - `include/hil_rig_protocol/transport/transport.h`
 - `include/hil_rig_protocol/transport/transport_types.h`
 
-CRC, parser, profile-specific frame-codec, session, handshake and reliability
-headers are private under `src/transport/internal`. Internal tests may include
-them to validate source composition, but that creates no installation or caller
-compatibility promise.
+CRC, parser, profile-specific frame-codec, session, handshake, reliability, and
+control-output headers are private under `src/transport/internal`. Internal
+tests may include them to validate source composition, but that creates no
+installation or caller compatibility promise.
 
 The public C structures are API representations, not wire structures. Native
 enums, `size_t`, pointers, padding, and structures must never be copied directly
