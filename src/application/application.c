@@ -15,6 +15,7 @@
 */
 
 #include "hil_rig_protocol/application/application.h"
+#include "hil_rig_protocol/application/application_encoding.h"
 #include "hil_rig_protocol/application/application_control.h"
 #include "hil_rig_protocol/application/application_error.h"
 #include "hil_rig_protocol/application/application_instruction.h"
@@ -25,8 +26,6 @@
 #include "hil_rig_protocol/application/application_test_config.h"
 #include "hil_rig_protocol/application/application_types.h"
 
-// #include <cstdint>
-#include <cstdint>
 #include <string.h>
 
 HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_T* config )
@@ -40,6 +39,8 @@ HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_
      * after every field is initialized. Fixed GPIO, analogue, and PWM array
      * extents are protocol constants and must not become configurable limits.
      */
+
+    // FILL WITH DEFAULT VALUES
 
     /**
      * Largest complete encoded Application message accepted or produced.
@@ -381,192 +382,6 @@ HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Con
     return HIL_APPLICATION_STATUS_OK;
 }
 
-HIL_Application_Status_T HIL_APPLICATION_Byte_Span_encode( const HIL_Application_Byte_Span_T* data,
-                                                           uint8_t* payload )
-{
-    memcpy( payload, &( data->size ), sizeof( data->size ) );
-    memcpy( payload, &( data->data ), data->size );
-    return HIL_APPLICATION_STATUS_OK;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Request_T* data,
-    uint32_t max_payload_size, uint8_t* payload )
-{
-    /**
-    Payload = 2 Bytes:
-    ________________________________
-    |               |               |
-    |  git hash {1} |    query {1}  |
-    |_______________|_______________|
-    */
-    uint32_t payload_size = 2;
-    if ( max_payload_size < payload_size )
-    {
-        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
-    }
-    memcpy( payload, &( data->request_firmware_git_hash ),
-            sizeof( data->request_firmware_git_hash ) );
-    memcpy( &( payload[1] ), &( data->query ), sizeof( data->query ) );
-    return HIL_APPLICATION_STATUS_OK;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Response_T* data,
-    uint32_t max_payload_size, uint8_t* payload )
-{
-    /**
-    Payload = 10 Bytes:
-    _______________________________________________________
-    |                         |                            |
-    |   protocol major {2}    |    protocol minor {2}      |
-    |_________________________|____________________________|
-    |                         |                            |
-    |    version major {2}    |     version minor {2}      |
-    |_________________________|____________________________|
-    |                         |                            |
-    |    version patch {2}    |        git hash {X}        |
-    |_________________________|____________________________|
-    |                         |
-    |   diagnostic data {X}   |
-    |_________________________|
-    */
-    uint32_t payload_size = 10 + data->firmware_git_hash.size + data->diagnostic_data.size;
-    if ( max_payload_size < payload_size )
-    {
-        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
-    }
-    memcpy( payload, &( data->application_protocol_major ),
-            sizeof( data->application_protocol_major ) );
-    memcpy( &( payload[2] ), &( data->application_protocol_minor ),
-            sizeof( data->application_protocol_minor ) );
-    memcpy( &( payload[4] ), &( data->firmware_version_major ),
-            sizeof( data->firmware_version_major ) );
-    memcpy( &( payload[6] ), &( data->firmware_version_minor ),
-            sizeof( data->firmware_version_minor ) );
-    memcpy( &( payload[8] ), &( data->firmware_version_patch ),
-            sizeof( data->firmware_version_patch ) );
-    HIL_APPLICATION_Byte_Span_encode( &( data->firmware_git_hash ), &( payload[10] ) );
-    HIL_APPLICATION_Byte_Span_encode( &( data->firmware_git_hash ),
-                                      &( payload[10 + data->diagnostic_data.size] ) );
-    return HIL_APPLICATION_STATUS_OK;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Configuration_T* data,
-    uint32_t max_payload_size, uint8_t* payload )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Instruction_T* data,
-    uint32_t max_payload_size, uint8_t* payload )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T                    test_id,
-    const HIL_Application_Variable_Instruction_Data_T* data, uint32_t max_payload_size,
-    uint8_t* payload )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_Execution_Control_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Execution_Control_T* data,
-    uint32_t max_payload_size, uint8_t* payload )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_Global_Control_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Global_Control_T* data,
-    uint32_t max_payload_size, uint8_t* payload )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Result_T* data,
-    uint32_t max_payload_size, uint8_t* payload )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Result_Data_T* data,
-    uint32_t max_payload_size, uint8_t* payload )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_Response_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Response_T* data,
-    uint32_t max_payload_size, uint8_t* payload )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
 HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_Context_T* context,
                                                          const HIL_Application_Message_T* message,
                                                          uint8_t*  out_buffer,
@@ -600,7 +415,6 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
     {
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
             return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
-            break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
             HIL_APPLICATION_System_Info_Request_encode(
@@ -665,15 +479,12 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
 
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
             return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
-            break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
             return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-            break;
 
         default:
             return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
-            break;
     }
 
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
