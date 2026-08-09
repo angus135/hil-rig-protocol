@@ -19,6 +19,16 @@
 #include "../common/transport_parser.h"
 #include "../transport_internal.h"
 
+/**
+ * @brief Fixed storage for one complete encoded MVP control frame.
+ *
+ * @details ACK and RESET have a 14-byte header, no payload, and a four-byte
+ * CRC, giving an 18-byte decoded frame. Ordinary COBS needs at most 19 bytes
+ * for that input, and the trailing zero delimiter adds one byte, for a maximum
+ * complete encoded size of 20 bytes.
+ */
+#define HIL_TRANSPORT_MVP_CONTROL_OUTPUT_CAPACITY ( 20u )
+
 /** Explicit private MVP progress through session establishment. */
 typedef enum
 {
@@ -78,6 +88,19 @@ typedef enum
     /** Retry allowance ended; the owner must choose session recovery policy. */
     HIL_TRANSPORT_MVP_RELIABLE_EXHAUSTED
 } HIL_Transport_Mvp_Reliable_State_T;
+
+/** Ownership state of the private one-item encoded control-output slot. */
+typedef enum
+{
+    /** No control output is owned; the retained size is zero. */
+    HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE = 0,
+
+    /** One complete encoded control item is available for copying. */
+    HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY,
+
+    /** The item was copied and remains pinned until private commit or reset. */
+    HIL_TRANSPORT_MVP_CONTROL_OUTPUT_PEEKED
+} HIL_Transport_Mvp_Control_Output_State_T;
 
 /** Private selection pinned by a successful Peek_Output() operation. */
 typedef enum
@@ -169,9 +192,14 @@ typedef struct
  * @brief Private root object placed at the aligned start of MVP workspace.
  *
  * @details Byte pointers identify single retained regions, not queues: one
- * submitted message, one stable encoded output/retry copy, one parser body, one
- * decoded-frame scratch region, and one complete received message. Workspace
- * sizing reserves these non-overlapping regions with checked arithmetic.
+ * submitted message, one stable reliable encoded output/retry copy, one parser
+ * body, one decoded-frame scratch region, and one complete received message.
+ * A separate fixed-capacity embedded array retains one control output. Neither
+ * output slot is a queue, and ownership of each byte region is determined by
+ * its lifecycle state and valid size rather than by clearing stale bytes.
+ * Workspace sizing reserves the pointer-backed non-overlapping regions with
+ * checked arithmetic; the embedded control array is included in this root's
+ * size automatically.
  */
 typedef struct
 {
@@ -192,13 +220,23 @@ typedef struct
 
     /** Item selected by a successful peek and protected until commit/reset. */
     HIL_Transport_Mvp_Output_Selection_T output_selection;
-    uint8_t*                             codec_scratch;
-    size_t                               codec_scratch_size;
-    uint8_t*                             received_message;
-    size_t                               received_message_size;
-    uint8_t                              received_message_pending;
-    HIL_Transport_Event_T                pending_event;
-    uint8_t                              event_pending;
+
+    /** Fixed private copy of one opaque, already encoded control item. */
+    uint8_t control_output[HIL_TRANSPORT_MVP_CONTROL_OUTPUT_CAPACITY];
+
+    /** Valid control byte count; zero only while control state is IDLE. */
+    size_t control_output_size;
+
+    /** Independent ownership state for the one-item control slot. */
+    HIL_Transport_Mvp_Control_Output_State_T control_output_state;
+
+    uint8_t*              codec_scratch;
+    size_t                codec_scratch_size;
+    uint8_t*              received_message;
+    size_t                received_message_size;
+    uint8_t               received_message_pending;
+    HIL_Transport_Event_T pending_event;
+    uint8_t               event_pending;
 } HIL_Transport_Mvp_Root_T;
 
 #endif /* HIL_RIG_PROTOCOL_TRANSPORT_INTERNAL_MVP_TRANSPORT_TYPES_MVP_H */
