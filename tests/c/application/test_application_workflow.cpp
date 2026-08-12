@@ -49,8 +49,8 @@ void CompileCodecFacadeUsage()
 
     std::array<std::uint8_t, 2048u> encoded_message{};
     AlignedDecodeStorageBuffer      decode_storage{};
-    std::uint32_t                   encoded_size            = 0u;
-    std::uint32_t                   required_decode_storage = 0u;
+    std::size_t                     encoded_size            = 0u;
+    std::size_t                     required_decode_storage = 0u;
     HIL_Application_Message_T       decoded{};
 
     ( void )HIL_APPLICATION_Default_Config( &config );

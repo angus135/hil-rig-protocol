@@ -4,7 +4,7 @@
  *
  * @details Types in this header are public C API representations, not packed
  * wire structures. A future codec must serialize each approved field with an
- * explicit fixed width and byte order. Native enum size, uint32_t, structure
+ * explicit fixed width and byte order. Native enum size, size_t, structure
  * padding, and pointers must never be copied directly into a message.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_TYPES_H
@@ -105,7 +105,7 @@ typedef struct
     const uint8_t* data;
 
     /** Number of readable bytes at data. */
-    uint32_t size;
+    size_t size;
 } HIL_Application_Byte_Span_T;
 
 /**
@@ -268,7 +268,7 @@ typedef struct
     /** UART, SPI, I2C, or CAN channel carrying the variable bytes. */
     HIL_Application_Channel_Id_T channel;
     /** Exact bytes expected in the matching variable-data message. */
-    uint32_t byte_length;
+    size_t byte_length;
 } HIL_Application_Data_Declaration_T;
 
 /**
@@ -317,16 +317,16 @@ typedef struct
      * Integration must configure Transport's maximum Application-message size
      * to at least this value. The codec does not inspect Transport configuration.
      */
-    uint32_t max_encoded_message_size;
+    size_t max_encoded_message_size;
 
     /** Largest byte span in one variable instruction/result/error field. */
-    uint32_t max_variable_data_size;
+    size_t max_variable_data_size;
 
     /** Maximum peripheral configuration records in one typed configuration. */
-    uint32_t max_peripheral_config_count;
+    size_t max_peripheral_config_count;
 
     /** Maximum variable-data declarations in one typed tick body. */
-    uint32_t max_variable_transfers_per_tick;
+    size_t max_variable_transfers_per_tick;
 
     /**
      * Largest expected_tick_count value accepted structurally.

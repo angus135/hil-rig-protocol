@@ -113,7 +113,7 @@ typedef struct
     /** Reserved protocol option bits; must be zero in the initial protocol. */
     uint32_t flags;
     /** Maximum captured bytes per tick; zero disables result capture. */
-    uint32_t capture_limit_bytes;
+    size_t capture_limit_bytes;
 } HIL_Application_Communication_Config_T;
 
 /**
@@ -181,7 +181,7 @@ typedef struct
     /** Peripheral/channel configuration records. */
     const HIL_Application_Peripheral_Config_T* peripherals;
     /** Number of readable records at peripherals. */
-    uint32_t peripheral_count;
+    size_t peripheral_count;
     /** Reserved versioned settings bytes; must be empty in the initial protocol. */
     HIL_Application_Byte_Span_T extension_data;
 } HIL_Application_Test_Configuration_T;

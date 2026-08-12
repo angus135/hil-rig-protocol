@@ -30,7 +30,7 @@ constexpr std::array<HIL_Application_Message_Type_T, 5u> kFirmwareToPythonMessag
     HIL_APPLICATION_MESSAGE_TYPE_ERROR,
 };
 
-template <std::uint32_t LeftSize, std::uint32_t RightSize> constexpr bool
+template <std::size_t LeftSize, std::size_t RightSize> constexpr bool
 DirectionSetsAreDisjoint( const std::array<HIL_Application_Message_Type_T, LeftSize>&  left,
                           const std::array<HIL_Application_Message_Type_T, RightSize>& right )
 {

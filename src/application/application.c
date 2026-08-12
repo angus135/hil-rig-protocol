@@ -49,25 +49,25 @@ HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_
      * Integration must configure Transport's maximum Application-message size
      * to at least this value. The codec does not inspect Transport configuration.
      */
-    uint32_t max_encoded_message_size = 0U;
+    size_t max_encoded_message_size = 0U;
     if ( max_encoded_message_size > HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE_BYTES )
     {
         return HIL_APPLICATION_STATUS_INVALID_COUNT;
     }
     /** Largest byte span in one variable instruction/result/error field. */
-    uint32_t max_variable_data_size = 0U;
+    size_t max_variable_data_size = 0U;
     if ( max_variable_data_size > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE )
     {
         return HIL_APPLICATION_STATUS_INVALID_COUNT;
     }
     /** Maximum peripheral configuration records in one typed configuration. */
-    uint32_t max_peripheral_config_count = 0U;
+    size_t max_peripheral_config_count = 0U;
     if ( max_peripheral_config_count > HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT )
     {
         return HIL_APPLICATION_STATUS_INVALID_COUNT;
     }
     /** Maximum variable-data declarations in one typed tick body. */
-    uint32_t max_variable_transfers_per_tick = 0U;
+    size_t max_variable_transfers_per_tick = 0U;
     if ( max_variable_transfers_per_tick > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
     {
         return HIL_APPLICATION_STATUS_INVALID_COUNT;
@@ -146,9 +146,142 @@ HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      c
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
+HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Request_T* data,
+    size_t* encoded_size )
+{
+    // The message will be the application header and the HIL_Application_System_Info_Request_T
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )encoded_size;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Response_T* data,
+    size_t* encoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )encoded_size;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Configuration_T* data,
+    size_t* encoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )encoded_size;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Instruction_T* data,
+    size_t* encoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )encoded_size;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T                    test_id,
+    const HIL_Application_Variable_Instruction_Data_T* data, size_t* encoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )encoded_size;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Execution_Control_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Execution_Control_T* data,
+    size_t* encoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )encoded_size;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Global_Control_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Global_Control_T* data,
+    size_t* encoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )encoded_size;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Test_Result_size( const HIL_Application_Context_T*         context,
+                                  const HIL_Application_Message_Subtype_T* sub_type,
+                                  const HIL_Application_Test_Id_T          test_id,
+                                  const HIL_Application_Test_Result_T* data, size_t* encoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )encoded_size;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Result_Data_T* data,
+    size_t* encoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )encoded_size;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Response_size( const HIL_Application_Context_T*         context,
+                               const HIL_Application_Message_Subtype_T* sub_type,
+                               const HIL_Application_Test_Id_T          test_id,
+                               const HIL_Application_Response_T* data, size_t* encoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )encoded_size;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
 HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Context_T* context,
                                                        const HIL_Application_Message_T* message,
-                                                       uint32_t* encoded_size )
+                                                       size_t* encoded_size )
 {
     /*
      * TODO: Validate initialized bounds and the complete tagged typed message:
@@ -166,7 +299,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Con
      * retain context/message, or publish encoded_size before all validation and
      * arithmetic succeeds.
      */
-    uint32_t size = 0;
+    size_t size = 0;
     if ( encoded_size == NULL || context == NULL || message == NULL )
     {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
@@ -251,11 +384,153 @@ HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Con
     return HIL_APPLICATION_STATUS_OK;
 }
 
+HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Request_T* data,
+    size_t max_payload_size, uint8_t* payload )
+{
+    // The message will be the application header and the HIL_Application_System_Info_Request_T
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Response_T* data,
+    size_t max_payload_size, uint8_t* payload )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Configuration_T* data,
+    size_t max_payload_size, uint8_t* payload )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Instruction_T* data,
+    size_t max_payload_size, uint8_t* payload )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T                    test_id,
+    const HIL_Application_Variable_Instruction_Data_T* data, size_t max_payload_size,
+    uint8_t* payload )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Execution_Control_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Execution_Control_T* data,
+    size_t max_payload_size, uint8_t* payload )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Global_Control_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Global_Control_T* data,
+    size_t max_payload_size, uint8_t* payload )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Result_T* data,
+    size_t max_payload_size, uint8_t* payload )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Result_Data_T* data,
+    size_t max_payload_size, uint8_t* payload )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Response_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Response_T* data,
+    size_t max_payload_size, uint8_t* payload )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
 HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_Context_T* context,
                                                          const HIL_Application_Message_T* message,
-                                                         uint8_t*  out_buffer,
-                                                         uint32_t  out_buffer_size,
-                                                         uint32_t* output_size )
+                                                         uint8_t* out_buffer,
+                                                         size_t   out_buffer_size,
+                                                         size_t*  output_size )
 {
     /*
      * TODO: Validate context, output pointer-size pair, and tagged message;
@@ -276,7 +551,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
     {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
-    uint32_t max_payload_size =
+    size_t max_payload_size =
         out_buffer_size
         - HIL_APPLICATION_HEADER_SIZE_BYTES;  // calculate the maximum allow-able payload size
     uint8_t payload[max_payload_size];        // Allocate memory for the payload
@@ -361,8 +636,8 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
 
 HIL_Application_Status_T
 HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
-                                     const uint8_t* encoded_message, uint32_t encoded_message_size,
-                                     uint32_t* required_storage_size )
+                                     const uint8_t* encoded_message, size_t encoded_message_size,
+                                     size_t* required_storage_size )
 {
     /*
      * TODO: Validate context and complete input pointer-size pair; parse the
@@ -392,8 +667,8 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
 
 HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
     const HIL_Application_Context_T* context, const uint8_t* encoded_message,
-    uint32_t encoded_message_size, uint8_t* decode_storage, uint32_t decode_storage_capacity,
-    HIL_Application_Message_T* out_message, uint32_t* decode_storage_size )
+    size_t encoded_message_size, uint8_t* decode_storage, size_t decode_storage_capacity,
+    HIL_Application_Message_T* out_message, size_t* decode_storage_size )
 {
     /*
      * TODO: Validate context, complete input, output, and decode-storage
@@ -474,7 +749,7 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
 
 HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
     const HIL_Application_Context_T* context, const uint8_t* encoded_message,
-    uint32_t encoded_message_size, uint32_t* required_decode_storage )
+    size_t encoded_message_size, size_t* required_decode_storage )
 {
     /*
      * TODO: Safely parse one complete message without publishing typed data;
