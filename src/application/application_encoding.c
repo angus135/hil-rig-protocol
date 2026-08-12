@@ -55,8 +55,7 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_encode(
     |  git hash {1} |   query {4}   |
     |_______________|_______________|
     */
-    uint32_t payload_size = HIL_APPLICATION_SYSTEM_INFO_REQUEST_FIXED_ENCODE_SIZE;
-    if ( max_payload_size < payload_size )
+    if ( max_payload_size < HIL_APPLICATION_SYSTEM_INFO_REQUEST_FIXED_ENCODE_SIZE )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
@@ -426,13 +425,67 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Result_T* data,
     uint32_t max_payload_size, uint8_t* payload )
 {
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    /**
+    _______________________________________________________
+    |                         |                            |
+    |     tick number {4}     |       Digital In {X}       |
+    |_________________________|____________________________|
+    |                         |                            |
+    |      analog in {Y}      |         PWM in {Z}         |
+    |_________________________|____________________________|
+    |                         |                            |
+    | variable data count {4} |    *varaible data {Q}      |
+    |_________________________|____________________________|
+    |                         |                            |
+    |      condition {4}      |     problem detail {4}     |
+    |_________________________|____________________________|
+
+    *variable data expanded:
+    _______________________________________________________
+    |                         |                            |
+    |     peripheral {4}      |        channel {2}         |
+    |_________________________|____________________________|
+    |                         |                            |
+    |         size {4}        |          span {U}          |
+    |_________________________|____________________________|
+    */
+    // tick number
+    memcpy( payload, &( data->tick_number ), sizeof( data->tick_number ) );
+    uint8_t running_total = sizeof( data->tick_number );
+    //  digital out
+    for (uint8_t i=0; i<HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT;i++){
+        memcpy( &( payload[running_total] ), &( data->digital_inputs[i].high ), sizeof( data->digital_inputs[i].high ) );
+        running_total += sizeof( data->digital_inputs[i].high ); 
+    }
+    // Analog out
+    for (uint8_t i=0; i<HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT;i++){
+        memcpy( &( payload[running_total] ), &( data->analog_inputs[i].microvolts ), sizeof( data->analog_inputs[i].microvolts ) );
+        running_total += sizeof( data->analog_inputs[i].microvolts ); 
+    }
+    // pwm out
+    for (uint8_t i=0; i<HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT;i++){
+        memcpy( &( payload[running_total] ), &( data->pwm_inputs[i].period_nanoseconds ), sizeof( data->pwm_inputs[i].period_nanoseconds ) );
+        running_total += sizeof( data->pwm_inputs[i].period_nanoseconds ); 
+        memcpy( &( payload[running_total] ), &( data->pwm_inputs[i].duty_cycle_permyriad ), sizeof( data->pwm_inputs[i].duty_cycle_permyriad ) );
+        running_total += sizeof( data->pwm_inputs[i].duty_cycle_permyriad ); 
+    }
+    // variable data
+    memcpy( &( payload[running_total] ), &( data->variable_data_count ), sizeof( data->variable_data_count ) );
+    running_total += sizeof( data->variable_data_count ); 
+    for (uint8_t i=0; i<data->variable_data_count;i++){
+        memcpy( &( payload[running_total] ), &( data->variable_data->channel.peripheral ), sizeof( data->variable_data->channel.peripheral ) );
+        running_total += sizeof( data->variable_data->channel.peripheral ); 
+        memcpy( &( payload[running_total] ), &( data->variable_data->channel.channel ), sizeof( data->variable_data->channel.channel ) );
+        running_total += sizeof( data->variable_data->channel.channel ); 
+        HIL_APPLICATION_Byte_Span_encode(&(data->variable_data->data), &( payload[running_total] ));
+        running_total += data->variable_data->data.size; 
+    }
+    // Condition and problem
+    memcpy( &( payload[running_total] ), &( data->condition ), sizeof( data->condition ) );
+    running_total += sizeof( data->condition );
+     memcpy( &( payload[running_total] ), &( data->problem_detail ), sizeof( data->problem_detail ) );
+    running_total += sizeof( data->problem_detail );
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_encode(
