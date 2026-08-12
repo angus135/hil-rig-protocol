@@ -13,6 +13,26 @@
 
 #include <string.h>
 
+HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Request_T* data,
+    uint32_t* encoded_size )
+{
+    // The message will be the application header and the HIL_Application_System_Info_Request_T
+    *encoded_size = HIL_APPLICATION_SYSTEM_INFO_REQUEST_FIXED_ENCODE_SIZE;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Response_T* data,
+    uint32_t* encoded_size )
+{
+    *encoded_size = HIL_APPLICATION_SYSTEM_INFO_RESPONSE_FIXED_ENCODE_SIZE
+                            + data->firmware_git_hash.size + data->diagnostic_data.size;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
 HIL_Application_Status_T
 HIL_APPLICATION_Peripheral_Config_size( const HIL_Application_Peripheral_Config_T* data,
                                         uint32_t*                                  size )
@@ -97,33 +117,6 @@ HIL_APPLICATION_Peripheral_Config_size( const HIL_Application_Peripheral_Config_
     }
     *size = size_local;
     return HIL_APPLICATION_STATUS_OK;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_size(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Request_T* data,
-    uint32_t* encoded_size )
-{
-    // The message will be the application header and the HIL_Application_System_Info_Request_T
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )encoded_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_size(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Response_T* data,
-    uint32_t* encoded_size )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )encoded_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_size(
