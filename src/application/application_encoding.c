@@ -312,13 +312,60 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Instruction_T* data,
     uint32_t max_payload_size, uint8_t* payload )
 {
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    /**
+    _______________________________________________________
+    |                         |                            |
+    |     tick number {4}     |      Digital Out {X}       |
+    |_________________________|____________________________|
+    |                         |                            |
+    |     analog out {Y}      |        PWM out {Z}         |
+    |_________________________|____________________________|
+    |                         |                            |
+    | variable data count {4} |    *varaible data {Q}      |
+    |_________________________|____________________________|
+
+    *variable data expanded:
+    _______________________________________________________
+    |                         |                            |
+    |     peripheral {4}      |        channel {2}         |
+    |_________________________|____________________________|
+    |                         |                            |
+    |         size {4}        |          span {U}          |
+    |_________________________|____________________________|
+    */
+
+    // tick number
+    memcpy( payload, &( data->tick_number ), sizeof( data->tick_number ) );
+    uint8_t running_total = sizeof( data->tick_number );
+    //  digital out
+    for (uint8_t i=0; i<HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT;i++){
+        memcpy( &( payload[running_total] ), &( data->digital_outputs[i].high ), sizeof( data->digital_outputs[i].high ) );
+        running_total += sizeof( data->digital_outputs[i].high ); 
+    }
+    // Analog out
+    for (uint8_t i=0; i<HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT;i++){
+        memcpy( &( payload[running_total] ), &( data->analog_outputs[i].microvolts ), sizeof( data->analog_outputs[i].microvolts ) );
+        running_total += sizeof( data->analog_outputs[i].microvolts ); 
+    }
+    // pwm out
+    for (uint8_t i=0; i<HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT;i++){
+        memcpy( &( payload[running_total] ), &( data->pwm_outputs[i].period_nanoseconds ), sizeof( data->pwm_outputs[i].period_nanoseconds ) );
+        running_total += sizeof( data->pwm_outputs[i].period_nanoseconds ); 
+        memcpy( &( payload[running_total] ), &( data->pwm_outputs[i].duty_cycle_permyriad ), sizeof( data->pwm_outputs[i].duty_cycle_permyriad ) );
+        running_total += sizeof( data->pwm_outputs[i].duty_cycle_permyriad ); 
+    }
+    // variable data
+    memcpy( &( payload[running_total] ), &( data->variable_data_count ), sizeof( data->variable_data_count ) );
+    running_total += sizeof( data->variable_data_count ); 
+    for (uint8_t i=0; i<data->variable_data_count;i++){
+        memcpy( &( payload[running_total] ), &( data->variable_data->channel.peripheral ), sizeof( data->variable_data->channel.peripheral ) );
+        running_total += sizeof( data->variable_data->channel.peripheral ); 
+        memcpy( &( payload[running_total] ), &( data->variable_data->channel.channel ), sizeof( data->variable_data->channel.channel ) );
+        running_total += sizeof( data->variable_data->channel.channel ); 
+        HIL_APPLICATION_Byte_Span_encode(&(data->variable_data->data), &( payload[running_total] ));
+        running_total += data->variable_data->data.size; 
+    }
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_encode(

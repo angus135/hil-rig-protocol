@@ -268,7 +268,7 @@ typedef struct
     /** UART, SPI, I2C, or CAN channel carrying the variable bytes. */
     HIL_Application_Channel_Id_T channel;
     /** Exact bytes expected in the matching variable-data message. */
-    size_t byte_length;
+    HIL_Application_Byte_Span_T data;
 } HIL_Application_Data_Declaration_T;
 
 /**
