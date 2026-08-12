@@ -388,13 +388,18 @@ HIL_Application_Status_T HIL_APPLICATION_Execution_Control_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Execution_Control_T* data,
     uint32_t max_payload_size, uint8_t* payload )
 {
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    /**
+    _______________________________________________________
+    |                         |                            |
+    |       command {4}       |         flags {4}          |
+    |_________________________|____________________________|
+
+    */
+    memcpy( payload, &( data->command ), sizeof( data->command ) );
+    uint8_t running_total = sizeof( data->command );
+    memcpy( &( payload[running_total] ), &( data->flags ), sizeof( data->flags ) );
+    running_total += sizeof( data->flags );
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Global_Control_encode(
@@ -402,13 +407,18 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Global_Control_T* data,
     uint32_t max_payload_size, uint8_t* payload )
 {
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    /**
+    _______________________________________________________
+    |                         |                            |
+    |       command {4}       |         flags {4}          |
+    |_________________________|____________________________|
+
+    */
+    memcpy( payload, &( data->command ), sizeof( data->command ) );
+    uint8_t running_total = sizeof( data->command );
+    memcpy( &( payload[running_total] ), &( data->flags ), sizeof( data->flags ) );
+    running_total += sizeof( data->flags );
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
@@ -444,11 +454,35 @@ HIL_Application_Status_T HIL_APPLICATION_Response_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Response_T* data,
     uint32_t max_payload_size, uint8_t* payload )
 {
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    /**
+    _______________________________________________________
+    |                         |                            |
+    |        scope {4}        |        outcome {4}         |
+    |_________________________|____________________________|
+    |                         |                            |
+    |        reason {4}       |      tick number {4}       |
+    |_________________________|____________________________|
+    |                         |                            |
+    |   comtrol command {4}   | global control command {4} |
+    |_________________________|____________________________|
+    |                         |
+    |        detail {4}       |
+    |_________________________|
+
+    */
+    memcpy( payload, &( data->scope ), sizeof( data->scope ) );
+    uint8_t running_total = sizeof( data->scope );
+    memcpy( &( payload[running_total] ), &( data->outcome ), sizeof( data->outcome ) );
+    running_total += sizeof( data->outcome );
+    memcpy( &( payload[running_total] ), &( data->reason ), sizeof( data->reason ) );
+    running_total += sizeof( data->reason );
+    memcpy( &( payload[running_total] ), &( data->tick_number ), sizeof( data->tick_number ) );
+    running_total += sizeof( data->tick_number );
+    memcpy( &( payload[running_total] ), &( data->control_command ), sizeof( data->control_command ) );
+    running_total += sizeof( data->control_command );
+    memcpy( &( payload[running_total] ), &( data->global_control_command ), sizeof( data->global_control_command ) );
+    running_total += sizeof( data->global_control_command );
+    memcpy( &( payload[running_total] ), &( data->detail ), sizeof( data->detail ) );
+    running_total += sizeof( data->detail );
+    return HIL_APPLICATION_STATUS_OK;
 }
