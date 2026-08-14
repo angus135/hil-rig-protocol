@@ -9,6 +9,7 @@
 /* Public and selected-profile private headers intentionally share this TU. */
 #include "hil_rig_protocol/transport/transport.h"
 #include "transport/internal/common/transport_parser.h"
+#include "transport/internal/mvp/transport_events_mvp.h"
 #include "transport/internal/mvp/transport_frame_codec_mvp.h"
 #include "transport/internal/mvp/transport_session_mvp.h"
 #include "transport/internal/mvp/transport_types_mvp.h"
@@ -300,4 +301,124 @@ TEST( TransportSessionEstablishment, RequiresAnObservedConnectedLink )
     root.session.link_state = HIL_TRANSPORT_LINK_STATE_CONNECTED;
     EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ),
                HIL_TRANSPORT_STATUS_NOT_READY );
+}
+
+TEST( TransportSessionRecovery, AutomaticAbandonmentCleansWorkAndPreservesEvents )
+{
+    HIL_Transport_Config_T config{};
+    HIL_TRANSPORT_Default_Config( &config );
+    config.session_seed = 11u;
+    std::size_t required_size = 0u;
+    ASSERT_EQ( HIL_TRANSPORT_Required_Storage_Size( &config, &required_size ),
+               HIL_TRANSPORT_STATUS_OK );
+    alignas( HIL_TRANSPORT_WORKSPACE_ALIGNMENT ) std::array<std::uint8_t, 4096u> workspace{};
+    ASSERT_LE( required_size, workspace.size() );
+    HIL_Transport_Context_T context{};
+    HIL_Transport_Storage_T storage{ workspace.data(), required_size };
+    ASSERT_EQ( HIL_TRANSPORT_Init( &context, HIL_TRANSPORT_ROLE_HOST, &config, &storage ),
+               HIL_TRANSPORT_STATUS_OK );
+    auto* root = static_cast<HIL_Transport_Mvp_Root_T*>( context.implementation );
+
+    root->base.link_state                    = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root->session.link_state                 = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root->session.link_state_observed        = 1u;
+    root->base.session_state                 = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root->session.state                      = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root->session.session_identifier         = 11u;
+    root->session.session_identifier_valid   = 1u;
+    root->session.handshake_phase            = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
+    root->submitted_message_size             = 3u;
+    root->submitted_message_pending          = 1u;
+    root->received_message_size              = 4u;
+    root->received_message_pending           = 1u;
+    root->parser.accumulated_size            = 2u;
+    root->parser.discarding                  = 1u;
+    root->session.next_transmit_sequence     = 17u;
+    root->session.expected_receive_sequence  = 18u;
+    root->session.last_accepted_receive_sequence = 17u;
+    root->session.accepted_receive_sequence_valid = 1u;
+    root->session.last_valid_receive_ms      = 99u;
+    root->session.next_host_session_identifier = 12u;
+    const auto* submitted_storage = root->submitted_message;
+    const auto* parser_storage    = root->parser.scratch_buffer;
+    const auto* encoded_storage   = root->encoded_output;
+    const HIL_Transport_Event_T older_event{ HIL_TRANSPORT_EVENT_PROTOCOL_ERROR,
+                                              HIL_TRANSPORT_STATUS_NOT_READY,
+                                              HIL_TRANSPORT_FAILURE_PROTOCOL, 0u };
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Events_Publish( root, &older_event ),
+               HIL_TRANSPORT_STATUS_OK );
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Abandon( root, HIL_TRANSPORT_FAILURE_DELIVERY ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( root->base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( root->session.state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( root->base.last_failure, HIL_TRANSPORT_FAILURE_DELIVERY );
+    EXPECT_EQ( root->session.last_failure, HIL_TRANSPORT_FAILURE_DELIVERY );
+    EXPECT_EQ( root->submitted_message_pending, 0u );
+    EXPECT_EQ( root->submitted_message_size, 0u );
+    EXPECT_EQ( root->received_message_pending, 0u );
+    EXPECT_EQ( root->received_message_size, 0u );
+    EXPECT_EQ( root->parser.accumulated_size, 0u );
+    EXPECT_EQ( root->parser.discarding, 0u );
+    EXPECT_EQ( root->session.session_identifier_valid, 0u );
+    EXPECT_EQ( root->session.handshake_phase, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE );
+    EXPECT_EQ( root->session.next_transmit_sequence, config.initial_reliable_sequence );
+    EXPECT_EQ( root->session.expected_receive_sequence, config.initial_reliable_sequence );
+    EXPECT_EQ( root->session.next_host_session_identifier, 12u );
+    EXPECT_EQ( root->submitted_message, submitted_storage );
+    EXPECT_EQ( root->parser.scratch_buffer, parser_storage );
+    EXPECT_EQ( root->encoded_output, encoded_storage );
+    EXPECT_EQ( root->event_count, 2u );
+
+    HIL_Transport_Event_T event{};
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Events_Read( root, &event ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( event.type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Events_Read( root, &event ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( event.type, HIL_TRANSPORT_EVENT_SESSION_RESET );
+    EXPECT_EQ( event.status, HIL_TRANSPORT_STATUS_DELIVERY_FAILED );
+    EXPECT_EQ( event.failure, HIL_TRANSPORT_FAILURE_DELIVERY );
+    EXPECT_EQ( event.required_capacity, 0u );
+}
+
+TEST( TransportSessionRecovery, ValidatesAutomaticFailureAndExplicitResetRepairsEvents )
+{
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Abandon( nullptr, HIL_TRANSPORT_FAILURE_DELIVERY ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+    HIL_Transport_Mvp_Root_T root{};
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Abandon( &root, HIL_TRANSPORT_FAILURE_NONE ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Abandon( &root, HIL_TRANSPORT_FAILURE_LOCAL_RESET ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+
+    HIL_Transport_Config_T config{};
+    HIL_TRANSPORT_Default_Config( &config );
+    config.session_seed = 7u;
+    std::size_t required_size = 0u;
+    ASSERT_EQ( HIL_TRANSPORT_Required_Storage_Size( &config, &required_size ),
+               HIL_TRANSPORT_STATUS_OK );
+    alignas( HIL_TRANSPORT_WORKSPACE_ALIGNMENT ) std::array<std::uint8_t, 4096u> workspace{};
+    HIL_Transport_Context_T context{};
+    HIL_Transport_Storage_T storage{ workspace.data(), required_size };
+    ASSERT_EQ( HIL_TRANSPORT_Init( &context, HIL_TRANSPORT_ROLE_HOST, &config, &storage ),
+               HIL_TRANSPORT_STATUS_OK );
+    auto* initialized = static_cast<HIL_Transport_Mvp_Root_T*>( context.implementation );
+    initialized->base.link_state                     = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    initialized->session.link_state                  = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    initialized->session.link_state_observed         = 1u;
+    initialized->base.session_state                  = HIL_TRANSPORT_SESSION_STATE_FAULT;
+    initialized->session.state                       = HIL_TRANSPORT_SESSION_STATE_FAULT;
+    initialized->base.last_failure                   = HIL_TRANSPORT_FAILURE_INTERNAL;
+    initialized->session.last_failure                = HIL_TRANSPORT_FAILURE_INTERNAL;
+    initialized->session.next_host_session_identifier = 19u;
+    initialized->event_read_index                    = 99u;
+    initialized->event_count                         = 99u;
+
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &context ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( initialized->event_read_index, 0u );
+    EXPECT_EQ( initialized->event_count, 0u );
+    EXPECT_EQ( initialized->base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( initialized->session.state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( initialized->base.last_failure, HIL_TRANSPORT_FAILURE_LOCAL_RESET );
+    EXPECT_EQ( initialized->session.last_failure, HIL_TRANSPORT_FAILURE_LOCAL_RESET );
+    EXPECT_EQ( initialized->session.next_host_session_identifier, 19u );
 }
