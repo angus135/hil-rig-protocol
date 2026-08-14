@@ -165,14 +165,21 @@ static void HIL_TRANSPORT_MVP_Handshake_Set_Established( HIL_Transport_Mvp_Root_
     root->session.last_failure    = HIL_TRANSPORT_FAILURE_NONE;
 }
 
+typedef enum
+{
+    HIL_TRANSPORT_MVP_HANDSHAKE_ACK_UNEXPECTED = 0,
+    HIL_TRANSPORT_MVP_HANDSHAKE_ACK_MATCHED,
+    HIL_TRANSPORT_MVP_HANDSHAKE_ACK_BLOCKED_BY_PINNED_RETRY
+} HIL_Transport_Mvp_Handshake_Ack_Result_T;
+
 static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Classify_Acknowledgement(
     HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
-    HIL_Transport_Mvp_Frame_Type_T expected_type, int* matched )
+    HIL_Transport_Mvp_Frame_Type_T expected_type, HIL_Transport_Mvp_Handshake_Ack_Result_T* result )
 {
     HIL_Transport_Mvp_Ack_Result_T acknowledgement_result;
     HIL_Transport_Status_T         status;
 
-    *matched = 0;
+    *result = HIL_TRANSPORT_MVP_HANDSHAKE_ACK_UNEXPECTED;
     if ( root->session.retained_reliable_frame_type != expected_type )
     {
         return HIL_TRANSPORT_STATUS_OK;
@@ -183,7 +190,16 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Classify_Acknowledgeme
     {
         return status;
     }
-    *matched = acknowledgement_result == HIL_TRANSPORT_MVP_ACK_MATCHED;
+    if ( acknowledgement_result == HIL_TRANSPORT_MVP_ACK_MATCHED )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_ACK_MATCHED;
+    }
+    else if ( ( root->session.reliable_state == HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_PEEKED )
+              && ( frame->acknowledgement_sequence == root->session.retained_transmit_sequence ) )
+    {
+        /* The exact ACK is valid, but the selected retry remains pinned until commit. */
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_ACK_BLOCKED_BY_PINNED_RETRY;
+    }
     return HIL_TRANSPORT_STATUS_OK;
 }
 
@@ -227,9 +243,9 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Host_Response(
     HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
     HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
 {
-    HIL_Transport_Mvp_Rx_Sequence_Result_T sequence_result;
-    HIL_Transport_Status_T                 status;
-    int                                    acknowledgement_matched;
+    HIL_Transport_Mvp_Rx_Sequence_Result_T   sequence_result;
+    HIL_Transport_Status_T                   status;
+    HIL_Transport_Mvp_Handshake_Ack_Result_T acknowledgement_result;
 
     if ( frame->session_identifier != root->session.session_identifier )
     {
@@ -276,12 +292,16 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Host_Response(
         return HIL_TRANSPORT_STATUS_OK;
     }
     status = HIL_TRANSPORT_MVP_Handshake_Classify_Acknowledgement(
-        root, frame, HIL_TRANSPORT_MVP_FRAME_INITIATE, &acknowledgement_matched );
+        root, frame, HIL_TRANSPORT_MVP_FRAME_INITIATE, &acknowledgement_result );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
         return status;
     }
-    if ( !acknowledgement_matched )
+    if ( acknowledgement_result == HIL_TRANSPORT_MVP_HANDSHAKE_ACK_BLOCKED_BY_PINNED_RETRY )
+    {
+        return HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED;
+    }
+    if ( acknowledgement_result != HIL_TRANSPORT_MVP_HANDSHAKE_ACK_MATCHED )
     {
         *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
         return HIL_TRANSPORT_STATUS_OK;
@@ -309,8 +329,8 @@ HIL_TRANSPORT_MVP_Handshake_Handle_Host_Ack( HIL_Transport_Mvp_Root_T*          
                                              const HIL_Transport_Mvp_Frame_T*            frame,
                                              HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
 {
-    HIL_Transport_Status_T status;
-    int                    acknowledgement_matched;
+    HIL_Transport_Status_T                   status;
+    HIL_Transport_Mvp_Handshake_Ack_Result_T acknowledgement_result;
 
     if ( ( root->session.handshake_phase
            != HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK )
@@ -320,12 +340,16 @@ HIL_TRANSPORT_MVP_Handshake_Handle_Host_Ack( HIL_Transport_Mvp_Root_T*          
         return HIL_TRANSPORT_STATUS_OK;
     }
     status = HIL_TRANSPORT_MVP_Handshake_Classify_Acknowledgement(
-        root, frame, HIL_TRANSPORT_MVP_FRAME_CONFIRM, &acknowledgement_matched );
+        root, frame, HIL_TRANSPORT_MVP_FRAME_CONFIRM, &acknowledgement_result );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
         return status;
     }
-    if ( !acknowledgement_matched )
+    if ( acknowledgement_result == HIL_TRANSPORT_MVP_HANDSHAKE_ACK_BLOCKED_BY_PINNED_RETRY )
+    {
+        return HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED;
+    }
+    if ( acknowledgement_result != HIL_TRANSPORT_MVP_HANDSHAKE_ACK_MATCHED )
     {
         *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE;
         return HIL_TRANSPORT_STATUS_OK;
@@ -432,9 +456,9 @@ HIL_TRANSPORT_MVP_Handshake_Handle_Rig_Confirm( HIL_Transport_Mvp_Root_T*       
                                                 const HIL_Transport_Mvp_Frame_T*            frame,
                                                 HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
 {
-    HIL_Transport_Mvp_Rx_Sequence_Result_T sequence_result;
-    HIL_Transport_Status_T                 status;
-    int                                    acknowledgement_matched;
+    HIL_Transport_Mvp_Rx_Sequence_Result_T   sequence_result;
+    HIL_Transport_Status_T                   status;
+    HIL_Transport_Mvp_Handshake_Ack_Result_T acknowledgement_result;
 
     if ( frame->session_identifier != root->session.session_identifier )
     {
@@ -478,12 +502,16 @@ HIL_TRANSPORT_MVP_Handshake_Handle_Rig_Confirm( HIL_Transport_Mvp_Root_T*       
         return HIL_TRANSPORT_STATUS_OK;
     }
     status = HIL_TRANSPORT_MVP_Handshake_Classify_Acknowledgement(
-        root, frame, HIL_TRANSPORT_MVP_FRAME_RESPONSE, &acknowledgement_matched );
+        root, frame, HIL_TRANSPORT_MVP_FRAME_RESPONSE, &acknowledgement_result );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
         return status;
     }
-    if ( !acknowledgement_matched )
+    if ( acknowledgement_result == HIL_TRANSPORT_MVP_HANDSHAKE_ACK_BLOCKED_BY_PINNED_RETRY )
+    {
+        return HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED;
+    }
+    if ( acknowledgement_result != HIL_TRANSPORT_MVP_HANDSHAKE_ACK_MATCHED )
     {
         *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
         return HIL_TRANSPORT_STATUS_OK;
