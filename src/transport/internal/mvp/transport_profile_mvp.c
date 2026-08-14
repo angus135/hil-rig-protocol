@@ -259,15 +259,19 @@ HIL_Transport_Status_T
 HIL_TRANSPORT_PROFILE_Notify_Link_State( HIL_Transport_Context_T*   context,
                                          HIL_Transport_Link_State_T link_state, uint32_t now_ms )
 {
-    /*
-     * TODO: Validate inputs, record caller-owned link state/time, start private
-     * session establishment on connection, and perform full session reset on
-     * disconnection. Never call, configure, or poll external hardware.
-     */
-    ( void )context;
-    ( void )link_state;
+    HIL_Transport_Mvp_Root_T* root = HIL_TRANSPORT_MVP_Root_From_Context( context );
+
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( ( link_state != HIL_TRANSPORT_LINK_STATE_DISCONNECTED )
+         && ( link_state != HIL_TRANSPORT_LINK_STATE_CONNECTED ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
     ( void )now_ms;
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    return HIL_TRANSPORT_MVP_Session_Notify_Link_State( root, link_state );
 }
 
 HIL_Transport_Status_T

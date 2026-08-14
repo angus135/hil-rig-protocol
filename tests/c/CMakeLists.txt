@@ -18,6 +18,7 @@ set(HIL_RIG_PROTOCOL_UNIT_TEST_SOURCES
     unit/test_transport_events.cpp
     unit/test_transport_output.cpp
     unit/test_transport_reliability.cpp
+    unit/test_transport_session.cpp
     unit/test_transport_wire.cpp
 )
 
