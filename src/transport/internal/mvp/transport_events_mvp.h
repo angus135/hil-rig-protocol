@@ -28,6 +28,16 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Events_Publish( HIL_Transport_Mvp_Root_
                                                          const HIL_Transport_Event_T* event );
 
 /**
+ * @brief Check whether one event can be retained without reserving or mutating a slot.
+ *
+ * @details The MVP is single-owner, so a successful check followed by one
+ * publication in the same call is sufficient for transactional semantic
+ * acceptance. Full capacity returns CAPACITY_EXHAUSTED.
+ */
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Events_Check_Capacity( HIL_Transport_Mvp_Root_T* root );
+
+/**
  * Copy and consume the oldest event only after a complete successful copy,
  * preserving the destination on NOT_READY and every other failure.
  */
