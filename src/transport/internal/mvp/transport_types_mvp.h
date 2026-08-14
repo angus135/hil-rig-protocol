@@ -98,11 +98,11 @@ typedef enum
     /** One complete encoded control item is available for copying. */
     HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY,
 
-    /** The item was copied and remains pinned until private commit or reset. */
+    /** The item was copied and remains pinned until routed commit or reset. */
     HIL_TRANSPORT_MVP_CONTROL_OUTPUT_PEEKED
 } HIL_Transport_Mvp_Control_Output_State_T;
 
-/** Private selection pinned by a successful Peek_Output() operation. */
+/** Arbiter-owned lifecycle selection pinned by a successful public peek. */
 typedef enum
 {
     /** No output is pinned for a following commit. */
@@ -196,10 +196,11 @@ typedef struct
  * body, one decoded-frame scratch region, and one complete received message.
  * A separate fixed-capacity embedded array retains one control output. Neither
  * output slot is a queue, and ownership of each byte region is determined by
- * its lifecycle state and valid size rather than by clearing stale bytes.
- * Workspace sizing reserves the pointer-backed non-overlapping regions with
- * checked arithmetic; the embedded control array is included in this root's
- * size automatically.
+ * its lifecycle state and valid size rather than by clearing stale bytes. The
+ * output arbiter pins exactly one lifecycle after a successful public peek and
+ * routes commit back to it. Workspace sizing reserves the pointer-backed
+ * non-overlapping regions with checked arithmetic; the embedded control array
+ * is included in this root's size automatically.
  */
 typedef struct
 {
@@ -218,7 +219,7 @@ typedef struct
     /** Valid retained byte count; zero means no encoded output is owned. */
     size_t encoded_output_size;
 
-    /** Item selected by a successful peek and protected until commit/reset. */
+    /** Arbiter-owned item selected by a successful public peek until commit/reset. */
     HIL_Transport_Mvp_Output_Selection_T output_selection;
 
     /** Fixed private copy of one opaque, already encoded control item. */

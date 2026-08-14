@@ -57,24 +57,25 @@ little-endian frames use CRC-32/ISO-HDLC for accidental-corruption detection,
 standard COBS encoding, and a trailing `0x00` stream delimiter. Workspace
 sizing, initialization, and the bounded stream parser are also implemented.
 
-The MVP also implements the private one-item reliable output lifecycle: an
-already encoded frame can be published, repeatedly peeked, committed, retained
-byte-for-byte across timed retransmissions, completed by an exact ACK, exhausted
-without choosing recovery policy, or abandoned by reset. Public
-`Peek_Output()`, `Commit_Output()`, `Get_Status()`, and `Reset()` use that
-primitive. Dedicated tests drive it directly with opaque sentinel bytes because
-the later handshake and Application submission paths do not yet publish frames.
+The MVP also implements independent one-item reliable and control-output
+lifecycles plus public arbitration between them. Reliable output retains one
+already encoded frame byte-for-byte across commit, ACK wait, timed retries, and
+retry exhaustion. Control output retains up to 20 already encoded bytes and is
+preferred when no output is already pinned. A complete successful peek pins the
+opaque selected item until commit or reset; size queries and undersized buffers
+do not pin or cause fallback to the other lifecycle.
 
-A separate private one-item control-output lifecycle is also implemented. It
-retains up to 20 already encoded bytes independently of reliable output, making
-room for a future ACK while a reliable frame remains owned. No code generates
-ACKs yet, and public output selection still exposes only reliable output; public
-control/reliable arbitration remains later work.
+Public `Peek_Output()`, `Commit_Output()`, `Get_Status()`, and `Reset()` use the
+arbiter. Control commit releases its slot immediately and ignores the supplied
+time, while reliable commit starts ACK timing and retains the encoded bytes.
+`output_pending` aggregates both lifecycles, while
+`reliable_delivery_pending` remains limited to reliable ownership. Dedicated
+tests publish opaque sentinel bytes through the private seams because the later
+handshake and Application paths do not yet produce frames.
 
-The broader Transport runtime—session handshake, received-ACK dispatch,
-receive-side duplicate handling, ACK generation and public output arbitration,
-Application submission and delivery, delivery events, and session recovery—
-remains as intentional
+The broader Transport runtime—session handshake, received-frame and received-ACK
+dispatch, receive-side duplicate handling, ACK and RESET generation, Application
+submission and delivery, delivery events, and session recovery—remains as intentional
 `HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs. The public send/receive workflow
 is therefore not operational end to end yet.
 

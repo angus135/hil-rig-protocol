@@ -45,7 +45,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Control_Output_Publish_Encoded(
  * reports the required size without a partial copy or state change. A complete
  * READY copy enters PEEKED; repeated PEEKED copies return the same bytes and
  * remain pinned. This private operation deliberately leaves global output
- * selection unchanged until a later arbitration layer owns that decision.
+ * selection unchanged because the output arbiter alone owns that decision.
  *
  * @param[in,out] root Private MVP root owning the fixed control slot.
  * @param[out] out_buffer Caller-owned destination, or NULL only with zero capacity.
@@ -88,8 +88,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Control_Output_Reset( HIL_Transport_Mvp
  * @brief Query whether the private control slot owns output.
  *
  * @details READY and PEEKED report one; IDLE reports zero. The result is cleared
- * before later validation. This query is intentionally not connected to public
- * status until public output arbitration can return the same item.
+ * before later validation. The output arbiter combines this flag with reliable
+ * availability for public status without treating control as reliable delivery.
  *
  * @param[in,out] root Private MVP root; invariant failure records FAULT/INTERNAL.
  * @param[out] pending Zero or one, defensively cleared before validation.

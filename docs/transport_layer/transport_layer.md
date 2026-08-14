@@ -8,11 +8,11 @@ do not constrain the MVP unless they are later promoted here or into public
 header contracts.
 
 The MVP wire codec, CRC, COBS framing, bounded stream parser, workspace sizing,
-initialization, private one-item reliable encoded-output lifecycle, and separate
-private one-item control-output lifecycle are implemented. Public peek, commit,
-and status still expose reliable output only; reset clears both private slots.
-Session establishment, received-ACK dispatch, ACK generation, public output
-arbitration, receive-side duplicate handling, Application-message orchestration,
+initialization, private one-item reliable and control-output lifecycles, and
+public arbitration between those lifecycles are implemented. Public peek,
+commit, status, and reset operate across both private slots. Session
+establishment, received-frame and received-ACK dispatch, ACK and RESET
+generation, receive-side duplicate handling, Application-message orchestration,
 delivery events, and session recovery remain intentional stubs unless stated
 otherwise below.
 
@@ -323,19 +323,31 @@ numeric value crosses the profile boundary.
 the item is unchanged. On `NOT_READY`, it is zero. NULL with zero capacity is a
 size query.
 
-A successful copy pins the selected bytes. Repeated peeks return the same item
-until `HIL_TRANSPORT_Commit_Output()`, reset, or terminal recovery. Peek does not
-call hardware, mark bytes transmitted, begin retry timing, or release storage.
-A low-level output-buffer-too-small condition is retryable and cannot discard a
+A public output item may come from the reliable lifecycle or the control slot;
+the caller sees only opaque encoded bytes and no output-type parameter is
+needed. When nothing is pinned, control output is preferred. Priority also
+selects the item reported by a size query or undersized destination; Transport
+does not fall back to reliable output merely because the caller's buffer would
+fit it.
+
+Only a complete successful copy pins the selected lifecycle. Size queries and
+undersized destinations do not enter `PEEKED` or pin global selection. Once an
+item is pinned, repeated peeks route to it even if a higher-priority item later
+becomes ready. The same item remains selected until
+`HIL_TRANSPORT_Commit_Output()`, reset, or terminal recovery. Peek does not call
+hardware, mark bytes transmitted, begin retry timing, or release storage. A
+low-level output-buffer-too-small condition is retryable and cannot discard a
 valid item.
 
-The caller commits only after external I/O accepts the complete item. Commit
-records that time but performs no I/O. The acknowledgement timer therefore
-starts at commit, not publication or peek. Initial commit leaves the committed
-retransmission count at zero; retransmission commit increases it exactly once.
-Private reliable ownership continues after commit until matching
-acknowledgement, owner-directed recovery, or reset. An uncommitted or awaiting
-item cannot be replaced.
+The caller commits only after external I/O accepts the complete item. Commit is
+routed to the lifecycle that produced the pinned bytes and performs no I/O. A
+control commit releases the fixed control slot immediately and deliberately
+ignores `now_ms`; it cannot alter reliable state, timing, retries, sequence, or
+retained bytes. A reliable commit records `now_ms`, so its acknowledgement timer
+starts at commit rather than publication or peek. Initial reliable commit leaves
+the committed retransmission count at zero; retransmission commit increases it
+exactly once. Reliable ownership and exact encoded bytes continue after commit
+until matching acknowledgement, owner-directed recovery, or reset.
 
 The reliable lifecycle is:
 
@@ -403,10 +415,12 @@ the item immediately by returning to `IDLE` and setting its valid size to zero;
 the array need not be cleared because stale bytes are then inaccessible. Control
 output has no timer, acknowledgement, retry, sequence ownership, or event.
 
-This lifecycle supplies only private storage. No producer generates ACKs or
-RESET output yet, and no public arbiter selects control versus reliable output.
-Consequently public `Peek_Output()`, `Commit_Output()`, and `Get_Status()` remain
-reliable-only until that arbitration is implemented.
+This lifecycle supplies private storage to the public output arbiter. When no
+item is already pinned, public peek selects ready control output before reliable
+output. Successful control peek pins that item, public commit releases it
+immediately, and the next peek can expose still-ready reliable output. The
+arbiter does not itself generate ACK or RESET frames; no producer generates
+either control frame yet.
 
 ## Link, reset, events, and status
 
@@ -439,14 +453,14 @@ way to clear it on an initialized context.
 `HIL_TRANSPORT_Read_Event()` will expose high-level establishment, reset, delivery,
 protocol, capacity, and link conditions. It never asks the caller to build a
 control frame. `HIL_TRANSPORT_Get_Status()` is implemented: `output_pending` is
-set while reliable initial/retry bytes are ready or peeked, and
+set while either control or reliable initial/retry bytes are ready or peeked, and
 `reliable_delivery_pending` remains set in every non-IDLE reliable state,
 including `EXHAUSTED`. The remaining fields expose role, link, high-level
 session state, local operating mode, received-message/event indicators, and
 high-level failure. Handshake phases, parser states, sequence numbers and retry
-counts remain private. Private control ownership is deliberately omitted until
-public peek can return it. Any future extended fragmentation, reassembly, window,
-keepalive or queueing metadata also remains private.
+counts remain private. Control ownership never sets
+`reliable_delivery_pending`. Any future extended fragmentation, reassembly,
+window, keepalive or queueing metadata also remains private.
 
 ## Public and private headers
 
@@ -455,10 +469,10 @@ Normal integrations use only:
 - `include/hil_rig_protocol/transport/transport.h`
 - `include/hil_rig_protocol/transport/transport_types.h`
 
-CRC, parser, profile-specific frame-codec, session, handshake, reliability, and
-control-output headers are private under `src/transport/internal`. Internal
-tests may include them to validate source composition, but that creates no
-installation or caller compatibility promise.
+CRC, parser, profile-specific frame-codec, session, handshake, reliability,
+control-output, and output-arbitration headers are private under
+`src/transport/internal`. Internal tests may include them to validate source
+composition, but that creates no installation or caller compatibility promise.
 
 The public C structures are API representations, not wire structures. Native
 enums, `size_t`, pointers, padding, and structures must never be copied directly
