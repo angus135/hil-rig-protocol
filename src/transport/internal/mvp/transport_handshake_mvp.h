@@ -30,7 +30,13 @@ typedef enum
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Process( HIL_Transport_Mvp_Root_T* root,
                                                             uint32_t                  now_ms );
 
-/** Apply semantic handshake, ACK, duplicate, and active-session RESET handling. */
+/**
+ * Apply semantic handshake, ACK, duplicate, and active-session RESET handling.
+ *
+ * @return HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED if semantic acceptance is
+ * temporarily blocked by a pinned reliable retry or unavailable ACK control
+ * output. The same decoded frame remains retryable without partial acceptance.
+ */
 HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Handshake_Handle_Frame( HIL_Transport_Mvp_Root_T*                   root,
                                           const HIL_Transport_Mvp_Frame_T*            frame,
