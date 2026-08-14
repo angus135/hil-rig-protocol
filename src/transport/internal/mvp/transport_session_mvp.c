@@ -49,8 +49,10 @@ HIL_TRANSPORT_MVP_Session_Clear_Scoped_Work( HIL_Transport_Mvp_Root_T* root )
     root->session.handshake_phase                 = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE;
     root->session.next_transmit_sequence          = root->session.initial_reliable_sequence;
     root->session.expected_receive_sequence       = root->session.initial_reliable_sequence;
-    root->session.last_accepted_receive_sequence  = 0u;
-    root->session.accepted_receive_sequence_valid = 0u;
+    root->session.last_accepted_receive_sequence                    = 0u;
+    root->session.accepted_receive_sequence_valid                   = 0u;
+    root->session.last_accepted_receive_frame_type                  = HIL_TRANSPORT_MVP_FRAME_INVALID;
+    root->session.last_accepted_receive_acknowledgement_sequence = 0u;
     root->session.reliable_state                  = HIL_TRANSPORT_MVP_RELIABLE_IDLE;
     root->session.retained_reliable_frame_type    = HIL_TRANSPORT_MVP_FRAME_INVALID;
     root->session.retained_transmit_sequence      = 0u;
@@ -155,9 +157,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Init( HIL_Transport_Mvp_Session
     initialized_session.initial_reliable_sequence    = initial_reliable_sequence;
     initialized_session.next_transmit_sequence       = initial_reliable_sequence;
     initialized_session.expected_receive_sequence    = initial_reliable_sequence;
-    initialized_session.retained_reliable_frame_type = HIL_TRANSPORT_MVP_FRAME_INVALID;
-    initialized_session.reliable_state               = HIL_TRANSPORT_MVP_RELIABLE_IDLE;
-    initialized_session.last_failure                 = HIL_TRANSPORT_FAILURE_NONE;
+    initialized_session.retained_reliable_frame_type      = HIL_TRANSPORT_MVP_FRAME_INVALID;
+    initialized_session.last_accepted_receive_frame_type = HIL_TRANSPORT_MVP_FRAME_INVALID;
+    initialized_session.reliable_state                    = HIL_TRANSPORT_MVP_RELIABLE_IDLE;
+    initialized_session.last_failure                      = HIL_TRANSPORT_FAILURE_NONE;
 
     *session = initialized_session;
     return HIL_TRANSPORT_STATUS_OK;
@@ -214,6 +217,8 @@ HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root )
          || ( root->parser.accumulated_size != 0u ) || ( root->parser.body_ready != 0u )
          || ( root->parser.discarding != 0u ) || ( session->last_accepted_receive_sequence != 0u )
          || ( session->accepted_receive_sequence_valid != 0u )
+         || ( session->last_accepted_receive_frame_type != HIL_TRANSPORT_MVP_FRAME_INVALID )
+         || ( session->last_accepted_receive_acknowledgement_sequence != 0u )
          || ( session->last_valid_receive_ms != 0u ) )
     {
         return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
@@ -221,8 +226,10 @@ HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root )
 
     session->next_transmit_sequence          = session->initial_reliable_sequence;
     session->expected_receive_sequence       = session->initial_reliable_sequence;
-    session->last_accepted_receive_sequence  = 0u;
-    session->accepted_receive_sequence_valid = 0u;
+    session->last_accepted_receive_sequence                    = 0u;
+    session->accepted_receive_sequence_valid                   = 0u;
+    session->last_accepted_receive_frame_type                  = HIL_TRANSPORT_MVP_FRAME_INVALID;
+    session->last_accepted_receive_acknowledgement_sequence = 0u;
 
     if ( session->role == HIL_TRANSPORT_ROLE_HOST )
     {
@@ -510,21 +517,64 @@ HIL_TRANSPORT_MVP_Session_Reserve_Sequence( HIL_Transport_Mvp_Session_T* session
 }
 
 HIL_Transport_Status_T
-HIL_TRANSPORT_MVP_Session_Classify_Sequence( HIL_Transport_Mvp_Session_T*            session,
+HIL_TRANSPORT_MVP_Session_Classify_Sequence( const HIL_Transport_Mvp_Session_T*      session,
                                              uint16_t                                sequence,
                                              HIL_Transport_Mvp_Rx_Sequence_Result_T* result )
 {
-    /*
-     * TODO: Validate and classify the expected sequence, the exact last accepted
-     * duplicate, or incompatible traffic using approved wrap rules. Deliver and
-     * advance expected data once; request another ACK without redelivery for the
-     * duplicate; and require complete session restart for incompatibility. The
-     * private result is mapped to public status/events by the MVP profile.
-     */
-    ( void )session;
-    ( void )sequence;
-    ( void )result;
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    if ( result == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    *result = HIL_TRANSPORT_MVP_RX_SEQUENCE_INCOMPATIBLE;
+    if ( session == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( session->accepted_receive_sequence_valid > 1u )
+    {
+        return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    }
+
+    if ( session->accepted_receive_sequence_valid == 0u )
+    {
+        *result = HIL_TRANSPORT_MVP_RX_SEQUENCE_EXPECTED;
+    }
+    else if ( sequence == session->expected_receive_sequence )
+    {
+        *result = HIL_TRANSPORT_MVP_RX_SEQUENCE_EXPECTED;
+    }
+    else if ( sequence == session->last_accepted_receive_sequence )
+    {
+        *result = HIL_TRANSPORT_MVP_RX_SEQUENCE_DUPLICATE;
+    }
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Session_Accept_Sequence( HIL_Transport_Mvp_Session_T* session,
+                                           uint16_t                     sequence )
+{
+    HIL_Transport_Mvp_Rx_Sequence_Result_T result;
+    HIL_Transport_Status_T                 status;
+
+    if ( session == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    status = HIL_TRANSPORT_MVP_Session_Classify_Sequence( session, sequence, &result );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    if ( result != HIL_TRANSPORT_MVP_RX_SEQUENCE_EXPECTED )
+    {
+        return HIL_TRANSPORT_STATUS_NOT_READY;
+    }
+
+    session->last_accepted_receive_sequence  = sequence;
+    session->expected_receive_sequence       = ( uint16_t )( sequence + 1u );
+    session->accepted_receive_sequence_valid = 1u;
+    return HIL_TRANSPORT_STATUS_OK;
 }
 
 HIL_Transport_Status_T

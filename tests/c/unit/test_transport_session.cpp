@@ -51,6 +51,8 @@ TEST( TransportSessionInit, InitializesHostCompletely )
     EXPECT_EQ( session.expected_receive_sequence, UINT16_MAX );
     EXPECT_EQ( session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE );
     EXPECT_EQ( session.retained_reliable_frame_type, HIL_TRANSPORT_MVP_FRAME_INVALID );
+    EXPECT_EQ( session.last_accepted_receive_frame_type, HIL_TRANSPORT_MVP_FRAME_INVALID );
+    EXPECT_EQ( session.last_accepted_receive_acknowledgement_sequence, 0u );
     EXPECT_EQ( session.last_failure, HIL_TRANSPORT_FAILURE_NONE );
 }
 
@@ -61,6 +63,84 @@ TEST( TransportSessionInit, InitializesRigWithZeroSequence )
                HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( session.next_host_session_identifier, 0u );
     EXPECT_EQ( session.next_transmit_sequence, 0u );
+}
+
+TEST( TransportSessionSequence, FirstPeerSequenceEstablishesIndependentBaseline )
+{
+    HIL_Transport_Mvp_Session_T            session{};
+    HIL_Transport_Mvp_Rx_Sequence_Result_T result = HIL_TRANSPORT_MVP_RX_SEQUENCE_INCOMPATIBLE;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init( &session, HIL_TRANSPORT_ROLE_HOST, 7u, 99u ),
+               HIL_TRANSPORT_STATUS_OK );
+
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Classify_Sequence( &session, 42u, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( result, HIL_TRANSPORT_MVP_RX_SEQUENCE_EXPECTED );
+    EXPECT_EQ( session.expected_receive_sequence, 99u );
+    EXPECT_EQ( session.accepted_receive_sequence_valid, 0u );
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Accept_Sequence( &session, 42u ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( session.last_accepted_receive_sequence, 42u );
+    EXPECT_EQ( session.expected_receive_sequence, 43u );
+    EXPECT_EQ( session.accepted_receive_sequence_valid, 1u );
+}
+
+TEST( TransportSessionSequence, ClassifiesExpectedDuplicateAndIncompatibleWithoutMutation )
+{
+    HIL_Transport_Mvp_Session_T            session{};
+    HIL_Transport_Mvp_Rx_Sequence_Result_T result = HIL_TRANSPORT_MVP_RX_SEQUENCE_EXPECTED;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init( &session, HIL_TRANSPORT_ROLE_RIG, 0u, 500u ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Accept_Sequence( &session, 1000u ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto accepted = session;
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Classify_Sequence( &session, 1001u, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( result, HIL_TRANSPORT_MVP_RX_SEQUENCE_EXPECTED );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Classify_Sequence( &session, 1000u, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( result, HIL_TRANSPORT_MVP_RX_SEQUENCE_DUPLICATE );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Classify_Sequence( &session, 999u, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( result, HIL_TRANSPORT_MVP_RX_SEQUENCE_INCOMPATIBLE );
+    EXPECT_EQ( 0, std::memcmp( &session, &accepted, sizeof( session ) ) );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Accept_Sequence( &session, 1000u ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Accept_Sequence( &session, 999u ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+}
+
+TEST( TransportSessionSequence, AcceptsNaturalUint16Wrap )
+{
+    HIL_Transport_Mvp_Session_T            session{};
+    HIL_Transport_Mvp_Rx_Sequence_Result_T result = HIL_TRANSPORT_MVP_RX_SEQUENCE_INCOMPATIBLE;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init( &session, HIL_TRANSPORT_ROLE_RIG, 0u, 0u ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Accept_Sequence( &session, UINT16_MAX ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( session.expected_receive_sequence, 0u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Classify_Sequence( &session, 0u, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( result, HIL_TRANSPORT_MVP_RX_SEQUENCE_EXPECTED );
+}
+
+TEST( TransportSessionSequence, ValidatesInputsAndCorruptValidityFlag )
+{
+    HIL_Transport_Mvp_Session_T            session{};
+    HIL_Transport_Mvp_Rx_Sequence_Result_T result = HIL_TRANSPORT_MVP_RX_SEQUENCE_EXPECTED;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init( &session, HIL_TRANSPORT_ROLE_RIG, 0u, 0u ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Classify_Sequence( nullptr, 0u, &result ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Classify_Sequence( &session, 0u, nullptr ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Accept_Sequence( nullptr, 0u ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+    session.accepted_receive_sequence_valid = 2u;
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Classify_Sequence( &session, 0u, &result ),
+               HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( result, HIL_TRANSPORT_MVP_RX_SEQUENCE_INCOMPATIBLE );
 }
 
 struct RootFixture : testing::Test
