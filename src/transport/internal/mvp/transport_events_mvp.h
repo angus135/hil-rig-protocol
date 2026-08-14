@@ -17,11 +17,20 @@ extern "C"
 {
 #endif
 
-/** Copy one complete event into the next FIFO slot without overwriting older events. */
+/**
+ * @brief Copy one complete event into the next FIFO slot.
+ *
+ * @details The caller's pointer is borrowed only for the call. Full capacity
+ * returns CAPACITY_EXHAUSTED without changing queue metadata or overwriting an
+ * older event. Repeated identical values remain separate FIFO occurrences.
+ */
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Events_Publish( HIL_Transport_Mvp_Root_T*    root,
                                                          const HIL_Transport_Event_T* event );
 
-/** Copy and consume the oldest event, preserving the destination on failure. */
+/**
+ * Copy and consume the oldest event only after a complete successful copy,
+ * preserving the destination on NOT_READY and every other failure.
+ */
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Events_Read( HIL_Transport_Mvp_Root_T* root,
                                                       HIL_Transport_Event_T*    event );
 
@@ -35,7 +44,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Events_Read( HIL_Transport_Mvp_Root_T* 
  */
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Events_Reset( HIL_Transport_Mvp_Root_T* root );
 
-/** Report only whether at least one validated event is currently owned. */
+/** Report only whether at least one validated event is owned, never its count or capacity. */
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Events_Get_Pending_Status( HIL_Transport_Mvp_Root_T* root,
                                                                     uint8_t* event_pending );
 

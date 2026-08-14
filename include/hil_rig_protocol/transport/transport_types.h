@@ -229,8 +229,10 @@ typedef enum
  *
  * @details Sequence numbers, frame categories, handshake steps, fragment
  * offsets, and queue slots are intentionally absent. Events report protocol
- * delivery rather than Application acceptance. Fields not relevant to an event
- * are set to their zero/none values by the future implementation.
+ * delivery rather than Application acceptance. A private producer constructs
+ * every complete value before publication; fields not relevant to that event
+ * are set to their zero/none values. The selected profile's retention depth is
+ * private and is not encoded in this structure.
  */
 typedef struct
 {
@@ -281,7 +283,7 @@ typedef struct
     /** Nonzero while one complete received Application message is unread. */
     uint8_t application_message_pending;
 
-    /** Nonzero while at least one high-level event is unread. */
+    /** Nonzero while at least one event is unread; no count or depth is exposed. */
     uint8_t event_pending;
 
     /** Nonzero only while a reliable transmission remains owned by Transport. */

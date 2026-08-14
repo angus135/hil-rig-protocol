@@ -73,17 +73,29 @@ time, while reliable commit starts ACK timing and retains the encoded bytes.
 tests publish opaque sentinel bytes through the private seams because the later
 handshake and Application paths do not yet produce frames.
 
+The MVP also embeds private storage for four complete high-level Transport
+events. Private modules can publish complete event values into this bounded
+FIFO without retaining caller pointers. `Read_Event()` returns the oldest event
+and consumes exactly that event only after a successful complete copy;
+`NOT_READY` and other errors preserve the destination. A full FIFO returns
+`CAPACITY_EXHAUSTED` without overwriting older events, and public status exposes
+only whether any event is pending, not the private depth or count. Explicit
+`Reset()` releases all queued event ownership without clearing inaccessible slot
+bytes. No session, link, handshake, protocol, capacity, or delivery path
+publishes real events yet.
+
 The broader Transport runtime—session handshake, received-frame and received-ACK
 dispatch, receive-side duplicate handling, ACK and RESET generation, Application
-submission and delivery, delivery events, and session recovery—remains as intentional
+submission and delivery, event generation, and session recovery—remains as intentional
 `HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs. The public send/receive workflow
 is therefore not operational end to end yet.
 
 The default MVP Transport profile is designed for one complete Application
-message per frame and one outstanding reliable transmission. Extended
-fragmentation, reassembly, flow control, keepalives, and queueing remain future
-design only. Public headers, documentation, and compile-level tests currently
-define the integration contracts.
+message per frame and one outstanding reliable transmission. The private event
+FIFO does not imply message or output queueing. Extended fragmentation,
+reassembly, flow control, keepalives, and message queueing remain future design
+only. Public headers, documentation, and compile-level tests currently define
+the integration contracts.
 
 ## Build and test
 

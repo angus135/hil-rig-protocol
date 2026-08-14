@@ -24,7 +24,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
                                                    const HIL_Transport_Config_T*  config,
                                                    const HIL_Transport_Storage_T* storage );
 
-/** Clear session-scoped work, including both output lifecycles and selection. */
+/**
+ * Clear session-scoped work, both output lifecycles, selection, and all queued
+ * event ownership for an explicit public reset.
+ */
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* context );
 
 HIL_Transport_Status_T
@@ -71,10 +74,11 @@ HIL_Transport_Status_T
 HIL_TRANSPORT_PROFILE_Read_Application_Data( HIL_Transport_Context_T* context, uint8_t* out_buffer,
                                              size_t out_buffer_size, size_t* message_size );
 
+/** Copy and consume one oldest event only on success; preserve output on failure. */
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Read_Event( HIL_Transport_Context_T* context,
                                                          HIL_Transport_Event_T*   event );
 
-/** Aggregate both output lifecycles while keeping delivery status reliable-only. */
+/** Aggregate output state and validated event presence without exposing private counts. */
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Get_Status( const HIL_Transport_Context_T*   context,
                                                          HIL_Transport_Status_Snapshot_T* status );
 

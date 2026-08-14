@@ -29,7 +29,7 @@
  */
 #define HIL_TRANSPORT_MVP_CONTROL_OUTPUT_CAPACITY ( 20u )
 
-/** Fixed number of complete high-level events retained by the MVP. */
+/** Private, non-configurable number of complete high-level events retained by the MVP. */
 #define HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY ( 4u )
 
 /** Explicit private MVP progress through session establishment. */
