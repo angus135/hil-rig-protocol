@@ -12,10 +12,12 @@
  * success, reject a working context unchanged, and leave a failed first context
  * deterministically zero/uninitialized. Replacing retained setup is unsupported.
  *
- * Reset implementations must clear session negotiation, reliable delivery,
- * parsers, partial data, pinned output, unread messages, and events together so
- * no work from an abandoned session becomes visible later. They retain copied
- * configuration, workspace ownership, endpoint role, and current link input.
+ * Session recovery must clear negotiation, reliable delivery, parsers, partial
+ * data, pinned output, and unread messages together so no work from an abandoned
+ * session becomes visible later. Explicit caller reset also clears event
+ * ownership, while automatic abandonment preserves unread events and appends a
+ * SESSION_RESET event when capacity permits. Both retain copied configuration,
+ * workspace ownership, endpoint role, and current link input.
  */
 #ifndef HIL_RIG_PROTOCOL_TRANSPORT_INTERNAL_TRANSPORT_INTERNAL_H
 #define HIL_RIG_PROTOCOL_TRANSPORT_INTERNAL_TRANSPORT_INTERNAL_H

@@ -28,9 +28,11 @@
  * control-output lifecycles, public priority arbitration with stable pinned
  * selection, aggregate output status, commit routing, and output reset are
  * implemented. Private bounded event retention, FIFO reads, pending status, and
- * explicit event reset are implemented, but no real event producers exist yet.
- * Session establishment, received-frame dispatch, ACK and RESET generation,
- * and public Application-message orchestration remain intentional
+ * explicit event reset are implemented. Session initialization, establishment
+ * preparation, link observation, automatic abandonment, and explicit reset are
+ * coordinated through the MVP session module; link changes and automatic
+ * abandonment produce events. Handshake frame processing, received-frame
+ * dispatch, ACK and RESET generation, and public Application-message orchestration remain intentional
  * HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED stubs.
  */
 #ifndef HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
@@ -59,8 +61,8 @@ extern "C"
  *
  * The host supplies session_seed because the library has no entropy source.
  * Each newly initiated session must use a value different from the active or
- * recently abandoned session. A future implementation advances the seed
- * deterministically, skips INVALID and RESERVED, and defines wraparound without
+ * recently abandoned session. The MVP advances the seed when an establishment
+ * attempt begins, skips INVALID and RESERVED, and wraps deterministically without
  * consulting clocks or platform services. A HIL-RIG adopts the identity in a
  * valid host initiation; it does not originate one. A HOST must configure a
  * value other than INVALID or RESERVED. A RIG must configure exactly INVALID;
@@ -259,28 +261,49 @@ HIL_Transport_Status_T HIL_TRANSPORT_Init( HIL_Transport_Context_T*       contex
  * call is the only supported way to clear terminal FAULT on an initialized
  * context. Event slot bytes need not be cleared because zero queue ownership
  * makes them inaccessible. It does not permit changing configuration, role, or
- * workspace. No Application state or hardware is reset. Future automatic/peer
- * abandonment preserves existing queued events and attempts to append
- * SESSION_RESET rather than clearing the event FIFO.
+ * workspace. No Application state or hardware is reset. Automatic abandonment
+ * preserves existing queued events and attempts to append
+ * SESSION_RESET rather than clearing the event FIFO. Reset canonicalizes
+ * repairable private lifecycle metadata, including the link-observed flag and
+ * private role/link mirrors, while preserving a valid advanced host identity
+ * cursor. If essential retained setup cannot be reconstructed safely, it
+ * clears ownership where possible, remains in FAULT with INTERNAL recorded,
+ * and returns INTERNAL_ERROR; arbitrary memory corruption is not guaranteed to
+ * be recoverable.
  *
  * @param[in,out] context Initialized single-owner context.
- * @return OK or INVALID_ARGUMENT.
+ * @return OK, INVALID_ARGUMENT, or INTERNAL_ERROR.
  */
 HIL_Transport_Status_T HIL_TRANSPORT_Reset( HIL_Transport_Context_T* context );
 
 /**
  * @brief Notify Transport of caller-owned physical-link availability.
  *
- * @details This records an input only. CONNECTED permits future session
- * establishment; DISCONNECTED abandons session-scoped work under reset rules.
- * Reconnection establishes a new Transport session and never resumes old
- * reliable state. The function neither operates nor polls hardware.
+ * @details The first DISCONNECTED observation is silent because it does not
+ * change the effective initialized state. A change to CONNECTED publishes
+ * LINK_STATE_CHANGED and prepares a fresh handshake attempt; a host consumes a
+ * new session identity and a rig waits for INITIATE. A change to DISCONNECTED
+ * publishes LINK_STATE_CHANGED, abandons session-scoped work, preserves older
+ * unread events, and attempts to append SESSION_RESET with LINK_LOST. Repeated
+ * same-state observations are idempotent and never retry a failed event
+ * publication. Reconnection never resumes old reliable, parser, duplicate, or
+ * handshake state. In FAULT, the latest link observation is retained without
+ * leaving FAULT or publishing normal events. A FAULT-state disconnection still
+ * performs best-effort mandatory cleanup and returns INTERNAL_ERROR if that
+ * cleanup detects another private invariant failure. The function neither
+ * operates nor polls hardware.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[in] link_state CONNECTED or DISCONNECTED.
- * @param[in] now_ms Current caller-provided monotonic time; wrap is handled by
- * future profile timer logic using unsigned elapsed-time arithmetic.
- * @return OK, INVALID_ARGUMENT, or current NOT_IMPLEMENTED stub result.
+ * @param[in] now_ms Current caller-provided monotonic time. The MVP accepts but
+ * does not use it because connection timeout and link-liveness timing are not
+ * implemented.
+ * @retval HIL_TRANSPORT_STATUS_OK The observation and required transition completed.
+ * @retval HIL_TRANSPORT_STATUS_INVALID_ARGUMENT The context or link value is invalid.
+ * @retval HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED The physical transition completed,
+ * but one or more resulting events could not be retained.
+ * @retval HIL_TRANSPORT_STATUS_INTERNAL_ERROR A private invariant failed; mandatory
+ * disconnect cleanup still completed where possible and the context remains in FAULT.
  */
 HIL_Transport_Status_T HIL_TRANSPORT_Notify_Link_State( HIL_Transport_Context_T*   context,
                                                         HIL_Transport_Link_State_T link_state,
@@ -401,7 +424,9 @@ HIL_Transport_Status_T HIL_TRANSPORT_Process( HIL_Transport_Context_T* context, 
  * recovery, even if another item becomes ready. Peeking does not start retry
  * timing, update transmitted-byte accounting, or tell Transport that external
  * hardware accepted the frame. A low-level output-buffer-too-small condition is
- * always retryable and cannot discard a valid item.
+ * always retryable and cannot discard a valid item. If either session-state
+ * mirror is FAULT, peek exposes no bytes, sets output_size to zero, returns
+ * INTERNAL_ERROR, and leaves output ownership unchanged until explicit reset.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[out] out_buffer Caller output, or NULL only with out_buffer_size zero.
@@ -424,7 +449,9 @@ HIL_Transport_Status_T HIL_TRANSPORT_Peek_Output( HIL_Transport_Context_T* conte
  * matching acknowledgement, later owner-directed recovery, or reset. The
  * initial reliable commit does not count as a retransmission; each committed
  * retry increments the private count exactly once. Commit never performs
- * hardware I/O, reconstruction, CRC, or COBS work.
+ * hardware I/O, reconstruction, CRC, or COBS work. If either session-state
+ * mirror is FAULT, commit returns INTERNAL_ERROR without changing output
+ * ownership; explicit reset is the only supported recovery.
  *
  * @param[in,out] context Initialized context with successfully peeked output.
  * @param[in] now_ms Monotonic acceptance time supplied by the caller.
@@ -463,8 +490,9 @@ HIL_Transport_Status_T HIL_TRANSPORT_Read_Application_Data( HIL_Transport_Contex
  * INVALID_ARGUMENT, and INTERNAL_ERROR leave event unchanged. Events do not
  * instruct callers to construct ACK, recovery, or handshake frames; such output
  * remains an internal Transport responsibility. Event storage and reading are
- * implemented, but later session, link, receive, and delivery work must still
- * generate the real events.
+ * implemented. Link changes and automatic session abandonment generate their
+ * events; later handshake, receive, protocol, capacity, and delivery paths must
+ * generate their initiating events.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[out] event Destination for one event; must not be NULL.

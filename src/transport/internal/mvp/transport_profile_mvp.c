@@ -2,12 +2,13 @@
  * @file transport_profile_mvp.c
  * @brief MVP wire storage and private output lifecycles plus remaining stubs.
  *
- * @details The eventual MVP uses simple session establishment, one complete
+ * @details The MVP uses simple session establishment, one complete
  * Application message per frame, framing plus integrity, and one outstanding
  * reliable transmission. Workspace sizing, initialization, the wire path, the
  * reliable encoded-output lifecycle, separate private one-item control storage,
- * and public output arbitration are implemented. Handshake progression and
- * Application-message orchestration remain stubs.
+ * public output arbitration, session lifecycle coordination, and link-state
+ * recovery are implemented. Handshake frame progression and Application-message
+ * orchestration remain stubs.
  */
 #include "../transport_profile.h"
 
