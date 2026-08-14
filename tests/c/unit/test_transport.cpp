@@ -202,3 +202,102 @@ TEST( TransportSessionInitialization, InitializesHostAndRigFieldsDeterministical
     EXPECT_EQ( rig.next_transmit_sequence, 0u );
     EXPECT_EQ( rig.expected_receive_sequence, 0u );
 }
+
+TEST( TransportSessionEstablishment, PreparesHostAndAdvancesIdentityOnce )
+{
+    HIL_Transport_Mvp_Root_T root{};
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init( &root.session, HIL_TRANSPORT_ROLE_HOST, 5u, 9u ),
+               HIL_TRANSPORT_STATUS_OK );
+    root.base.role          = HIL_TRANSPORT_ROLE_HOST;
+    root.base.link_state    = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.base.session_state = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
+    root.session.link_state = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.session.link_state_observed = 1u;
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( root.session.state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( root.session.handshake_phase, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INITIATE_PENDING );
+    EXPECT_EQ( root.session.session_identifier, 5u );
+    EXPECT_EQ( root.session.session_identifier_valid, 1u );
+    EXPECT_EQ( root.session.next_host_session_identifier, 6u );
+    EXPECT_EQ( root.session.next_transmit_sequence, 9u );
+    EXPECT_EQ( root.session.expected_receive_sequence, 9u );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+    EXPECT_EQ( root.session.next_host_session_identifier, 6u );
+}
+
+TEST( TransportSessionEstablishment, PreparesRigWithoutOriginatingIdentity )
+{
+    HIL_Transport_Mvp_Root_T root{};
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init(
+                   &root.session, HIL_TRANSPORT_ROLE_RIG,
+                   HIL_TRANSPORT_SESSION_SEED_INVALID, UINT16_MAX ),
+               HIL_TRANSPORT_STATUS_OK );
+    root.base.role                    = HIL_TRANSPORT_ROLE_RIG;
+    root.base.link_state              = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.base.session_state           = HIL_TRANSPORT_SESSION_STATE_RECOVERING;
+    root.session.link_state           = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.session.link_state_observed  = 1u;
+    root.session.state                = HIL_TRANSPORT_SESSION_STATE_RECOVERING;
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( root.session.handshake_phase,
+               HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_INITIATE );
+    EXPECT_EQ( root.session.session_identifier, 0u );
+    EXPECT_EQ( root.session.session_identifier_valid, 0u );
+    EXPECT_EQ( root.session.next_transmit_sequence, UINT16_MAX );
+}
+
+TEST( TransportSessionEstablishment, WrapsHostCursorAndFaultsOnDirtyOwnership )
+{
+    HIL_Transport_Mvp_Root_T root{};
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init(
+                   &root.session, HIL_TRANSPORT_ROLE_HOST,
+                   HIL_TRANSPORT_SESSION_SEED_RESERVED - 1u, 0u ),
+               HIL_TRANSPORT_STATUS_OK );
+    root.base.role                    = HIL_TRANSPORT_ROLE_HOST;
+    root.base.link_state              = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.base.session_state           = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
+    root.session.link_state           = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.session.link_state_observed  = 1u;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( root.session.session_identifier, HIL_TRANSPORT_SESSION_SEED_RESERVED - 1u );
+    EXPECT_EQ( root.session.next_host_session_identifier, 1u );
+
+    HIL_Transport_Mvp_Root_T dirty{};
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init( &dirty.session, HIL_TRANSPORT_ROLE_HOST, 1u, 0u ),
+               HIL_TRANSPORT_STATUS_OK );
+    dirty.base.role                    = HIL_TRANSPORT_ROLE_HOST;
+    dirty.base.link_state              = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    dirty.base.session_state           = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
+    dirty.session.link_state           = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    dirty.session.link_state_observed  = 1u;
+    dirty.output_selection             = HIL_TRANSPORT_MVP_OUTPUT_CONTROL;
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &dirty ),
+               HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( dirty.base.session_state, HIL_TRANSPORT_SESSION_STATE_FAULT );
+    EXPECT_EQ( dirty.session.state, HIL_TRANSPORT_SESSION_STATE_FAULT );
+    EXPECT_EQ( dirty.base.last_failure, HIL_TRANSPORT_FAILURE_INTERNAL );
+    EXPECT_EQ( dirty.session.last_failure, HIL_TRANSPORT_FAILURE_INTERNAL );
+}
+
+TEST( TransportSessionEstablishment, RequiresAnObservedConnectedLink )
+{
+    HIL_Transport_Mvp_Root_T root{};
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init( &root.session, HIL_TRANSPORT_ROLE_HOST, 1u, 0u ),
+               HIL_TRANSPORT_STATUS_OK );
+    root.base.role = HIL_TRANSPORT_ROLE_HOST;
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( nullptr ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+    root.base.link_state    = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.session.link_state = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+}

@@ -33,6 +33,17 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Init( HIL_Transport_Mvp_Session
                                                        uint16_t initial_reliable_sequence );
 
 /**
+ * @brief Prepare a fresh handshake attempt without encoding or publishing output.
+ *
+ * @details Requires a caller-observed connected link and an otherwise clean
+ * DISCONNECTED or RECOVERING session. A host consumes and advances its identity
+ * cursor when the attempt begins; a rig waits to adopt the peer's identity.
+ * Duplicate calls while establishment is already active return NOT_READY.
+ */
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root );
+
+/**
  * @brief Abandon private MVP session work for a high-level failure reason.
  *
  * @details The future implementation retains role, link observation, initial

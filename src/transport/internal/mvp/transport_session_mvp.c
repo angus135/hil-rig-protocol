@@ -2,6 +2,28 @@
 
 #include <string.h>
 
+static void HIL_TRANSPORT_MVP_Session_Set_State( HIL_Transport_Mvp_Root_T* root,
+                                                 HIL_Transport_Session_State_T state )
+{
+    root->base.session_state = state;
+    root->session.state      = state;
+}
+
+static void HIL_TRANSPORT_MVP_Session_Set_Failure( HIL_Transport_Mvp_Root_T* root,
+                                                   HIL_Transport_Failure_T failure )
+{
+    root->base.last_failure = failure;
+    root->session.last_failure = failure;
+}
+
+static HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( HIL_Transport_Mvp_Root_T* root )
+{
+    HIL_TRANSPORT_MVP_Session_Set_State( root, HIL_TRANSPORT_SESSION_STATE_FAULT );
+    HIL_TRANSPORT_MVP_Session_Set_Failure( root, HIL_TRANSPORT_FAILURE_INTERNAL );
+    return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+}
+
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Init( HIL_Transport_Mvp_Session_T* session,
                                                        HIL_Transport_Role_T         role,
                                                        uint64_t                     session_seed,
@@ -41,6 +63,102 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Init( HIL_Transport_Mvp_Session
     initialized_session.last_failure                 = HIL_TRANSPORT_FAILURE_NONE;
 
     *session = initialized_session;
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root )
+{
+    HIL_Transport_Mvp_Session_T* session;
+
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    session = &root->session;
+
+    if ( ( session->role < HIL_TRANSPORT_ROLE_HOST ) || ( session->role > HIL_TRANSPORT_ROLE_RIG )
+         || ( root->base.role != session->role )
+         || ( session->link_state < HIL_TRANSPORT_LINK_STATE_DISCONNECTED )
+         || ( session->link_state > HIL_TRANSPORT_LINK_STATE_CONNECTED )
+         || ( root->base.link_state != session->link_state )
+         || ( session->link_state_observed > 1u )
+         || ( session->state < HIL_TRANSPORT_SESSION_STATE_DISCONNECTED )
+         || ( session->state > HIL_TRANSPORT_SESSION_STATE_FAULT )
+         || ( root->base.session_state != session->state ) )
+    {
+        return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
+    }
+    if ( ( session->state != HIL_TRANSPORT_SESSION_STATE_DISCONNECTED )
+         && ( session->state != HIL_TRANSPORT_SESSION_STATE_RECOVERING ) )
+    {
+        return HIL_TRANSPORT_STATUS_NOT_READY;
+    }
+    if ( ( session->link_state_observed == 0u )
+         || ( session->link_state != HIL_TRANSPORT_LINK_STATE_CONNECTED ) )
+    {
+        return HIL_TRANSPORT_STATUS_NOT_READY;
+    }
+
+    if ( ( session->handshake_phase != HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE )
+         || ( session->session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID )
+         || ( session->session_identifier_valid != 0u )
+         || ( session->reliable_state != HIL_TRANSPORT_MVP_RELIABLE_IDLE )
+         || ( session->retained_reliable_frame_type != HIL_TRANSPORT_MVP_FRAME_INVALID )
+         || ( session->retained_transmit_sequence != 0u )
+         || ( session->retransmissions_committed != 0u )
+         || ( session->reliable_last_committed_ms != 0u )
+         || ( root->encoded_output_size != 0u )
+         || ( root->control_output_state != HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE )
+         || ( root->control_output_size != 0u )
+         || ( root->output_selection != HIL_TRANSPORT_MVP_OUTPUT_NONE )
+         || ( root->submitted_message_size != 0u )
+         || ( root->submitted_message_pending != 0u )
+         || ( root->received_message_size != 0u )
+         || ( root->received_message_pending != 0u )
+         || ( root->parser.accumulated_size != 0u ) || ( root->parser.body_ready != 0u )
+         || ( root->parser.discarding != 0u )
+         || ( session->last_accepted_receive_sequence != 0u )
+         || ( session->accepted_receive_sequence_valid != 0u )
+         || ( session->last_valid_receive_ms != 0u ) )
+    {
+        return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
+    }
+
+    session->next_transmit_sequence              = session->initial_reliable_sequence;
+    session->expected_receive_sequence           = session->initial_reliable_sequence;
+    session->last_accepted_receive_sequence      = 0u;
+    session->accepted_receive_sequence_valid     = 0u;
+
+    if ( session->role == HIL_TRANSPORT_ROLE_HOST )
+    {
+        if ( ( session->next_host_session_identifier == HIL_TRANSPORT_SESSION_SEED_INVALID )
+             || ( session->next_host_session_identifier == HIL_TRANSPORT_SESSION_SEED_RESERVED ) )
+        {
+            return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
+        }
+        session->session_identifier       = session->next_host_session_identifier;
+        session->session_identifier_valid = 1u;
+        if ( session->next_host_session_identifier == ( HIL_TRANSPORT_SESSION_SEED_RESERVED - 1u ) )
+        {
+            session->next_host_session_identifier = 1u;
+        }
+        else
+        {
+            session->next_host_session_identifier++;
+        }
+        session->handshake_phase = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INITIATE_PENDING;
+    }
+    else
+    {
+        if ( session->next_host_session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID )
+        {
+            return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
+        }
+        session->handshake_phase = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_INITIATE;
+    }
+
+    HIL_TRANSPORT_MVP_Session_Set_State( root, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
     return HIL_TRANSPORT_STATUS_OK;
 }
 
