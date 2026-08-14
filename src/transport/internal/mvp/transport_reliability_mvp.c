@@ -322,6 +322,54 @@ HIL_TRANSPORT_MVP_Reliability_Process_Pending( HIL_Transport_Mvp_Root_T* root, u
     return HIL_TRANSPORT_STATUS_OK;
 }
 
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Reliability_Request_Retransmission(
+    HIL_Transport_Mvp_Root_T* root, HIL_Transport_Mvp_Frame_Type_T expected_frame_type,
+    HIL_Transport_Mvp_Reliability_Outcome_T* outcome )
+{
+    HIL_Transport_Status_T status;
+
+    if ( outcome == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    *outcome = HIL_TRANSPORT_MVP_RELIABILITY_NO_CHANGE;
+    if ( !HIL_TRANSPORT_MVP_Reliability_Has_Storage( root )
+         || !HIL_TRANSPORT_MVP_Reliability_Is_Reliable_Type( expected_frame_type ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+
+    status = HIL_TRANSPORT_MVP_Reliability_Validate_State( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    if ( root->session.reliable_state == HIL_TRANSPORT_MVP_RELIABLE_IDLE )
+    {
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( root->session.retained_reliable_frame_type != expected_frame_type )
+    {
+        return HIL_TRANSPORT_MVP_Reliability_Record_Invariant_Failure( root );
+    }
+    if ( root->session.reliable_state != HIL_TRANSPORT_MVP_RELIABLE_AWAITING_ACK )
+    {
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    if ( root->session.retransmissions_committed < root->base.config.max_retries )
+    {
+        root->session.reliable_state = HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_READY;
+        *outcome                     = HIL_TRANSPORT_MVP_RELIABILITY_RETRANSMIT_READY;
+    }
+    else
+    {
+        root->session.reliable_state = HIL_TRANSPORT_MVP_RELIABLE_EXHAUSTED;
+        *outcome                     = HIL_TRANSPORT_MVP_RELIABILITY_RETRIES_EXHAUSTED;
+    }
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Reliability_Reset( HIL_Transport_Mvp_Root_T* root )
 {
     if ( !HIL_TRANSPORT_MVP_Reliability_Has_Storage( root ) )

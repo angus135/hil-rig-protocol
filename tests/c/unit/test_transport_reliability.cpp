@@ -641,6 +641,100 @@ TEST_F( TransportReliabilityTest, ZeroTimeoutDisablesProgressionAndUint32WrapIsS
     EXPECT_EQ( outcome, HIL_TRANSPORT_MVP_RELIABILITY_RETRANSMIT_READY );
 }
 
+TEST_F( TransportReliabilityTest, DuplicateRequestMakesAwaitingBytesRetryableWithoutSpendingRetry )
+{
+    PrepareAwaiting();
+    root_.output_selection = HIL_TRANSPORT_MVP_OUTPUT_CONTROL;
+    const auto before      = Snapshot();
+    HIL_Transport_Mvp_Reliability_Outcome_T outcome = HIL_TRANSPORT_MVP_RELIABILITY_NO_CHANGE;
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Reliability_Request_Retransmission(
+                   &root_, HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE, &outcome ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( outcome, HIL_TRANSPORT_MVP_RELIABILITY_RETRANSMIT_READY );
+    EXPECT_EQ( root_.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_READY );
+    EXPECT_EQ( root_.session.retransmissions_committed, before.retransmissions_committed );
+    EXPECT_EQ( root_.session.reliable_last_committed_ms, before.last_committed_ms );
+    EXPECT_EQ( root_.output_selection, HIL_TRANSPORT_MVP_OUTPUT_CONTROL );
+    EXPECT_EQ( retained_, before.bytes );
+
+    Peek();
+    EXPECT_EQ( root_.session.retransmissions_committed, 0u );
+    Commit( 200u );
+    EXPECT_EQ( root_.session.retransmissions_committed, 1u );
+    EXPECT_EQ( root_.session.reliable_last_committed_ms, 200u );
+}
+
+TEST_F( TransportReliabilityTest, DuplicateRequestDoesNotDisturbAlreadyAvailableOrPinnedBytes )
+{
+    constexpr std::array<HIL_Transport_Mvp_Reliable_State_T, 4> states{
+        HIL_TRANSPORT_MVP_RELIABLE_READY,
+        HIL_TRANSPORT_MVP_RELIABLE_PEEKED,
+        HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_READY,
+        HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_PEEKED,
+    };
+
+    for ( const auto state : states )
+    {
+        SetValidState( state );
+        root_.output_selection = ( state == HIL_TRANSPORT_MVP_RELIABLE_PEEKED
+                                   || state == HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_PEEKED )
+                                     ? HIL_TRANSPORT_MVP_OUTPUT_RELIABLE
+                                     : HIL_TRANSPORT_MVP_OUTPUT_CONTROL;
+        const auto before = Snapshot();
+        HIL_Transport_Mvp_Reliability_Outcome_T outcome =
+            HIL_TRANSPORT_MVP_RELIABILITY_ACKNOWLEDGED;
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Reliability_Request_Retransmission(
+                       &root_, HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE, &outcome ),
+                   HIL_TRANSPORT_STATUS_OK );
+        EXPECT_EQ( outcome, HIL_TRANSPORT_MVP_RELIABILITY_NO_CHANGE );
+        EXPECT_TRUE( Snapshot() == before );
+    }
+}
+
+TEST_F( TransportReliabilityTest, DuplicateRequestExhaustsWhenNoRetryAllowanceRemains )
+{
+    root_.base.config.max_retries = 0u;
+    PrepareAwaiting();
+    HIL_Transport_Mvp_Reliability_Outcome_T outcome = HIL_TRANSPORT_MVP_RELIABILITY_NO_CHANGE;
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Reliability_Request_Retransmission(
+                   &root_, HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE, &outcome ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( outcome, HIL_TRANSPORT_MVP_RELIABILITY_RETRIES_EXHAUSTED );
+    EXPECT_EQ( root_.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_EXHAUSTED );
+    EXPECT_EQ( root_.session.retransmissions_committed, 0u );
+
+    outcome = HIL_TRANSPORT_MVP_RELIABILITY_ACKNOWLEDGED;
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Reliability_Request_Retransmission(
+                   &root_, HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE, &outcome ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( outcome, HIL_TRANSPORT_MVP_RELIABILITY_NO_CHANGE );
+}
+
+TEST_F( TransportReliabilityTest, DuplicateRequestValidatesTypeAndTreatsIdleAsNoWork )
+{
+    HIL_Transport_Mvp_Reliability_Outcome_T outcome =
+        HIL_TRANSPORT_MVP_RELIABILITY_ACKNOWLEDGED;
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Reliability_Request_Retransmission(
+                   &root_, HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE, &outcome ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( outcome, HIL_TRANSPORT_MVP_RELIABILITY_NO_CHANGE );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Reliability_Request_Retransmission(
+                   &root_, HIL_TRANSPORT_MVP_FRAME_ACK, &outcome ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Reliability_Request_Retransmission(
+                   &root_, HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE, nullptr ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+
+    Publish( HIL_TRANSPORT_MVP_FRAME_CONFIRM );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Reliability_Request_Retransmission(
+                   &root_, HIL_TRANSPORT_MVP_FRAME_RESPONSE, &outcome ),
+               HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( root_.session.state, HIL_TRANSPORT_SESSION_STATE_FAULT );
+    EXPECT_EQ( root_.base.session_state, HIL_TRANSPORT_SESSION_STATE_FAULT );
+}
+
 TEST_F( TransportReliabilityTest, RetransmissionReusesBytesAndCountsOnlyItsCommit )
 {
     PrepareAwaiting( 100u );
