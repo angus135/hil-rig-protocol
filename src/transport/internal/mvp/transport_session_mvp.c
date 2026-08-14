@@ -1,22 +1,47 @@
 #include "transport_session_mvp.h"
 
+#include <string.h>
+
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Init( HIL_Transport_Mvp_Session_T* session,
                                                        HIL_Transport_Role_T         role,
                                                        uint64_t                     session_seed,
                                                        uint16_t initial_reliable_sequence )
 {
-    /*
-     * TODO: Validate session/role; require a usable nonreserved seed for HOST and
-     * INVALID for RIG; copy the initial sequence; and initialize link/session/
-     * handshake/reliable state to DISCONNECTED/INACTIVE/IDLE. Clear identities,
-     * sequences, ACK/duplicate state, retry counter, timestamps, and failure.
-     * Allocate nothing and perform no I/O.
-     */
-    ( void )session;
-    ( void )role;
-    ( void )session_seed;
-    ( void )initial_reliable_sequence;
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    HIL_Transport_Mvp_Session_T initialized_session;
+
+    if ( session == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( ( role != HIL_TRANSPORT_ROLE_HOST ) && ( role != HIL_TRANSPORT_ROLE_RIG ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( ( ( role == HIL_TRANSPORT_ROLE_HOST )
+           && ( ( session_seed == HIL_TRANSPORT_SESSION_SEED_INVALID )
+                || ( session_seed == HIL_TRANSPORT_SESSION_SEED_RESERVED ) ) )
+         || ( ( role == HIL_TRANSPORT_ROLE_RIG )
+              && ( session_seed != HIL_TRANSPORT_SESSION_SEED_INVALID ) ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+
+    memset( &initialized_session, 0, sizeof( initialized_session ) );
+    initialized_session.role                         = role;
+    initialized_session.link_state                   = HIL_TRANSPORT_LINK_STATE_DISCONNECTED;
+    initialized_session.link_state_observed          = 0u;
+    initialized_session.state                        = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
+    initialized_session.handshake_phase              = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE;
+    initialized_session.next_host_session_identifier = session_seed;
+    initialized_session.initial_reliable_sequence    = initial_reliable_sequence;
+    initialized_session.next_transmit_sequence       = initial_reliable_sequence;
+    initialized_session.expected_receive_sequence    = initial_reliable_sequence;
+    initialized_session.retained_reliable_frame_type = HIL_TRANSPORT_MVP_FRAME_INVALID;
+    initialized_session.reliable_state               = HIL_TRANSPORT_MVP_RELIABLE_IDLE;
+    initialized_session.last_failure                 = HIL_TRANSPORT_FAILURE_NONE;
+
+    *session = initialized_session;
+    return HIL_TRANSPORT_STATUS_OK;
 }
 
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Reset( HIL_Transport_Mvp_Session_T* session,

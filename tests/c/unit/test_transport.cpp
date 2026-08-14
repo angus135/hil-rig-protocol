@@ -1,6 +1,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <type_traits>
 
 #include <gtest/gtest.h>
@@ -141,4 +142,63 @@ TEST( TransportStructuredOutputs, PreserveEventAndClearStatusForInvalidContext )
     EXPECT_EQ( snapshot.event_pending, 0u );
     EXPECT_EQ( snapshot.reliable_delivery_pending, 0u );
     EXPECT_EQ( snapshot.last_failure, HIL_TRANSPORT_FAILURE_NONE );
+}
+
+TEST( TransportSessionInitialization, ValidatesWithoutPartiallyMutatingDestination )
+{
+    HIL_Transport_Mvp_Session_T session;
+    std::memset( &session, 0xA5, sizeof( session ) );
+    const HIL_Transport_Mvp_Session_T original = session;
+
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init( nullptr, HIL_TRANSPORT_ROLE_HOST, 1u, 0u ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init(
+                   &session, static_cast<HIL_Transport_Role_T>( 99 ), 1u, 0u ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init(
+                   &session, HIL_TRANSPORT_ROLE_HOST, HIL_TRANSPORT_SESSION_SEED_INVALID, 0u ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init(
+                   &session, HIL_TRANSPORT_ROLE_HOST, HIL_TRANSPORT_SESSION_SEED_RESERVED, 0u ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init( &session, HIL_TRANSPORT_ROLE_RIG, 1u, 0u ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+    EXPECT_EQ( std::memcmp( &session, &original, sizeof( session ) ), 0 );
+}
+
+TEST( TransportSessionInitialization, InitializesHostAndRigFieldsDeterministically )
+{
+    HIL_Transport_Mvp_Session_T host;
+    std::memset( &host, 0xA5, sizeof( host ) );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init( &host, HIL_TRANSPORT_ROLE_HOST, 7u, UINT16_MAX ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host.role, HIL_TRANSPORT_ROLE_HOST );
+    EXPECT_EQ( host.link_state, HIL_TRANSPORT_LINK_STATE_DISCONNECTED );
+    EXPECT_EQ( host.link_state_observed, 0u );
+    EXPECT_EQ( host.state, HIL_TRANSPORT_SESSION_STATE_DISCONNECTED );
+    EXPECT_EQ( host.handshake_phase, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE );
+    EXPECT_EQ( host.session_identifier, 0u );
+    EXPECT_EQ( host.session_identifier_valid, 0u );
+    EXPECT_EQ( host.next_host_session_identifier, 7u );
+    EXPECT_EQ( host.initial_reliable_sequence, UINT16_MAX );
+    EXPECT_EQ( host.next_transmit_sequence, UINT16_MAX );
+    EXPECT_EQ( host.expected_receive_sequence, UINT16_MAX );
+    EXPECT_EQ( host.retained_transmit_sequence, 0u );
+    EXPECT_EQ( host.retained_reliable_frame_type, HIL_TRANSPORT_MVP_FRAME_INVALID );
+    EXPECT_EQ( host.last_accepted_receive_sequence, 0u );
+    EXPECT_EQ( host.accepted_receive_sequence_valid, 0u );
+    EXPECT_EQ( host.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE );
+    EXPECT_EQ( host.retransmissions_committed, 0u );
+    EXPECT_EQ( host.reliable_last_committed_ms, 0u );
+    EXPECT_EQ( host.last_valid_receive_ms, 0u );
+    EXPECT_EQ( host.last_failure, HIL_TRANSPORT_FAILURE_NONE );
+
+    HIL_Transport_Mvp_Session_T rig;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init(
+                   &rig, HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 0u ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig.next_host_session_identifier, 0u );
+    EXPECT_EQ( rig.initial_reliable_sequence, 0u );
+    EXPECT_EQ( rig.next_transmit_sequence, 0u );
+    EXPECT_EQ( rig.expected_receive_sequence, 0u );
 }

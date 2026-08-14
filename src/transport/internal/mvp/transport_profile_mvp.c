@@ -15,6 +15,7 @@
 #include "transport_events_mvp.h"
 #include "transport_frame_codec_mvp.h"
 #include "transport_output_mvp.h"
+#include "transport_session_mvp.h"
 #include "transport_types_mvp.h"
 
 #include <stdint.h>
@@ -201,15 +202,13 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
     root->base.session_state  = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
     root->base.operating_mode = HIL_TRANSPORT_OPERATING_MODE_NORMAL;
 
-    root->session.role                         = role;
-    root->session.link_state                   = HIL_TRANSPORT_LINK_STATE_DISCONNECTED;
-    root->session.state                        = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
-    root->session.handshake_phase              = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE;
-    root->session.next_host_session_identifier = config->session_seed;
-    root->session.initial_reliable_sequence    = config->initial_reliable_sequence;
-    root->session.next_transmit_sequence       = config->initial_reliable_sequence;
-    root->session.expected_receive_sequence    = config->initial_reliable_sequence;
-    root->session.reliable_state               = HIL_TRANSPORT_MVP_RELIABLE_IDLE;
+    status = HIL_TRANSPORT_MVP_Session_Init( &root->session, role, config->session_seed,
+                                             config->initial_reliable_sequence );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        memset( storage->workspace, 0, required_size );
+        return status;
+    }
     root->output_selection                     = HIL_TRANSPORT_MVP_OUTPUT_NONE;
     root->control_output_state                 = HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE;
     root->control_output_size                  = 0u;

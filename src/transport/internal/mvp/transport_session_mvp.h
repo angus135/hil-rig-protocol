@@ -19,8 +19,8 @@ extern "C"
 /**
  * @brief Initialize minimal MVP session state.
  *
- * @details The future implementation validates role-specific seed rules, copies
- * the initial sequence, and clears all private handshake, reliable, duplicate,
+ * @details Validates role-specific seed rules before mutation, copies the
+ * initial sequence, and clears all private handshake, reliable, duplicate,
  * retry and failure state. Host INITIATE, rig RESPONSE, and host CONFIRM are
  * reliable and share the public retry policy. The rig establishes after valid
  * CONFIRM and offers its ACK; the host establishes only after that matching ACK.
