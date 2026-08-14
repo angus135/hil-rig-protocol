@@ -14,6 +14,29 @@
 
 namespace {
 
+TEST( TransportEventsCapacity, PreflightDoesNotReserveOrMutateSlots )
+{
+    HIL_Transport_Mvp_Root_T root{};
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Events_Reset( &root ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Check_Capacity( &root ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( root.event_count, 0u );
+
+    const HIL_Transport_Event_T event{ HIL_TRANSPORT_EVENT_PROTOCOL_ERROR,
+                                       HIL_TRANSPORT_STATUS_NOT_READY,
+                                       HIL_TRANSPORT_FAILURE_PROTOCOL, 0u };
+    for ( std::size_t index = 0u; index < HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY; ++index )
+    {
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Events_Publish( &root, &event ), HIL_TRANSPORT_STATUS_OK );
+    }
+    const auto full = root;
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Check_Capacity( &root ),
+               HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
+    EXPECT_EQ( root.event_count, full.event_count );
+    EXPECT_EQ( root.event_read_index, full.event_read_index );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Check_Capacity( nullptr ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+}
+
 using EventArray = std::array<HIL_Transport_Event_T, HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY>;
 
 HIL_Transport_Event_T Event( std::size_t identifier )

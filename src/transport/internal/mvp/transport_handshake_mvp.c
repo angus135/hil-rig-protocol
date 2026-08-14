@@ -1,0 +1,647 @@
+/**
+ * @file transport_handshake_mvp.c
+ * @brief Private semantic coordinator for the MVP session handshake.
+ */
+#include "transport_handshake_mvp.h"
+
+#include "transport_control_output_mvp.h"
+#include "transport_events_mvp.h"
+#include "transport_frame_codec_mvp.h"
+#include "transport_reliability_mvp.h"
+#include "transport_session_mvp.h"
+
+#include <stddef.h>
+
+static HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( HIL_Transport_Mvp_Root_T* root )
+{
+    root->base.session_state   = HIL_TRANSPORT_SESSION_STATE_FAULT;
+    root->base.last_failure    = HIL_TRANSPORT_FAILURE_INTERNAL;
+    root->session.state        = HIL_TRANSPORT_SESSION_STATE_FAULT;
+    root->session.last_failure = HIL_TRANSPORT_FAILURE_INTERNAL;
+    return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+}
+
+static int
+HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Valid( uint64_t session_identifier )
+{
+    return ( session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID )
+           && ( session_identifier != HIL_TRANSPORT_SESSION_SEED_RESERVED );
+}
+
+static int HIL_TRANSPORT_MVP_Handshake_Frame_Has_Empty_Payload(
+    const HIL_Transport_Mvp_Frame_T* frame )
+{
+    return frame->payload_size == 0u;
+}
+
+static int HIL_TRANSPORT_MVP_Handshake_Frame_Is_Exact_Duplicate(
+    const HIL_Transport_Mvp_Session_T* session, const HIL_Transport_Mvp_Frame_T* frame )
+{
+    return ( session->accepted_receive_sequence_valid != 0u )
+           && ( frame->sequence == session->last_accepted_receive_sequence )
+           && ( frame->type == session->last_accepted_receive_frame_type )
+           && ( frame->acknowledgement_sequence
+                == session->last_accepted_receive_acknowledgement_sequence );
+}
+
+static void HIL_TRANSPORT_MVP_Handshake_Record_Accepted_Frame(
+    HIL_Transport_Mvp_Session_T* session, const HIL_Transport_Mvp_Frame_T* frame )
+{
+    session->last_accepted_receive_frame_type = frame->type;
+    session->last_accepted_receive_acknowledgement_sequence =
+        frame->acknowledgement_sequence;
+}
+
+static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Publish_Reliable(
+    HIL_Transport_Mvp_Root_T* root, HIL_Transport_Mvp_Frame_Type_T frame_type,
+    uint16_t acknowledgement_sequence, HIL_Transport_Mvp_Handshake_Phase_T next_phase )
+{
+    HIL_Transport_Mvp_Frame_T frame;
+    HIL_Transport_Status_T    status;
+    uint16_t                  sequence;
+    size_t                    encoded_size = 0u;
+
+    status = HIL_TRANSPORT_MVP_Session_Reserve_Sequence( &root->session, &sequence );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+
+    frame.type                     = frame_type;
+    frame.session_identifier       = root->session.session_identifier;
+    frame.sequence                 = sequence;
+    frame.acknowledgement_sequence = acknowledgement_sequence;
+    frame.payload                  = NULL;
+    frame.payload_size             = 0u;
+    status = HIL_TRANSPORT_MVP_Encode_Frame(
+        &frame, root->base.config.max_application_message_size, root->codec_scratch,
+        root->codec_scratch_size, root->encoded_output, root->encoded_output_capacity,
+        &encoded_size );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    status = HIL_TRANSPORT_MVP_Reliability_Publish_Encoded( root, frame_type, sequence,
+                                                            encoded_size );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+
+    root->session.handshake_phase = next_phase;
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
+static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Publish_Control(
+    HIL_Transport_Mvp_Root_T* root, HIL_Transport_Mvp_Frame_Type_T frame_type,
+    uint64_t session_identifier, uint16_t acknowledgement_sequence )
+{
+    uint8_t                   encoded_control[HIL_TRANSPORT_MVP_CONTROL_OUTPUT_CAPACITY];
+    HIL_Transport_Mvp_Frame_T frame;
+    HIL_Transport_Status_T    status;
+    size_t                    encoded_size = 0u;
+
+    frame.type                     = frame_type;
+    frame.session_identifier       = session_identifier;
+    frame.sequence                 = 0u;
+    frame.acknowledgement_sequence = acknowledgement_sequence;
+    frame.payload                  = NULL;
+    frame.payload_size             = 0u;
+    status = HIL_TRANSPORT_MVP_Encode_Frame(
+        &frame, root->base.config.max_application_message_size, root->codec_scratch,
+        root->codec_scratch_size, encoded_control, sizeof( encoded_control ), &encoded_size );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    return HIL_TRANSPORT_MVP_Control_Output_Publish_Encoded( root, encoded_control, encoded_size );
+}
+
+static HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Publish_Acknowledgement( HIL_Transport_Mvp_Root_T* root,
+                                                      uint16_t sequence )
+{
+    return HIL_TRANSPORT_MVP_Handshake_Publish_Control(
+        root, HIL_TRANSPORT_MVP_FRAME_ACK, root->session.session_identifier, sequence );
+}
+
+static HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Publish_Established_Event( HIL_Transport_Mvp_Root_T* root )
+{
+    const HIL_Transport_Event_T event = { HIL_TRANSPORT_EVENT_SESSION_ESTABLISHED,
+                                          HIL_TRANSPORT_STATUS_OK,
+                                          HIL_TRANSPORT_FAILURE_NONE, 0u };
+    return HIL_TRANSPORT_MVP_Events_Publish( root, &event );
+}
+
+static void HIL_TRANSPORT_MVP_Handshake_Set_Established( HIL_Transport_Mvp_Root_T* root )
+{
+    root->base.session_state        = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root->session.state             = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root->session.handshake_phase   = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
+    root->base.last_failure         = HIL_TRANSPORT_FAILURE_NONE;
+    root->session.last_failure      = HIL_TRANSPORT_FAILURE_NONE;
+}
+
+static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Classify_Acknowledgement(
+    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
+    HIL_Transport_Mvp_Frame_Type_T expected_type, int* matched )
+{
+    HIL_Transport_Mvp_Ack_Result_T acknowledgement_result;
+    HIL_Transport_Status_T         status;
+
+    *matched = 0;
+    if ( root->session.retained_reliable_frame_type != expected_type )
+    {
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    status = HIL_TRANSPORT_MVP_Session_Classify_Acknowledgement(
+        &root->session, frame->acknowledgement_sequence, &acknowledgement_result );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    *matched = acknowledgement_result == HIL_TRANSPORT_MVP_ACK_MATCHED;
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
+static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Complete_Acknowledgement(
+    HIL_Transport_Mvp_Root_T* root, uint16_t acknowledgement_sequence,
+    HIL_Transport_Mvp_Frame_Type_T expected_type )
+{
+    HIL_Transport_Mvp_Frame_Type_T          completed_type;
+    HIL_Transport_Mvp_Reliability_Outcome_T outcome;
+    HIL_Transport_Status_T                  status;
+
+    status = HIL_TRANSPORT_MVP_Reliability_Accept_Acknowledgement(
+        root, acknowledgement_sequence, &completed_type, &outcome );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    if ( ( outcome != HIL_TRANSPORT_MVP_RELIABILITY_ACKNOWLEDGED )
+         || ( completed_type != expected_type ) )
+    {
+        return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+    }
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
+static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Duplicate_Response_Work(
+    HIL_Transport_Mvp_Root_T* root, HIL_Transport_Mvp_Frame_Type_T expected_response_type )
+{
+    HIL_Transport_Mvp_Reliability_Outcome_T outcome;
+
+    if ( root->session.reliable_state == HIL_TRANSPORT_MVP_RELIABLE_IDLE )
+    {
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    return HIL_TRANSPORT_MVP_Reliability_Request_Retransmission( root, expected_response_type,
+                                                                 &outcome );
+}
+
+static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Host_Response(
+    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
+    HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
+{
+    HIL_Transport_Mvp_Rx_Sequence_Result_T sequence_result;
+    HIL_Transport_Status_T                 status;
+    int                                    acknowledgement_matched;
+
+    if ( frame->session_identifier != root->session.session_identifier )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    status = HIL_TRANSPORT_MVP_Session_Classify_Sequence( &root->session, frame->sequence,
+                                                          &sequence_result );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    if ( sequence_result == HIL_TRANSPORT_MVP_RX_SEQUENCE_DUPLICATE )
+    {
+        if ( !HIL_TRANSPORT_MVP_Handshake_Frame_Is_Exact_Duplicate( &root->session, frame ) )
+        {
+            *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+            return HIL_TRANSPORT_STATUS_OK;
+        }
+        if ( ( root->session.handshake_phase == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_CONFIRM_PENDING )
+             || ( root->session.handshake_phase
+                  == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK ) )
+        {
+            status = HIL_TRANSPORT_MVP_Handshake_Handle_Duplicate_Response_Work(
+                root, HIL_TRANSPORT_MVP_FRAME_CONFIRM );
+            if ( status != HIL_TRANSPORT_STATUS_OK )
+            {
+                return status;
+            }
+            *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_DUPLICATE;
+            return HIL_TRANSPORT_STATUS_OK;
+        }
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( sequence_result != HIL_TRANSPORT_MVP_RX_SEQUENCE_EXPECTED )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( root->session.handshake_phase != HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_RESPONSE )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    status = HIL_TRANSPORT_MVP_Handshake_Classify_Acknowledgement(
+        root, frame, HIL_TRANSPORT_MVP_FRAME_INITIATE, &acknowledgement_matched );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    if ( !acknowledgement_matched )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    status = HIL_TRANSPORT_MVP_Handshake_Complete_Acknowledgement(
+        root, frame->acknowledgement_sequence, HIL_TRANSPORT_MVP_FRAME_INITIATE );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    status = HIL_TRANSPORT_MVP_Session_Accept_Sequence( &root->session, frame->sequence );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+    }
+    HIL_TRANSPORT_MVP_Handshake_Record_Accepted_Frame( &root->session, frame );
+    root->session.handshake_phase = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_CONFIRM_PENDING;
+    *result                       = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_ACCEPTED;
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
+static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Host_Ack(
+    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
+    HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
+{
+    HIL_Transport_Status_T status;
+    int                    acknowledgement_matched;
+
+    if ( ( root->session.handshake_phase
+           != HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK )
+         || ( frame->session_identifier != root->session.session_identifier ) )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    status = HIL_TRANSPORT_MVP_Handshake_Classify_Acknowledgement(
+        root, frame, HIL_TRANSPORT_MVP_FRAME_CONFIRM, &acknowledgement_matched );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    if ( !acknowledgement_matched )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    status = HIL_TRANSPORT_MVP_Events_Check_Capacity( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    status = HIL_TRANSPORT_MVP_Handshake_Complete_Acknowledgement(
+        root, frame->acknowledgement_sequence, HIL_TRANSPORT_MVP_FRAME_CONFIRM );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+
+    HIL_TRANSPORT_MVP_Handshake_Set_Established( root );
+    status = HIL_TRANSPORT_MVP_Handshake_Publish_Established_Event( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+    }
+    *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_ACCEPTED;
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
+static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Rig_Initiate(
+    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
+    HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
+{
+    HIL_Transport_Mvp_Rx_Sequence_Result_T sequence_result;
+    HIL_Transport_Status_T                 status;
+
+    if ( !HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Valid( frame->session_identifier )
+         || ( frame->acknowledgement_sequence != 0u ) )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( ( root->session.session_identifier_valid != 0u )
+         && ( frame->session_identifier != root->session.session_identifier ) )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    status = HIL_TRANSPORT_MVP_Session_Classify_Sequence( &root->session, frame->sequence,
+                                                          &sequence_result );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    if ( sequence_result == HIL_TRANSPORT_MVP_RX_SEQUENCE_DUPLICATE )
+    {
+        if ( !HIL_TRANSPORT_MVP_Handshake_Frame_Is_Exact_Duplicate( &root->session, frame ) )
+        {
+            *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+            return HIL_TRANSPORT_STATUS_OK;
+        }
+        if ( ( root->session.handshake_phase == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_RESPONSE_PENDING )
+             || ( root->session.handshake_phase
+                  == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM ) )
+        {
+            status = HIL_TRANSPORT_MVP_Handshake_Handle_Duplicate_Response_Work(
+                root, HIL_TRANSPORT_MVP_FRAME_RESPONSE );
+            if ( status != HIL_TRANSPORT_STATUS_OK )
+            {
+                return status;
+            }
+            *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_DUPLICATE;
+            return HIL_TRANSPORT_STATUS_OK;
+        }
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( sequence_result != HIL_TRANSPORT_MVP_RX_SEQUENCE_EXPECTED )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( ( root->session.link_state != HIL_TRANSPORT_LINK_STATE_CONNECTED )
+         || ( root->session.state != HIL_TRANSPORT_SESSION_STATE_CONNECTING )
+         || ( root->session.handshake_phase
+              != HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_INITIATE ) )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    root->session.session_identifier       = frame->session_identifier;
+    root->session.session_identifier_valid = 1u;
+    status = HIL_TRANSPORT_MVP_Session_Accept_Sequence( &root->session, frame->sequence );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+    }
+    HIL_TRANSPORT_MVP_Handshake_Record_Accepted_Frame( &root->session, frame );
+    root->session.handshake_phase = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_RESPONSE_PENDING;
+    *result                       = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_ACCEPTED;
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
+static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Rig_Confirm(
+    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
+    HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
+{
+    HIL_Transport_Mvp_Rx_Sequence_Result_T sequence_result;
+    HIL_Transport_Status_T                 status;
+    int                                    acknowledgement_matched;
+
+    if ( frame->session_identifier != root->session.session_identifier )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    status = HIL_TRANSPORT_MVP_Session_Classify_Sequence( &root->session, frame->sequence,
+                                                          &sequence_result );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    if ( sequence_result == HIL_TRANSPORT_MVP_RX_SEQUENCE_DUPLICATE )
+    {
+        if ( !HIL_TRANSPORT_MVP_Handshake_Frame_Is_Exact_Duplicate( &root->session, frame ) )
+        {
+            *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+            return HIL_TRANSPORT_STATUS_OK;
+        }
+        if ( root->session.handshake_phase == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED )
+        {
+            status = HIL_TRANSPORT_MVP_Handshake_Publish_Acknowledgement( root, frame->sequence );
+            if ( status != HIL_TRANSPORT_STATUS_OK )
+            {
+                return status;
+            }
+            *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_DUPLICATE;
+            return HIL_TRANSPORT_STATUS_OK;
+        }
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( sequence_result != HIL_TRANSPORT_MVP_RX_SEQUENCE_EXPECTED )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( root->session.handshake_phase != HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    status = HIL_TRANSPORT_MVP_Handshake_Classify_Acknowledgement(
+        root, frame, HIL_TRANSPORT_MVP_FRAME_RESPONSE, &acknowledgement_matched );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    if ( !acknowledgement_matched )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    status = HIL_TRANSPORT_MVP_Events_Check_Capacity( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    status = HIL_TRANSPORT_MVP_Handshake_Publish_Acknowledgement( root, frame->sequence );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    status = HIL_TRANSPORT_MVP_Handshake_Complete_Acknowledgement(
+        root, frame->acknowledgement_sequence, HIL_TRANSPORT_MVP_FRAME_RESPONSE );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    status = HIL_TRANSPORT_MVP_Session_Accept_Sequence( &root->session, frame->sequence );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+    }
+    HIL_TRANSPORT_MVP_Handshake_Record_Accepted_Frame( &root->session, frame );
+    HIL_TRANSPORT_MVP_Handshake_Set_Established( root );
+    status = HIL_TRANSPORT_MVP_Handshake_Publish_Established_Event( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+    }
+    *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_ACCEPTED;
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
+static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Reset(
+    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
+    HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
+{
+    HIL_Transport_Status_T status;
+
+    if ( ( frame->sequence != 0u ) || ( frame->acknowledgement_sequence != 0u )
+         || !HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Valid( frame->session_identifier ) )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( ( root->session.session_identifier_valid == 0u )
+         || ( frame->session_identifier != root->session.session_identifier ) )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    status = HIL_TRANSPORT_MVP_Session_Abandon( root, HIL_TRANSPORT_FAILURE_PROTOCOL );
+    if ( ( status != HIL_TRANSPORT_STATUS_OK )
+         && ( status != HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED ) )
+    {
+        return status;
+    }
+    *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_ACCEPTED;
+    return status;
+}
+
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Process( HIL_Transport_Mvp_Root_T* root, uint32_t now_ms )
+{
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    ( void )now_ms;
+    if ( ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_FAULT )
+         || ( root->session.state == HIL_TRANSPORT_SESSION_STATE_FAULT ) )
+    {
+        return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    }
+    if ( root->base.session_state != root->session.state )
+    {
+        return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+    }
+
+    switch ( root->session.handshake_phase )
+    {
+        case HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INITIATE_PENDING:
+            if ( root->session.role != HIL_TRANSPORT_ROLE_HOST )
+            {
+                return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+            }
+            return HIL_TRANSPORT_MVP_Handshake_Publish_Reliable(
+                root, HIL_TRANSPORT_MVP_FRAME_INITIATE, 0u,
+                HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_RESPONSE );
+        case HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_RESPONSE_PENDING:
+            if ( root->session.role != HIL_TRANSPORT_ROLE_RIG )
+            {
+                return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+            }
+            return HIL_TRANSPORT_MVP_Handshake_Publish_Reliable(
+                root, HIL_TRANSPORT_MVP_FRAME_RESPONSE,
+                root->session.last_accepted_receive_sequence,
+                HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM );
+        case HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_CONFIRM_PENDING:
+            if ( root->session.role != HIL_TRANSPORT_ROLE_HOST )
+            {
+                return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+            }
+            return HIL_TRANSPORT_MVP_Handshake_Publish_Reliable(
+                root, HIL_TRANSPORT_MVP_FRAME_CONFIRM,
+                root->session.last_accepted_receive_sequence,
+                HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK );
+        default:
+            return HIL_TRANSPORT_STATUS_OK;
+    }
+}
+
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Frame(
+    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
+    HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
+{
+    if ( result == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+    if ( ( root == NULL ) || ( frame == NULL ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_FAULT )
+         || ( root->session.state == HIL_TRANSPORT_SESSION_STATE_FAULT ) )
+    {
+        return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    }
+    if ( !HIL_TRANSPORT_MVP_Handshake_Frame_Has_Empty_Payload( frame ) )
+    {
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( frame->type == HIL_TRANSPORT_MVP_FRAME_RESET )
+    {
+        return HIL_TRANSPORT_MVP_Handshake_Handle_Reset( root, frame, result );
+    }
+
+    if ( root->session.role == HIL_TRANSPORT_ROLE_HOST )
+    {
+        if ( frame->type == HIL_TRANSPORT_MVP_FRAME_RESPONSE )
+        {
+            return HIL_TRANSPORT_MVP_Handshake_Handle_Host_Response( root, frame, result );
+        }
+        if ( ( frame->type == HIL_TRANSPORT_MVP_FRAME_ACK ) && ( frame->sequence == 0u ) )
+        {
+            return HIL_TRANSPORT_MVP_Handshake_Handle_Host_Ack( root, frame, result );
+        }
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( root->session.role == HIL_TRANSPORT_ROLE_RIG )
+    {
+        if ( frame->type == HIL_TRANSPORT_MVP_FRAME_INITIATE )
+        {
+            return HIL_TRANSPORT_MVP_Handshake_Handle_Rig_Initiate( root, frame, result );
+        }
+        if ( frame->type == HIL_TRANSPORT_MVP_FRAME_CONFIRM )
+        {
+            return HIL_TRANSPORT_MVP_Handshake_Handle_Rig_Confirm( root, frame, result );
+        }
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+}
+
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Publish_Reset( HIL_Transport_Mvp_Root_T* root,
+                                           uint64_t session_identifier )
+{
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( !HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Valid( session_identifier ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    return HIL_TRANSPORT_MVP_Handshake_Publish_Control(
+        root, HIL_TRANSPORT_MVP_FRAME_RESET, session_identifier, 0u );
+}

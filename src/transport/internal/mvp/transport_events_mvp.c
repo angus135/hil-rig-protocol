@@ -77,6 +77,25 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Events_Publish( HIL_Transport_Mvp_Root_
     return HIL_TRANSPORT_STATUS_OK;
 }
 
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Events_Check_Capacity( HIL_Transport_Mvp_Root_T* root )
+{
+    HIL_Transport_Status_T status;
+
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    status = HIL_TRANSPORT_MVP_Events_Validate_State( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    return root->event_count == HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY
+               ? HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED
+               : HIL_TRANSPORT_STATUS_OK;
+}
+
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Events_Read( HIL_Transport_Mvp_Root_T* root,
                                                       HIL_Transport_Event_T*    event )
 {
