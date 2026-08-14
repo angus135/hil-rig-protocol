@@ -2,6 +2,8 @@
 
 extern "C" {
 #include "transport/internal/mvp/transport_events_mvp.h"
+#include "transport/internal/mvp/transport_output_mvp.h"
+#include "transport/internal/mvp/transport_reliability_mvp.h"
 #include "transport/internal/mvp/transport_session_mvp.h"
 }
 
@@ -133,6 +135,84 @@ TEST_F(RootFixture, BeginNeedsObservedConnectedLinkAndFaultsOnDirtyState)
     root.output_selection = HIL_TRANSPORT_MVP_OUTPUT_CONTROL;
     EXPECT_EQ(HIL_TRANSPORT_MVP_Session_Begin_Establishment(&root), HIL_TRANSPORT_STATUS_INTERNAL_ERROR);
     EXPECT_EQ(root.session.state, HIL_TRANSPORT_SESSION_STATE_FAULT);
+    EXPECT_EQ(root.output_selection, HIL_TRANSPORT_MVP_OUTPUT_NONE);
+}
+
+TEST_F(RootFixture, EstablishmentInvariantFaultClearsAndBlocksStaleOutput)
+{
+    encoded[0] = 0xA1u;
+    encoded[1] = 0xB2u;
+    encoded[2] = 0xC3u;
+    root.control_output[0] = 0xD4u;
+    root.control_output[1] = 0xE5u;
+    root.session.link_state_observed = 1u;
+    root.session.link_state = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.base.link_state = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.session.reliable_state = HIL_TRANSPORT_MVP_RELIABLE_READY;
+    root.session.retained_reliable_frame_type = HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE;
+    root.session.retained_transmit_sequence = root.session.next_transmit_sequence;
+    root.encoded_output_size = 3u;
+    root.control_output_state = HIL_TRANSPORT_MVP_CONTROL_OUTPUT_PEEKED;
+    root.control_output_size = 2u;
+    root.output_selection = HIL_TRANSPORT_MVP_OUTPUT_CONTROL;
+
+    ASSERT_EQ(HIL_TRANSPORT_MVP_Session_Begin_Establishment(&root),
+              HIL_TRANSPORT_STATUS_INTERNAL_ERROR);
+    EXPECT_EQ(root.base.session_state, HIL_TRANSPORT_SESSION_STATE_FAULT);
+    EXPECT_EQ(root.session.state, HIL_TRANSPORT_SESSION_STATE_FAULT);
+    EXPECT_EQ(root.base.last_failure, HIL_TRANSPORT_FAILURE_INTERNAL);
+    EXPECT_EQ(root.session.last_failure, HIL_TRANSPORT_FAILURE_INTERNAL);
+    EXPECT_EQ(root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE);
+    EXPECT_EQ(root.encoded_output_size, 0u);
+    EXPECT_EQ(root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE);
+    EXPECT_EQ(root.control_output_size, 0u);
+    EXPECT_EQ(root.output_selection, HIL_TRANSPORT_MVP_OUTPUT_NONE);
+    EXPECT_EQ(encoded[0], 0xA1u);
+    EXPECT_EQ(encoded[1], 0xB2u);
+    EXPECT_EQ(encoded[2], 0xC3u);
+    EXPECT_EQ(root.control_output[0], 0xD4u);
+    EXPECT_EQ(root.control_output[1], 0xE5u);
+
+    HIL_Transport_Context_T context{&root, sizeof(root),
+                                    HIL_TRANSPORT_INTERNAL_INITIALIZATION_COOKIE};
+    std::array<uint8_t, 8> output{};
+    output.fill(0x5Au);
+    const auto untouched = output;
+    size_t output_size = 99u;
+    EXPECT_EQ(HIL_TRANSPORT_MVP_Output_Peek_Output(&root, output.data(), output.size(), &output_size),
+              HIL_TRANSPORT_STATUS_INTERNAL_ERROR);
+    EXPECT_EQ(output_size, 0u);
+    EXPECT_EQ(output, untouched);
+    output_size = 99u;
+    EXPECT_EQ(HIL_TRANSPORT_Peek_Output(&context, output.data(), output.size(), &output_size),
+              HIL_TRANSPORT_STATUS_INTERNAL_ERROR);
+    EXPECT_EQ(output_size, 0u);
+    EXPECT_EQ(HIL_TRANSPORT_MVP_Output_Commit_Output(&root, 123u),
+              HIL_TRANSPORT_STATUS_INTERNAL_ERROR);
+    EXPECT_EQ(HIL_TRANSPORT_Commit_Output(&context, 123u), HIL_TRANSPORT_STATUS_INTERNAL_ERROR);
+
+    ASSERT_EQ(HIL_TRANSPORT_MVP_Session_Explicit_Reset(&root), HIL_TRANSPORT_STATUS_OK);
+    ASSERT_EQ(HIL_TRANSPORT_MVP_Reliability_Publish_Encoded(
+                  &root, HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE,
+                  root.session.next_transmit_sequence, 3u),
+              HIL_TRANSPORT_STATUS_OK);
+    ASSERT_EQ(HIL_TRANSPORT_Peek_Output(&context, output.data(), output.size(), &output_size),
+              HIL_TRANSPORT_STATUS_OK);
+    EXPECT_EQ(output_size, 3u);
+}
+
+TEST_F(RootFixture, CoordinatorFaultsContradictoryPublicAndPrivateMetadata)
+{
+    root.session.link_state_observed = 1u;
+    root.session.link_state = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.base.link_state = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.base.last_failure = HIL_TRANSPORT_FAILURE_PROTOCOL;
+    EXPECT_EQ(HIL_TRANSPORT_MVP_Session_Begin_Establishment(&root),
+              HIL_TRANSPORT_STATUS_INTERNAL_ERROR);
+    EXPECT_EQ(root.base.session_state, HIL_TRANSPORT_SESSION_STATE_FAULT);
+    EXPECT_EQ(root.session.state, HIL_TRANSPORT_SESSION_STATE_FAULT);
+    EXPECT_EQ(root.base.last_failure, HIL_TRANSPORT_FAILURE_INTERNAL);
+    EXPECT_EQ(root.session.last_failure, HIL_TRANSPORT_FAILURE_INTERNAL);
 }
 
 TEST_F(RootFixture, DisconnectPublishesOrderedEventsAndCleansWork)

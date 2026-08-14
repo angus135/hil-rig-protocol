@@ -109,6 +109,11 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Output_Peek_Output( HIL_Transport_Mvp_R
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
+    if ( ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_FAULT )
+         || ( root->session.state == HIL_TRANSPORT_SESSION_STATE_FAULT ) )
+    {
+        return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    }
 
     status = HIL_TRANSPORT_MVP_Output_Validate_State(
         root, &reliable_output_pending, &control_output_pending, &reliable_delivery_pending );
@@ -164,6 +169,11 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Output_Commit_Output( HIL_Transport_Mvp
     if ( root == NULL )
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_FAULT )
+         || ( root->session.state == HIL_TRANSPORT_SESSION_STATE_FAULT ) )
+    {
+        return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
     }
     status = HIL_TRANSPORT_MVP_Output_Validate_State(
         root, &reliable_output_pending, &control_output_pending, &reliable_delivery_pending );

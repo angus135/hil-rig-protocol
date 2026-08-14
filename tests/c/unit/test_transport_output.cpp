@@ -100,6 +100,7 @@ protected:
         root_.session.role                          = HIL_TRANSPORT_ROLE_HOST;
         root_.session.link_state                    = HIL_TRANSPORT_LINK_STATE_DISCONNECTED;
         root_.session.state                         = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
+        root_.session.next_host_session_identifier  = 1u;
         root_.session.initial_reliable_sequence     = InitialSequence;
         root_.session.next_transmit_sequence        = InitialSequence;
         root_.encoded_output                        = reliable_storage_.data();
@@ -652,6 +653,81 @@ TEST_F( TransportOutputTest, InvalidCrossOutputRelationshipsFaultWithoutExposing
         EXPECT_EQ( delivery_pending, 0u );
         ExpectFault();
     }
+}
+
+TEST_F( TransportOutputTest, FaultPreventsReliableOutputPeekAndCommitWithoutMutation )
+{
+    HIL_Transport_Context_T context = Context();
+    PublishReliable();
+    root_.base.session_state   = HIL_TRANSPORT_SESSION_STATE_FAULT;
+    root_.base.last_failure    = HIL_TRANSPORT_FAILURE_INTERNAL;
+    root_.session.state        = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
+    root_.session.last_failure = HIL_TRANSPORT_FAILURE_INTERNAL;
+    const auto                                 reliable_before  = SnapshotReliable();
+    const auto                                 selection_before = root_.output_selection;
+    std::array<std::uint8_t, ReliableCapacity> output{};
+    output.fill( 0xD5u );
+    const auto  untouched   = output;
+    std::size_t output_size = 99u;
+
+    EXPECT_EQ(
+        HIL_TRANSPORT_MVP_Output_Peek_Output( &root_, output.data(), output.size(), &output_size ),
+        HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( output_size, 0u );
+    EXPECT_EQ( output, untouched );
+    output_size = 99u;
+    EXPECT_EQ( HIL_TRANSPORT_Peek_Output( &context, output.data(), output.size(), &output_size ),
+               HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( output_size, 0u );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Output_Commit_Output( &root_, 123u ),
+               HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( HIL_TRANSPORT_Commit_Output( &context, 123u ), HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( SnapshotReliable(), reliable_before );
+    EXPECT_EQ( root_.output_selection, selection_before );
+
+    root_.base.session_state = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
+    root_.session.state      = HIL_TRANSPORT_SESSION_STATE_FAULT;
+    output_size              = 99u;
+    EXPECT_EQ( HIL_TRANSPORT_Peek_Output( &context, output.data(), output.size(), &output_size ),
+               HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( output_size, 0u );
+    EXPECT_EQ( HIL_TRANSPORT_Commit_Output( &context, 123u ), HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( SnapshotReliable(), reliable_before );
+    EXPECT_EQ( root_.output_selection, selection_before );
+
+    root_.base.session_state = HIL_TRANSPORT_SESSION_STATE_FAULT;
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &context ), HIL_TRANSPORT_STATUS_OK );
+    output_size = 99u;
+    EXPECT_EQ( HIL_TRANSPORT_Peek_Output( &context, output.data(), output.size(), &output_size ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+    EXPECT_EQ( output_size, 0u );
+    EXPECT_EQ( HIL_TRANSPORT_Commit_Output( &context, 123u ), HIL_TRANSPORT_STATUS_NOT_READY );
+}
+
+TEST_F( TransportOutputTest, FaultPreservesPinnedControlOwnershipUntilExplicitReset )
+{
+    HIL_Transport_Context_T context = Context();
+    PublishControl();
+    ( void )PeekOutput( ControlSize );
+    ASSERT_EQ( root_.output_selection, HIL_TRANSPORT_MVP_OUTPUT_CONTROL );
+    root_.base.session_state                                    = HIL_TRANSPORT_SESSION_STATE_FAULT;
+    root_.base.last_failure                                     = HIL_TRANSPORT_FAILURE_INTERNAL;
+    root_.session.state                                         = HIL_TRANSPORT_SESSION_STATE_FAULT;
+    root_.session.last_failure                                  = HIL_TRANSPORT_FAILURE_INTERNAL;
+    const auto                                 control_before   = SnapshotControl();
+    const auto                                 selection_before = root_.output_selection;
+    std::array<std::uint8_t, ReliableCapacity> output{};
+    std::size_t                                output_size = 99u;
+
+    EXPECT_EQ( HIL_TRANSPORT_Peek_Output( &context, output.data(), output.size(), &output_size ),
+               HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( output_size, 0u );
+    EXPECT_EQ( HIL_TRANSPORT_Commit_Output( &context, 123u ), HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( SnapshotControl(), control_before );
+    EXPECT_EQ( root_.output_selection, selection_before );
+
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &context ), HIL_TRANSPORT_STATUS_OK );
+    ExpectResetState();
 }
 
 TEST_F( TransportOutputTest, PublicFacadeArbitratesAndCommitsBothLifecycles )
