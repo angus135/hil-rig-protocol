@@ -144,8 +144,15 @@ static HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Handshake_Publish_Acknowledgement( HIL_Transport_Mvp_Root_T* root,
                                                      uint16_t                  sequence )
 {
-    return HIL_TRANSPORT_MVP_Handshake_Publish_Control(
+    HIL_Transport_Status_T status = HIL_TRANSPORT_MVP_Handshake_Publish_Control(
         root, HIL_TRANSPORT_MVP_FRAME_ACK, root->session.session_identifier, sequence );
+
+    /* Semantic receive can retry once the different ready or pinned control item is committed. */
+    if ( status == HIL_TRANSPORT_STATUS_NOT_READY )
+    {
+        return HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED;
+    }
+    return status;
 }
 
 static HIL_Transport_Status_T

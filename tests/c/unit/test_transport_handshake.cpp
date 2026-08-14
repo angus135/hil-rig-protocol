@@ -528,10 +528,146 @@ TEST( TransportHandshake, FinalAcceptanceIsRetryableWhenEventOrControlCapacityIs
     ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Publish_Reset( &rig.root, 5u ),
                HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &confirm, &result ),
-               HIL_TRANSPORT_STATUS_NOT_READY );
+               HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
     EXPECT_EQ( rig.root.session.handshake_phase,
                HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM );
     EXPECT_EQ( rig.root.session.expected_receive_sequence, 10u );
+}
+
+TEST( TransportHandshake, InitialConfirmRetriesAfterConflictingReadyOrPinnedControlOutput )
+{
+    for ( const bool peek_conflict : std::array<bool, 2>{ false, true } )
+    {
+        SCOPED_TRACE( peek_conflict );
+        Harness rig;
+        rig.Initialize( HIL_TRANSPORT_ROLE_RIG, 0u, 100u );
+        const auto initiate = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_INITIATE, 5u, 9u, 0u );
+        HIL_Transport_Mvp_Handshake_Frame_Result_T result;
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &initiate, &result ),
+                   HIL_TRANSPORT_STATUS_OK );
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Process( &rig.root, 0u ), HIL_TRANSPORT_STATUS_OK );
+        HIL_Transport_Mvp_Frame_T response{};
+        ASSERT_TRUE( PeekDecodeCommit( rig, 100u, &response ) );
+        const auto confirm = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_CONFIRM, 5u, 10u, 100u );
+
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Publish_Reset( &rig.root, 5u ),
+                   HIL_TRANSPORT_STATUS_OK );
+        HIL_Transport_Mvp_Frame_T reset{};
+        if ( peek_conflict )
+        {
+            ASSERT_TRUE( PeekDecode( rig, &reset ) );
+        }
+        std::array<std::uint8_t, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_CAPACITY> control_before{};
+        std::memcpy( control_before.data(), rig.root.control_output, control_before.size() );
+        const auto control_size_before = rig.root.control_output_size;
+
+        EXPECT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &confirm, &result ),
+                   HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
+        EXPECT_EQ( rig.root.control_output_size, control_size_before );
+        EXPECT_EQ(
+            std::memcmp( control_before.data(), rig.root.control_output, control_before.size() ),
+            0 );
+        EXPECT_EQ( rig.root.control_output_state, peek_conflict
+                                                      ? HIL_TRANSPORT_MVP_CONTROL_OUTPUT_PEEKED
+                                                      : HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY );
+        EXPECT_EQ( rig.root.output_selection, peek_conflict ? HIL_TRANSPORT_MVP_OUTPUT_CONTROL
+                                                            : HIL_TRANSPORT_MVP_OUTPUT_NONE );
+        EXPECT_EQ( rig.root.session.handshake_phase,
+                   HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM );
+        EXPECT_EQ( rig.root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_AWAITING_ACK );
+        EXPECT_EQ( rig.root.session.expected_receive_sequence, 10u );
+        EXPECT_EQ( rig.root.session.last_accepted_receive_sequence, 9u );
+        EXPECT_EQ( rig.root.session.last_accepted_receive_frame_type,
+                   HIL_TRANSPORT_MVP_FRAME_INITIATE );
+        EXPECT_EQ( rig.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+        EXPECT_EQ( rig.root.event_count, 0u );
+
+        if ( !peek_conflict )
+        {
+            ASSERT_TRUE( PeekDecode( rig, &reset ) );
+        }
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Output_Commit_Output( &rig.root, 101u ),
+                   HIL_TRANSPORT_STATUS_OK );
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &confirm, &result ),
+                   HIL_TRANSPORT_STATUS_OK );
+        EXPECT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_ACCEPTED );
+        EXPECT_EQ( rig.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+        EXPECT_EQ( rig.root.session.expected_receive_sequence, 11u );
+        EXPECT_EQ( rig.root.session.last_accepted_receive_frame_type,
+                   HIL_TRANSPORT_MVP_FRAME_CONFIRM );
+        EXPECT_EQ( rig.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY );
+        EXPECT_EQ( rig.root.event_count, 1u );
+    }
+}
+
+TEST( TransportHandshake, DuplicateConfirmRetriesAfterConflictingReadyOrPinnedControlOutput )
+{
+    for ( const bool peek_conflict : std::array<bool, 2>{ false, true } )
+    {
+        SCOPED_TRACE( peek_conflict );
+        Harness rig;
+        rig.Initialize( HIL_TRANSPORT_ROLE_RIG, 0u, 100u );
+        const auto initiate = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_INITIATE, 5u, 9u, 0u );
+        HIL_Transport_Mvp_Handshake_Frame_Result_T result;
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &initiate, &result ),
+                   HIL_TRANSPORT_STATUS_OK );
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Process( &rig.root, 0u ), HIL_TRANSPORT_STATUS_OK );
+        HIL_Transport_Mvp_Frame_T response{};
+        ASSERT_TRUE( PeekDecodeCommit( rig, 100u, &response ) );
+        const auto confirm = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_CONFIRM, 5u, 10u, 100u );
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &confirm, &result ),
+                   HIL_TRANSPORT_STATUS_OK );
+        HIL_Transport_Mvp_Frame_T ack{};
+        ASSERT_TRUE( PeekDecodeCommit( rig, 101u, &ack ) );
+        ASSERT_EQ( rig.root.event_count, 1u );
+
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Publish_Reset( &rig.root, 5u ),
+                   HIL_TRANSPORT_STATUS_OK );
+        HIL_Transport_Mvp_Frame_T reset{};
+        if ( peek_conflict )
+        {
+            ASSERT_TRUE( PeekDecode( rig, &reset ) );
+        }
+        std::array<std::uint8_t, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_CAPACITY> control_before{};
+        std::memcpy( control_before.data(), rig.root.control_output, control_before.size() );
+        const auto control_size_before = rig.root.control_output_size;
+
+        EXPECT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &confirm, &result ),
+                   HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
+        EXPECT_EQ( rig.root.control_output_size, control_size_before );
+        EXPECT_EQ(
+            std::memcmp( control_before.data(), rig.root.control_output, control_before.size() ),
+            0 );
+        EXPECT_EQ( rig.root.control_output_state, peek_conflict
+                                                      ? HIL_TRANSPORT_MVP_CONTROL_OUTPUT_PEEKED
+                                                      : HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY );
+        EXPECT_EQ( rig.root.output_selection, peek_conflict ? HIL_TRANSPORT_MVP_OUTPUT_CONTROL
+                                                            : HIL_TRANSPORT_MVP_OUTPUT_NONE );
+        EXPECT_EQ( rig.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+        EXPECT_EQ( rig.root.session.handshake_phase,
+                   HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED );
+        EXPECT_EQ( rig.root.session.expected_receive_sequence, 11u );
+        EXPECT_EQ( rig.root.session.last_accepted_receive_frame_type,
+                   HIL_TRANSPORT_MVP_FRAME_CONFIRM );
+        EXPECT_EQ( rig.root.event_count, 1u );
+
+        if ( !peek_conflict )
+        {
+            ASSERT_TRUE( PeekDecode( rig, &reset ) );
+        }
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Output_Commit_Output( &rig.root, 102u ),
+                   HIL_TRANSPORT_STATUS_OK );
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &confirm, &result ),
+                   HIL_TRANSPORT_STATUS_OK );
+        EXPECT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_DUPLICATE );
+        EXPECT_EQ( rig.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY );
+        EXPECT_EQ( rig.root.event_count, 1u );
+
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &confirm, &result ),
+                   HIL_TRANSPORT_STATUS_OK );
+        EXPECT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_DUPLICATE );
+        EXPECT_EQ( rig.root.event_count, 1u );
+    }
 }
 
 TEST( TransportHandshake, HostFinalAckWaitsForEventCapacityWithoutReleasingConfirm )
