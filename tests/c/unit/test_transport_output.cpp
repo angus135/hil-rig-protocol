@@ -2,6 +2,8 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <type_traits>
 
 #include <gtest/gtest.h>
 
@@ -71,6 +73,16 @@ enum class InvalidRelationship
     ReliableWithOnlyControlPeeked,
     ControlWithOnlyReliablePeeked,
 };
+
+HIL_Transport_Mvp_Output_Selection_T InvalidOutputSelection()
+{
+    using SelectionStorage = std::underlying_type_t<HIL_Transport_Mvp_Output_Selection_T>;
+    static_assert( sizeof( SelectionStorage ) == sizeof( HIL_Transport_Mvp_Output_Selection_T ) );
+    const SelectionStorage               invalid_value = 99;
+    HIL_Transport_Mvp_Output_Selection_T selection     = HIL_TRANSPORT_MVP_OUTPUT_NONE;
+    std::memcpy( &selection, &invalid_value, sizeof( selection ) );
+    return selection;
+}
 
 class TransportOutputTest : public ::testing::Test
 {
@@ -244,7 +256,7 @@ protected:
         switch ( relationship )
         {
             case InvalidRelationship::InvalidSelection:
-                root_.output_selection = static_cast<HIL_Transport_Mvp_Output_Selection_T>( 99 );
+                root_.output_selection = InvalidOutputSelection();
                 break;
 
             case InvalidRelationship::NoneWithReliablePeeked:
@@ -583,7 +595,7 @@ TEST_F( TransportOutputTest, ResetClearsEverySpecifiedOwnershipCombination )
                 PublishControl();
                 break;
             case 6:
-                root_.output_selection = static_cast<HIL_Transport_Mvp_Output_Selection_T>( 99 );
+                root_.output_selection = InvalidOutputSelection();
                 break;
             default:
                 FAIL() << "Unexpected reset scenario";
