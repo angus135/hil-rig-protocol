@@ -25,8 +25,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
                                                    const HIL_Transport_Storage_T* storage );
 
 /**
- * Clear session-scoped work, both output lifecycles, selection, and all queued
- * event ownership for an explicit public reset.
+ * Delegate complete caller-requested recovery and event clearing to the MVP
+ * session coordinator.
  */
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* context );
 

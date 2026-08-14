@@ -247,55 +247,12 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* context )
 {
     HIL_Transport_Mvp_Root_T* root = HIL_TRANSPORT_MVP_Root_From_Context( context );
-    HIL_Transport_Status_T    status;
 
     if ( root == NULL )
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    status = HIL_TRANSPORT_MVP_Output_Reset( root );
-    if ( status != HIL_TRANSPORT_STATUS_OK )
-    {
-        return status;
-    }
-    /*
-     * Only explicit public reset clears queued event ownership. Future
-     * automatic session abandonment must preserve older events and attempt to
-     * append SESSION_RESET instead of calling Events_Reset().
-     */
-    status = HIL_TRANSPORT_MVP_Events_Reset( root );
-    if ( status != HIL_TRANSPORT_STATUS_OK )
-    {
-        return status;
-    }
-
-    HIL_TRANSPORT_Parser_Reset( &root->parser );
-    root->submitted_message_size                  = 0u;
-    root->submitted_message_pending               = 0u;
-    root->received_message_size                   = 0u;
-    root->received_message_pending                = 0u;
-    root->session.session_identifier              = 0u;
-    root->session.session_identifier_valid        = 0u;
-    root->session.handshake_phase                 = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE;
-    root->session.next_transmit_sequence          = root->session.initial_reliable_sequence;
-    root->session.expected_receive_sequence       = root->session.initial_reliable_sequence;
-    root->session.last_accepted_receive_sequence  = 0u;
-    root->session.accepted_receive_sequence_valid = 0u;
-    root->session.last_valid_receive_ms           = 0u;
-    root->session.last_failure                    = HIL_TRANSPORT_FAILURE_LOCAL_RESET;
-    root->base.last_failure                       = HIL_TRANSPORT_FAILURE_LOCAL_RESET;
-
-    if ( root->base.link_state == HIL_TRANSPORT_LINK_STATE_DISCONNECTED )
-    {
-        root->base.session_state = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
-    }
-    else
-    {
-        root->base.session_state = HIL_TRANSPORT_SESSION_STATE_RECOVERING;
-    }
-    root->session.link_state = root->base.link_state;
-    root->session.state      = root->base.session_state;
-    return HIL_TRANSPORT_STATUS_OK;
+    return HIL_TRANSPORT_MVP_Session_Explicit_Reset( root );
 }
 
 HIL_Transport_Status_T

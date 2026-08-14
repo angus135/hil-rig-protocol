@@ -44,16 +44,26 @@ HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root );
 
 /**
- * @brief Abandon private MVP session work for a high-level failure reason.
+ * @brief Abandon all session-scoped ownership for an automatic recovery reason.
  *
- * @details The future implementation retains role, link observation, initial
- * sequence and advanced host identity cursor while clearing all session-scoped
- * progress. Retry exhaustion and incompatible identities both use this complete
- * abandonment boundary; they never continue with uncertain sequence state. The
- * profile separately clears owned bytes and events.
+ * @details Preserves setup, link observation, the advanced host identity cursor,
+ * and unread events, then appends one SESSION_RESET event when capacity permits.
+ * NONE and LOCAL_RESET are not automatic-abandonment reasons.
  */
-HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Reset( HIL_Transport_Mvp_Session_T* session,
-                                                        HIL_Transport_Failure_T      failure );
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Abandon( HIL_Transport_Mvp_Root_T* root,
+                                                          HIL_Transport_Failure_T failure );
+
+/**
+ * @brief Perform the complete caller-requested reset of an initialized root.
+ *
+ * @details Clears all session-scoped ownership and every queued event, records
+ * LOCAL_RESET, repairs defined private mirrors from valid retained setup,
+ * canonicalizes the link-observed flag, preserves the advanced host cursor,
+ * and is the only operation that can leave FAULT. Unusable essential retained
+ * setup leaves the context in FAULT and returns INTERNAL_ERROR.
+ */
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Session_Explicit_Reset( HIL_Transport_Mvp_Root_T* root );
 
 /**
  * @brief Reserve, without advancing, the sole reliable transmit sequence.
