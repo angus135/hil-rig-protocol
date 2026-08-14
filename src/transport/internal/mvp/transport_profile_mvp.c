@@ -12,9 +12,8 @@
 #include "../transport_profile.h"
 
 #include "../transport_internal.h"
-#include "transport_control_output_mvp.h"
 #include "transport_frame_codec_mvp.h"
-#include "transport_reliability_mvp.h"
+#include "transport_output_mvp.h"
 #include "transport_types_mvp.h"
 
 #include <stdint.h>
@@ -210,6 +209,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
     root->session.next_transmit_sequence       = config->initial_reliable_sequence;
     root->session.expected_receive_sequence    = config->initial_reliable_sequence;
     root->session.reliable_state               = HIL_TRANSPORT_MVP_RELIABLE_IDLE;
+    root->output_selection                     = HIL_TRANSPORT_MVP_OUTPUT_NONE;
     root->control_output_state                 = HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE;
     root->control_output_size                  = 0u;
 
@@ -246,12 +246,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* con
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    status = HIL_TRANSPORT_MVP_Reliability_Reset( root );
-    if ( status != HIL_TRANSPORT_STATUS_OK )
-    {
-        return status;
-    }
-    status = HIL_TRANSPORT_MVP_Control_Output_Reset( root );
+    status = HIL_TRANSPORT_MVP_Output_Reset( root );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
         return status;
@@ -397,8 +392,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Peek_Output( HIL_Transport_Context_
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    return HIL_TRANSPORT_MVP_Reliability_Peek_Output( root, out_buffer, out_buffer_size,
-                                                      output_size );
+    return HIL_TRANSPORT_MVP_Output_Peek_Output( root, out_buffer, out_buffer_size, output_size );
 }
 
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Commit_Output( HIL_Transport_Context_T* context,
@@ -410,7 +404,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Commit_Output( HIL_Transport_Contex
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    return HIL_TRANSPORT_MVP_Reliability_Commit_Output( root, now_ms );
+    return HIL_TRANSPORT_MVP_Output_Commit_Output( root, now_ms );
 }
 
 HIL_Transport_Status_T
@@ -468,8 +462,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Get_Status( const HIL_Transport_Con
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    result = HIL_TRANSPORT_MVP_Reliability_Get_Pending_Status( root, &output_pending,
-                                                               &delivery_pending );
+    result =
+        HIL_TRANSPORT_MVP_Output_Get_Pending_Status( root, &output_pending, &delivery_pending );
     if ( result != HIL_TRANSPORT_STATUS_OK )
     {
         return result;
