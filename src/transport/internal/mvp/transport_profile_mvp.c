@@ -210,9 +210,9 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
         memset( storage->workspace, 0, required_size );
         return status;
     }
-    root->output_selection                     = HIL_TRANSPORT_MVP_OUTPUT_NONE;
-    root->control_output_state                 = HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE;
-    root->control_output_size                  = 0u;
+    root->output_selection     = HIL_TRANSPORT_MVP_OUTPUT_NONE;
+    root->control_output_state = HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE;
+    root->control_output_size  = 0u;
 
     root->submitted_message = next_region;
     next_region += config->max_application_message_size;

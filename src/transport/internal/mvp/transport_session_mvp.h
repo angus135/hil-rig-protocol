@@ -51,7 +51,7 @@ HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root );
  * NONE and LOCAL_RESET are not automatic-abandonment reasons.
  */
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Abandon( HIL_Transport_Mvp_Root_T* root,
-                                                          HIL_Transport_Failure_T failure );
+                                                          HIL_Transport_Failure_T   failure );
 
 /**
  * @brief Perform the complete caller-requested reset of an initialized root.
@@ -62,8 +62,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Abandon( HIL_Transport_Mvp_Root
  * and is the only operation that can leave FAULT. Unusable essential retained
  * setup leaves the context in FAULT and returns INTERNAL_ERROR.
  */
-HIL_Transport_Status_T
-HIL_TRANSPORT_MVP_Session_Explicit_Reset( HIL_Transport_Mvp_Root_T* root );
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Explicit_Reset( HIL_Transport_Mvp_Root_T* root );
 
 /**
  * @brief Observe one caller-owned physical-link state.
@@ -75,8 +74,9 @@ HIL_TRANSPORT_MVP_Session_Explicit_Reset( HIL_Transport_Mvp_Root_T* root );
  * INTERNAL_ERROR when mandatory best-effort cleanup detects another invariant
  * failure.
  */
-HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Notify_Link_State(
-    HIL_Transport_Mvp_Root_T* root, HIL_Transport_Link_State_T link_state );
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Session_Notify_Link_State( HIL_Transport_Mvp_Root_T*  root,
+                                             HIL_Transport_Link_State_T link_state );
 
 /**
  * @brief Reserve, without advancing, the sole reliable transmit sequence.

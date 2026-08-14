@@ -157,11 +157,11 @@ TEST( TransportSessionInitialization, ValidatesWithoutPartiallyMutatingDestinati
                HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
     EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init( &session, invalid_role, 1u, 0u ),
                HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
-    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init(
-                   &session, HIL_TRANSPORT_ROLE_HOST, HIL_TRANSPORT_SESSION_SEED_INVALID, 0u ),
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init( &session, HIL_TRANSPORT_ROLE_HOST,
+                                               HIL_TRANSPORT_SESSION_SEED_INVALID, 0u ),
                HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
-    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init(
-                   &session, HIL_TRANSPORT_ROLE_HOST, HIL_TRANSPORT_SESSION_SEED_RESERVED, 0u ),
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init( &session, HIL_TRANSPORT_ROLE_HOST,
+                                               HIL_TRANSPORT_SESSION_SEED_RESERVED, 0u ),
                HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
     EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init( &session, HIL_TRANSPORT_ROLE_RIG, 1u, 0u ),
                HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
@@ -196,8 +196,8 @@ TEST( TransportSessionInitialization, InitializesHostAndRigFieldsDeterministical
     EXPECT_EQ( host.last_failure, HIL_TRANSPORT_FAILURE_NONE );
 
     HIL_Transport_Mvp_Session_T rig;
-    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init(
-                   &rig, HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 0u ),
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init( &rig, HIL_TRANSPORT_ROLE_RIG,
+                                               HIL_TRANSPORT_SESSION_SEED_INVALID, 0u ),
                HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( rig.next_host_session_identifier, 0u );
     EXPECT_EQ( rig.initial_reliable_sequence, 0u );
@@ -210,14 +210,13 @@ TEST( TransportSessionEstablishment, PreparesHostAndAdvancesIdentityOnce )
     HIL_Transport_Mvp_Root_T root{};
     ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init( &root.session, HIL_TRANSPORT_ROLE_HOST, 5u, 9u ),
                HIL_TRANSPORT_STATUS_OK );
-    root.base.role          = HIL_TRANSPORT_ROLE_HOST;
-    root.base.link_state    = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    root.base.session_state = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
-    root.session.link_state = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.base.role                   = HIL_TRANSPORT_ROLE_HOST;
+    root.base.link_state             = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.base.session_state          = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
+    root.session.link_state          = HIL_TRANSPORT_LINK_STATE_CONNECTED;
     root.session.link_state_observed = 1u;
 
-    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ),
-               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ), HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
     EXPECT_EQ( root.session.state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
     EXPECT_EQ( root.session.handshake_phase, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INITIATE_PENDING );
@@ -234,19 +233,17 @@ TEST( TransportSessionEstablishment, PreparesHostAndAdvancesIdentityOnce )
 TEST( TransportSessionEstablishment, PreparesRigWithoutOriginatingIdentity )
 {
     HIL_Transport_Mvp_Root_T root{};
-    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init(
-                   &root.session, HIL_TRANSPORT_ROLE_RIG,
-                   HIL_TRANSPORT_SESSION_SEED_INVALID, UINT16_MAX ),
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init( &root.session, HIL_TRANSPORT_ROLE_RIG,
+                                               HIL_TRANSPORT_SESSION_SEED_INVALID, UINT16_MAX ),
                HIL_TRANSPORT_STATUS_OK );
-    root.base.role                    = HIL_TRANSPORT_ROLE_RIG;
-    root.base.link_state              = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    root.base.session_state           = HIL_TRANSPORT_SESSION_STATE_RECOVERING;
-    root.session.link_state           = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    root.session.link_state_observed  = 1u;
-    root.session.state                = HIL_TRANSPORT_SESSION_STATE_RECOVERING;
+    root.base.role                   = HIL_TRANSPORT_ROLE_RIG;
+    root.base.link_state             = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.base.session_state          = HIL_TRANSPORT_SESSION_STATE_RECOVERING;
+    root.session.link_state          = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.session.link_state_observed = 1u;
+    root.session.state               = HIL_TRANSPORT_SESSION_STATE_RECOVERING;
 
-    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ),
-               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ), HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( root.session.handshake_phase,
                HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_INITIATE );
     EXPECT_EQ( root.session.session_identifier, 0u );
@@ -257,29 +254,27 @@ TEST( TransportSessionEstablishment, PreparesRigWithoutOriginatingIdentity )
 TEST( TransportSessionEstablishment, WrapsHostCursorAndFaultsOnDirtyOwnership )
 {
     HIL_Transport_Mvp_Root_T root{};
-    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init(
-                   &root.session, HIL_TRANSPORT_ROLE_HOST,
-                   HIL_TRANSPORT_SESSION_SEED_RESERVED - 1u, 0u ),
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init( &root.session, HIL_TRANSPORT_ROLE_HOST,
+                                               HIL_TRANSPORT_SESSION_SEED_RESERVED - 1u, 0u ),
                HIL_TRANSPORT_STATUS_OK );
-    root.base.role                    = HIL_TRANSPORT_ROLE_HOST;
-    root.base.link_state              = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    root.base.session_state           = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
-    root.session.link_state           = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    root.session.link_state_observed  = 1u;
-    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ),
-               HIL_TRANSPORT_STATUS_OK );
+    root.base.role                   = HIL_TRANSPORT_ROLE_HOST;
+    root.base.link_state             = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.base.session_state          = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
+    root.session.link_state          = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.session.link_state_observed = 1u;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ), HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( root.session.session_identifier, HIL_TRANSPORT_SESSION_SEED_RESERVED - 1u );
     EXPECT_EQ( root.session.next_host_session_identifier, 1u );
 
     HIL_Transport_Mvp_Root_T dirty{};
     ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Init( &dirty.session, HIL_TRANSPORT_ROLE_HOST, 1u, 0u ),
                HIL_TRANSPORT_STATUS_OK );
-    dirty.base.role                    = HIL_TRANSPORT_ROLE_HOST;
-    dirty.base.link_state              = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    dirty.base.session_state           = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
-    dirty.session.link_state           = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    dirty.session.link_state_observed  = 1u;
-    dirty.output_selection             = HIL_TRANSPORT_MVP_OUTPUT_CONTROL;
+    dirty.base.role                   = HIL_TRANSPORT_ROLE_HOST;
+    dirty.base.link_state             = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    dirty.base.session_state          = HIL_TRANSPORT_SESSION_STATE_DISCONNECTED;
+    dirty.session.link_state          = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    dirty.session.link_state_observed = 1u;
+    dirty.output_selection            = HIL_TRANSPORT_MVP_OUTPUT_CONTROL;
     EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &dirty ),
                HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
     EXPECT_EQ( dirty.base.session_state, HIL_TRANSPORT_SESSION_STATE_FAULT );
@@ -308,7 +303,7 @@ TEST( TransportSessionRecovery, AutomaticAbandonmentCleansWorkAndPreservesEvents
 {
     HIL_Transport_Config_T config{};
     HIL_TRANSPORT_Default_Config( &config );
-    config.session_seed = 11u;
+    config.session_seed       = 11u;
     std::size_t required_size = 0u;
     ASSERT_EQ( HIL_TRANSPORT_Required_Storage_Size( &config, &required_size ),
                HIL_TRANSPORT_STATUS_OK );
@@ -320,34 +315,33 @@ TEST( TransportSessionRecovery, AutomaticAbandonmentCleansWorkAndPreservesEvents
                HIL_TRANSPORT_STATUS_OK );
     auto* root = static_cast<HIL_Transport_Mvp_Root_T*>( context.implementation );
 
-    root->base.link_state                    = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    root->session.link_state                 = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    root->session.link_state_observed        = 1u;
-    root->base.session_state                 = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
-    root->session.state                      = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
-    root->session.session_identifier         = 11u;
-    root->session.session_identifier_valid   = 1u;
-    root->session.handshake_phase            = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
-    root->submitted_message_size             = 3u;
-    root->submitted_message_pending          = 1u;
-    root->received_message_size              = 4u;
-    root->received_message_pending           = 1u;
-    root->parser.accumulated_size            = 2u;
-    root->parser.discarding                  = 1u;
-    root->session.next_transmit_sequence     = 17u;
-    root->session.expected_receive_sequence  = 18u;
-    root->session.last_accepted_receive_sequence = 17u;
+    root->base.link_state                         = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root->session.link_state                      = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root->session.link_state_observed             = 1u;
+    root->base.session_state                      = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root->session.state                           = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root->session.session_identifier              = 11u;
+    root->session.session_identifier_valid        = 1u;
+    root->session.handshake_phase                 = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
+    root->submitted_message_size                  = 3u;
+    root->submitted_message_pending               = 1u;
+    root->received_message_size                   = 4u;
+    root->received_message_pending                = 1u;
+    root->parser.accumulated_size                 = 2u;
+    root->parser.discarding                       = 1u;
+    root->session.next_transmit_sequence          = 17u;
+    root->session.expected_receive_sequence       = 18u;
+    root->session.last_accepted_receive_sequence  = 17u;
     root->session.accepted_receive_sequence_valid = 1u;
-    root->session.last_valid_receive_ms      = 99u;
-    root->session.next_host_session_identifier = 12u;
-    const auto* submitted_storage = root->submitted_message;
-    const auto* parser_storage    = root->parser.scratch_buffer;
-    const auto* encoded_storage   = root->encoded_output;
+    root->session.last_valid_receive_ms           = 99u;
+    root->session.next_host_session_identifier    = 12u;
+    const auto*                 submitted_storage = root->submitted_message;
+    const auto*                 parser_storage    = root->parser.scratch_buffer;
+    const auto*                 encoded_storage   = root->encoded_output;
     const HIL_Transport_Event_T older_event{ HIL_TRANSPORT_EVENT_PROTOCOL_ERROR,
-                                              HIL_TRANSPORT_STATUS_NOT_READY,
-                                              HIL_TRANSPORT_FAILURE_PROTOCOL, 0u };
-    ASSERT_EQ( HIL_TRANSPORT_MVP_Events_Publish( root, &older_event ),
-               HIL_TRANSPORT_STATUS_OK );
+                                             HIL_TRANSPORT_STATUS_NOT_READY,
+                                             HIL_TRANSPORT_FAILURE_PROTOCOL, 0u };
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Events_Publish( root, &older_event ), HIL_TRANSPORT_STATUS_OK );
 
     ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Abandon( root, HIL_TRANSPORT_FAILURE_DELIVERY ),
                HIL_TRANSPORT_STATUS_OK );
@@ -393,26 +387,26 @@ TEST( TransportSessionRecovery, ValidatesAutomaticFailureAndExplicitResetRepairs
 
     HIL_Transport_Config_T config{};
     HIL_TRANSPORT_Default_Config( &config );
-    config.session_seed = 7u;
+    config.session_seed       = 7u;
     std::size_t required_size = 0u;
     ASSERT_EQ( HIL_TRANSPORT_Required_Storage_Size( &config, &required_size ),
                HIL_TRANSPORT_STATUS_OK );
     alignas( HIL_TRANSPORT_WORKSPACE_ALIGNMENT ) std::array<std::uint8_t, 4096u> workspace{};
-    HIL_Transport_Context_T context{};
+    HIL_Transport_Context_T                                                      context{};
     HIL_Transport_Storage_T storage{ workspace.data(), required_size };
     ASSERT_EQ( HIL_TRANSPORT_Init( &context, HIL_TRANSPORT_ROLE_HOST, &config, &storage ),
                HIL_TRANSPORT_STATUS_OK );
-    auto* initialized = static_cast<HIL_Transport_Mvp_Root_T*>( context.implementation );
-    initialized->base.link_state                     = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    initialized->session.link_state                  = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    initialized->session.link_state_observed         = 1u;
-    initialized->base.session_state                  = HIL_TRANSPORT_SESSION_STATE_FAULT;
-    initialized->session.state                       = HIL_TRANSPORT_SESSION_STATE_FAULT;
-    initialized->base.last_failure                   = HIL_TRANSPORT_FAILURE_INTERNAL;
-    initialized->session.last_failure                = HIL_TRANSPORT_FAILURE_INTERNAL;
+    auto* initialized            = static_cast<HIL_Transport_Mvp_Root_T*>( context.implementation );
+    initialized->base.link_state = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    initialized->session.link_state                   = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    initialized->session.link_state_observed          = 1u;
+    initialized->base.session_state                   = HIL_TRANSPORT_SESSION_STATE_FAULT;
+    initialized->session.state                        = HIL_TRANSPORT_SESSION_STATE_FAULT;
+    initialized->base.last_failure                    = HIL_TRANSPORT_FAILURE_INTERNAL;
+    initialized->session.last_failure                 = HIL_TRANSPORT_FAILURE_INTERNAL;
     initialized->session.next_host_session_identifier = 19u;
-    initialized->event_read_index                    = 99u;
-    initialized->event_count                         = 99u;
+    initialized->event_read_index                     = 99u;
+    initialized->event_count                          = 99u;
 
     ASSERT_EQ( HIL_TRANSPORT_Reset( &context ), HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( initialized->event_read_index, 0u );

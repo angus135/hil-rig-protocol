@@ -5,14 +5,14 @@
 
 #include <string.h>
 
-static void HIL_TRANSPORT_MVP_Session_Set_Link_State( HIL_Transport_Mvp_Root_T* root,
+static void HIL_TRANSPORT_MVP_Session_Set_Link_State( HIL_Transport_Mvp_Root_T*  root,
                                                       HIL_Transport_Link_State_T link_state )
 {
     root->base.link_state    = link_state;
     root->session.link_state = link_state;
 }
 
-static void HIL_TRANSPORT_MVP_Session_Set_State( HIL_Transport_Mvp_Root_T* root,
+static void HIL_TRANSPORT_MVP_Session_Set_State( HIL_Transport_Mvp_Root_T*     root,
                                                  HIL_Transport_Session_State_T state )
 {
     root->base.session_state = state;
@@ -20,9 +20,9 @@ static void HIL_TRANSPORT_MVP_Session_Set_State( HIL_Transport_Mvp_Root_T* root,
 }
 
 static void HIL_TRANSPORT_MVP_Session_Set_Failure( HIL_Transport_Mvp_Root_T* root,
-                                                   HIL_Transport_Failure_T failure )
+                                                   HIL_Transport_Failure_T   failure )
 {
-    root->base.last_failure = failure;
+    root->base.last_failure    = failure;
     root->session.last_failure = failure;
 }
 
@@ -107,7 +107,7 @@ HIL_TRANSPORT_MVP_Session_Reset_Status_For_Failure( HIL_Transport_Failure_T fail
 }
 
 static HIL_Transport_Status_T
-HIL_TRANSPORT_MVP_Session_Publish_Link_Event( HIL_Transport_Mvp_Root_T* root,
+HIL_TRANSPORT_MVP_Session_Publish_Link_Event( HIL_Transport_Mvp_Root_T*  root,
                                               HIL_Transport_Link_State_T link_state )
 {
     HIL_Transport_Event_T event;
@@ -205,28 +205,24 @@ HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root )
          || ( session->retained_reliable_frame_type != HIL_TRANSPORT_MVP_FRAME_INVALID )
          || ( session->retained_transmit_sequence != 0u )
          || ( session->retransmissions_committed != 0u )
-         || ( session->reliable_last_committed_ms != 0u )
-         || ( root->encoded_output_size != 0u )
+         || ( session->reliable_last_committed_ms != 0u ) || ( root->encoded_output_size != 0u )
          || ( root->control_output_state != HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE )
          || ( root->control_output_size != 0u )
          || ( root->output_selection != HIL_TRANSPORT_MVP_OUTPUT_NONE )
-         || ( root->submitted_message_size != 0u )
-         || ( root->submitted_message_pending != 0u )
-         || ( root->received_message_size != 0u )
-         || ( root->received_message_pending != 0u )
+         || ( root->submitted_message_size != 0u ) || ( root->submitted_message_pending != 0u )
+         || ( root->received_message_size != 0u ) || ( root->received_message_pending != 0u )
          || ( root->parser.accumulated_size != 0u ) || ( root->parser.body_ready != 0u )
-         || ( root->parser.discarding != 0u )
-         || ( session->last_accepted_receive_sequence != 0u )
+         || ( root->parser.discarding != 0u ) || ( session->last_accepted_receive_sequence != 0u )
          || ( session->accepted_receive_sequence_valid != 0u )
          || ( session->last_valid_receive_ms != 0u ) )
     {
         return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
     }
 
-    session->next_transmit_sequence              = session->initial_reliable_sequence;
-    session->expected_receive_sequence           = session->initial_reliable_sequence;
-    session->last_accepted_receive_sequence      = 0u;
-    session->accepted_receive_sequence_valid     = 0u;
+    session->next_transmit_sequence          = session->initial_reliable_sequence;
+    session->expected_receive_sequence       = session->initial_reliable_sequence;
+    session->last_accepted_receive_sequence  = 0u;
+    session->accepted_receive_sequence_valid = 0u;
 
     if ( session->role == HIL_TRANSPORT_ROLE_HOST )
     {
@@ -261,7 +257,7 @@ HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root )
 }
 
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Abandon( HIL_Transport_Mvp_Root_T* root,
-                                                          HIL_Transport_Failure_T failure )
+                                                          HIL_Transport_Failure_T   failure )
 {
     HIL_Transport_Status_T event_status;
     HIL_Transport_Status_T associated_status;
@@ -278,8 +274,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Abandon( HIL_Transport_Mvp_Root
     }
     if ( ( root->session.role < HIL_TRANSPORT_ROLE_HOST )
          || ( root->session.role > HIL_TRANSPORT_ROLE_RIG )
-         || ( root->base.role != root->session.role )
-         || ( root->session.link_state_observed > 1u )
+         || ( root->base.role != root->session.role ) || ( root->session.link_state_observed > 1u )
          || ( root->base.last_failure != root->session.last_failure )
          || ( root->base.session_state != root->session.state )
          || ( root->base.link_state != root->session.link_state )
@@ -303,10 +298,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Abandon( HIL_Transport_Mvp_Root
     }
 
     HIL_TRANSPORT_MVP_Session_Set_Failure( root, failure );
-    HIL_TRANSPORT_MVP_Session_Set_State(
-        root, root->session.link_state == HIL_TRANSPORT_LINK_STATE_DISCONNECTED
-                  ? HIL_TRANSPORT_SESSION_STATE_DISCONNECTED
-                  : HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    HIL_TRANSPORT_MVP_Session_Set_State( root, root->session.link_state
+                                                       == HIL_TRANSPORT_LINK_STATE_DISCONNECTED
+                                                   ? HIL_TRANSPORT_SESSION_STATE_DISCONNECTED
+                                                   : HIL_TRANSPORT_SESSION_STATE_RECOVERING );
 
     event.type              = HIL_TRANSPORT_EVENT_SESSION_RESET;
     event.status            = associated_status;
@@ -328,8 +323,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Abandon( HIL_Transport_Mvp_Root
     return HIL_TRANSPORT_STATUS_OK;
 }
 
-HIL_Transport_Status_T
-HIL_TRANSPORT_MVP_Session_Explicit_Reset( HIL_Transport_Mvp_Root_T* root )
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Explicit_Reset( HIL_Transport_Mvp_Root_T* root )
 {
     HIL_Transport_Status_T cleanup_status;
     int                    retained_link_is_valid;
@@ -373,19 +367,20 @@ HIL_TRANSPORT_MVP_Session_Explicit_Reset( HIL_Transport_Mvp_Root_T* root )
     }
 
     HIL_TRANSPORT_MVP_Session_Set_Failure( root, HIL_TRANSPORT_FAILURE_LOCAL_RESET );
-    HIL_TRANSPORT_MVP_Session_Set_State(
-        root, root->base.link_state == HIL_TRANSPORT_LINK_STATE_DISCONNECTED
-                  ? HIL_TRANSPORT_SESSION_STATE_DISCONNECTED
-                  : HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    HIL_TRANSPORT_MVP_Session_Set_State( root, root->base.link_state
+                                                       == HIL_TRANSPORT_LINK_STATE_DISCONNECTED
+                                                   ? HIL_TRANSPORT_SESSION_STATE_DISCONNECTED
+                                                   : HIL_TRANSPORT_SESSION_STATE_RECOVERING );
     return HIL_TRANSPORT_STATUS_OK;
 }
 
-HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Notify_Link_State(
-    HIL_Transport_Mvp_Root_T* root, HIL_Transport_Link_State_T link_state )
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Session_Notify_Link_State( HIL_Transport_Mvp_Root_T*  root,
+                                             HIL_Transport_Link_State_T link_state )
 {
-    HIL_Transport_Status_T link_event_status;
-    HIL_Transport_Status_T transition_status;
-    int                    was_observed;
+    HIL_Transport_Status_T     link_event_status;
+    HIL_Transport_Status_T     transition_status;
+    int                        was_observed;
     HIL_Transport_Link_State_T previous_link_state;
 
     if ( root == NULL )

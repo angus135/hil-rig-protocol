@@ -32,8 +32,8 @@
  * preparation, link observation, automatic abandonment, and explicit reset are
  * coordinated through the MVP session module; link changes and automatic
  * abandonment produce events. Handshake frame processing, received-frame
- * dispatch, ACK and RESET generation, and public Application-message orchestration remain intentional
- * HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED stubs.
+ * dispatch, ACK and RESET generation, and public Application-message orchestration remain
+ * intentional HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED stubs.
  */
 #ifndef HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
 #define HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
