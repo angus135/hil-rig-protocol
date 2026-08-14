@@ -29,7 +29,7 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_size(
     uint32_t* encoded_size )
 {
     *encoded_size = HIL_APPLICATION_SYSTEM_INFO_RESPONSE_FIXED_ENCODE_SIZE
-                            + data->firmware_git_hash.size + data->diagnostic_data.size;
+                    + data->firmware_git_hash.size + data->diagnostic_data.size;
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
