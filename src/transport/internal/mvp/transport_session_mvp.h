@@ -99,9 +99,13 @@ HIL_TRANSPORT_MVP_Session_Reserve_Sequence( HIL_Transport_Mvp_Session_T* session
 /**
  * @brief Classify received reliable traffic without leaking private statuses.
  *
- * @details The private result distinguishes expected, duplicate and incompatible
- * sequence values. The profile maps it to delivery, duplicate re-ACK, session
- * restart, public status and high-level events.
+ * @details This operation never advances receive state. Before any peer
+ * reliable frame is accepted, every uint16_t value is expected and the first
+ * accepted value establishes the peer baseline independently of the local
+ * initial transmit sequence. Afterwards the next value is expected, the exact
+ * last accepted value is duplicate, and every other value is incompatible.
+ * Semantic type and acknowledgement metadata are checked separately by the
+ * owning handshake or future Application receive path.
  */
 HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Session_Classify_Sequence( const HIL_Transport_Mvp_Session_T*      session,
