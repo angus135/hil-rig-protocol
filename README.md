@@ -81,14 +81,16 @@ and consumes exactly that event only after a successful complete copy;
 `CAPACITY_EXHAUSTED` without overwriting older events, and public status exposes
 only whether any event is pending, not the private depth or count. Explicit
 `Reset()` releases all queued event ownership without clearing inaccessible slot
-bytes. No session, link, handshake, protocol, capacity, or delivery path
-publishes real events yet.
+bytes. Link changes publish `LINK_STATE_CHANGED`; automatic session abandonment
+preserves older events and attempts to append `SESSION_RESET`.
 
 The broader Transport runtime—session handshake, received-frame and received-ACK
-dispatch, receive-side duplicate handling, ACK and RESET generation, Application
-submission and delivery, event generation, and session recovery—remains as intentional
-`HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs. The public send/receive workflow
-is therefore not operational end to end yet.
+dispatch, receive-side duplicate handling, ACK and RESET generation, and
+Application submission and delivery—remains as intentional
+`HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs. Session initialization, link
+observation, host identity progression, establishment preparation, automatic
+abandonment, and explicit reset are implemented through one private coordinator.
+The public send/receive workflow is therefore not operational end to end yet.
 
 The default MVP Transport profile is designed for one complete Application
 message per frame and one outstanding reliable transmission. The private event

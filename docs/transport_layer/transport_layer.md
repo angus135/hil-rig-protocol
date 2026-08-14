@@ -13,10 +13,12 @@ public arbitration between those lifecycles are implemented. A separate private
 four-entry event FIFO, public consume-on-success event reads, event pending
 status, and explicit event reset are also implemented. Public peek, commit,
 status, and reset operate across the implemented private lifecycles. Session
-establishment, received-frame and received-ACK dispatch, ACK and RESET
-generation, receive-side duplicate handling, Application-message orchestration,
-real event generation, and session recovery remain intentional stubs unless stated
-otherwise below.
+initialization, link observation, establishment preparation, automatic
+abandonment, and explicit reset are coordinated by the private session module;
+link changes and abandonment produce real events. Handshake frame processing,
+received-frame and received-ACK dispatch, ACK and RESET generation,
+receive-side duplicate handling, and Application-message orchestration remain
+intentional stubs unless stated otherwise below.
 
 Transport is HIL-RIG-specific but communication-medium-agnostic. It maps opaque,
 complete Application messages to opaque encoded output and received raw bytes
@@ -109,6 +111,12 @@ later adopts a valid host-proposed identity. A non-invalid rig seed is
 `INVALID_ARGUMENT`. A new or reconnected session cannot continue the previous
 session's sequences or ACK state. Session identity is independent of every
 Application test identifier.
+
+Session initialization validates before mutating its destination. It records the
+role, deterministic initial DISCONNECTED states, an unobserved link, an inactive
+handshake, idle output metadata, invalid duplicate state, the configured initial
+sequence, and no failure. The host identity cursor starts at the validated seed;
+the rig cursor remains zero. Every `uint16_t` initial sequence is valid.
 
 `HIL_TRANSPORT_Required_Storage_Size()` has no role input. It validates only
 role-independent configuration and the selected profile's capacity relationships,
@@ -341,6 +349,14 @@ hardware, mark bytes transmitted, begin retry timing, or release storage. A
 low-level output-buffer-too-small condition is retryable and cannot discard a
 valid item.
 
+If either public or private session state is `FAULT`, peek clears `output_size`,
+returns `INTERNAL_ERROR`, exposes no retained bytes, and does not change output
+ownership. Commit likewise returns `INTERNAL_ERROR` without changing ownership.
+Session invariant handling performs best-effort session-scoped cleanup before
+finalizing `FAULT`, so any ownership it can safely invalidate becomes
+inaccessible immediately. Explicit reset is the only operation that can make
+output access usable again.
+
 The caller commits only after external I/O accepts the complete item. Commit is
 routed to the lifecycle that produced the pinned bytes and performs no I/O. A
 control commit releases the fixed control slot immediately and deliberately
@@ -426,9 +442,36 @@ either control frame yet.
 
 ## Link, reset, events, and status
 
-`HIL_TRANSPORT_Notify_Link_State()` records caller-owned link availability.
-Disconnect abandons session-scoped work. Reconnect creates a new Transport
-session rather than continuing the old one.
+`HIL_TRANSPORT_Notify_Link_State()` records caller-owned link availability. The
+private link-observed flag distinguishes the initialized DISCONNECTED value from
+a real caller observation and is retained across abandonment and reset. The
+first DISCONNECTED observation is silent. The first CONNECTED observation
+publishes `LINK_STATE_CHANGED`, enters `CONNECTING`, and prepares a fresh
+handshake without encoding or publishing a frame. A host assigns the current
+identity cursor to the attempt and advances it immediately; after using
+`UINT64_MAX - 1`, the cursor wraps to 1. A rig keeps an invalid active identity
+and waits for a later validated INITIATE. Starting another attempt while already
+CONNECTING or ESTABLISHED returns `NOT_READY` through the private seam and does
+not consume another identity.
+
+A CONNECTED-to-DISCONNECTED change records the physical state first, publishes
+`LINK_STATE_CHANGED` with LINK_LOST, clears all session-scoped ownership, enters
+DISCONNECTED, and attempts to append `SESSION_RESET`. A later reconnection
+starts from the configured initial sequences with cleared parser, message,
+duplicate, output, retry, and handshake ownership and consumes a new host
+identity. Repeated same-state notifications return `OK`, do not restart work,
+and do not retry event publication that previously failed. `now_ms` is accepted
+but unused by the MVP because nonzero connection timeout is unsupported and no
+link-liveness timer exists.
+
+Automatic abandonment is shared by link loss and future timeout, delivery,
+protocol, and capacity callers. It preserves existing unread events, records the
+high-level failure, enters DISCONNECTED when the link is down or RECOVERING when
+it remains up, and attempts exactly one `SESSION_RESET` event. The event maps
+LINK_LOST and PROTOCOL to `NOT_READY`, CONNECTION_TIMEOUT to `TIMEOUT`, DELIVERY
+to `DELIVERY_FAILED`, and CAPACITY to `CAPACITY_EXHAUSTED`. Initiating paths own
+their initiating event, so future protocol and delivery flows publish that event
+before calling abandonment.
 
 `HIL_TRANSPORT_Reset()` clears all session negotiation, sequences, ACKs,
 retransmission ownership, timers, partial input, pinned output, submitted
@@ -437,10 +480,18 @@ initiated it, explicit reset does not enqueue `SESSION_RESET`. It retains copied
 configuration, workspace ownership, endpoint role, and latest link observation;
 records `HIL_TRANSPORT_FAILURE_LOCAL_RESET`; and enters `DISCONNECTED` for a
 disconnected link or `RECOVERING` for a connected link. A later `Process` may
-then start a fresh session. Future automatic or peer-driven abandonment must
-preserve already queued events and attempt to append `SESSION_RESET`; ordinary
-automatic abandonment must not clear the event FIFO. Reset does not operate
-hardware or Application state.
+then start a fresh session. Reset canonicalizes the private link-observed flag
+to zero or one and reconstructs repairable private role and link mirrors from
+their retained public values. It preserves a valid advanced host identity
+cursor rather than returning to the configured seed. If essential retained
+setup, such as the public role, public link value, host identity cursor, or
+workspace-backed output storage, cannot be used safely, reset still releases
+session and event ownership where possible but remains in `FAULT`, records
+`INTERNAL`, and returns `INTERNAL_ERROR`. This is repair of defined lifecycle
+metadata, not a guarantee that arbitrary memory corruption is recoverable.
+Automatic abandonment preserves already queued events and attempts to append
+`SESSION_RESET`; it never clears the event FIFO. Reset does not operate hardware
+or Application state.
 
 Reliable reset invalidates ownership and encoded size but does not clear the
 full encoded buffer. Control reset likewise enters `IDLE` and invalidates its
@@ -458,6 +509,13 @@ FIFO returns `CAPACITY_EXHAUSTED` and leaves every older event, slot, and queue
 metadata unchanged. There is no overwrite-oldest rule, reserved slot, priority,
 coalescing, or overflow flag.
 
+Event capacity never blocks a physical-link or recovery transition. The
+transition and cleanup complete before `CAPACITY_EXHAUSTED` is returned. With
+one free slot during disconnection, `LINK_STATE_CHANGED` occupies it and the
+following `SESSION_RESET` publication fails. Repeating that same link
+observation does not retry either event. Result precedence is
+`INTERNAL_ERROR`, then `CAPACITY_EXHAUSTED`, then `OK`.
+
 `HIL_TRANSPORT_Read_Event()` validates the queue, copies the oldest complete
 event, and consumes exactly that event on success. FIFO order is preserved
 through wraparound. `NOT_READY`, invalid arguments, and internal errors leave
@@ -467,15 +525,23 @@ zeroing the read index and count, including when repairing corrupt metadata; it
 does not clear the four event structures because their stale bytes are then
 inaccessible.
 
-A private invariant failure returns `INTERNAL_ERROR`, enters public `FAULT`, and
-records `HIL_TRANSPORT_FAILURE_INTERNAL`. `FAULT` stops new Application
-submission and normal protocol progress. Explicit `Reset` is the only supported
-way to clear it on an initialized context.
+A private invariant failure returns `INTERNAL_ERROR`, enters public and private
+`FAULT`, and records `HIL_TRANSPORT_FAILURE_INTERNAL`. `FAULT` stops new
+Application submission and normal protocol progress. Explicit `Reset` is the
+only supported way to clear it on an initialized context. Link notifications in
+FAULT still record the latest observation so explicit reset chooses DISCONNECTED
+or RECOVERING correctly. They publish no normal events or begin establishment.
+A disconnection in FAULT still releases session-scoped ownership, then restores
+FAULT and INTERNAL as the final diagnostic. If that mandatory best-effort
+cleanup detects another private invariant failure, the physical link update and
+safe ownership release still occur, and link notification returns
+`INTERNAL_ERROR`; otherwise the notification returns `OK`.
 
-No current session, link, handshake, receive, protocol, capacity, or delivery
-path generates an event. Later producers will construct complete public values
-and use the private FIFO without transferring their state transitions into the
-storage module. `HIL_TRANSPORT_Get_Status()` reports `event_pending` from the
+Link transitions generate `LINK_STATE_CHANGED`, and automatic abandonment
+generates `SESSION_RESET`. Later handshake, receive, protocol, capacity, and
+delivery producers will construct their complete public values and use the
+private FIFO without transferring their state transitions into the storage
+module. `HIL_TRANSPORT_Get_Status()` reports `event_pending` from the
 validated FIFO. `output_pending` is set while either control or reliable
 initial/retry bytes are ready or peeked, and `reliable_delivery_pending` remains
 set in every non-IDLE reliable state, including `EXHAUSTED`. The remaining

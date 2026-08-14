@@ -30,6 +30,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
  */
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* context );
 
+/** Validate the link value, ignore now_ms for this MVP, and delegate the transition. */
 HIL_Transport_Status_T
 HIL_TRANSPORT_PROFILE_Notify_Link_State( HIL_Transport_Context_T*   context,
                                          HIL_Transport_Link_State_T link_state, uint32_t now_ms );

@@ -55,7 +55,11 @@ int main( void )
         return 2;
     }
 
-    ( void )HIL_TRANSPORT_Notify_Link_State( &context, HIL_TRANSPORT_LINK_STATE_CONNECTED, 10u );
+    if ( HIL_TRANSPORT_Notify_Link_State( &context, HIL_TRANSPORT_LINK_STATE_CONNECTED, 10u )
+         != HIL_TRANSPORT_STATUS_OK )
+    {
+        return 3;
+    }
     ( void )HIL_TRANSPORT_Process( &context, 11u, HIL_TRANSPORT_OPERATING_MODE_NORMAL );
     ( void )HIL_TRANSPORT_Process( &context, 12u, HIL_TRANSPORT_OPERATING_MODE_BULK_TRANSFER );
     ( void )HIL_TRANSPORT_Process( &context, 13u, HIL_TRANSPORT_OPERATING_MODE_QUIET_REAL_TIME );
