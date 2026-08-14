@@ -66,6 +66,19 @@ HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Session_Explicit_Reset( HIL_Transport_Mvp_Root_T* root );
 
 /**
+ * @brief Observe one caller-owned physical-link state.
+ *
+ * @details Applies link and recovery transitions even when event capacity is
+ * exhausted. Repeated observations are idempotent and are never used to retry
+ * failed event publication. FAULT retains terminal state while still recording
+ * the latest link observation; a FAULT-state disconnection returns
+ * INTERNAL_ERROR when mandatory best-effort cleanup detects another invariant
+ * failure.
+ */
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Notify_Link_State(
+    HIL_Transport_Mvp_Root_T* root, HIL_Transport_Link_State_T link_state );
+
+/**
  * @brief Reserve, without advancing, the sole reliable transmit sequence.
  *
  * @details This operation checks only sequence ownership: it succeeds with an

@@ -5,6 +5,13 @@
 
 #include <string.h>
 
+static void HIL_TRANSPORT_MVP_Session_Set_Link_State( HIL_Transport_Mvp_Root_T* root,
+                                                      HIL_Transport_Link_State_T link_state )
+{
+    root->base.link_state    = link_state;
+    root->session.link_state = link_state;
+}
+
 static void HIL_TRANSPORT_MVP_Session_Set_State( HIL_Transport_Mvp_Root_T* root,
                                                  HIL_Transport_Session_State_T state )
 {
@@ -97,6 +104,21 @@ HIL_TRANSPORT_MVP_Session_Reset_Status_For_Failure( HIL_Transport_Failure_T fail
         default:
             return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
+}
+
+static HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Session_Publish_Link_Event( HIL_Transport_Mvp_Root_T* root,
+                                              HIL_Transport_Link_State_T link_state )
+{
+    HIL_Transport_Event_T event;
+
+    event.type              = HIL_TRANSPORT_EVENT_LINK_STATE_CHANGED;
+    event.status            = HIL_TRANSPORT_STATUS_OK;
+    event.failure           = link_state == HIL_TRANSPORT_LINK_STATE_DISCONNECTED
+                                  ? HIL_TRANSPORT_FAILURE_LINK_LOST
+                                  : HIL_TRANSPORT_FAILURE_NONE;
+    event.required_capacity = 0u;
+    return HIL_TRANSPORT_MVP_Events_Publish( root, &event );
 }
 
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Init( HIL_Transport_Mvp_Session_T* session,
@@ -349,6 +371,105 @@ HIL_TRANSPORT_MVP_Session_Explicit_Reset( HIL_Transport_Mvp_Root_T* root )
         root, root->base.link_state == HIL_TRANSPORT_LINK_STATE_DISCONNECTED
                   ? HIL_TRANSPORT_SESSION_STATE_DISCONNECTED
                   : HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Notify_Link_State(
+    HIL_Transport_Mvp_Root_T* root, HIL_Transport_Link_State_T link_state )
+{
+    HIL_Transport_Status_T link_event_status;
+    HIL_Transport_Status_T transition_status;
+    int                    was_observed;
+    HIL_Transport_Link_State_T previous_link_state;
+
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( ( link_state != HIL_TRANSPORT_LINK_STATE_DISCONNECTED )
+         && ( link_state != HIL_TRANSPORT_LINK_STATE_CONNECTED ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+
+    if ( ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_FAULT )
+         || ( root->session.state == HIL_TRANSPORT_SESSION_STATE_FAULT ) )
+    {
+        HIL_Transport_Status_T cleanup_status = HIL_TRANSPORT_STATUS_OK;
+
+        root->session.link_state_observed = 1u;
+        HIL_TRANSPORT_MVP_Session_Set_Link_State( root, link_state );
+        if ( link_state == HIL_TRANSPORT_LINK_STATE_DISCONNECTED )
+        {
+            cleanup_status = HIL_TRANSPORT_MVP_Session_Clear_Scoped_Work( root );
+        }
+        HIL_TRANSPORT_MVP_Session_Set_Fault( root );
+        return cleanup_status;
+    }
+
+    if ( ( root->session.role < HIL_TRANSPORT_ROLE_HOST )
+         || ( root->session.role > HIL_TRANSPORT_ROLE_RIG )
+         || ( root->base.role != root->session.role )
+         || ( root->base.link_state < HIL_TRANSPORT_LINK_STATE_DISCONNECTED )
+         || ( root->base.link_state > HIL_TRANSPORT_LINK_STATE_CONNECTED )
+         || ( root->base.link_state != root->session.link_state )
+         || ( root->session.link_state_observed > 1u )
+         || ( root->base.session_state < HIL_TRANSPORT_SESSION_STATE_DISCONNECTED )
+         || ( root->base.session_state > HIL_TRANSPORT_SESSION_STATE_FAULT )
+         || ( root->base.session_state != root->session.state )
+         || ( root->base.last_failure != root->session.last_failure ) )
+    {
+        return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
+    }
+
+    was_observed        = root->session.link_state_observed != 0u;
+    previous_link_state = root->session.link_state;
+    if ( was_observed && ( previous_link_state == link_state ) )
+    {
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    root->session.link_state_observed = 1u;
+    HIL_TRANSPORT_MVP_Session_Set_Link_State( root, link_state );
+    if ( !was_observed && ( link_state == HIL_TRANSPORT_LINK_STATE_DISCONNECTED ) )
+    {
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    link_event_status = HIL_TRANSPORT_MVP_Session_Publish_Link_Event( root, link_state );
+    if ( link_event_status == HIL_TRANSPORT_STATUS_INTERNAL_ERROR )
+    {
+        return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
+    }
+    if ( ( link_event_status != HIL_TRANSPORT_STATUS_OK )
+         && ( link_event_status != HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED ) )
+    {
+        return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
+    }
+
+    if ( link_state == HIL_TRANSPORT_LINK_STATE_DISCONNECTED )
+    {
+        transition_status =
+            HIL_TRANSPORT_MVP_Session_Abandon( root, HIL_TRANSPORT_FAILURE_LINK_LOST );
+    }
+    else
+    {
+        transition_status = HIL_TRANSPORT_MVP_Session_Begin_Establishment( root );
+    }
+
+    if ( transition_status == HIL_TRANSPORT_STATUS_INTERNAL_ERROR )
+    {
+        return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    }
+    if ( ( link_event_status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
+         || ( transition_status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED ) )
+    {
+        return HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED;
+    }
+    if ( transition_status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
+    }
     return HIL_TRANSPORT_STATUS_OK;
 }
 
