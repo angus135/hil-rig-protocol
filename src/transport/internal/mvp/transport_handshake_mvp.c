@@ -22,6 +22,28 @@ HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( HIL_Transport_Mvp_Root_T* 
     return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
 }
 
+static HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Validate_Root( HIL_Transport_Mvp_Root_T* root )
+{
+    if ( ( root->session.role < HIL_TRANSPORT_ROLE_HOST )
+         || ( root->session.role > HIL_TRANSPORT_ROLE_RIG )
+         || ( root->base.role != root->session.role )
+         || ( root->session.link_state < HIL_TRANSPORT_LINK_STATE_DISCONNECTED )
+         || ( root->session.link_state > HIL_TRANSPORT_LINK_STATE_CONNECTED )
+         || ( root->base.link_state != root->session.link_state )
+         || ( root->session.state < HIL_TRANSPORT_SESSION_STATE_DISCONNECTED )
+         || ( root->session.state > HIL_TRANSPORT_SESSION_STATE_FAULT )
+         || ( root->base.session_state != root->session.state )
+         || ( root->base.last_failure != root->session.last_failure )
+         || ( root->session.handshake_phase < HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE )
+         || ( root->session.handshake_phase > HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED )
+         || ( root->session.session_identifier_valid > 1u ) )
+    {
+        return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+    }
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
 static int
 HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Valid( uint64_t session_identifier )
 {
@@ -528,6 +550,8 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Reset(
 HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Handshake_Process( HIL_Transport_Mvp_Root_T* root, uint32_t now_ms )
 {
+    HIL_Transport_Status_T status;
+
     if ( root == NULL )
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
@@ -538,9 +562,25 @@ HIL_TRANSPORT_MVP_Handshake_Process( HIL_Transport_Mvp_Root_T* root, uint32_t no
     {
         return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
     }
-    if ( root->base.session_state != root->session.state )
+    status = HIL_TRANSPORT_MVP_Handshake_Validate_Root( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
     {
-        return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+        return status;
+    }
+    if ( ( root->session.handshake_phase == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INITIATE_PENDING )
+         || ( root->session.handshake_phase
+              == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_RESPONSE_PENDING )
+         || ( root->session.handshake_phase
+              == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_CONFIRM_PENDING ) )
+    {
+        if ( ( root->session.link_state != HIL_TRANSPORT_LINK_STATE_CONNECTED )
+             || ( root->session.state != HIL_TRANSPORT_SESSION_STATE_CONNECTING )
+             || ( root->session.session_identifier_valid == 0u )
+             || !HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Valid(
+                 root->session.session_identifier ) )
+        {
+            return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+        }
     }
 
     switch ( root->session.handshake_phase )
@@ -591,6 +631,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Frame(
     }
     if ( ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_FAULT )
          || ( root->session.state == HIL_TRANSPORT_SESSION_STATE_FAULT ) )
+    {
+        return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    }
+    if ( HIL_TRANSPORT_MVP_Handshake_Validate_Root( root ) != HIL_TRANSPORT_STATUS_OK )
     {
         return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
     }
