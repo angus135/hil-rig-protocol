@@ -70,8 +70,8 @@ arbiter. Control commit releases its slot immediately and ignores the supplied
 time, while reliable commit starts ACK timing and retains the encoded bytes.
 `output_pending` aggregates both lifecycles, while
 `reliable_delivery_pending` remains limited to reliable ownership. Dedicated
-tests publish opaque sentinel bytes through the private seams because the later
-handshake and Application paths do not yet produce frames.
+lifecycle tests use opaque sentinel bytes; handshake tests additionally decode
+the real INITIATE, RESPONSE, CONFIRM, ACK, and RESET output they coordinate.
 
 The MVP also embeds private storage for four complete high-level Transport
 events. Private modules can publish complete event values into this bounded
@@ -81,16 +81,24 @@ and consumes exactly that event only after a successful complete copy;
 `CAPACITY_EXHAUSTED` without overwriting older events, and public status exposes
 only whether any event is pending, not the private depth or count. Explicit
 `Reset()` releases all queued event ownership without clearing inaccessible slot
-bytes. Link changes publish `LINK_STATE_CHANGED`; automatic session abandonment
+bytes. Link changes publish `LINK_STATE_CHANGED`; completed handshakes publish
+exactly one `SESSION_ESTABLISHED` per endpoint; automatic session abandonment
 preserves older events and attempts to append `SESSION_RESET`.
 
-The broader Transport runtime—session handshake, received-frame and received-ACK
-dispatch, receive-side duplicate handling, ACK and RESET generation, and
-Application submission and delivery—remains as intentional
-`HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs. Session initialization, link
-observation, host identity progression, establishment preparation, automatic
-abandonment, and explicit reset are implemented through one private coordinator.
-The public send/receive workflow is therefore not operational end to end yet.
+The semantic MVP session handshake is implemented through a private coordinator:
+host INITIATE, rig RESPONSE, host CONFIRM, and rig ACK establish both endpoints.
+It reuses the codec and output lifecycles, supports exact duplicate recovery and
+timed retries, and abandons exhausted attempts through the existing session
+recovery path. `HIL_TRANSPORT_Process()` validates and records all three MVP
+operating modes, publishes pending handshake work, advances reliable timing, and
+starts later recovery attempts. Tests inject decoded frames directly because
+public arbitrary-byte receive dispatch remains deferred.
+
+Public `Receive_Bytes()`, Application submission, and Application reception are
+still intentional `HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs. Parser-to-codec
+dispatch, Application delivery events, fragmentation, and reassembly are not
+implemented, so the public send/receive workflow is not yet operational end to
+end.
 
 The default MVP Transport profile is designed for one complete Application
 message per frame and one outstanding reliable transmission. The private event

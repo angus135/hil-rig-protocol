@@ -30,10 +30,12 @@
  * implemented. Private bounded event retention, FIFO reads, pending status, and
  * explicit event reset are implemented. Session initialization, establishment
  * preparation, link observation, automatic abandonment, and explicit reset are
- * coordinated through the MVP session module; link changes and automatic
- * abandonment produce events. Handshake frame processing, received-frame
- * dispatch, ACK and RESET generation, and public Application-message orchestration remain
- * intentional HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED stubs.
+ * coordinated through the MVP session module. The private semantic handshake,
+ * ACK/RESET production, duplicate recovery, handshake retry policy, and public
+ * Process() scheduling are implemented; link, establishment, and abandonment
+ * transitions produce events. Public arbitrary-byte receive dispatch and
+ * Application submission/reception remain intentional
+ * HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED stubs.
  */
 #ifndef HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
 #define HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
@@ -372,19 +374,20 @@ HIL_Transport_Status_T HIL_TRANSPORT_Receive_Bytes( HIL_Transport_Context_T* con
  * @brief Advance caller-driven Transport work.
  *
  * @details The owner calls this regularly with current monotonic time and local
- * Transport operating mode. A future profile progresses session establishment,
- * timeouts, acknowledgements, retries, liveness, and automatic control output;
- * it never calls hardware. Operating mode is a local policy input, not an
- * Application state and not peer-synchronized. Automatic encoded output is
- * retrieved through Peek_Output() and Commit_Output(). Exhausted delivery maps
- * to DELIVERY_FAILED and configured deadline expiry maps to TIMEOUT. Exhausting
- * retries for an accepted Application message publishes DELIVERY_FAILED,
- * abandons all work in the uncertain session, and enters recovery before any
- * later Application submission can be accepted. Handshake retry exhaustion also
- * abandons and restarts session establishment, but publishes no Application
- * delivery event. A private invariant failure instead enters FAULT, records
- * INTERNAL, returns INTERNAL_ERROR, and stops new submission and normal progress
- * until explicit Reset.
+ * Transport operating mode. The MVP publishes at most one pending handshake
+ * frame, progresses the sole reliable timeout lifecycle once, and routes
+ * exhausted INITIATE, RESPONSE, or CONFIRM delivery through normal session
+ * abandonment. A later call starts the replacement attempt after any old
+ * control output has been committed. A host consumes a new session identity;
+ * a rig returns to waiting for INITIATE. Handshake exhaustion publishes no
+ * Application delivery event. The function never calls hardware; automatic
+ * encoded output is retrieved through Peek_Output() and Commit_Output().
+ *
+ * A valid mode is recorded before state-dependent progress. A disconnected
+ * context otherwise performs no work. FAULT returns INTERNAL_ERROR without
+ * normal progress. A private invariant failure enters FAULT, records INTERNAL,
+ * and stops normal progress until explicit Reset. Application reliability and
+ * liveness scheduling remain deferred with the public Application/receive path.
  *
  * NORMAL, BULK_TRANSFER, and QUIET_REAL_TIME are all valid. The MVP may treat
  * them identically, but records the latest valid value in the status snapshot.
@@ -398,12 +401,12 @@ HIL_Transport_Status_T HIL_TRANSPORT_Receive_Bytes( HIL_Transport_Context_T* con
  * @retval HIL_TRANSPORT_STATUS_OK Valid mode accepted and work progressed.
  * @retval HIL_TRANSPORT_STATUS_INVALID_ARGUMENT The context is invalid or the
  * mode is outside the three defined enumeration values; no work is progressed.
- * @retval HIL_TRANSPORT_STATUS_DELIVERY_FAILED An accepted Application message
- * exhausted retries and recovery of the uncertain session began.
- * @retval HIL_TRANSPORT_STATUS_TIMEOUT A configured Transport deadline expired.
+ * @retval HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED Handshake recovery completed
+ * safely, but the resulting SESSION_RESET event could not be retained.
+ * @retval HIL_TRANSPORT_STATUS_NOT_READY Pending handshake publication is
+ * temporarily blocked by outstanding lifecycle ownership.
  * @retval HIL_TRANSPORT_STATUS_INTERNAL_ERROR A private invariant failed and the
  * context entered terminal FAULT.
- * @retval HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED Current stub result.
  */
 HIL_Transport_Status_T HIL_TRANSPORT_Process( HIL_Transport_Context_T* context, uint32_t now_ms,
                                               HIL_Transport_Operating_Mode_T operating_mode );
@@ -490,9 +493,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_Read_Application_Data( HIL_Transport_Contex
  * INVALID_ARGUMENT, and INTERNAL_ERROR leave event unchanged. Events do not
  * instruct callers to construct ACK, recovery, or handshake frames; such output
  * remains an internal Transport responsibility. Event storage and reading are
- * implemented. Link changes and automatic session abandonment generate their
- * events; later handshake, receive, protocol, capacity, and delivery paths must
- * generate their initiating events.
+ * implemented. Link changes, handshake establishment, and automatic session
+ * abandonment generate their events; later receive, protocol, Application
+ * capacity, and Application delivery paths must generate their initiating
+ * events.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[out] event Destination for one event; must not be NULL.

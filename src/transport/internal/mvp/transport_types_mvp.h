@@ -32,17 +32,33 @@
 /** Private, non-configurable number of complete high-level events retained by the MVP. */
 #define HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY ( 4u )
 
-/** Explicit private MVP progress through session establishment. */
+/**
+ * @brief Explicit private MVP progress through session establishment.
+ *
+ * @details A PENDING phase means semantic work is recorded but its reliable
+ * frame is not published. A WAITING phase means the corresponding reliable
+ * output is published. WAITING_FOR_CONFIRM_ACK is host-only and deliberately
+ * distinct from the rig's WAITING_FOR_CONFIRM phase.
+ */
 typedef enum
 {
+    /** No active establishment attempt. */
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE = 0,
+    /** Rig is connected and waiting to adopt a valid host INITIATE. */
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_INITIATE,
+    /** Host owns a fresh identity but has not published INITIATE. */
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INITIATE_PENDING,
+    /** Host published INITIATE and awaits the matching RESPONSE. */
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_RESPONSE,
+    /** Rig accepted INITIATE but has not published RESPONSE. */
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_RESPONSE_PENDING,
+    /** Rig published RESPONSE and awaits the matching CONFIRM. */
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM,
+    /** Host accepted RESPONSE but has not published CONFIRM. */
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_CONFIRM_PENDING,
+    /** Host published CONFIRM and awaits its exact final ACK. */
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK,
+    /** The endpoint completed its semantic establishment transition. */
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED
 } HIL_Transport_Mvp_Handshake_Phase_T;
 
@@ -171,7 +187,8 @@ typedef struct
     uint64_t                            next_host_session_identifier;
     uint16_t                            initial_reliable_sequence;
     uint16_t                            next_transmit_sequence;
-    uint16_t                            expected_receive_sequence;
+    /** Next peer sequence after a baseline exists; ignored before first acceptance. */
+    uint16_t expected_receive_sequence;
     /** Sequence owned by the active reliable item; valid outside IDLE. */
     uint16_t retained_transmit_sequence;
 

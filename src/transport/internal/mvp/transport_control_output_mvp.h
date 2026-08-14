@@ -6,7 +6,8 @@
  * control item independently of the reliable retry buffer. It does not encode
  * or validate frames, perform I/O, start timers, retransmit, choose output
  * priority, modify global output selection, or publish events. ACK/RESET wire
- * semantics remain the responsibility of a future private producer.
+ * semantics and encoding belong to the private handshake and later receive
+ * producers; this lifecycle treats their complete bytes opaquely.
  */
 #ifndef HIL_RIG_PROTOCOL_TRANSPORT_INTERNAL_MVP_TRANSPORT_CONTROL_OUTPUT_MVP_H
 #define HIL_RIG_PROTOCOL_TRANSPORT_INTERNAL_MVP_TRANSPORT_CONTROL_OUTPUT_MVP_H

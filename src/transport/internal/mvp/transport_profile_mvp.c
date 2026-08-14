@@ -6,9 +6,10 @@
  * Application message per frame, framing plus integrity, and one outstanding
  * reliable transmission. Workspace sizing, initialization, the wire path, the
  * reliable encoded-output lifecycle, separate private one-item control storage,
- * public output arbitration, session lifecycle coordination, and link-state
- * recovery are implemented. Handshake frame progression and Application-message
- * orchestration remain stubs.
+ * public output arbitration, session lifecycle coordination, link-state
+ * recovery, semantic handshake progression, and Process scheduling are
+ * implemented. Public byte reception and Application-message orchestration
+ * remain stubs.
  */
 #include "../transport_profile.h"
 
