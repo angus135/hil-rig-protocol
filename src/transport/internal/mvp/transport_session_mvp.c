@@ -40,29 +40,29 @@ HIL_TRANSPORT_MVP_Session_Clear_Scoped_Work( HIL_Transport_Mvp_Root_T* root )
     output_status = HIL_TRANSPORT_MVP_Output_Reset( root );
 
     HIL_TRANSPORT_Parser_Reset( &root->parser );
-    root->submitted_message_size                  = 0u;
-    root->submitted_message_pending               = 0u;
-    root->received_message_size                   = 0u;
-    root->received_message_pending                = 0u;
-    root->session.session_identifier              = HIL_TRANSPORT_SESSION_SEED_INVALID;
-    root->session.session_identifier_valid        = 0u;
-    root->session.handshake_phase                 = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE;
-    root->session.next_transmit_sequence          = root->session.initial_reliable_sequence;
-    root->session.expected_receive_sequence       = root->session.initial_reliable_sequence;
-    root->session.last_accepted_receive_sequence                    = 0u;
-    root->session.accepted_receive_sequence_valid                   = 0u;
-    root->session.last_accepted_receive_frame_type                  = HIL_TRANSPORT_MVP_FRAME_INVALID;
+    root->submitted_message_size                   = 0u;
+    root->submitted_message_pending                = 0u;
+    root->received_message_size                    = 0u;
+    root->received_message_pending                 = 0u;
+    root->session.session_identifier               = HIL_TRANSPORT_SESSION_SEED_INVALID;
+    root->session.session_identifier_valid         = 0u;
+    root->session.handshake_phase                  = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE;
+    root->session.next_transmit_sequence           = root->session.initial_reliable_sequence;
+    root->session.expected_receive_sequence        = root->session.initial_reliable_sequence;
+    root->session.last_accepted_receive_sequence   = 0u;
+    root->session.accepted_receive_sequence_valid  = 0u;
+    root->session.last_accepted_receive_frame_type = HIL_TRANSPORT_MVP_FRAME_INVALID;
     root->session.last_accepted_receive_acknowledgement_sequence = 0u;
-    root->session.reliable_state                  = HIL_TRANSPORT_MVP_RELIABLE_IDLE;
-    root->session.retained_reliable_frame_type    = HIL_TRANSPORT_MVP_FRAME_INVALID;
-    root->session.retained_transmit_sequence      = 0u;
-    root->session.retransmissions_committed       = 0u;
-    root->session.reliable_last_committed_ms      = 0u;
-    root->session.last_valid_receive_ms           = 0u;
-    root->encoded_output_size                     = 0u;
-    root->control_output_size                     = 0u;
-    root->control_output_state                    = HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE;
-    root->output_selection                        = HIL_TRANSPORT_MVP_OUTPUT_NONE;
+    root->session.reliable_state                                 = HIL_TRANSPORT_MVP_RELIABLE_IDLE;
+    root->session.retained_reliable_frame_type                   = HIL_TRANSPORT_MVP_FRAME_INVALID;
+    root->session.retained_transmit_sequence                     = 0u;
+    root->session.retransmissions_committed                      = 0u;
+    root->session.reliable_last_committed_ms                     = 0u;
+    root->session.last_valid_receive_ms                          = 0u;
+    root->encoded_output_size                                    = 0u;
+    root->control_output_size                                    = 0u;
+    root->control_output_state = HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE;
+    root->output_selection     = HIL_TRANSPORT_MVP_OUTPUT_NONE;
 
     if ( output_status != HIL_TRANSPORT_STATUS_OK )
     {
@@ -157,10 +157,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Init( HIL_Transport_Mvp_Session
     initialized_session.initial_reliable_sequence    = initial_reliable_sequence;
     initialized_session.next_transmit_sequence       = initial_reliable_sequence;
     initialized_session.expected_receive_sequence    = initial_reliable_sequence;
-    initialized_session.retained_reliable_frame_type      = HIL_TRANSPORT_MVP_FRAME_INVALID;
+    initialized_session.retained_reliable_frame_type = HIL_TRANSPORT_MVP_FRAME_INVALID;
     initialized_session.last_accepted_receive_frame_type = HIL_TRANSPORT_MVP_FRAME_INVALID;
-    initialized_session.reliable_state                    = HIL_TRANSPORT_MVP_RELIABLE_IDLE;
-    initialized_session.last_failure                      = HIL_TRANSPORT_FAILURE_NONE;
+    initialized_session.reliable_state                   = HIL_TRANSPORT_MVP_RELIABLE_IDLE;
+    initialized_session.last_failure                     = HIL_TRANSPORT_FAILURE_NONE;
 
     *session = initialized_session;
     return HIL_TRANSPORT_STATUS_OK;
@@ -224,11 +224,11 @@ HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root )
         return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
     }
 
-    session->next_transmit_sequence          = session->initial_reliable_sequence;
-    session->expected_receive_sequence       = session->initial_reliable_sequence;
-    session->last_accepted_receive_sequence                    = 0u;
-    session->accepted_receive_sequence_valid                   = 0u;
-    session->last_accepted_receive_frame_type                  = HIL_TRANSPORT_MVP_FRAME_INVALID;
+    session->next_transmit_sequence                         = session->initial_reliable_sequence;
+    session->expected_receive_sequence                      = session->initial_reliable_sequence;
+    session->last_accepted_receive_sequence                 = 0u;
+    session->accepted_receive_sequence_valid                = 0u;
+    session->last_accepted_receive_frame_type               = HIL_TRANSPORT_MVP_FRAME_INVALID;
     session->last_accepted_receive_acknowledgement_sequence = 0u;
 
     if ( session->role == HIL_TRANSPORT_ROLE_HOST )
@@ -551,8 +551,7 @@ HIL_TRANSPORT_MVP_Session_Classify_Sequence( const HIL_Transport_Mvp_Session_T* 
 }
 
 HIL_Transport_Status_T
-HIL_TRANSPORT_MVP_Session_Accept_Sequence( HIL_Transport_Mvp_Session_T* session,
-                                           uint16_t                     sequence )
+HIL_TRANSPORT_MVP_Session_Accept_Sequence( HIL_Transport_Mvp_Session_T* session, uint16_t sequence )
 {
     HIL_Transport_Mvp_Rx_Sequence_Result_T result;
     HIL_Transport_Status_T                 status;

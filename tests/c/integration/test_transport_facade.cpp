@@ -190,13 +190,12 @@ TEST( TransportFacadeProcess, RecordsModesPublishesInitiateAndRejectsInvalidMode
     ASSERT_EQ( HIL_TRANSPORT_Required_Storage_Size( &config, &required_size ),
                HIL_TRANSPORT_STATUS_OK );
     alignas( HIL_TRANSPORT_WORKSPACE_ALIGNMENT ) std::array<std::uint8_t, WorkspaceSize>
-        workspace{};
+                            workspace{};
     HIL_Transport_Storage_T storage{ workspace.data(), required_size };
     ASSERT_EQ( HIL_TRANSPORT_Init( &context, HIL_TRANSPORT_ROLE_HOST, &config, &storage ),
                HIL_TRANSPORT_STATUS_OK );
 
-    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u,
-                                      HIL_TRANSPORT_OPERATING_MODE_BULK_TRANSFER ),
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_BULK_TRANSFER ),
                HIL_TRANSPORT_STATUS_OK );
     HIL_Transport_Status_Snapshot_T snapshot{};
     ASSERT_EQ( HIL_TRANSPORT_Get_Status( &context, &snapshot ), HIL_TRANSPORT_STATUS_OK );
@@ -206,8 +205,7 @@ TEST( TransportFacadeProcess, RecordsModesPublishesInitiateAndRejectsInvalidMode
 
     ASSERT_EQ( HIL_TRANSPORT_Notify_Link_State( &context, HIL_TRANSPORT_LINK_STATE_CONNECTED, 2u ),
                HIL_TRANSPORT_STATUS_OK );
-    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 3u,
-                                      HIL_TRANSPORT_OPERATING_MODE_QUIET_REAL_TIME ),
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 3u, HIL_TRANSPORT_OPERATING_MODE_QUIET_REAL_TIME ),
                HIL_TRANSPORT_STATUS_OK );
     ASSERT_EQ( HIL_TRANSPORT_Get_Status( &context, &snapshot ), HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( snapshot.operating_mode, HIL_TRANSPORT_OPERATING_MODE_QUIET_REAL_TIME );

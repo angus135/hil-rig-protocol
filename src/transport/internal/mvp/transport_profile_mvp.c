@@ -328,11 +328,11 @@ HIL_Transport_Status_T
 HIL_TRANSPORT_PROFILE_Process( HIL_Transport_Context_T* context, uint32_t now_ms,
                                HIL_Transport_Operating_Mode_T operating_mode )
 {
-    HIL_Transport_Mvp_Root_T*                 root;
-    HIL_Transport_Mvp_Reliability_Outcome_T   reliability_outcome;
-    HIL_Transport_Status_T                    status;
-    uint8_t                                   control_pending;
-    HIL_Transport_Mvp_Frame_Type_T            retained_type;
+    HIL_Transport_Mvp_Root_T*               root;
+    HIL_Transport_Mvp_Reliability_Outcome_T reliability_outcome;
+    HIL_Transport_Status_T                  status;
+    uint8_t                                 control_pending;
+    HIL_Transport_Mvp_Frame_Type_T          retained_type;
 
     root = HIL_TRANSPORT_MVP_Root_From_Context( context );
     if ( root == NULL )
@@ -397,8 +397,7 @@ HIL_TRANSPORT_PROFILE_Process( HIL_Transport_Context_T* context, uint32_t now_ms
     {
         return status;
     }
-    status = HIL_TRANSPORT_MVP_Reliability_Process_Pending( root, now_ms,
-                                                            &reliability_outcome );
+    status = HIL_TRANSPORT_MVP_Reliability_Process_Pending( root, now_ms, &reliability_outcome );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
         return status;

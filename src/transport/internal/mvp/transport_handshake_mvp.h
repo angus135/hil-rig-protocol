@@ -27,18 +27,18 @@ typedef enum
 } HIL_Transport_Mvp_Handshake_Frame_Result_T;
 
 /** Publish at most one pending INITIATE, RESPONSE, or CONFIRM. */
-HIL_Transport_Status_T
-HIL_TRANSPORT_MVP_Handshake_Process( HIL_Transport_Mvp_Root_T* root, uint32_t now_ms );
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Process( HIL_Transport_Mvp_Root_T* root,
+                                                            uint32_t                  now_ms );
 
 /** Apply semantic handshake, ACK, duplicate, and active-session RESET handling. */
-HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Frame(
-    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
-    HIL_Transport_Mvp_Handshake_Frame_Result_T* result );
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Handle_Frame( HIL_Transport_Mvp_Root_T*                   root,
+                                          const HIL_Transport_Mvp_Frame_T*            frame,
+                                          HIL_Transport_Mvp_Handshake_Frame_Result_T* result );
 
 /** Encode and publish one best-effort, non-reliable RESET control frame. */
-HIL_Transport_Status_T
-HIL_TRANSPORT_MVP_Handshake_Publish_Reset( HIL_Transport_Mvp_Root_T* root,
-                                           uint64_t session_identifier );
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Publish_Reset( HIL_Transport_Mvp_Root_T* root,
+                                                                  uint64_t session_identifier );
 
 #ifdef __cplusplus
 }
