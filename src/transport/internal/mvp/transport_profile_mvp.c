@@ -257,8 +257,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* con
     root->submitted_message_pending               = 0u;
     root->received_message_size                   = 0u;
     root->received_message_pending                = 0u;
-    root->pending_event                           = ( HIL_Transport_Event_T ){ 0 };
-    root->event_pending                           = 0u;
+    root->event_read_index                        = 0u;
+    root->event_count                             = 0u;
     root->session.session_identifier              = 0u;
     root->session.session_identifier_valid        = 0u;
     root->session.handshake_phase                 = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE;
@@ -476,7 +476,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Get_Status( const HIL_Transport_Con
     status->operating_mode_valid        = root->base.operating_mode_valid;
     status->output_pending              = output_pending;
     status->application_message_pending = root->received_message_pending;
-    status->event_pending               = root->event_pending;
+    status->event_pending               = ( uint8_t )( root->event_count != 0u );
     status->reliable_delivery_pending   = delivery_pending;
     status->last_failure                = root->base.last_failure;
     return HIL_TRANSPORT_STATUS_OK;
