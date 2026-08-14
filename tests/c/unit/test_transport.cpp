@@ -100,7 +100,7 @@ TEST( TransportContextLifecycle, InsufficientFirstInitializationLeavesZeroContex
     /* A successful context would be reset, never passed to Init again. */
 }
 
-TEST( TransportStructuredOutputs, DefensivelyClearInvalidContextOutputs )
+TEST( TransportStructuredOutputs, PreserveEventAndClearStatusForInvalidContext )
 {
     HIL_Transport_Context_T         context{};
     HIL_Transport_Event_T           event{};
@@ -122,14 +122,15 @@ TEST( TransportStructuredOutputs, DefensivelyClearInvalidContextOutputs )
     snapshot.reliable_delivery_pending   = 1u;
     snapshot.last_failure                = HIL_TRANSPORT_FAILURE_INTERNAL;
 
-    EXPECT_EQ( HIL_TRANSPORT_Read_Event( &context, &event ), HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED );
+    EXPECT_EQ( HIL_TRANSPORT_Read_Event( &context, &event ),
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
     EXPECT_EQ( HIL_TRANSPORT_Get_Status( &context, &snapshot ),
                HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
 
-    EXPECT_EQ( event.type, HIL_TRANSPORT_EVENT_NONE );
-    EXPECT_EQ( event.status, HIL_TRANSPORT_STATUS_OK );
-    EXPECT_EQ( event.failure, HIL_TRANSPORT_FAILURE_NONE );
-    EXPECT_EQ( event.required_capacity, 0u );
+    EXPECT_EQ( event.type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
+    EXPECT_EQ( event.status, HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( event.failure, HIL_TRANSPORT_FAILURE_INTERNAL );
+    EXPECT_EQ( event.required_capacity, 123u );
     EXPECT_EQ( snapshot.role, HIL_TRANSPORT_ROLE_HOST );
     EXPECT_EQ( snapshot.link_state, HIL_TRANSPORT_LINK_STATE_DISCONNECTED );
     EXPECT_EQ( snapshot.session_state, HIL_TRANSPORT_SESSION_STATE_DISCONNECTED );

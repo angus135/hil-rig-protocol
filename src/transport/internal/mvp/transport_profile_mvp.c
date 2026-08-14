@@ -12,6 +12,7 @@
 #include "../transport_profile.h"
 
 #include "../transport_internal.h"
+#include "transport_events_mvp.h"
 #include "transport_frame_codec_mvp.h"
 #include "transport_output_mvp.h"
 #include "transport_types_mvp.h"
@@ -231,6 +232,13 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
     next_region += raw_scratch_size;
     root->received_message = next_region;
 
+    status = HIL_TRANSPORT_MVP_Events_Reset( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        memset( storage->workspace, 0, required_size );
+        return status;
+    }
+
     context->implementation        = root;
     context->implementation_size   = required_size;
     context->initialization_cookie = HIL_TRANSPORT_INTERNAL_INITIALIZATION_COOKIE;
@@ -251,14 +259,22 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* con
     {
         return status;
     }
+    /*
+     * Only explicit public reset clears queued event ownership. Future
+     * automatic session abandonment must preserve older events and attempt to
+     * append SESSION_RESET instead of calling Events_Reset().
+     */
+    status = HIL_TRANSPORT_MVP_Events_Reset( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
 
     HIL_TRANSPORT_Parser_Reset( &root->parser );
     root->submitted_message_size                  = 0u;
     root->submitted_message_pending               = 0u;
     root->received_message_size                   = 0u;
     root->received_message_pending                = 0u;
-    root->event_read_index                        = 0u;
-    root->event_count                             = 0u;
     root->session.session_identifier              = 0u;
     root->session.session_identifier_valid        = 0u;
     root->session.handshake_phase                 = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE;
@@ -430,18 +446,13 @@ HIL_TRANSPORT_PROFILE_Read_Application_Data( HIL_Transport_Context_T* context, u
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Read_Event( HIL_Transport_Context_T* context,
                                                          HIL_Transport_Event_T*   event )
 {
-    /*
-     * TODO: Validate initialized ownership and non-NULL event, copy one fully
-     * initialized high-level event, and consume it only after success. Keep
-     * frame/parser/handshake details and Application outcomes private. The
-     * current stub defensively clears a non-NULL destination.
-     */
-    ( void )context;
-    if ( event != NULL )
+    HIL_Transport_Mvp_Root_T* root = HIL_TRANSPORT_MVP_Root_From_Context( context );
+
+    if ( root == NULL )
     {
-        *event = ( HIL_Transport_Event_T ){ 0 };
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    return HIL_TRANSPORT_MVP_Events_Read( root, event );
 }
 
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Get_Status( const HIL_Transport_Context_T*   context,
@@ -451,6 +462,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Get_Status( const HIL_Transport_Con
     HIL_Transport_Status_T    result;
     uint8_t                   output_pending;
     uint8_t                   delivery_pending;
+    uint8_t                   event_pending;
 
     if ( status == NULL )
     {
@@ -468,6 +480,11 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Get_Status( const HIL_Transport_Con
     {
         return result;
     }
+    result = HIL_TRANSPORT_MVP_Events_Get_Pending_Status( root, &event_pending );
+    if ( result != HIL_TRANSPORT_STATUS_OK )
+    {
+        return result;
+    }
 
     status->role                        = root->base.role;
     status->link_state                  = root->base.link_state;
@@ -476,7 +493,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Get_Status( const HIL_Transport_Con
     status->operating_mode_valid        = root->base.operating_mode_valid;
     status->output_pending              = output_pending;
     status->application_message_pending = root->received_message_pending;
-    status->event_pending               = ( uint8_t )( root->event_count != 0u );
+    status->event_pending               = event_pending;
     status->reliable_delivery_pending   = delivery_pending;
     status->last_failure                = root->base.last_failure;
     return HIL_TRANSPORT_STATUS_OK;
