@@ -77,8 +77,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Events_Publish( HIL_Transport_Mvp_Root_
     return HIL_TRANSPORT_STATUS_OK;
 }
 
-HIL_Transport_Status_T
-HIL_TRANSPORT_MVP_Events_Check_Capacity( HIL_Transport_Mvp_Root_T* root )
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Events_Check_Capacity( HIL_Transport_Mvp_Root_T* root )
 {
     HIL_Transport_Status_T status;
 

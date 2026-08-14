@@ -44,21 +44,21 @@ HIL_TRANSPORT_MVP_Handshake_Validate_Root( HIL_Transport_Mvp_Root_T* root )
     return HIL_TRANSPORT_STATUS_OK;
 }
 
-static int
-HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Valid( uint64_t session_identifier )
+static int HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Valid( uint64_t session_identifier )
 {
     return ( session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID )
            && ( session_identifier != HIL_TRANSPORT_SESSION_SEED_RESERVED );
 }
 
-static int HIL_TRANSPORT_MVP_Handshake_Frame_Has_Empty_Payload(
-    const HIL_Transport_Mvp_Frame_T* frame )
+static int
+HIL_TRANSPORT_MVP_Handshake_Frame_Has_Empty_Payload( const HIL_Transport_Mvp_Frame_T* frame )
 {
     return frame->payload_size == 0u;
 }
 
-static int HIL_TRANSPORT_MVP_Handshake_Frame_Is_Exact_Duplicate(
-    const HIL_Transport_Mvp_Session_T* session, const HIL_Transport_Mvp_Frame_T* frame )
+static int
+HIL_TRANSPORT_MVP_Handshake_Frame_Is_Exact_Duplicate( const HIL_Transport_Mvp_Session_T* session,
+                                                      const HIL_Transport_Mvp_Frame_T*   frame )
 {
     return ( session->accepted_receive_sequence_valid != 0u )
            && ( frame->sequence == session->last_accepted_receive_sequence )
@@ -67,12 +67,12 @@ static int HIL_TRANSPORT_MVP_Handshake_Frame_Is_Exact_Duplicate(
                 == session->last_accepted_receive_acknowledgement_sequence );
 }
 
-static void HIL_TRANSPORT_MVP_Handshake_Record_Accepted_Frame(
-    HIL_Transport_Mvp_Session_T* session, const HIL_Transport_Mvp_Frame_T* frame )
+static void
+HIL_TRANSPORT_MVP_Handshake_Record_Accepted_Frame( HIL_Transport_Mvp_Session_T*     session,
+                                                   const HIL_Transport_Mvp_Frame_T* frame )
 {
-    session->last_accepted_receive_frame_type = frame->type;
-    session->last_accepted_receive_acknowledgement_sequence =
-        frame->acknowledgement_sequence;
+    session->last_accepted_receive_frame_type               = frame->type;
+    session->last_accepted_receive_acknowledgement_sequence = frame->acknowledgement_sequence;
 }
 
 static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Publish_Reliable(
@@ -96,16 +96,16 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Publish_Reliable(
     frame.acknowledgement_sequence = acknowledgement_sequence;
     frame.payload                  = NULL;
     frame.payload_size             = 0u;
-    status = HIL_TRANSPORT_MVP_Encode_Frame(
-        &frame, root->base.config.max_application_message_size, root->codec_scratch,
-        root->codec_scratch_size, root->encoded_output, root->encoded_output_capacity,
-        &encoded_size );
+    status = HIL_TRANSPORT_MVP_Encode_Frame( &frame, root->base.config.max_application_message_size,
+                                             root->codec_scratch, root->codec_scratch_size,
+                                             root->encoded_output, root->encoded_output_capacity,
+                                             &encoded_size );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
         return status;
     }
-    status = HIL_TRANSPORT_MVP_Reliability_Publish_Encoded( root, frame_type, sequence,
-                                                            encoded_size );
+    status =
+        HIL_TRANSPORT_MVP_Reliability_Publish_Encoded( root, frame_type, sequence, encoded_size );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
         return status;
@@ -130,7 +130,7 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Publish_Control(
     frame.acknowledgement_sequence = acknowledgement_sequence;
     frame.payload                  = NULL;
     frame.payload_size             = 0u;
-    status = HIL_TRANSPORT_MVP_Encode_Frame(
+    status                         = HIL_TRANSPORT_MVP_Encode_Frame(
         &frame, root->base.config.max_application_message_size, root->codec_scratch,
         root->codec_scratch_size, encoded_control, sizeof( encoded_control ), &encoded_size );
     if ( status != HIL_TRANSPORT_STATUS_OK )
@@ -142,7 +142,7 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Publish_Control(
 
 static HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Handshake_Publish_Acknowledgement( HIL_Transport_Mvp_Root_T* root,
-                                                      uint16_t sequence )
+                                                     uint16_t                  sequence )
 {
     return HIL_TRANSPORT_MVP_Handshake_Publish_Control(
         root, HIL_TRANSPORT_MVP_FRAME_ACK, root->session.session_identifier, sequence );
@@ -152,18 +152,17 @@ static HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Handshake_Publish_Established_Event( HIL_Transport_Mvp_Root_T* root )
 {
     const HIL_Transport_Event_T event = { HIL_TRANSPORT_EVENT_SESSION_ESTABLISHED,
-                                          HIL_TRANSPORT_STATUS_OK,
-                                          HIL_TRANSPORT_FAILURE_NONE, 0u };
+                                          HIL_TRANSPORT_STATUS_OK, HIL_TRANSPORT_FAILURE_NONE, 0u };
     return HIL_TRANSPORT_MVP_Events_Publish( root, &event );
 }
 
 static void HIL_TRANSPORT_MVP_Handshake_Set_Established( HIL_Transport_Mvp_Root_T* root )
 {
-    root->base.session_state        = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
-    root->session.state             = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
-    root->session.handshake_phase   = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
-    root->base.last_failure         = HIL_TRANSPORT_FAILURE_NONE;
-    root->session.last_failure      = HIL_TRANSPORT_FAILURE_NONE;
+    root->base.session_state      = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root->session.state           = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root->session.handshake_phase = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
+    root->base.last_failure       = HIL_TRANSPORT_FAILURE_NONE;
+    root->session.last_failure    = HIL_TRANSPORT_FAILURE_NONE;
 }
 
 static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Classify_Acknowledgement(
@@ -188,16 +187,17 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Classify_Acknowledgeme
     return HIL_TRANSPORT_STATUS_OK;
 }
 
-static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Complete_Acknowledgement(
-    HIL_Transport_Mvp_Root_T* root, uint16_t acknowledgement_sequence,
-    HIL_Transport_Mvp_Frame_Type_T expected_type )
+static HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Complete_Acknowledgement( HIL_Transport_Mvp_Root_T* root,
+                                                      uint16_t acknowledgement_sequence,
+                                                      HIL_Transport_Mvp_Frame_Type_T expected_type )
 {
     HIL_Transport_Mvp_Frame_Type_T          completed_type;
     HIL_Transport_Mvp_Reliability_Outcome_T outcome;
     HIL_Transport_Status_T                  status;
 
-    status = HIL_TRANSPORT_MVP_Reliability_Accept_Acknowledgement(
-        root, acknowledgement_sequence, &completed_type, &outcome );
+    status = HIL_TRANSPORT_MVP_Reliability_Accept_Acknowledgement( root, acknowledgement_sequence,
+                                                                   &completed_type, &outcome );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
         return status;
@@ -304,9 +304,10 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Host_Response(
     return HIL_TRANSPORT_STATUS_OK;
 }
 
-static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Host_Ack(
-    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
-    HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
+static HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Handle_Host_Ack( HIL_Transport_Mvp_Root_T*                   root,
+                                             const HIL_Transport_Mvp_Frame_T*            frame,
+                                             HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
 {
     HIL_Transport_Status_T status;
     int                    acknowledgement_matched;
@@ -426,9 +427,10 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Rig_Initiate(
     return HIL_TRANSPORT_STATUS_OK;
 }
 
-static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Rig_Confirm(
-    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
-    HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
+static HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Handle_Rig_Confirm( HIL_Transport_Mvp_Root_T*                   root,
+                                                const HIL_Transport_Mvp_Frame_T*            frame,
+                                                HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
 {
     HIL_Transport_Mvp_Rx_Sequence_Result_T sequence_result;
     HIL_Transport_Status_T                 status;
@@ -518,9 +520,10 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Rig_Confirm(
     return HIL_TRANSPORT_STATUS_OK;
 }
 
-static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Reset(
-    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
-    HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
+static HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Handle_Reset( HIL_Transport_Mvp_Root_T*                   root,
+                                          const HIL_Transport_Mvp_Frame_T*            frame,
+                                          HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
 {
     HIL_Transport_Status_T status;
 
@@ -547,8 +550,8 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Reset(
     return status;
 }
 
-HIL_Transport_Status_T
-HIL_TRANSPORT_MVP_Handshake_Process( HIL_Transport_Mvp_Root_T* root, uint32_t now_ms )
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Process( HIL_Transport_Mvp_Root_T* root,
+                                                            uint32_t                  now_ms )
 {
     HIL_Transport_Status_T status;
 
@@ -568,10 +571,8 @@ HIL_TRANSPORT_MVP_Handshake_Process( HIL_Transport_Mvp_Root_T* root, uint32_t no
         return status;
     }
     if ( ( root->session.handshake_phase == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INITIATE_PENDING )
-         || ( root->session.handshake_phase
-              == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_RESPONSE_PENDING )
-         || ( root->session.handshake_phase
-              == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_CONFIRM_PENDING ) )
+         || ( root->session.handshake_phase == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_RESPONSE_PENDING )
+         || ( root->session.handshake_phase == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_CONFIRM_PENDING ) )
     {
         if ( ( root->session.link_state != HIL_TRANSPORT_LINK_STATE_CONNECTED )
              || ( root->session.state != HIL_TRANSPORT_SESSION_STATE_CONNECTING )
@@ -608,17 +609,17 @@ HIL_TRANSPORT_MVP_Handshake_Process( HIL_Transport_Mvp_Root_T* root, uint32_t no
                 return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
             }
             return HIL_TRANSPORT_MVP_Handshake_Publish_Reliable(
-                root, HIL_TRANSPORT_MVP_FRAME_CONFIRM,
-                root->session.last_accepted_receive_sequence,
+                root, HIL_TRANSPORT_MVP_FRAME_CONFIRM, root->session.last_accepted_receive_sequence,
                 HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK );
         default:
             return HIL_TRANSPORT_STATUS_OK;
     }
 }
 
-HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Frame(
-    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
-    HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Handle_Frame( HIL_Transport_Mvp_Root_T*                   root,
+                                          const HIL_Transport_Mvp_Frame_T*            frame,
+                                          HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
 {
     if ( result == NULL )
     {
@@ -674,9 +675,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Frame(
     return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
 }
 
-HIL_Transport_Status_T
-HIL_TRANSPORT_MVP_Handshake_Publish_Reset( HIL_Transport_Mvp_Root_T* root,
-                                           uint64_t session_identifier )
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Publish_Reset( HIL_Transport_Mvp_Root_T* root,
+                                                                  uint64_t session_identifier )
 {
     if ( root == NULL )
     {
@@ -686,6 +686,6 @@ HIL_TRANSPORT_MVP_Handshake_Publish_Reset( HIL_Transport_Mvp_Root_T* root,
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    return HIL_TRANSPORT_MVP_Handshake_Publish_Control(
-        root, HIL_TRANSPORT_MVP_FRAME_RESET, session_identifier, 0u );
+    return HIL_TRANSPORT_MVP_Handshake_Publish_Control( root, HIL_TRANSPORT_MVP_FRAME_RESET,
+                                                        session_identifier, 0u );
 }

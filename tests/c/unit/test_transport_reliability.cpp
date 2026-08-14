@@ -644,8 +644,8 @@ TEST_F( TransportReliabilityTest, ZeroTimeoutDisablesProgressionAndUint32WrapIsS
 TEST_F( TransportReliabilityTest, DuplicateRequestMakesAwaitingBytesRetryableWithoutSpendingRetry )
 {
     PrepareAwaiting();
-    root_.output_selection = HIL_TRANSPORT_MVP_OUTPUT_CONTROL;
-    const auto before      = Snapshot();
+    root_.output_selection                          = HIL_TRANSPORT_MVP_OUTPUT_CONTROL;
+    const auto                              before  = Snapshot();
     HIL_Transport_Mvp_Reliability_Outcome_T outcome = HIL_TRANSPORT_MVP_RELIABILITY_NO_CHANGE;
 
     ASSERT_EQ( HIL_TRANSPORT_MVP_Reliability_Request_Retransmission(
@@ -681,7 +681,7 @@ TEST_F( TransportReliabilityTest, DuplicateRequestDoesNotDisturbAlreadyAvailable
                                    || state == HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_PEEKED )
                                      ? HIL_TRANSPORT_MVP_OUTPUT_RELIABLE
                                      : HIL_TRANSPORT_MVP_OUTPUT_CONTROL;
-        const auto before = Snapshot();
+        const auto                              before = Snapshot();
         HIL_Transport_Mvp_Reliability_Outcome_T outcome =
             HIL_TRANSPORT_MVP_RELIABILITY_ACKNOWLEDGED;
         ASSERT_EQ( HIL_TRANSPORT_MVP_Reliability_Request_Retransmission(
@@ -714,8 +714,7 @@ TEST_F( TransportReliabilityTest, DuplicateRequestExhaustsWhenNoRetryAllowanceRe
 
 TEST_F( TransportReliabilityTest, DuplicateRequestValidatesTypeAndTreatsIdleAsNoWork )
 {
-    HIL_Transport_Mvp_Reliability_Outcome_T outcome =
-        HIL_TRANSPORT_MVP_RELIABILITY_ACKNOWLEDGED;
+    HIL_Transport_Mvp_Reliability_Outcome_T outcome = HIL_TRANSPORT_MVP_RELIABILITY_ACKNOWLEDGED;
     EXPECT_EQ( HIL_TRANSPORT_MVP_Reliability_Request_Retransmission(
                    &root_, HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE, &outcome ),
                HIL_TRANSPORT_STATUS_OK );

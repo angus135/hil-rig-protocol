@@ -34,8 +34,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Events_Publish( HIL_Transport_Mvp_Root_
  * publication in the same call is sufficient for transactional semantic
  * acceptance. Full capacity returns CAPACITY_EXHAUSTED.
  */
-HIL_Transport_Status_T
-HIL_TRANSPORT_MVP_Events_Check_Capacity( HIL_Transport_Mvp_Root_T* root );
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Events_Check_Capacity( HIL_Transport_Mvp_Root_T* root );
 
 /**
  * Copy and consume the oldest event only after a complete successful copy,
