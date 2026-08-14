@@ -159,8 +159,8 @@ typedef struct
 /** Private MVP session and stop-and-wait state. */
 typedef struct
 {
-    HIL_Transport_Role_T                role;
-    HIL_Transport_Link_State_T          link_state;
+    HIL_Transport_Role_T       role;
+    HIL_Transport_Link_State_T link_state;
     /** Nonzero after the caller has supplied at least one physical-link observation. */
     uint8_t                             link_state_observed;
     HIL_Transport_Session_State_T       state;

@@ -120,7 +120,7 @@ TEST( TransportFacadeSessionLifecycle, ObservesLinksPublishesEventsAndResetsExpl
     HIL_Transport_Context_T context{};
     HIL_Transport_Config_T  config{};
     HIL_TRANSPORT_Default_Config( &config );
-    config.session_seed = UINT64_C( 0x1234 );
+    config.session_seed       = UINT64_C( 0x1234 );
     std::size_t required_size = 0u;
     ASSERT_EQ( HIL_TRANSPORT_Required_Storage_Size( &config, &required_size ),
                HIL_TRANSPORT_STATUS_OK );
@@ -131,9 +131,9 @@ TEST( TransportFacadeSessionLifecycle, ObservesLinksPublishesEventsAndResetsExpl
     ASSERT_EQ( HIL_TRANSPORT_Init( &context, HIL_TRANSPORT_ROLE_HOST, &config, &storage ),
                HIL_TRANSPORT_STATUS_OK );
 
-    EXPECT_EQ( HIL_TRANSPORT_Notify_Link_State(
-                   &context, HIL_TRANSPORT_LINK_STATE_DISCONNECTED, 1u ),
-               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ(
+        HIL_TRANSPORT_Notify_Link_State( &context, HIL_TRANSPORT_LINK_STATE_DISCONNECTED, 1u ),
+        HIL_TRANSPORT_STATUS_OK );
     HIL_Transport_Event_T event{};
     EXPECT_EQ( HIL_TRANSPORT_Read_Event( &context, &event ), HIL_TRANSPORT_STATUS_NOT_READY );
 
@@ -153,9 +153,9 @@ TEST( TransportFacadeSessionLifecycle, ObservesLinksPublishesEventsAndResetsExpl
                HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( HIL_TRANSPORT_Read_Event( &context, &event ), HIL_TRANSPORT_STATUS_NOT_READY );
 
-    ASSERT_EQ( HIL_TRANSPORT_Notify_Link_State(
-                   &context, HIL_TRANSPORT_LINK_STATE_DISCONNECTED, 4u ),
-               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ(
+        HIL_TRANSPORT_Notify_Link_State( &context, HIL_TRANSPORT_LINK_STATE_DISCONNECTED, 4u ),
+        HIL_TRANSPORT_STATUS_OK );
     ASSERT_EQ( HIL_TRANSPORT_Get_Status( &context, &snapshot ), HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( snapshot.link_state, HIL_TRANSPORT_LINK_STATE_DISCONNECTED );
     EXPECT_EQ( snapshot.session_state, HIL_TRANSPORT_SESSION_STATE_DISCONNECTED );
@@ -167,9 +167,9 @@ TEST( TransportFacadeSessionLifecycle, ObservesLinksPublishesEventsAndResetsExpl
     EXPECT_EQ( event.type, HIL_TRANSPORT_EVENT_SESSION_RESET );
     EXPECT_EQ( event.status, HIL_TRANSPORT_STATUS_NOT_READY );
     EXPECT_EQ( event.failure, HIL_TRANSPORT_FAILURE_LINK_LOST );
-    EXPECT_EQ( HIL_TRANSPORT_Notify_Link_State(
-                   &context, HIL_TRANSPORT_LINK_STATE_DISCONNECTED, 5u ),
-               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ(
+        HIL_TRANSPORT_Notify_Link_State( &context, HIL_TRANSPORT_LINK_STATE_DISCONNECTED, 5u ),
+        HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( HIL_TRANSPORT_Read_Event( &context, &event ), HIL_TRANSPORT_STATUS_NOT_READY );
 
     ASSERT_EQ( HIL_TRANSPORT_Reset( &context ), HIL_TRANSPORT_STATUS_OK );
