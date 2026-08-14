@@ -290,6 +290,40 @@ TEST( TransportHandshake, DuplicateResponsePreservesOrReplaysTheSameConfirmWithP
     EXPECT_EQ( host.root.session.retransmissions_committed, 0u );
 }
 
+TEST( TransportHandshake, DuplicateResponseLeavesPinnedRetryStableUntilCommitConsumesIt )
+{
+    Harness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 45u, 30u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Process( &host.root, 0u ), HIL_TRANSPORT_STATUS_OK );
+    HIL_Transport_Mvp_Frame_T initiate{};
+    ASSERT_TRUE( PeekDecodeCommit( host, 100u, &initiate ) );
+    const auto response = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 45u, 70u, 30u );
+    HIL_Transport_Mvp_Handshake_Frame_Result_T result;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host.root, &response, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Process( &host.root, 0u ), HIL_TRANSPORT_STATUS_OK );
+    HIL_Transport_Mvp_Frame_T confirm{};
+    ASSERT_TRUE( PeekDecodeCommit( host, 200u, &confirm ) );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host.root, &response, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host.root.session.reliable_state,
+               HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_READY );
+    HIL_Transport_Mvp_Frame_T retry{};
+    ASSERT_TRUE( PeekDecode( host, &retry ) );
+    EXPECT_EQ( host.root.output_selection, HIL_TRANSPORT_MVP_OUTPUT_RELIABLE );
+    EXPECT_EQ( host.root.session.reliable_state,
+               HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_PEEKED );
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host.root, &response, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_DUPLICATE );
+    EXPECT_EQ( host.root.output_selection, HIL_TRANSPORT_MVP_OUTPUT_RELIABLE );
+    EXPECT_EQ( host.root.session.retransmissions_committed, 0u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Output_Commit_Output( &host.root, 201u ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host.root.session.retransmissions_committed, 1u );
+}
+
 TEST( TransportHandshake, DuplicateConfirmReissuesAckWithoutAnotherEvent )
 {
     Harness rig;
@@ -456,6 +490,54 @@ TEST( TransportHandshake, RejectsInvalidReservedInitiateAndStaleAckWithoutMutati
     EXPECT_EQ( host.root.session.retained_transmit_sequence, before.retained_transmit_sequence );
 }
 
+TEST( TransportHandshake, RejectsUnexpectedConfirmSequenceAndWrongPhaseWithoutMutation )
+{
+    Harness rig;
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, 0u, 20u );
+    const auto initiate = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_INITIATE, 6u, 8u, 0u );
+    HIL_Transport_Mvp_Handshake_Frame_Result_T result;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &initiate, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto premature_confirm = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_CONFIRM, 6u, 9u, 20u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &premature_confirm, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE );
+    EXPECT_EQ( rig.root.session.handshake_phase,
+               HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_RESPONSE_PENDING );
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Process( &rig.root, 0u ), HIL_TRANSPORT_STATUS_OK );
+    HIL_Transport_Mvp_Frame_T response{};
+    ASSERT_TRUE( PeekDecodeCommit( rig, 10u, &response ) );
+    const auto wrong_sequence = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_CONFIRM, 6u, 10u, 20u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &wrong_sequence, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE );
+    EXPECT_EQ( rig.root.session.expected_receive_sequence, 9u );
+    EXPECT_EQ( rig.root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_AWAITING_ACK );
+}
+
+TEST( TransportHandshake, HandshakeTransmitAndReceiveSequencesWrapNaturally )
+{
+    Harness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 7u, UINT16_MAX );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Process( &host.root, 0u ), HIL_TRANSPORT_STATUS_OK );
+    HIL_Transport_Mvp_Frame_T initiate{};
+    ASSERT_TRUE( PeekDecodeCommit( host, 10u, &initiate ) );
+    EXPECT_EQ( initiate.sequence, UINT16_MAX );
+    const auto response =
+        EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 7u, UINT16_MAX, UINT16_MAX );
+    HIL_Transport_Mvp_Handshake_Frame_Result_T result;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host.root, &response, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host.root.session.next_transmit_sequence, 0u );
+    EXPECT_EQ( host.root.session.expected_receive_sequence, 0u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Process( &host.root, 0u ), HIL_TRANSPORT_STATUS_OK );
+    HIL_Transport_Mvp_Frame_T confirm{};
+    ASSERT_TRUE( PeekDecodeCommit( host, 20u, &confirm ) );
+    EXPECT_EQ( confirm.sequence, 0u );
+    EXPECT_EQ( confirm.acknowledgement_sequence, UINT16_MAX );
+}
+
 TEST( TransportHandshake, ActiveResetAbandonsEveryHandshakePhaseAndClearsDuplicateMetadata )
 {
     constexpr std::array<HIL_Transport_Mvp_Handshake_Phase_T, 4> phases{
@@ -484,6 +566,63 @@ TEST( TransportHandshake, ActiveResetAbandonsEveryHandshakePhaseAndClearsDuplica
                    HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE );
         EXPECT_EQ( host.root.session.accepted_receive_sequence_valid, 0u );
         EXPECT_EQ( host.root.session.last_accepted_receive_frame_type,
+                   HIL_TRANSPORT_MVP_FRAME_INVALID );
+    }
+}
+
+TEST( TransportHandshake, LinkLossAndExplicitResetClearEveryEffectiveHandshakePhase )
+{
+    struct PhaseCase
+    {
+        HIL_Transport_Role_T                role;
+        HIL_Transport_Mvp_Handshake_Phase_T phase;
+    };
+    constexpr std::array<PhaseCase, 7> phases{ {
+        { HIL_TRANSPORT_ROLE_HOST, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INITIATE_PENDING },
+        { HIL_TRANSPORT_ROLE_HOST, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_RESPONSE },
+        { HIL_TRANSPORT_ROLE_HOST, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_CONFIRM_PENDING },
+        { HIL_TRANSPORT_ROLE_HOST, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK },
+        { HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_INITIATE },
+        { HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_RESPONSE_PENDING },
+        { HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM },
+    } };
+
+    for ( const auto& phase_case : phases )
+    {
+        Harness link_loss;
+        const auto seed = phase_case.role == HIL_TRANSPORT_ROLE_HOST ? 100u : 0u;
+        link_loss.Initialize( phase_case.role, seed, 1u );
+        link_loss.root.session.handshake_phase = phase_case.phase;
+        if ( phase_case.phase != HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_INITIATE )
+        {
+            link_loss.root.session.session_identifier       = 100u;
+            link_loss.root.session.session_identifier_valid = 1u;
+        }
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Notify_Link_State(
+                       &link_loss.root, HIL_TRANSPORT_LINK_STATE_DISCONNECTED ),
+                   HIL_TRANSPORT_STATUS_OK );
+        EXPECT_EQ( link_loss.root.base.session_state,
+                   HIL_TRANSPORT_SESSION_STATE_DISCONNECTED );
+        EXPECT_EQ( link_loss.root.session.handshake_phase,
+                   HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE );
+        EXPECT_EQ( link_loss.root.session.session_identifier_valid, 0u );
+
+        Harness explicit_reset;
+        explicit_reset.Initialize( phase_case.role, seed, 1u );
+        explicit_reset.root.session.handshake_phase = phase_case.phase;
+        explicit_reset.root.session.last_accepted_receive_sequence = 4u;
+        explicit_reset.root.session.accepted_receive_sequence_valid = 1u;
+        explicit_reset.root.session.last_accepted_receive_frame_type =
+            HIL_TRANSPORT_MVP_FRAME_CONFIRM;
+        explicit_reset.root.session.last_accepted_receive_acknowledgement_sequence = 3u;
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Explicit_Reset( &explicit_reset.root ),
+                   HIL_TRANSPORT_STATUS_OK );
+        EXPECT_EQ( explicit_reset.root.base.session_state,
+                   HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+        EXPECT_EQ( explicit_reset.root.session.handshake_phase,
+                   HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE );
+        EXPECT_EQ( explicit_reset.root.session.accepted_receive_sequence_valid, 0u );
+        EXPECT_EQ( explicit_reset.root.session.last_accepted_receive_frame_type,
                    HIL_TRANSPORT_MVP_FRAME_INVALID );
     }
 }
