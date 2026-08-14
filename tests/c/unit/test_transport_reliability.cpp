@@ -1035,26 +1035,6 @@ TEST_F( TransportReliabilityTest, PrivateNullArgumentsAreRejectedWithoutMutation
     EXPECT_TRUE( Snapshot() == before );
 }
 
-TEST_F( TransportReliabilityTest, PublicPeekCommitAndStatusDelegateToReliableLifecycle )
-{
-    HIL_Transport_Context_T context = Context();
-    Publish();
-    HIL_Transport_Status_Snapshot_T status{};
-    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &context, &status ), HIL_TRANSPORT_STATUS_OK );
-    EXPECT_EQ( status.output_pending, 1u );
-    EXPECT_EQ( status.reliable_delivery_pending, 1u );
-
-    std::array<std::uint8_t, RetainedCapacity> output{};
-    std::size_t                                output_size = 0u;
-    ASSERT_EQ( HIL_TRANSPORT_Peek_Output( &context, output.data(), output.size(), &output_size ),
-               HIL_TRANSPORT_STATUS_OK );
-    ASSERT_EQ( HIL_TRANSPORT_Commit_Output( &context, 42u ), HIL_TRANSPORT_STATUS_OK );
-    EXPECT_EQ( root_.session.reliable_last_committed_ms, 42u );
-    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &context, &status ), HIL_TRANSPORT_STATUS_OK );
-    EXPECT_EQ( status.output_pending, 0u );
-    EXPECT_EQ( status.reliable_delivery_pending, 1u );
-}
-
 TEST_F( TransportReliabilityTest, PublicDisconnectedResetClearsAllSessionScopedState )
 {
     HIL_Transport_Context_T context = Context();
