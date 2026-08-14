@@ -13,9 +13,12 @@
 #include "../transport_profile.h"
 
 #include "../transport_internal.h"
+#include "transport_control_output_mvp.h"
 #include "transport_events_mvp.h"
 #include "transport_frame_codec_mvp.h"
+#include "transport_handshake_mvp.h"
 #include "transport_output_mvp.h"
+#include "transport_reliability_mvp.h"
 #include "transport_session_mvp.h"
 #include "transport_types_mvp.h"
 
@@ -324,32 +327,94 @@ HIL_Transport_Status_T
 HIL_TRANSPORT_PROFILE_Process( HIL_Transport_Context_T* context, uint32_t now_ms,
                                HIL_Transport_Operating_Mode_T operating_mode )
 {
-    /*
-     * TODO: Accept NORMAL, BULK_TRANSFER, and QUIET_REAL_TIME, recording the
-     * latest valid value (the MVP may schedule them identically). Reject every
-     * other numeric value with INVALID_ARGUMENT without changing the recorded
-     * mode or progressing any work. Progress private INITIATE, RESPONSE, CONFIRM
-     * establishment and one-message-per-frame work. A rig becomes ESTABLISHED
-     * after valid CONFIRM and offers its ACK; a host becomes ESTABLISHED only
-     * after the matching CONFIRM ACK. A lost CONFIRM or ACK retransmits the same
-     * CONFIRM; an established rig re-ACKs an identical duplicate without another
-     * transition. Apply the global retransmission timeout and max_retries to all
-     * reliable handshake and Application work, retaining identical frame bytes,
-     * session identity, and sequence. Accept only the matching ACK and advance
-     * once. On accepted-Application retry exhaustion, return DELIVERY_FAILED as
-     * appropriate, publish its DELIVERY_FAILED event, abandon the uncertain
-     * session, and enter recovery. On handshake retry
-     * exhaustion, publish no Application delivery event, abandon the incomplete
-     * handshake, and restart establishment using the host's next derived session
-     * identity. Incompatible identities likewise abandon the complete session.
-     * Map configured deadlines to TIMEOUT. In FAULT, stop normal progress until
-     * explicit Reset. Any invariant failure enters FAULT, records INTERNAL, and
-     * returns INTERNAL_ERROR. Never infer Application lifecycle or call I/O.
-     */
-    ( void )context;
-    ( void )now_ms;
-    ( void )operating_mode;
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    HIL_Transport_Mvp_Root_T*                 root;
+    HIL_Transport_Mvp_Reliability_Outcome_T   reliability_outcome;
+    HIL_Transport_Status_T                    status;
+    uint8_t                                   control_pending;
+    HIL_Transport_Mvp_Frame_Type_T            retained_type;
+
+    root = HIL_TRANSPORT_MVP_Root_From_Context( context );
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( ( operating_mode < HIL_TRANSPORT_OPERATING_MODE_NORMAL )
+         || ( operating_mode > HIL_TRANSPORT_OPERATING_MODE_QUIET_REAL_TIME ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+
+    root->base.operating_mode       = operating_mode;
+    root->base.operating_mode_valid = 1u;
+    if ( ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_FAULT )
+         || ( root->session.state == HIL_TRANSPORT_SESSION_STATE_FAULT ) )
+    {
+        return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    }
+    if ( root->base.link_state != root->session.link_state )
+    {
+        root->base.session_state   = HIL_TRANSPORT_SESSION_STATE_FAULT;
+        root->session.state        = HIL_TRANSPORT_SESSION_STATE_FAULT;
+        root->base.last_failure    = HIL_TRANSPORT_FAILURE_INTERNAL;
+        root->session.last_failure = HIL_TRANSPORT_FAILURE_INTERNAL;
+        return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    }
+    if ( root->base.link_state == HIL_TRANSPORT_LINK_STATE_DISCONNECTED )
+    {
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    if ( ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_RECOVERING )
+         || ( root->session.state == HIL_TRANSPORT_SESSION_STATE_RECOVERING ) )
+    {
+        if ( root->base.session_state != root->session.state )
+        {
+            root->base.session_state   = HIL_TRANSPORT_SESSION_STATE_FAULT;
+            root->session.state        = HIL_TRANSPORT_SESSION_STATE_FAULT;
+            root->base.last_failure    = HIL_TRANSPORT_FAILURE_INTERNAL;
+            root->session.last_failure = HIL_TRANSPORT_FAILURE_INTERNAL;
+            return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+        }
+        status = HIL_TRANSPORT_MVP_Control_Output_Get_Pending_Status( root, &control_pending );
+        if ( status != HIL_TRANSPORT_STATUS_OK )
+        {
+            return status;
+        }
+        if ( control_pending != 0u )
+        {
+            return HIL_TRANSPORT_STATUS_OK;
+        }
+        status = HIL_TRANSPORT_MVP_Session_Begin_Establishment( root );
+        if ( status != HIL_TRANSPORT_STATUS_OK )
+        {
+            return status;
+        }
+    }
+
+    status = HIL_TRANSPORT_MVP_Handshake_Process( root, now_ms );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    status = HIL_TRANSPORT_MVP_Reliability_Process_Pending( root, now_ms,
+                                                            &reliability_outcome );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+
+    retained_type = root->session.retained_reliable_frame_type;
+    if ( ( reliability_outcome == HIL_TRANSPORT_MVP_RELIABILITY_RETRIES_EXHAUSTED )
+         || ( root->session.reliable_state == HIL_TRANSPORT_MVP_RELIABLE_EXHAUSTED ) )
+    {
+        if ( ( retained_type == HIL_TRANSPORT_MVP_FRAME_INITIATE )
+             || ( retained_type == HIL_TRANSPORT_MVP_FRAME_RESPONSE )
+             || ( retained_type == HIL_TRANSPORT_MVP_FRAME_CONFIRM ) )
+        {
+            return HIL_TRANSPORT_MVP_Session_Abandon( root, HIL_TRANSPORT_FAILURE_DELIVERY );
+        }
+    }
+    return HIL_TRANSPORT_STATUS_OK;
 }
 
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Peek_Output( HIL_Transport_Context_T* context,

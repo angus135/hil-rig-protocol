@@ -80,13 +80,15 @@ int main( void )
 
     if ( HIL_TRANSPORT_Peek_Output( &context, encoded_output, sizeof( encoded_output ),
                                     &output_size )
-             != HIL_TRANSPORT_STATUS_NOT_READY
-         || output_size != 0u )
+             != HIL_TRANSPORT_STATUS_OK
+         || output_size == 0u )
     {
         return 4;
     }
-
-    ( void )HIL_TRANSPORT_Commit_Output( &context, 14u );
+    if ( HIL_TRANSPORT_Commit_Output( &context, 14u ) != HIL_TRANSPORT_STATUS_OK )
+    {
+        return 4;
+    }
 
     if ( HIL_TRANSPORT_Read_Application_Data( &context, application_message,
                                               sizeof( application_message ), &message_size )
