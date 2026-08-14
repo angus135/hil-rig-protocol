@@ -22,6 +22,8 @@ extern "C"
  * @details A previously successful peek remains selected. Otherwise control
  * output is preferred over reliable output. Size queries and undersized
  * destinations report the selected item's complete size without pinning it.
+ * Either public or private FAULT state prevents exposure and returns
+ * INTERNAL_ERROR after clearing output_size.
  *
  * @param[in,out] root Initialized private MVP root.
  * @param[out] out_buffer Caller-owned destination, or NULL only for a size query.
@@ -39,7 +41,9 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Output_Peek_Output( HIL_Transport_Mvp_R
  *
  * @details Reliable commit records now_ms and retains bytes while awaiting an
  * acknowledgement. Control commit ignores now_ms and immediately releases its
- * slot. Selection is cleared only after the routed commit succeeds.
+ * slot. Selection is cleared only after the routed commit succeeds. Either
+ * public or private FAULT state returns INTERNAL_ERROR without changing output
+ * ownership.
  *
  * @param[in,out] root Initialized private MVP root.
  * @param[in] now_ms Caller-provided reliable external-I/O acceptance time.

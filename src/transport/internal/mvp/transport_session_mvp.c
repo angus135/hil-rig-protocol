@@ -182,7 +182,8 @@ HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root )
          || ( session->link_state_observed > 1u )
          || ( session->state < HIL_TRANSPORT_SESSION_STATE_DISCONNECTED )
          || ( session->state > HIL_TRANSPORT_SESSION_STATE_FAULT )
-         || ( root->base.session_state != session->state ) )
+         || ( root->base.session_state != session->state )
+         || ( root->base.last_failure != session->last_failure ) )
     {
         return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
     }
@@ -275,7 +276,12 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Abandon( HIL_Transport_Mvp_Root
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    if ( ( root->base.session_state != root->session.state )
+    if ( ( root->session.role < HIL_TRANSPORT_ROLE_HOST )
+         || ( root->session.role > HIL_TRANSPORT_ROLE_RIG )
+         || ( root->base.role != root->session.role )
+         || ( root->session.link_state_observed > 1u )
+         || ( root->base.last_failure != root->session.last_failure )
+         || ( root->base.session_state != root->session.state )
          || ( root->base.link_state != root->session.link_state )
          || ( root->session.state < HIL_TRANSPORT_SESSION_STATE_DISCONNECTED )
          || ( root->session.state > HIL_TRANSPORT_SESSION_STATE_FAULT )
