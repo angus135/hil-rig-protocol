@@ -9,11 +9,13 @@ header contracts.
 
 The MVP wire codec, CRC, COBS framing, bounded stream parser, workspace sizing,
 initialization, private one-item reliable and control-output lifecycles, and
-public arbitration between those lifecycles are implemented. Public peek,
-commit, status, and reset operate across both private slots. Session
+public arbitration between those lifecycles are implemented. A separate private
+four-entry event FIFO, public consume-on-success event reads, event pending
+status, and explicit event reset are also implemented. Public peek, commit,
+status, and reset operate across the implemented private lifecycles. Session
 establishment, received-frame and received-ACK dispatch, ACK and RESET
 generation, receive-side duplicate handling, Application-message orchestration,
-delivery events, and session recovery remain intentional stubs unless stated
+real event generation, and session recovery remain intentional stubs unless stated
 otherwise below.
 
 Transport is HIL-RIG-specific but communication-medium-agnostic. It maps opaque,
@@ -435,8 +437,10 @@ initiated it, explicit reset does not enqueue `SESSION_RESET`. It retains copied
 configuration, workspace ownership, endpoint role, and latest link observation;
 records `HIL_TRANSPORT_FAILURE_LOCAL_RESET`; and enters `DISCONNECTED` for a
 disconnected link or `RECOVERING` for a connected link. A later `Process` may
-then start a fresh session. Automatic or peer-driven abandonment may still
-enqueue `SESSION_RESET`. Reset does not operate hardware or Application state.
+then start a fresh session. Future automatic or peer-driven abandonment must
+preserve already queued events and attempt to append `SESSION_RESET`; ordinary
+automatic abandonment must not clear the event FIFO. Reset does not operate
+hardware or Application state.
 
 Reliable reset invalidates ownership and encoded size but does not clear the
 full encoded buffer. Control reset likewise enters `IDLE` and invalidates its
@@ -445,20 +449,40 @@ corrupted private lifecycle metadata. With size zero and state `IDLE`, stale
 bytes are inaccessible, and avoiding buffer `memset` work is useful on an MCU.
 The same regions can then receive newly encoded items.
 
+The event lifecycle is a separate fixed four-entry FIFO embedded in the MVP
+root. Its private read index and count define ownership; the public API exposes
+only an `event_pending` boolean, so callers cannot depend on the depth. Private
+producers publish complete `HIL_Transport_Event_T` values, which are copied in
+full and may include repeated identical occurrences. Publication into a full
+FIFO returns `CAPACITY_EXHAUSTED` and leaves every older event, slot, and queue
+metadata unchanged. There is no overwrite-oldest rule, reserved slot, priority,
+coalescing, or overflow flag.
+
+`HIL_TRANSPORT_Read_Event()` validates the queue, copies the oldest complete
+event, and consumes exactly that event on success. FIFO order is preserved
+through wraparound. `NOT_READY`, invalid arguments, and internal errors leave
+the destination unchanged. Reading the final event returns the empty queue to a
+canonical read index of zero. Explicit reset releases all event ownership by
+zeroing the read index and count, including when repairing corrupt metadata; it
+does not clear the four event structures because their stale bytes are then
+inaccessible.
+
 A private invariant failure returns `INTERNAL_ERROR`, enters public `FAULT`, and
 records `HIL_TRANSPORT_FAILURE_INTERNAL`. `FAULT` stops new Application
 submission and normal protocol progress. Explicit `Reset` is the only supported
 way to clear it on an initialized context.
 
-`HIL_TRANSPORT_Read_Event()` will expose high-level establishment, reset, delivery,
-protocol, capacity, and link conditions. It never asks the caller to build a
-control frame. `HIL_TRANSPORT_Get_Status()` is implemented: `output_pending` is
-set while either control or reliable initial/retry bytes are ready or peeked, and
-`reliable_delivery_pending` remains set in every non-IDLE reliable state,
-including `EXHAUSTED`. The remaining fields expose role, link, high-level
-session state, local operating mode, received-message/event indicators, and
-high-level failure. Handshake phases, parser states, sequence numbers and retry
-counts remain private. Control ownership never sets
+No current session, link, handshake, receive, protocol, capacity, or delivery
+path generates an event. Later producers will construct complete public values
+and use the private FIFO without transferring their state transitions into the
+storage module. `HIL_TRANSPORT_Get_Status()` reports `event_pending` from the
+validated FIFO. `output_pending` is set while either control or reliable
+initial/retry bytes are ready or peeked, and `reliable_delivery_pending` remains
+set in every non-IDLE reliable state, including `EXHAUSTED`. The remaining
+fields expose role, link, high-level session state, local operating mode,
+received-message state, and high-level failure. Handshake phases, parser states,
+event count and capacity, sequence numbers, and retry counts remain private.
+Control ownership never sets
 `reliable_delivery_pending`. Any future extended fragmentation, reassembly,
 window, keepalive or queueing metadata also remains private.
 

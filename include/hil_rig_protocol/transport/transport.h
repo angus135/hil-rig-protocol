@@ -27,8 +27,10 @@
  * bounded stream parsing are implemented. Independent one-item reliable and
  * control-output lifecycles, public priority arbitration with stable pinned
  * selection, aggregate output status, commit routing, and output reset are
- * implemented. Session establishment, received-frame dispatch, ACK and RESET
- * generation, and public Application-message orchestration remain intentional
+ * implemented. Private bounded event retention, FIFO reads, pending status, and
+ * explicit event reset are implemented, but no real event producers exist yet.
+ * Session establishment, received-frame dispatch, ACK and RESET generation,
+ * and public Application-message orchestration remain intentional
  * HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED stubs.
  */
 #ifndef HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
@@ -255,9 +257,11 @@ HIL_Transport_Status_T HIL_TRANSPORT_Init( HIL_Transport_Context_T*       contex
  * is disconnected, or enters RECOVERING if it remains connected so later
  * Process() can start a fresh session. A host uses a new derived identity. This
  * call is the only supported way to clear terminal FAULT on an initialized
- * context. It does not permit changing configuration, role, or workspace. No
- * Application state or hardware is reset. Automatic/peer abandonment may still
- * enqueue SESSION_RESET.
+ * context. Event slot bytes need not be cleared because zero queue ownership
+ * makes them inaccessible. It does not permit changing configuration, role, or
+ * workspace. No Application state or hardware is reset. Future automatic/peer
+ * abandonment preserves existing queued events and attempts to append
+ * SESSION_RESET rather than clearing the event FIFO.
  *
  * @param[in,out] context Initialized single-owner context.
  * @return OK or INVALID_ARGUMENT.
@@ -453,15 +457,18 @@ HIL_Transport_Status_T HIL_TRANSPORT_Read_Application_Data( HIL_Transport_Contex
 /**
  * @brief Retrieve and consume the oldest high-level Transport event.
  *
- * @details The future implementation copies a fully initialized event and then
- * releases its private queue item. NOT_READY leaves event unchanged. Events do
- * not instruct callers to construct ACK, recovery, or handshake frames; such
- * output remains an internal Transport responsibility. The current
- * NOT_IMPLEMENTED stub defensively zero-initializes a non-NULL destination.
+ * @details The MVP retains a private bounded FIFO whose depth is not part of the
+ * public contract. This operation copies one fully initialized oldest event and
+ * consumes exactly that event only after the complete copy succeeds. NOT_READY,
+ * INVALID_ARGUMENT, and INTERNAL_ERROR leave event unchanged. Events do not
+ * instruct callers to construct ACK, recovery, or handshake frames; such output
+ * remains an internal Transport responsibility. Event storage and reading are
+ * implemented, but later session, link, receive, and delivery work must still
+ * generate the real events.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[out] event Destination for one event; must not be NULL.
- * @return OK, NOT_READY, INVALID_ARGUMENT, or current NOT_IMPLEMENTED result.
+ * @return OK, NOT_READY, INVALID_ARGUMENT, or INTERNAL_ERROR.
  */
 HIL_Transport_Status_T HIL_TRANSPORT_Read_Event( HIL_Transport_Context_T* context,
                                                  HIL_Transport_Event_T*   event );
@@ -474,8 +481,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_Read_Event( HIL_Transport_Context_T* contex
  * set while either control or reliable initial/retry bytes are ready or peeked.
  * Reliable delivery pending is unaffected by control ownership and remains set
  * through reliable ACK wait and retry exhaustion until the owning session later
- * handles it. The snapshot does not expose output type, private profile state,
- * sequences, retry counts, borrowed workspace pointers, or mutable handles.
+ * handles it. Event pending is a boolean derived from the validated private
+ * FIFO; the snapshot never exposes its count or capacity. The snapshot does not
+ * expose output type, private profile state, sequences, retry counts, borrowed
+ * workspace pointers, or mutable handles.
  *
  * @param[in] context Initialized single-owner context.
  * @param[out] status Snapshot destination; must not be NULL.
