@@ -16,11 +16,13 @@ namespace {
 TEST(TransportSessionInit, ValidatesWithoutMutation)
 {
     HIL_Transport_Mvp_Session_T session;
+    HIL_Transport_Role_T invalid_role;
     std::memset(&session, 0xA5, sizeof(session));
+    std::memset(&invalid_role, 0x7F, sizeof(invalid_role));
     const auto original = session;
     EXPECT_EQ(HIL_TRANSPORT_MVP_Session_Init(nullptr, HIL_TRANSPORT_ROLE_HOST, 1u, 0u),
               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT);
-    EXPECT_EQ(HIL_TRANSPORT_MVP_Session_Init(&session, static_cast<HIL_Transport_Role_T>(99), 1u, 0u),
+    EXPECT_EQ(HIL_TRANSPORT_MVP_Session_Init(&session, invalid_role, 1u, 0u),
               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(0, std::memcmp(&session, &original, sizeof(session)));
     EXPECT_EQ(HIL_TRANSPORT_MVP_Session_Init(&session, HIL_TRANSPORT_ROLE_HOST, 0u, 0u),
@@ -660,6 +662,8 @@ TEST_F(RootFixture, ExplicitResetWorksFromEveryStateAndPreservesRetainedSetup)
 
 TEST_F(RootFixture, PublicAdapterValidatesBeforeMutation)
 {
+    HIL_Transport_Link_State_T invalid_link_state;
+    std::memset(&invalid_link_state, 0x7F, sizeof(invalid_link_state));
     HIL_Transport_Context_T invalid_context{};
     EXPECT_EQ(HIL_TRANSPORT_Notify_Link_State(&invalid_context,
                                                HIL_TRANSPORT_LINK_STATE_CONNECTED, 123u),
@@ -668,17 +672,17 @@ TEST_F(RootFixture, PublicAdapterValidatesBeforeMutation)
     HIL_Transport_Context_T context{&root, sizeof(root),
                                     HIL_TRANSPORT_INTERNAL_INITIALIZATION_COOKIE};
     const auto original = root;
-    EXPECT_EQ(HIL_TRANSPORT_Notify_Link_State(&context,
-                                               static_cast<HIL_Transport_Link_State_T>(99), 123u),
+    EXPECT_EQ(HIL_TRANSPORT_Notify_Link_State(&context, invalid_link_state, 123u),
               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(0, std::memcmp(&root, &original, sizeof(root)));
 }
 
 TEST_F(RootFixture, InvalidLinkDoesNotMutate)
 {
+    HIL_Transport_Link_State_T invalid_link_state;
+    std::memset(&invalid_link_state, 0x7F, sizeof(invalid_link_state));
     const auto original = root;
-    EXPECT_EQ(HIL_TRANSPORT_MVP_Session_Notify_Link_State(
-                  &root, static_cast<HIL_Transport_Link_State_T>(99)),
+    EXPECT_EQ(HIL_TRANSPORT_MVP_Session_Notify_Link_State(&root, invalid_link_state),
               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(0, std::memcmp(&root, &original, sizeof(root)));
 }

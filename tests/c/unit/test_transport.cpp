@@ -148,13 +148,14 @@ TEST( TransportStructuredOutputs, PreserveEventAndClearStatusForInvalidContext )
 TEST( TransportSessionInitialization, ValidatesWithoutPartiallyMutatingDestination )
 {
     HIL_Transport_Mvp_Session_T session;
+    HIL_Transport_Role_T        invalid_role;
     std::memset( &session, 0xA5, sizeof( session ) );
+    std::memset( &invalid_role, 0x7F, sizeof( invalid_role ) );
     const HIL_Transport_Mvp_Session_T original = session;
 
     EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init( nullptr, HIL_TRANSPORT_ROLE_HOST, 1u, 0u ),
                HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
-    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init(
-                   &session, static_cast<HIL_Transport_Role_T>( 99 ), 1u, 0u ),
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init( &session, invalid_role, 1u, 0u ),
                HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
     EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Init(
                    &session, HIL_TRANSPORT_ROLE_HOST, HIL_TRANSPORT_SESSION_SEED_INVALID, 0u ),
