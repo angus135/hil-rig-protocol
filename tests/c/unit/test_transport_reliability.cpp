@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "hil_rig_protocol/transport/transport.h"
+#include "transport/internal/mvp/transport_events_mvp.h"
 #include "transport/internal/mvp/transport_reliability_mvp.h"
 #include "transport/internal/mvp/transport_session_mvp.h"
 
@@ -190,15 +191,14 @@ protected:
                                                     partial_body.size(), &consumed ),
                    HIL_TRANSPORT_PARSER_RESULT_NEED_MORE_DATA );
         ASSERT_EQ( consumed, partial_body.size() );
-        root_.submitted_message_size            = 5u;
-        root_.submitted_message_pending         = 1u;
-        root_.received_message_size             = 6u;
-        root_.received_message_pending          = 1u;
-        root_.pending_event.type                = HIL_TRANSPORT_EVENT_DELIVERY_FAILED;
-        root_.pending_event.status              = HIL_TRANSPORT_STATUS_DELIVERY_FAILED;
-        root_.pending_event.failure             = HIL_TRANSPORT_FAILURE_DELIVERY;
-        root_.pending_event.required_capacity   = 7u;
-        root_.event_pending                     = 1u;
+        root_.submitted_message_size    = 5u;
+        root_.submitted_message_pending = 1u;
+        root_.received_message_size     = 6u;
+        root_.received_message_pending  = 1u;
+        const HIL_Transport_Event_T event{ HIL_TRANSPORT_EVENT_DELIVERY_FAILED,
+                                           HIL_TRANSPORT_STATUS_DELIVERY_FAILED,
+                                           HIL_TRANSPORT_FAILURE_DELIVERY, 7u };
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Events_Publish( &root_, &event ), HIL_TRANSPORT_STATUS_OK );
         root_.session.session_identifier        = UINT64_C( 0x0123456789ABCDEF );
         root_.session.session_identifier_valid  = 1u;
         root_.session.handshake_phase           = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
@@ -709,7 +709,7 @@ TEST_F( TransportReliabilityTest, MatchingLateAckCancelsUnpinnedRetry )
     EXPECT_EQ( root_.session.retained_transmit_sequence, 0u );
     EXPECT_EQ( root_.session.reliable_last_committed_ms, 0u );
     EXPECT_EQ( retained_, original_bytes_ );
-    EXPECT_EQ( root_.event_pending, 0u );
+    EXPECT_EQ( root_.event_count, 0u );
     EXPECT_EQ( root_.base.session_state, HIL_TRANSPORT_SESSION_STATE_DISCONNECTED );
     EXPECT_EQ( root_.session.state, HIL_TRANSPORT_SESSION_STATE_DISCONNECTED );
 }
@@ -861,7 +861,7 @@ TEST_F( TransportReliabilityTest, ExhaustionPreservesOwnershipButExposesNoOutput
     EXPECT_EQ( root_.session.retained_transmit_sequence, InitialSequence );
     EXPECT_EQ( root_.session.next_transmit_sequence, InitialSequence );
     EXPECT_EQ( root_.encoded_output_size, FrameSize );
-    EXPECT_EQ( root_.event_pending, 0u );
+    EXPECT_EQ( root_.event_count, 0u );
     EXPECT_EQ( root_.base.session_state, HIL_TRANSPORT_SESSION_STATE_DISCONNECTED );
 
     std::array<std::uint8_t, RetainedCapacity> output{};
@@ -1086,11 +1086,8 @@ TEST_F( TransportReliabilityTest, PublicDisconnectedResetClearsAllSessionScopedS
     EXPECT_EQ( root_.submitted_message_pending, 0u );
     EXPECT_EQ( root_.received_message_size, 0u );
     EXPECT_EQ( root_.received_message_pending, 0u );
-    EXPECT_EQ( root_.pending_event.type, HIL_TRANSPORT_EVENT_NONE );
-    EXPECT_EQ( root_.pending_event.status, HIL_TRANSPORT_STATUS_OK );
-    EXPECT_EQ( root_.pending_event.failure, HIL_TRANSPORT_FAILURE_NONE );
-    EXPECT_EQ( root_.pending_event.required_capacity, 0u );
-    EXPECT_EQ( root_.event_pending, 0u );
+    EXPECT_EQ( root_.event_read_index, 0u );
+    EXPECT_EQ( root_.event_count, 0u );
     EXPECT_EQ( root_.session.session_identifier, 0u );
     EXPECT_EQ( root_.session.session_identifier_valid, 0u );
     EXPECT_EQ( root_.session.handshake_phase, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE );
@@ -1175,7 +1172,10 @@ TEST_F( TransportReliabilityTest, PublicStatusReportsCompleteImplementedSnapshot
     root_.base.operating_mode_valid = 1u;
     root_.base.last_failure         = HIL_TRANSPORT_FAILURE_PROTOCOL;
     root_.received_message_pending  = 1u;
-    root_.event_pending             = 1u;
+    const HIL_Transport_Event_T event{ HIL_TRANSPORT_EVENT_PROTOCOL_ERROR,
+                                       HIL_TRANSPORT_STATUS_INVALID_ARGUMENT,
+                                       HIL_TRANSPORT_FAILURE_PROTOCOL, 0u };
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Events_Publish( &root_, &event ), HIL_TRANSPORT_STATUS_OK );
     HIL_Transport_Status_Snapshot_T status{};
 
     ASSERT_EQ( HIL_TRANSPORT_Get_Status( &context, &status ), HIL_TRANSPORT_STATUS_OK );

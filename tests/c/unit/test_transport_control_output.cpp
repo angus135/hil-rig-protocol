@@ -21,6 +21,7 @@ constexpr std::array<std::uint8_t, 8u> DifferentBytes{ 0x90u, 0x81u, 0x72u, 0x63
 constexpr std::size_t                  RepresentativeSize = 8u;
 
 using ControlArray = std::array<std::uint8_t, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_CAPACITY>;
+using EventArray   = std::array<HIL_Transport_Event_T, HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY>;
 
 ControlArray SnapshotControlBytes( const HIL_Transport_Mvp_Root_T& root )
 {
@@ -33,6 +34,13 @@ void ExpectControlBytes( const HIL_Transport_Mvp_Root_T& root, const ControlArra
 {
     EXPECT_TRUE( std::equal( std::begin( root.control_output ), std::end( root.control_output ),
                              expected.begin() ) );
+}
+
+EventArray SnapshotEventQueue( const HIL_Transport_Mvp_Root_T& root )
+{
+    EventArray result{};
+    std::copy( std::begin( root.event_queue ), std::end( root.event_queue ), result.begin() );
+    return result;
 }
 
 HIL_Transport_Mvp_Control_Output_State_T InvalidControlState()
@@ -79,8 +87,9 @@ struct IsolationSnapshot
     std::uint8_t*                        received_message;
     std::size_t                          received_size;
     std::uint8_t                         received_pending;
-    HIL_Transport_Event_T                pending_event;
-    std::uint8_t                         event_pending;
+    EventArray                           event_queue;
+    std::size_t                          event_read_index;
+    std::size_t                          event_count;
     HIL_Transport_Mvp_Output_Selection_T output_selection;
 };
 
@@ -120,11 +129,15 @@ protected:
         root_.received_message                     = received_bytes_.data();
         root_.received_message_size                = 5u;
         root_.received_message_pending             = 1u;
-        root_.pending_event.type                   = HIL_TRANSPORT_EVENT_PROTOCOL_ERROR;
-        root_.pending_event.status                 = HIL_TRANSPORT_STATUS_NOT_READY;
-        root_.pending_event.failure                = HIL_TRANSPORT_FAILURE_PROTOCOL;
-        root_.pending_event.required_capacity      = 99u;
-        root_.event_pending                        = 1u;
+        for ( std::size_t index = 0u; index < HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY; ++index )
+        {
+            root_.event_queue[index].type              = HIL_TRANSPORT_EVENT_PROTOCOL_ERROR;
+            root_.event_queue[index].status            = HIL_TRANSPORT_STATUS_NOT_READY;
+            root_.event_queue[index].failure           = HIL_TRANSPORT_FAILURE_PROTOCOL;
+            root_.event_queue[index].required_capacity = 99u + index;
+        }
+        root_.event_read_index = 2u;
+        root_.event_count      = 3u;
     }
 
     void Publish( std::size_t size = RepresentativeSize )
@@ -179,8 +192,9 @@ protected:
                  root_.received_message,
                  root_.received_message_size,
                  root_.received_message_pending,
-                 root_.pending_event,
-                 root_.event_pending,
+                 SnapshotEventQueue( root_ ),
+                 root_.event_read_index,
+                 root_.event_count,
                  root_.output_selection };
     }
 
@@ -232,12 +246,16 @@ protected:
         EXPECT_EQ( root_.received_message, expected.received_message );
         EXPECT_EQ( root_.received_message_size, expected.received_size );
         EXPECT_EQ( root_.received_message_pending, expected.received_pending );
-        EXPECT_EQ( root_.pending_event.type, expected.pending_event.type );
-        EXPECT_EQ( root_.pending_event.status, expected.pending_event.status );
-        EXPECT_EQ( root_.pending_event.failure, expected.pending_event.failure );
-        EXPECT_EQ( root_.pending_event.required_capacity,
-                   expected.pending_event.required_capacity );
-        EXPECT_EQ( root_.event_pending, expected.event_pending );
+        for ( std::size_t index = 0u; index < HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY; ++index )
+        {
+            EXPECT_EQ( root_.event_queue[index].type, expected.event_queue[index].type );
+            EXPECT_EQ( root_.event_queue[index].status, expected.event_queue[index].status );
+            EXPECT_EQ( root_.event_queue[index].failure, expected.event_queue[index].failure );
+            EXPECT_EQ( root_.event_queue[index].required_capacity,
+                       expected.event_queue[index].required_capacity );
+        }
+        EXPECT_EQ( root_.event_read_index, expected.event_read_index );
+        EXPECT_EQ( root_.event_count, expected.event_count );
         EXPECT_EQ( root_.output_selection, expected.output_selection );
     }
 

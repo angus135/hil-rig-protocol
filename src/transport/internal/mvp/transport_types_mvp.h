@@ -29,6 +29,9 @@
  */
 #define HIL_TRANSPORT_MVP_CONTROL_OUTPUT_CAPACITY ( 20u )
 
+/** Fixed number of complete high-level events retained by the MVP. */
+#define HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY ( 4u )
+
 /** Explicit private MVP progress through session establishment. */
 typedef enum
 {
@@ -198,9 +201,15 @@ typedef struct
  * output slot is a queue, and ownership of each byte region is determined by
  * its lifecycle state and valid size rather than by clearing stale bytes. The
  * output arbiter pins exactly one lifecycle after a successful public peek and
- * routes commit back to it. Workspace sizing reserves the pointer-backed
- * non-overlapping regions with checked arithmetic; the embedded control array
- * is included in this root's size automatically.
+ * routes commit back to it.
+ *
+ * The embedded event queue is a fixed four-entry FIFO, separate from the
+ * one-item reliable, control, submitted-message, and received-message
+ * lifecycles. Its read index and count alone define owned entries; slot bytes
+ * are not cleared merely to invalidate them. This event retention does not
+ * imply message or output queueing. Workspace sizing reserves the
+ * pointer-backed non-overlapping regions with checked arithmetic; both fixed
+ * embedded arrays are included in this root's size automatically.
  */
 typedef struct
 {
@@ -236,8 +245,9 @@ typedef struct
     uint8_t*              received_message;
     size_t                received_message_size;
     uint8_t               received_message_pending;
-    HIL_Transport_Event_T pending_event;
-    uint8_t               event_pending;
+    HIL_Transport_Event_T event_queue[HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY];
+    size_t                event_read_index;
+    size_t                event_count;
 } HIL_Transport_Mvp_Root_T;
 
 #endif /* HIL_RIG_PROTOCOL_TRANSPORT_INTERNAL_MVP_TRANSPORT_TYPES_MVP_H */
