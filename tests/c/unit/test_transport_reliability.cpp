@@ -368,7 +368,7 @@ TEST_F( TransportReliabilityTest, ExactLargerAndRepeatedPeeksReturnStableIndepen
     EXPECT_EQ( output_size, FrameSize );
     EXPECT_TRUE( std::equal( exact.begin(), exact.end(), original_bytes_.begin() ) );
     EXPECT_EQ( root_.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_PEEKED );
-    EXPECT_EQ( root_.output_selection, HIL_TRANSPORT_MVP_OUTPUT_RELIABLE );
+    EXPECT_EQ( root_.output_selection, HIL_TRANSPORT_MVP_OUTPUT_NONE );
 
     exact.fill( 0x11u );
     std::array<std::uint8_t, RetainedCapacity + 4u> larger{};
@@ -427,6 +427,29 @@ TEST_F( TransportReliabilityTest, InitialCommitBeginsTimingAndCanOnlyOccurOncePe
                                                           &output_size ),
                HIL_TRANSPORT_STATUS_NOT_READY );
     EXPECT_EQ( output_size, 0u );
+}
+
+TEST_F( TransportReliabilityTest, PrivateLifecycleDoesNotOwnGlobalOutputSelection )
+{
+    root_.output_selection = HIL_TRANSPORT_MVP_OUTPUT_CONTROL;
+
+    Publish();
+    EXPECT_EQ( root_.output_selection, HIL_TRANSPORT_MVP_OUTPUT_CONTROL );
+    Peek();
+    EXPECT_EQ( root_.output_selection, HIL_TRANSPORT_MVP_OUTPUT_CONTROL );
+    Commit();
+    EXPECT_EQ( root_.output_selection, HIL_TRANSPORT_MVP_OUTPUT_CONTROL );
+
+    HIL_Transport_Mvp_Frame_Type_T          completed;
+    HIL_Transport_Mvp_Reliability_Outcome_T outcome;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Reliability_Accept_Acknowledgement( &root_, InitialSequence,
+                                                                     &completed, &outcome ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( outcome, HIL_TRANSPORT_MVP_RELIABILITY_ACKNOWLEDGED );
+    EXPECT_EQ( root_.output_selection, HIL_TRANSPORT_MVP_OUTPUT_CONTROL );
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Reliability_Reset( &root_ ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( root_.output_selection, HIL_TRANSPORT_MVP_OUTPUT_CONTROL );
 }
 
 TEST_F( TransportReliabilityTest, CommitRejectsEveryValidStateWithoutPeekedSelection )
@@ -969,19 +992,6 @@ TEST_F( TransportReliabilityTest, InvalidPrivateStatesFaultWithoutExposingOrOver
     ASSERT_EQ( HIL_TRANSPORT_MVP_Reliability_Reset( &root_ ), HIL_TRANSPORT_STATUS_OK );
     restore_base();
 
-    Publish();
-    Peek();
-    root_.output_selection = HIL_TRANSPORT_MVP_OUTPUT_NONE;
-    expect_fault_on_peek();
-    ASSERT_EQ( HIL_TRANSPORT_MVP_Reliability_Reset( &root_ ), HIL_TRANSPORT_STATUS_OK );
-    restore_base();
-
-    PrepareAwaiting();
-    root_.output_selection = HIL_TRANSPORT_MVP_OUTPUT_RELIABLE;
-    expect_fault_on_peek();
-    ASSERT_EQ( HIL_TRANSPORT_MVP_Reliability_Reset( &root_ ), HIL_TRANSPORT_STATUS_OK );
-    restore_base();
-
     SetValidState( HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_READY );
     root_.session.retransmissions_committed = root_.base.config.max_retries;
     expect_fault_on_peek();
@@ -991,11 +1001,6 @@ TEST_F( TransportReliabilityTest, InvalidPrivateStatesFaultWithoutExposingOrOver
     Publish();
     root_.session.retransmissions_committed =
         static_cast<std::uint8_t>( root_.base.config.max_retries + 1u );
-    expect_fault_on_peek();
-    ASSERT_EQ( HIL_TRANSPORT_MVP_Reliability_Reset( &root_ ), HIL_TRANSPORT_STATUS_OK );
-    restore_base();
-
-    root_.output_selection = HIL_TRANSPORT_MVP_OUTPUT_RELIABLE;
     expect_fault_on_peek();
     ASSERT_EQ( HIL_TRANSPORT_MVP_Reliability_Reset( &root_ ), HIL_TRANSPORT_STATUS_OK );
     restore_base();

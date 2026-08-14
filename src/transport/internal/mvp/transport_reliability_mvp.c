@@ -42,7 +42,6 @@ static void HIL_TRANSPORT_MVP_Reliability_Clear_Metadata( HIL_Transport_Mvp_Root
     root->session.retransmissions_committed    = 0u;
     root->session.reliable_last_committed_ms   = 0u;
     root->encoded_output_size                  = 0u;
-    root->output_selection                     = HIL_TRANSPORT_MVP_OUTPUT_NONE;
 }
 
 static HIL_Transport_Status_T
@@ -50,14 +49,9 @@ HIL_TRANSPORT_MVP_Reliability_Validate_State( HIL_Transport_Mvp_Root_T* root )
 {
     const HIL_Transport_Mvp_Reliable_State_T state     = root->session.reliable_state;
     const int                                is_active = state != HIL_TRANSPORT_MVP_RELIABLE_IDLE;
-    const int is_peeked = ( state == HIL_TRANSPORT_MVP_RELIABLE_PEEKED )
-                          || ( state == HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_PEEKED );
 
     if ( ( state < HIL_TRANSPORT_MVP_RELIABLE_IDLE )
          || ( state > HIL_TRANSPORT_MVP_RELIABLE_EXHAUSTED )
-         || ( root->output_selection < HIL_TRANSPORT_MVP_OUTPUT_NONE )
-         || ( root->output_selection > HIL_TRANSPORT_MVP_OUTPUT_CONTROL )
-         || ( root->output_selection == HIL_TRANSPORT_MVP_OUTPUT_CONTROL )
          || ( root->session.retransmissions_committed > root->base.config.max_retries ) )
     {
         return HIL_TRANSPORT_MVP_Reliability_Record_Invariant_Failure( root );
@@ -69,8 +63,7 @@ HIL_TRANSPORT_MVP_Reliability_Validate_State( HIL_Transport_Mvp_Root_T* root )
              || ( root->session.retained_reliable_frame_type != HIL_TRANSPORT_MVP_FRAME_INVALID )
              || ( root->session.retained_transmit_sequence != 0u )
              || ( root->session.retransmissions_committed != 0u )
-             || ( root->session.reliable_last_committed_ms != 0u )
-             || ( root->output_selection != HIL_TRANSPORT_MVP_OUTPUT_NONE ) )
+             || ( root->session.reliable_last_committed_ms != 0u ) )
         {
             return HIL_TRANSPORT_MVP_Reliability_Record_Invariant_Failure( root );
         }
@@ -81,9 +74,7 @@ HIL_TRANSPORT_MVP_Reliability_Validate_State( HIL_Transport_Mvp_Root_T* root )
          || ( root->encoded_output_size > root->encoded_output_capacity )
          || !HIL_TRANSPORT_MVP_Reliability_Is_Reliable_Type(
              root->session.retained_reliable_frame_type )
-         || ( root->session.retained_transmit_sequence != root->session.next_transmit_sequence )
-         || ( is_peeked && ( root->output_selection != HIL_TRANSPORT_MVP_OUTPUT_RELIABLE ) )
-         || ( !is_peeked && ( root->output_selection != HIL_TRANSPORT_MVP_OUTPUT_NONE ) ) )
+         || ( root->session.retained_transmit_sequence != root->session.next_transmit_sequence ) )
     {
         return HIL_TRANSPORT_MVP_Reliability_Record_Invariant_Failure( root );
     }
@@ -191,7 +182,6 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Reliability_Peek_Output( HIL_Transport_
     }
 
     memcpy( out_buffer, root->encoded_output, root->encoded_output_size );
-    root->output_selection = HIL_TRANSPORT_MVP_OUTPUT_RELIABLE;
     if ( root->session.reliable_state == HIL_TRANSPORT_MVP_RELIABLE_READY )
     {
         root->session.reliable_state = HIL_TRANSPORT_MVP_RELIABLE_PEEKED;
@@ -230,7 +220,6 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Reliability_Commit_Output( HIL_Transpor
         ++root->session.retransmissions_committed;
     }
     root->session.reliable_last_committed_ms = now_ms;
-    root->output_selection                   = HIL_TRANSPORT_MVP_OUTPUT_NONE;
     root->session.reliable_state             = HIL_TRANSPORT_MVP_RELIABLE_AWAITING_ACK;
 
     /* The original encoded bytes remain the retry copy; no reconstruction occurs. */

@@ -111,7 +111,7 @@ typedef enum
     /** The sole retained reliable encoded frame is pinned. */
     HIL_TRANSPORT_MVP_OUTPUT_RELIABLE,
 
-    /** Reserved for a later ACK/control-output implementation. */
+    /** The fixed one-item encoded control-output slot is pinned. */
     HIL_TRANSPORT_MVP_OUTPUT_CONTROL
 } HIL_Transport_Mvp_Output_Selection_T;
 
