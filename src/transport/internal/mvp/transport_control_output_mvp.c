@@ -121,7 +121,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Control_Output_Peek_Output( HIL_Transpo
 
     memcpy( out_buffer, root->control_output, root->control_output_size );
     root->control_output_state = HIL_TRANSPORT_MVP_CONTROL_OUTPUT_PEEKED;
-    /* Global output selection belongs to the later public arbitration layer. */
+    /* Global output selection belongs exclusively to the output arbiter. */
     return HIL_TRANSPORT_STATUS_OK;
 }
 

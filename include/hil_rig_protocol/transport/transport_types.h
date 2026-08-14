@@ -275,7 +275,7 @@ typedef struct
     /** Nonzero after Process() has accepted an operating-mode value. */
     uint8_t operating_mode_valid;
 
-    /** Nonzero while opaque encoded output can be peeked. */
+    /** Nonzero while control or reliable opaque encoded output can be peeked. */
     uint8_t output_pending;
 
     /** Nonzero while one complete received Application message is unread. */
@@ -284,7 +284,7 @@ typedef struct
     /** Nonzero while at least one high-level event is unread. */
     uint8_t event_pending;
 
-    /** Nonzero while a reliable transmission remains owned by Transport. */
+    /** Nonzero only while a reliable transmission remains owned by Transport. */
     uint8_t reliable_delivery_pending;
 
     /** Most recent high-level session failure. */

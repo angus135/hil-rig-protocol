@@ -24,12 +24,11 @@
  *
  * @par Current implementation status
  * MVP workspace sizing, initialization, CRC, COBS framing, frame codec, and
- * bounded stream parsing are implemented. The one-item reliable output
- * lifecycle, its timing/accounting primitive, public reliable peek/commit,
- * status, and reset are implemented. A separate private one-item control slot
- * is implemented but is not yet exposed through public output arbitration.
- * Session establishment, received-frame dispatch, ACK generation, and public
- * Application-message orchestration remain intentional
+ * bounded stream parsing are implemented. Independent one-item reliable and
+ * control-output lifecycles, public priority arbitration with stable pinned
+ * selection, aggregate output status, commit routing, and output reset are
+ * implemented. Session establishment, received-frame dispatch, ACK and RESET
+ * generation, and public Application-message orchestration remain intentional
  * HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED stubs.
  */
 #ifndef HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
@@ -388,16 +387,17 @@ HIL_Transport_Status_T HIL_TRANSPORT_Process( HIL_Transport_Context_T* context, 
  * @details On OK output_size is bytes copied. On BUFFER_TOO_SMALL it is required
  * bytes and the queued item is unchanged. On NOT_READY it is zero. Passing NULL
  * with size zero is a size query and returns BUFFER_TOO_SMALL with required size
- * when output exists. A successful copy pins the exact selected bytes: repeated
- * peeks return the same item until Commit_Output(), Reset(), or later failure
- * recovery. Peeking does not start retry timing, update transmitted-byte
- * accounting, or tell Transport that external hardware accepted the frame.
+ * when output exists. Output can be private control or reliable traffic; its
+ * type remains opaque to the caller. When nothing is pinned, control output is
+ * preferred. The same priority applies to size queries and undersized buffers,
+ * which do not pin selection or fall back based on caller capacity.
  *
- * The private MVP must ensure one reliable item cannot be replaced while ready,
- * pinned, committed awaiting acknowledgement, awaiting retransmission, or
- * exhausted pending owner policy. A low-level output-buffer-too-small condition
- * is always retryable and cannot discard a valid item. Reliable output is not
- * available while awaiting ACK or after retry exhaustion.
+ * A successful complete copy pins the exact selected bytes: repeated peeks
+ * return the same item until Commit_Output(), Reset(), or later failure
+ * recovery, even if another item becomes ready. Peeking does not start retry
+ * timing, update transmitted-byte accounting, or tell Transport that external
+ * hardware accepted the frame. A low-level output-buffer-too-small condition is
+ * always retryable and cannot discard a valid item.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[out] out_buffer Caller output, or NULL only with out_buffer_size zero.
@@ -413,12 +413,14 @@ HIL_Transport_Status_T HIL_TRANSPORT_Peek_Output( HIL_Transport_Context_T* conte
  * @brief Confirm that external I/O accepted the complete last-peeked item.
  *
  * @details Call only after the caller's USB/serial implementation accepted all
- * bytes as one transmission. Reliable acknowledgement timing starts at now_ms,
- * not when bytes were peeked. The initial commit does not count as a
- * retransmission; each committed retry increments the private count exactly
- * once. Reliable output keeps its private slot and exact encoded bytes until a
- * matching acknowledgement, later owner-directed recovery, or reset. Commit
- * never performs hardware I/O, reconstruction, CRC, or COBS work.
+ * bytes as one transmission. Transport routes commit to the lifecycle that
+ * produced the pinned item. Control commit releases its slot immediately and
+ * deliberately ignores now_ms. Reliable acknowledgement timing starts at
+ * now_ms, not when bytes were peeked; reliable bytes remain retained until a
+ * matching acknowledgement, later owner-directed recovery, or reset. The
+ * initial reliable commit does not count as a retransmission; each committed
+ * retry increments the private count exactly once. Commit never performs
+ * hardware I/O, reconstruction, CRC, or COBS work.
  *
  * @param[in,out] context Initialized context with successfully peeked output.
  * @param[in] now_ms Monotonic acceptance time supplied by the caller.
@@ -468,12 +470,12 @@ HIL_Transport_Status_T HIL_TRANSPORT_Read_Event( HIL_Transport_Context_T* contex
  * @brief Obtain a consistent high-level status snapshot.
  *
  * @details This observational operation exposes role, link, session, operating
- * mode, pending-work indicators, and high-level failure only. Reliable output
- * pending is set while initial/retry bytes are ready or peeked. Reliable
- * delivery remains pending through ACK wait and retry exhaustion until the
- * owning session later handles it. The snapshot does not expose private profile
- * state, sequences, retry counts, borrowed workspace pointers, or mutable
- * handles.
+ * mode, pending-work indicators, and high-level failure only. Output pending is
+ * set while either control or reliable initial/retry bytes are ready or peeked.
+ * Reliable delivery pending is unaffected by control ownership and remains set
+ * through reliable ACK wait and retry exhaustion until the owning session later
+ * handles it. The snapshot does not expose output type, private profile state,
+ * sequences, retry counts, borrowed workspace pointers, or mutable handles.
  *
  * @param[in] context Initialized single-owner context.
  * @param[out] status Snapshot destination; must not be NULL.

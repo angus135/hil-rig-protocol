@@ -5,9 +5,9 @@
  * @details The eventual MVP uses simple session establishment, one complete
  * Application message per frame, framing plus integrity, and one outstanding
  * reliable transmission. Workspace sizing, initialization, the wire path, the
- * reliable encoded-output lifecycle, and separate private one-item control
- * storage are implemented. Public control-output arbitration, handshake
- * progression, and Application-message orchestration remain stubs.
+ * reliable encoded-output lifecycle, separate private one-item control storage,
+ * and public output arbitration are implemented. Handshake progression and
+ * Application-message orchestration remain stubs.
  */
 #include "../transport_profile.h"
 

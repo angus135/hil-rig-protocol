@@ -36,13 +36,13 @@ typedef enum
 /**
  * @brief Publish metadata for a frame already encoded in the retained region.
  *
- * @details Publication requires IDLE ownership, no pinned selection, a reliable
+ * @details Publication requires IDLE reliable ownership, a reliable
  * INITIATE/RESPONSE/CONFIRM/APPLICATION type, a nonzero encoded size within the
  * configured region, and the current candidate transmit sequence. Success
  * enters READY without copying bytes, advancing the sequence, starting timing,
- * or retaining any caller buffer. Invalid publication from IDLE leaves the slot
- * unpublished and its encoded size zero. A non-IDLE slot returns NOT_READY and
- * preserves the active item.
+ * retaining any caller buffer, or changing global output selection. Invalid
+ * publication from IDLE leaves the slot unpublished and its encoded size zero.
+ * A non-IDLE slot returns NOT_READY and preserves the active item.
  *
  * @param[in,out] root Initialized private MVP root whose encoded region already
  * contains the complete valid frame.
@@ -61,9 +61,10 @@ HIL_TRANSPORT_MVP_Reliability_Publish_Encoded( HIL_Transport_Mvp_Root_T*      ro
  *
  * @details A NULL buffer with zero capacity is a size query. Insufficient
  * capacity reports the complete size without copying or pinning. A successful
- * READY peek selects reliable output and enters PEEKED; a successful retry peek
- * enters RETRANSMIT_PEEKED. Repeated peeks in either peeked state return the
- * same retained bytes and do not affect sequence, timing, or retry accounting.
+ * READY peek enters PEEKED; a successful retry peek enters
+ * RETRANSMIT_PEEKED. Repeated peeks in either peeked state return the same
+ * retained bytes and do not affect sequence, timing, retry accounting, or
+ * global output selection. The output arbiter alone owns that selection.
  *
  * @param[in,out] root Initialized private MVP root.
  * @param[out] out_buffer Caller-owned destination, or NULL only for a size query.
@@ -77,14 +78,16 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Reliability_Peek_Output( HIL_Transport_
                                                                   size_t*  output_size );
 
 /**
- * @brief Commit the reliable item most recently selected by a successful peek.
+ * @brief Commit the reliable item after a successful private reliable peek.
  *
  * @details Commit means external I/O accepted the complete copied item. An
  * initial commit enters AWAITING_ACK, records now_ms, and leaves the committed
  * retransmission count at zero. A retransmission commit increments that count
  * exactly once and replaces the timestamp. Both retain the exact encoded bytes,
  * type, and sequence. Timing starts here rather than at peek because a peek does
- * not prove external acceptance.
+ * not prove external acceptance. This local operation does not clear or
+ * otherwise change global output selection; the output arbiter routes commit
+ * and clears its selection after success.
  *
  * @param[in,out] root Initialized private MVP root.
  * @param[in] now_ms Caller-supplied external-I/O acceptance time.
@@ -105,7 +108,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Reliability_Commit_Output( HIL_Transpor
  *
  * On a match the completed type is captured, next_transmit_sequence advances
  * exactly once with natural uint16_t wrap, and retained metadata/size are
- * invalidated without clearing the large byte region.
+ * invalidated without clearing the large byte region or changing global output
+ * selection. This permits reliable completion while control output is pinned.
  *
  * @param[in,out] root Initialized private MVP root.
  * @param[in] acknowledgement_sequence Validated received ACK sequence.
@@ -142,9 +146,10 @@ HIL_TRANSPORT_MVP_Reliability_Process_Pending( HIL_Transport_Mvp_Root_T* root, u
  * @brief Abandon all reliable ownership and return the slot to IDLE.
  *
  * @details Reset works from every lifecycle state. It invalidates encoded size,
- * retained type/sequence, retry count, timestamp, and output selection. It does
- * not clear the encoded region, alter configuration/role, choose session policy,
- * or perform I/O.
+ * retained type/sequence, retry count, and timestamp. It does not change global
+ * output selection, clear the encoded region, alter configuration/role, choose
+ * session policy, or perform I/O. The output arbiter coordinates full output
+ * reset and clears selection.
  *
  * @param[in,out] root Private MVP root with an initialized encoded region.
  * @return OK or INVALID_ARGUMENT.
@@ -152,7 +157,7 @@ HIL_TRANSPORT_MVP_Reliability_Process_Pending( HIL_Transport_Mvp_Root_T* root, u
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Reliability_Reset( HIL_Transport_Mvp_Root_T* root );
 
 /**
- * @brief Return public pending flags after validating private reliability state.
+ * @brief Return reliable-local pending flags after validating local state.
  *
  * @param[in,out] root Initialized private MVP root; invariant failure records
  * FAULT/INTERNAL.
