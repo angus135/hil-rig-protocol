@@ -309,12 +309,6 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
 
 
     */
-    // TODO payload_size
-    // uint32_t payload_size = 10 + data->firmware_git_hash.size + data->diagnostic_data.size;
-    // if ( max_payload_size < payload_size )
-    // {
-    //     return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
-    // }
     uint32_t payload_size = sizeof( data->tick_duration )+sizeof( data->expected_tick_count )+sizeof( data->flags );
     if ( max_payload_size < payload_size )
     {
