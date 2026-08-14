@@ -143,6 +143,23 @@ HIL_TRANSPORT_MVP_Reliability_Process_Pending( HIL_Transport_Mvp_Root_T* root, u
                                                HIL_Transport_Mvp_Reliability_Outcome_T* outcome );
 
 /**
+ * @brief Make retained bytes available again after an exact peer duplicate.
+ *
+ * @details READY/PEEKED and RETRANSMIT_READY/RETRANSMIT_PEEKED already expose
+ * or pin the retained bytes and therefore do not change. AWAITING_ACK moves to
+ * RETRANSMIT_READY while retry allowance remains, or EXHAUSTED otherwise.
+ * Requesting or peeking never consumes retry allowance; only the existing
+ * retransmission commit path increments retransmissions_committed. The
+ * operation never changes the arbiter's pinned output selection.
+ *
+ * IDLE reports no work. An active retained item whose type differs from the
+ * expected duplicate-response type is a private invariant failure.
+ */
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Reliability_Request_Retransmission(
+    HIL_Transport_Mvp_Root_T* root, HIL_Transport_Mvp_Frame_Type_T expected_frame_type,
+    HIL_Transport_Mvp_Reliability_Outcome_T* outcome );
+
+/**
  * @brief Abandon all reliable ownership and return the slot to IDLE.
  *
  * @details Reset works from every lifecycle state. It invalidates encoded size,
