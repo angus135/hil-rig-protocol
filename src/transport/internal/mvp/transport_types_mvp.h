@@ -42,6 +42,7 @@ typedef enum
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_RESPONSE_PENDING,
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM,
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_CONFIRM_PENDING,
+    HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK,
     HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED
 } HIL_Transport_Mvp_Handshake_Phase_T;
 
@@ -179,6 +180,12 @@ typedef struct
 
     uint16_t last_accepted_receive_sequence;
     uint8_t  accepted_receive_sequence_valid;
+
+    /** Semantic identity of the last accepted reliable frame for exact duplicate checks. */
+    HIL_Transport_Mvp_Frame_Type_T last_accepted_receive_frame_type;
+
+    /** Acknowledgement field of the last accepted reliable frame. */
+    uint16_t last_accepted_receive_acknowledgement_sequence;
 
     /** Current ownership/peek/commit/retry state for the sole reliable item. */
     HIL_Transport_Mvp_Reliable_State_T reliable_state;

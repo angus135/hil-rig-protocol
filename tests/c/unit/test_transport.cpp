@@ -189,6 +189,8 @@ TEST( TransportSessionInitialization, InitializesHostAndRigFieldsDeterministical
     EXPECT_EQ( host.retained_reliable_frame_type, HIL_TRANSPORT_MVP_FRAME_INVALID );
     EXPECT_EQ( host.last_accepted_receive_sequence, 0u );
     EXPECT_EQ( host.accepted_receive_sequence_valid, 0u );
+    EXPECT_EQ( host.last_accepted_receive_frame_type, HIL_TRANSPORT_MVP_FRAME_INVALID );
+    EXPECT_EQ( host.last_accepted_receive_acknowledgement_sequence, 0u );
     EXPECT_EQ( host.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE );
     EXPECT_EQ( host.retransmissions_committed, 0u );
     EXPECT_EQ( host.reliable_last_committed_ms, 0u );
@@ -330,9 +332,11 @@ TEST( TransportSessionRecovery, AutomaticAbandonmentCleansWorkAndPreservesEvents
     root->parser.accumulated_size                 = 2u;
     root->parser.discarding                       = 1u;
     root->session.next_transmit_sequence          = 17u;
-    root->session.expected_receive_sequence       = 18u;
-    root->session.last_accepted_receive_sequence  = 17u;
-    root->session.accepted_receive_sequence_valid = 1u;
+    root->session.expected_receive_sequence                          = 18u;
+    root->session.last_accepted_receive_sequence                     = 17u;
+    root->session.accepted_receive_sequence_valid                    = 1u;
+    root->session.last_accepted_receive_frame_type                   = HIL_TRANSPORT_MVP_FRAME_CONFIRM;
+    root->session.last_accepted_receive_acknowledgement_sequence = 16u;
     root->session.last_valid_receive_ms           = 99u;
     root->session.next_host_session_identifier    = 12u;
     const auto*                 submitted_storage = root->submitted_message;
@@ -359,6 +363,8 @@ TEST( TransportSessionRecovery, AutomaticAbandonmentCleansWorkAndPreservesEvents
     EXPECT_EQ( root->session.handshake_phase, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE );
     EXPECT_EQ( root->session.next_transmit_sequence, config.initial_reliable_sequence );
     EXPECT_EQ( root->session.expected_receive_sequence, config.initial_reliable_sequence );
+    EXPECT_EQ( root->session.last_accepted_receive_frame_type, HIL_TRANSPORT_MVP_FRAME_INVALID );
+    EXPECT_EQ( root->session.last_accepted_receive_acknowledgement_sequence, 0u );
     EXPECT_EQ( root->session.next_host_session_identifier, 12u );
     EXPECT_EQ( root->submitted_message, submitted_storage );
     EXPECT_EQ( root->parser.scratch_buffer, parser_storage );

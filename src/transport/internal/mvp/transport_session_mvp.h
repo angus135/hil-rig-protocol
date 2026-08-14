@@ -104,9 +104,22 @@ HIL_TRANSPORT_MVP_Session_Reserve_Sequence( HIL_Transport_Mvp_Session_T* session
  * restart, public status and high-level events.
  */
 HIL_Transport_Status_T
-HIL_TRANSPORT_MVP_Session_Classify_Sequence( HIL_Transport_Mvp_Session_T*            session,
+HIL_TRANSPORT_MVP_Session_Classify_Sequence( const HIL_Transport_Mvp_Session_T*      session,
                                              uint16_t                                sequence,
                                              HIL_Transport_Mvp_Rx_Sequence_Result_T* result );
+
+/**
+ * @brief Commit one previously classified expected reliable receive sequence.
+ *
+ * @details The first accepted peer sequence establishes the receive baseline,
+ * independently of the local initial transmit sequence. Later acceptance
+ * requires expected_receive_sequence. Success records the accepted sequence
+ * and advances the expectation with natural uint16_t wrapping. Duplicate and
+ * incompatible values are not committed.
+ */
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Session_Accept_Sequence( HIL_Transport_Mvp_Session_T* session,
+                                           uint16_t                     sequence );
 
 /**
  * @brief Classify an ACK against the sole committed reliable item.
