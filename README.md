@@ -90,8 +90,9 @@ host INITIATE, rig RESPONSE, host CONFIRM, and rig ACK establish both endpoints.
 It reuses the codec and output lifecycles, supports exact duplicate recovery and
 timed retries, and abandons exhausted attempts through the existing session
 recovery path. `HIL_TRANSPORT_Process()` validates and records all three MVP
-operating modes, publishes pending handshake work, advances reliable timing, and
-starts later recovery attempts. Public `Receive_Bytes()` now feeds arbitrary
+operating modes, progresses Transport-owned receive work before retry expiry,
+publishes pending handshake work, advances reliable timing, and starts later
+recovery attempts. Public `Receive_Bytes()` now feeds arbitrary
 stream chunks through the bounded parser and non-copying decoder view, then
 dispatches complete frames into that coordinator transactionally. A completed
 parser body remains retained across temporary event, reliable-output, or

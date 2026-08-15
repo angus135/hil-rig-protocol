@@ -324,6 +324,7 @@ HIL_TRANSPORT_PROFILE_Process( HIL_Transport_Context_T* context, uint32_t now_ms
     HIL_Transport_Mvp_Root_T*               root;
     HIL_Transport_Mvp_Reliability_Outcome_T reliability_outcome;
     HIL_Transport_Status_T                  status;
+    size_t                                  receive_bytes_consumed;
     uint8_t                                 control_pending;
     HIL_Transport_Mvp_Frame_Type_T          retained_type;
 
@@ -379,6 +380,15 @@ HIL_TRANSPORT_PROFILE_Process( HIL_Transport_Context_T* context, uint32_t now_ms
             return HIL_TRANSPORT_STATUS_OK;
         }
         status = HIL_TRANSPORT_MVP_Session_Begin_Establishment( root );
+        if ( status != HIL_TRANSPORT_STATUS_OK )
+        {
+            return status;
+        }
+    }
+
+    if ( ( root->receive_protocol_error_pending != 0u ) || ( root->parser.body_ready != 0u ) )
+    {
+        status = HIL_TRANSPORT_MVP_Receive_Bytes( root, NULL, 0u, &receive_bytes_consumed );
         if ( status != HIL_TRANSPORT_STATUS_OK )
         {
             return status;

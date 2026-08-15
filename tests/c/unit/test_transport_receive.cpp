@@ -292,7 +292,8 @@ TEST( TransportReceive, FinalAckWaitsTransactionallyForEventCapacity )
 {
     ReceiveHarness host;
     host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
-    auto context = host.Context();
+    host.root.base.config.max_retries = 0u;
+    auto context                      = host.Context();
     ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
                HIL_TRANSPORT_STATUS_OK );
     ( void )PeekAndCommit( host, 2u );
@@ -309,19 +310,32 @@ TEST( TransportReceive, FinalAckWaitsTransactionallyForEventCapacity )
     EXPECT_EQ( consumed, ack.size() );
     EXPECT_EQ( host.root.parser.body_ready, 1u );
     EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    const auto retained_parser = host.parser;
+
+    EXPECT_EQ( HIL_TRANSPORT_Process( &context, 14u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
+    EXPECT_EQ( host.root.parser.body_ready, 1u );
+    EXPECT_EQ( host.parser, retained_parser );
+    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( host.root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_AWAITING_ACK );
+    EXPECT_EQ( host.root.session.retransmissions_committed, 0u );
+    EXPECT_EQ( host.root.session.reliable_last_committed_ms, 4u );
 
     ( void )ReadEvent( host );
-    EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, nullptr, 0u, &consumed ),
+    EXPECT_EQ( HIL_TRANSPORT_Process( &context, 15u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
                HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( consumed, ack.size() );
     EXPECT_EQ( host.root.parser.body_ready, 0u );
     EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+    EXPECT_EQ( host.root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE );
 }
 
 TEST( TransportReceive, ConfirmWaitsTransactionallyForOccupiedControlOutput )
 {
     ReceiveHarness rig;
     rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u );
-    auto context = rig.Context();
+    rig.root.base.config.max_retries = 0u;
+    auto context                     = rig.Context();
     ReceiveWhole( rig, Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_INITIATE, 77u, 10u, 0u ) ) );
     ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
                HIL_TRANSPORT_STATUS_OK );
@@ -333,13 +347,59 @@ TEST( TransportReceive, ConfirmWaitsTransactionallyForOccupiedControlOutput )
     std::size_t consumed = 0u;
     EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, confirm.data(), confirm.size(), &consumed ),
                HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
+    EXPECT_EQ( consumed, confirm.size() );
     EXPECT_EQ( rig.root.parser.body_ready, 1u );
     EXPECT_EQ( rig.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
-    ( void )PeekAndCommit( rig, 3u );
-    EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, nullptr, 0u, &consumed ),
+    const auto retained_parser = rig.parser;
+
+    EXPECT_EQ( HIL_TRANSPORT_Process( &context, 12u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
+    EXPECT_EQ( rig.root.parser.body_ready, 1u );
+    EXPECT_EQ( rig.parser, retained_parser );
+    EXPECT_EQ( rig.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( rig.root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_AWAITING_ACK );
+    EXPECT_EQ( rig.root.session.retransmissions_committed, 0u );
+    EXPECT_EQ( rig.root.session.reliable_last_committed_ms, 2u );
+
+    ( void )PeekAndCommit( rig, 13u );
+    EXPECT_EQ( HIL_TRANSPORT_Process( &context, 14u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
                HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( consumed, confirm.size() );
     EXPECT_EQ( rig.root.parser.body_ready, 0u );
     EXPECT_EQ( rig.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+    EXPECT_EQ( rig.root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE );
+}
+
+TEST( TransportReceive, PendingProtocolErrorSuspendsReliableTimeoutWhileEventCapacityIsFull )
+{
+    ReceiveHarness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
+    host.root.base.config.max_retries = 0u;
+    auto context                      = host.Context();
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ( void )PeekAndCommit( host, 2u );
+    FillEvents( host );
+    std::vector<std::uint8_t> oversized( EncodedCapacity, 0x7Fu );
+    oversized.push_back( 0u );
+
+    std::size_t consumed = 0u;
+    ASSERT_EQ(
+        HIL_TRANSPORT_Receive_Bytes( &context, oversized.data(), oversized.size(), &consumed ),
+        HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
+    ASSERT_EQ( consumed, oversized.size() );
+    ASSERT_EQ( host.root.receive_protocol_error_pending, 1u );
+    const auto retained_reliable = host.encoded;
+
+    EXPECT_EQ( HIL_TRANSPORT_Process( &context, 12u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
+    EXPECT_EQ( host.root.receive_protocol_error_pending, 1u );
+    EXPECT_EQ( host.root.parser.body_ready, 0u );
+    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( host.root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_AWAITING_ACK );
+    EXPECT_EQ( host.root.session.retransmissions_committed, 0u );
+    EXPECT_EQ( host.root.session.reliable_last_committed_ms, 2u );
+    EXPECT_EQ( host.encoded, retained_reliable );
 }
 
 TEST( TransportReceive, IncompatibilityAbandonsBodyPublishesResetAndWaitsForItsCommit )

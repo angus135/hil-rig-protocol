@@ -332,10 +332,12 @@ already completed parser body before accepting new bytes. A decoded body is a
 transaction: retryable event, reliable-output, or control-output exhaustion
 returns `CAPACITY_EXHAUSTED` while leaving the body unchanged. A later call,
 including one with zero input bytes, retries semantic processing without asking
-the caller to resend bytes already accepted into parser scratch. A completed
-oversized discard has no body to retain, so a one-bit pending diagnostic blocks
-later input until its `PROTOCOL_ERROR` event can be published. The parser stops
-at that discard delimiter, leaving every following byte in the caller-owned
+the caller to resend bytes already accepted into parser scratch. `Process()`
+also progresses this pending receive work before handshake publication or retry
+expiry, and leaves reliability timing unchanged while local capacity blocks it.
+A completed oversized discard has no body to retain, so a one-bit pending
+diagnostic blocks later input until its `PROTOCOL_ERROR` event can be published. The
+parser stops at that discard delimiter, leaving every following byte in the caller-owned
 suffix.
 
 Malformed, integrity-invalid, stale-session, or incompatible-sequence input is
