@@ -945,6 +945,7 @@ TEST( TransportStorage, SizesAndPartitionsWorkspaceForWireBuffers )
     EXPECT_EQ( root->codec_scratch_size,
                config.max_application_message_size + HIL_TRANSPORT_MVP_RAW_OVERHEAD );
     EXPECT_NE( root->codec_scratch, root->parser.scratch_buffer );
+    EXPECT_EQ( root->receive_protocol_error_pending, 0u );
 
     EXPECT_EQ( HIL_TRANSPORT_Init( &context, HIL_TRANSPORT_ROLE_HOST, &config, &storage ),
                HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );

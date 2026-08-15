@@ -44,6 +44,7 @@ HIL_TRANSPORT_MVP_Session_Clear_Scoped_Work( HIL_Transport_Mvp_Root_T* root )
     root->submitted_message_pending                = 0u;
     root->received_message_size                    = 0u;
     root->received_message_pending                 = 0u;
+    root->receive_protocol_error_pending           = 0u;
     root->session.session_identifier               = HIL_TRANSPORT_SESSION_SEED_INVALID;
     root->session.session_identifier_valid         = 0u;
     root->session.handshake_phase                  = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE;
@@ -214,6 +215,7 @@ HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root )
          || ( root->output_selection != HIL_TRANSPORT_MVP_OUTPUT_NONE )
          || ( root->submitted_message_size != 0u ) || ( root->submitted_message_pending != 0u )
          || ( root->received_message_size != 0u ) || ( root->received_message_pending != 0u )
+         || ( root->receive_protocol_error_pending != 0u )
          || ( root->parser.accumulated_size != 0u ) || ( root->parser.body_ready != 0u )
          || ( root->parser.discarding != 0u ) || ( session->last_accepted_receive_sequence != 0u )
          || ( session->accepted_receive_sequence_valid != 0u )
@@ -379,6 +381,18 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Explicit_Reset( HIL_Transport_M
                                                    ? HIL_TRANSPORT_SESSION_STATE_DISCONNECTED
                                                    : HIL_TRANSPORT_SESSION_STATE_RECOVERING );
     return HIL_TRANSPORT_STATUS_OK;
+}
+
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Enter_Fault( HIL_Transport_Mvp_Root_T* root )
+{
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+
+    ( void )HIL_TRANSPORT_MVP_Session_Clear_Scoped_Work( root );
+    HIL_TRANSPORT_MVP_Session_Set_Fault( root );
+    return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
 }
 
 HIL_Transport_Status_T

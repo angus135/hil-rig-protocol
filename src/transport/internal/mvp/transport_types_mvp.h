@@ -266,11 +266,15 @@ typedef struct
     /** Independent ownership state for the one-item control slot. */
     HIL_Transport_Mvp_Control_Output_State_T control_output_state;
 
-    uint8_t*              codec_scratch;
-    size_t                codec_scratch_size;
-    uint8_t*              received_message;
-    size_t                received_message_size;
-    uint8_t               received_message_pending;
+    uint8_t* codec_scratch;
+    size_t   codec_scratch_size;
+    uint8_t* received_message;
+    size_t   received_message_size;
+    uint8_t  received_message_pending;
+
+    /** Oversized body was discarded but its protocol-error event is not retained yet. */
+    uint8_t receive_protocol_error_pending;
+
     HIL_Transport_Event_T event_queue[HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY];
     size_t                event_read_index;
     size_t                event_count;
