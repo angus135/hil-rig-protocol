@@ -59,6 +59,21 @@ HIL_TRANSPORT_MVP_Decode_Frame( const uint8_t* encoded_body, size_t encoded_body
                                 size_t message_buffer_size, size_t* message_size,
                                 HIL_Transport_Mvp_Decode_Result_T* decode_result );
 
+/**
+ * @brief Decode one opaque body into a synchronous scratch-backed frame view.
+ *
+ * @details The operation performs the same COBS, size, CRC, version, field, and
+ * frame-specific validation as HIL_TRANSPORT_MVP_Decode_Frame(), but does not
+ * copy Application payload bytes into retained message storage. A nonempty
+ * valid payload points into raw_scratch; an empty payload is NULL. That view is
+ * valid only until raw_scratch is reused and must be handled synchronously.
+ * No partial frame is published on failure.
+ */
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Decode_Frame_View(
+    const uint8_t* encoded_body, size_t encoded_body_size, uint8_t* raw_scratch,
+    size_t raw_scratch_size, size_t maximum_application_message_size,
+    HIL_Transport_Mvp_Frame_T* frame, HIL_Transport_Mvp_Decode_Result_T* decode_result );
+
 #ifdef __cplusplus
 }
 #endif
