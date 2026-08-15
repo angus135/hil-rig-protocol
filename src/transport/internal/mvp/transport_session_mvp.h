@@ -112,9 +112,10 @@ HIL_TRANSPORT_MVP_Session_Reserve_Sequence( HIL_Transport_Mvp_Session_T* session
  * reliable frame is accepted, every uint16_t value is expected and the first
  * accepted value establishes the peer baseline independently of the local
  * initial transmit sequence. Afterwards the next value is expected, the exact
- * last accepted value is duplicate, and every other value is incompatible.
- * Semantic type and acknowledgement metadata are checked separately by the
- * owning handshake or future Application receive path.
+ * last accepted value is duplicate, an older value in the uint16 serial-number
+ * half-range is stale, and a future or ambiguous half-range value is
+ * incompatible. Semantic type and acknowledgement metadata are checked
+ * separately by the owning handshake or future Application receive path.
  */
 HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Session_Classify_Sequence( const HIL_Transport_Mvp_Session_T*      session,

@@ -188,6 +188,12 @@ the codec does not decide whether a nonzero session ID belongs to the current
 session. An Application payload is limited by
 `max_application_message_size`; control frames have exactly zero payload bytes.
 
+After the first accepted peer reliable sequence establishes a baseline, the
+next value is expected and the exact last value is a duplicate. Other values in
+the older half of uint16 serial-number space are stale; future values and the
+exactly ambiguous half-range value are incompatible. This modular comparison
+continues to work across natural sequence wrap.
+
 ### CRC integrity
 
 The four-byte integrity field is CRC-32/ISO-HDLC with polynomial `0x04C11DB7`
