@@ -65,6 +65,15 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Abandon( HIL_Transport_Mvp_Root
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Explicit_Reset( HIL_Transport_Mvp_Root_T* root );
 
 /**
+ * @brief Release session-scoped ownership and enter terminal FAULT.
+ *
+ * @details This is the shared invariant-failure seam for coordinators that must
+ * not write session state directly. Cleanup is best effort; the public and
+ * private state/failure mirrors are always finalized as FAULT/INTERNAL.
+ */
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Enter_Fault( HIL_Transport_Mvp_Root_T* root );
+
+/**
  * @brief Observe one caller-owned physical-link state.
  *
  * @details Applies link and recovery transitions even when event capacity is
