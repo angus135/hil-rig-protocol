@@ -290,12 +290,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Encode_Frame( const HIL_Transport_Mvp_F
     return HIL_TRANSPORT_STATUS_OK;
 }
 
-HIL_Transport_Status_T
-HIL_TRANSPORT_MVP_Decode_Frame( const uint8_t* encoded_body, size_t encoded_body_size,
-                                uint8_t* raw_scratch, size_t raw_scratch_size,
-                                HIL_Transport_Mvp_Frame_T* frame, uint8_t* message_buffer,
-                                size_t message_buffer_size, size_t* message_size,
-                                HIL_Transport_Mvp_Decode_Result_T* decode_result )
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Decode_Frame_View(
+    const uint8_t* encoded_body, size_t encoded_body_size, uint8_t* raw_scratch,
+    size_t raw_scratch_size, size_t maximum_application_message_size,
+    HIL_Transport_Mvp_Frame_T* frame, HIL_Transport_Mvp_Decode_Result_T* decode_result )
 {
     HIL_Transport_Status_T         status;
     HIL_Transport_Mvp_Frame_T      candidate = { 0 };
@@ -310,32 +308,22 @@ HIL_TRANSPORT_MVP_Decode_Frame( const uint8_t* encoded_body, size_t encoded_body
     {
         *frame = ( HIL_Transport_Mvp_Frame_T ){ 0 };
     }
-    if ( message_size != NULL )
-    {
-        *message_size = 0u;
-    }
     if ( decode_result != NULL )
     {
         *decode_result = HIL_TRANSPORT_MVP_DECODE_MALFORMED;
     }
     if ( ( encoded_body == NULL ) || ( encoded_body_size == 0u ) || ( raw_scratch == NULL )
-         || ( raw_scratch_size == 0u ) || ( frame == NULL ) || ( message_size == NULL )
-         || ( decode_result == NULL )
-         || ( ( message_buffer == NULL ) && ( message_buffer_size != 0u ) ) )
+         || ( raw_scratch_size == 0u ) || ( frame == NULL ) || ( decode_result == NULL ) )
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    if ( message_buffer_size > ( SIZE_MAX - HIL_TRANSPORT_MVP_RAW_OVERHEAD ) )
+    if ( maximum_application_message_size > ( SIZE_MAX - HIL_TRANSPORT_MVP_RAW_OVERHEAD ) )
     {
         return HIL_TRANSPORT_STATUS_UNSUPPORTED_CONFIGURATION;
     }
-    maximum_raw_size = message_buffer_size + HIL_TRANSPORT_MVP_RAW_OVERHEAD;
+    maximum_raw_size = maximum_application_message_size + HIL_TRANSPORT_MVP_RAW_OVERHEAD;
     if ( HIL_TRANSPORT_MVP_Ranges_Overlap( encoded_body, encoded_body_size, raw_scratch,
-                                           raw_scratch_size )
-         || HIL_TRANSPORT_MVP_Ranges_Overlap( encoded_body, encoded_body_size, message_buffer,
-                                              message_buffer_size )
-         || HIL_TRANSPORT_MVP_Ranges_Overlap( raw_scratch, raw_scratch_size, message_buffer,
-                                              message_buffer_size ) )
+                                           raw_scratch_size ) )
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
@@ -398,7 +386,7 @@ HIL_TRANSPORT_MVP_Decode_Frame( const uint8_t* encoded_body, size_t encoded_body
         ( payload_size == 0u ) ? NULL : ( raw_scratch + HIL_TRANSPORT_MVP_HEADER_SIZE );
     candidate.payload_size = payload_size;
 
-    status = HIL_TRANSPORT_MVP_Validate_Frame( &candidate, message_buffer_size );
+    status = HIL_TRANSPORT_MVP_Validate_Frame( &candidate, maximum_application_message_size );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
         if ( status == HIL_TRANSPORT_STATUS_MESSAGE_TOO_LARGE )
@@ -408,18 +396,70 @@ HIL_TRANSPORT_MVP_Decode_Frame( const uint8_t* encoded_body, size_t encoded_body
         return HIL_TRANSPORT_STATUS_OK;
     }
 
-    if ( payload_size != 0u )
+    *frame         = candidate;
+    *decode_result = HIL_TRANSPORT_MVP_DECODE_VALID;
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Decode_Frame( const uint8_t* encoded_body, size_t encoded_body_size,
+                                uint8_t* raw_scratch, size_t raw_scratch_size,
+                                HIL_Transport_Mvp_Frame_T* frame, uint8_t* message_buffer,
+                                size_t message_buffer_size, size_t* message_size,
+                                HIL_Transport_Mvp_Decode_Result_T* decode_result )
+{
+    HIL_Transport_Mvp_Frame_T candidate;
+    HIL_Transport_Status_T    status;
+
+    if ( frame != NULL )
     {
-        if ( message_buffer == NULL )
-        {
-            return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
-        }
-        memcpy( message_buffer, raw_scratch + HIL_TRANSPORT_MVP_HEADER_SIZE, payload_size );
-        candidate.payload = message_buffer;
+        *frame = ( HIL_Transport_Mvp_Frame_T ){ 0 };
+    }
+    if ( message_size != NULL )
+    {
+        *message_size = 0u;
+    }
+    if ( decode_result != NULL )
+    {
+        *decode_result = HIL_TRANSPORT_MVP_DECODE_MALFORMED;
+    }
+    if ( ( encoded_body == NULL ) || ( encoded_body_size == 0u ) || ( raw_scratch == NULL )
+         || ( raw_scratch_size == 0u ) || ( frame == NULL ) || ( message_size == NULL )
+         || ( decode_result == NULL )
+         || ( ( message_buffer == NULL ) && ( message_buffer_size != 0u ) ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( message_buffer_size > ( SIZE_MAX - HIL_TRANSPORT_MVP_RAW_OVERHEAD ) )
+    {
+        return HIL_TRANSPORT_STATUS_UNSUPPORTED_CONFIGURATION;
+    }
+    if ( HIL_TRANSPORT_MVP_Ranges_Overlap( encoded_body, encoded_body_size, message_buffer,
+                                           message_buffer_size )
+         || HIL_TRANSPORT_MVP_Ranges_Overlap( raw_scratch, raw_scratch_size, message_buffer,
+                                              message_buffer_size ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
 
-    *frame         = candidate;
-    *message_size  = payload_size;
-    *decode_result = HIL_TRANSPORT_MVP_DECODE_VALID;
+    status = HIL_TRANSPORT_MVP_Decode_Frame_View( encoded_body, encoded_body_size, raw_scratch,
+                                                  raw_scratch_size, message_buffer_size, &candidate,
+                                                  decode_result );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    if ( *decode_result != HIL_TRANSPORT_MVP_DECODE_VALID )
+    {
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    if ( candidate.payload_size != 0u )
+    {
+        memcpy( message_buffer, candidate.payload, candidate.payload_size );
+        candidate.payload = message_buffer;
+    }
+    *frame        = candidate;
+    *message_size = candidate.payload_size;
     return HIL_TRANSPORT_STATUS_OK;
 }

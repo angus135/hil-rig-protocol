@@ -552,6 +552,35 @@ TEST( TransportMvpCodec, ValidatesPointersCapacitiesAndNonoverlap )
                HIL_TRANSPORT_STATUS_BUFFER_TOO_SMALL );
 }
 
+TEST( TransportMvpCodec, DecodeViewPublishesScratchBackedPayloadOnlyAfterValidation )
+{
+    DecodeOutput output{};
+    const auto   body_size = GoldenApplication.size() - 1u;
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Decode_Frame_View( GoldenApplication.data(), body_size,
+                                                    output.raw.data(), output.raw.size(),
+                                                    MaxPayload, &output.frame, &output.result ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( output.result, HIL_TRANSPORT_MVP_DECODE_VALID );
+    EXPECT_EQ( output.frame.type, HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE );
+    ASSERT_EQ( output.frame.payload_size, 3u );
+    EXPECT_EQ( output.frame.payload, output.raw.data() + 14u );
+    constexpr std::array<std::uint8_t, 3> ExpectedPayload{ 0x11u, 0x00u, 0x22u };
+    EXPECT_TRUE( std::equal( output.frame.payload, output.frame.payload + output.frame.payload_size,
+                             ExpectedPayload.begin() ) );
+
+    auto invalid = GoldenApplication;
+    invalid[body_size - 1u] ^= 0x01u;
+    output.frame  = MakeFrame( HIL_TRANSPORT_MVP_FRAME_ACK, 0u, 1u );
+    output.result = HIL_TRANSPORT_MVP_DECODE_VALID;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Decode_Frame_View( invalid.data(), body_size, output.raw.data(),
+                                                    output.raw.size(), MaxPayload, &output.frame,
+                                                    &output.result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( output.result, HIL_TRANSPORT_MVP_DECODE_INTEGRITY_INVALID );
+    ExpectClearedFrameAndMessageSize( output );
+}
+
 TEST( TransportParser, AcceptsCompleteAndByteAtATimeFrames )
 {
     std::array<std::uint8_t, MaxFrame> scratch{};
