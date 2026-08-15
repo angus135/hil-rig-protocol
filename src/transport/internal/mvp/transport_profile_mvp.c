@@ -1,6 +1,6 @@
 /**
  * @file transport_profile_mvp.c
- * @brief MVP wire, receive, session, and output integration plus Application stubs.
+ * @brief MVP wire, receive, session, output, and outbound Application integration.
  *
  * @details The MVP uses simple session establishment, one complete
  * Application message per frame, framing plus integrity, and one outstanding
@@ -8,12 +8,13 @@
  * reliable encoded-output lifecycle, separate private one-item control storage,
  * public output arbitration, session lifecycle coordination, link-state
  * recovery, semantic handshake progression, transactional byte reception, and
- * Process scheduling are implemented. Application-message orchestration remains
- * stubbed.
+ * Process scheduling and outbound Application-message delivery are implemented.
+ * Inbound Application-message delivery remains intentionally deferred.
  */
 #include "../transport_profile.h"
 
 #include "../transport_internal.h"
+#include "transport_application_mvp.h"
 #include "transport_control_output_mvp.h"
 #include "transport_events_mvp.h"
 #include "transport_frame_codec_mvp.h"
@@ -284,18 +285,13 @@ HIL_Transport_Status_T
 HIL_TRANSPORT_PROFILE_Submit_Application_Data( HIL_Transport_Context_T* context,
                                                const uint8_t* payload, size_t payload_len )
 {
-    /*
-     * TODO: Validate the pointer/size and complete one-frame bound. Require public
-     * session state ESTABLISHED; otherwise return NOT_READY, retain no input
-     * pointer, and change nothing. The MVP does not queue before establishment.
-     * Reserve its sole message/reliable capacity before sequence allocation,
-     * copy synchronously, and publish atomically. A second reliable item is
-     * forbidden while the first is prepared, pinned, awaiting ACK, or retrying.
-     */
-    ( void )context;
-    ( void )payload;
-    ( void )payload_len;
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    HIL_Transport_Mvp_Root_T* root = HIL_TRANSPORT_MVP_Root_From_Context( context );
+
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    return HIL_TRANSPORT_MVP_Application_Submit( root, payload, payload_len );
 }
 
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Receive_Bytes( HIL_Transport_Context_T* context,
@@ -410,6 +406,10 @@ HIL_TRANSPORT_PROFILE_Process( HIL_Transport_Context_T* context, uint32_t now_ms
     if ( ( reliability_outcome == HIL_TRANSPORT_MVP_RELIABILITY_RETRIES_EXHAUSTED )
          || ( root->session.reliable_state == HIL_TRANSPORT_MVP_RELIABLE_EXHAUSTED ) )
     {
+        if ( retained_type == HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE )
+        {
+            return HIL_TRANSPORT_MVP_Application_Handle_Retry_Exhaustion( root );
+        }
         if ( ( retained_type == HIL_TRANSPORT_MVP_FRAME_INITIATE )
              || ( retained_type == HIL_TRANSPORT_MVP_FRAME_RESPONSE )
              || ( retained_type == HIL_TRANSPORT_MVP_FRAME_CONFIRM ) )

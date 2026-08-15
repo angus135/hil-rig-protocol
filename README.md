@@ -100,13 +100,21 @@ control-output blockage, so callers retry only the exact unconsumed input suffix
 Oversized bodies resynchronize at their delimiter and retain a pending error
 notification if the event FIFO is temporarily full.
 
-Application submission and Application reception are still intentional
-`HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs. Structurally valid inbound
+Outbound Application submission and reliable delivery are implemented. A caller
+may submit one complete message after session establishment; Transport copies it,
+encodes one APPLICATION_MESSAGE frame, retains the exact bytes through retry, and
+completes delivery on the matching ACK with one `DELIVERY_CONFIRMED` event. Retry
+exhaustion retains one `DELIVERY_FAILED` event before abandoning the uncertain
+session and starting replacement-session recovery. Established-session ACKs with
+no active Application delivery are treated as stale protocol input for both host
+and rig roles rather than being reinterpreted as handshake traffic.
+
+Application reception remains intentionally deferred. Structurally valid inbound
 Application frames are isolated in one receive-dispatch branch, consumed, and
-reported as protocol errors without copying into received-message storage.
-Application delivery events, fragmentation, and reassembly are not implemented,
-so the public Application send/receive workflow is not yet operational end to
-end.
+reported as protocol errors without copying into received-message storage, and
+`HIL_TRANSPORT_Read_Application_Data()` remains `NOT_IMPLEMENTED`. Fragmentation
+and reassembly are also not implemented, so the public Application send/receive
+workflow is not yet operational end to end.
 
 The default MVP Transport profile is designed for one complete Application
 message per frame and one outstanding reliable transmission. The private event

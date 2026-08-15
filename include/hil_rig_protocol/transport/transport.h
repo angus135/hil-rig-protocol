@@ -34,8 +34,10 @@
  * ACK/RESET production, duplicate recovery, handshake retry policy, and public
  * Process() scheduling are implemented; link, establishment, and abandonment
  * transitions produce events. Public arbitrary-byte receive dispatch now
- * transactionally drives that handshake. Application submission/reception
- * remain intentional HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED stubs.
+ * transactionally drives that handshake. Outbound Application submission, exact
+ * ACK completion, delivery confirmation, retry exhaustion, and delivery-failure
+ * recovery are implemented. Inbound Application-message ownership and public
+ * Application reads remain intentionally deferred.
  */
 #ifndef HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
 #define HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
@@ -317,12 +319,15 @@ HIL_Transport_Status_T HIL_TRANSPORT_Notify_Link_State( HIL_Transport_Context_T*
  * @details The initial profile-independent contract accepts a message only while
  * public session state is ESTABLISHED. DISCONNECTED, CONNECTING, RECOVERING, or
  * FAULT returns NOT_READY, retains no input pointer, and changes no state. The
- * MVP does not queue messages before establishment. On future success every
- * payload byte is copied into the retained
- * caller workspace before return; the input pointer is never borrowed beyond
- * the call. The selected profile owns the copy until delivery, failure, or
- * reset or disconnection, both of which abandon any accepted message. The caller
- * never fragments messages. An MVP may support only messages
+ * MVP does not queue messages before establishment. For a nonempty payload with
+ * otherwise valid arguments, session readiness is checked before the configured
+ * message-size limit, so a pre-establishment submission returns NOT_READY even
+ * when that payload would be too large for an established session. On success
+ * every payload byte is copied into the retained caller workspace before return;
+ * the input pointer is never borrowed beyond the call. The selected profile owns
+ * the copy until delivery, failure, reset, or disconnection; reset and
+ * disconnection abandon any accepted message. The caller never fragments
+ * messages. An MVP may support only messages
  * that fit one frame; that limitation is rejected during initialization rather
  * than exposed as fragment metadata here.
  *
@@ -335,7 +340,6 @@ HIL_Transport_Status_T HIL_TRANSPORT_Notify_Link_State( HIL_Transport_Context_T*
  * @retval HIL_TRANSPORT_STATUS_MESSAGE_TOO_LARGE Configured limit exceeded.
  * @retval HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED No complete-message capacity.
  * @retval HIL_TRANSPORT_STATUS_INVALID_ARGUMENT Inputs are invalid.
- * @retval HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED Current stub result.
  */
 HIL_Transport_Status_T HIL_TRANSPORT_Submit_Application_Data( HIL_Transport_Context_T* context,
                                                               const uint8_t*           payload,
@@ -363,10 +367,14 @@ HIL_Transport_Status_T HIL_TRANSPORT_Submit_Application_Data( HIL_Transport_Cont
  * blocked, only the later unconsumed suffix remains caller-owned.
  *
  * Receive accepts no bytes while the reported link is DISCONNECTED and returns
- * NOT_READY. Structurally valid Application frames are currently consumed and
- * reported as PROTOCOL_ERROR because inbound Application ownership is deferred;
- * they do not make received-message storage visible. The input is borrowed only
- * for this call. INVALID_ARGUMENT and NOT_READY report zero consumption.
+ * NOT_READY. During an established session, an ACK completes only the active
+ * outbound Application delivery that it exactly matches. Stale, duplicate, or
+ * otherwise unexpected established-session ACKs are reported as PROTOCOL_ERROR
+ * without abandoning the session and are not reinterpreted as handshake input.
+ * Structurally valid Application frames are currently consumed and reported as
+ * PROTOCOL_ERROR because inbound Application ownership is deferred; they do not
+ * make received-message storage visible. The input is borrowed only for this
+ * call. INVALID_ARGUMENT and NOT_READY report zero consumption.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[in] data Received bytes; may be NULL only when data_len is zero.
@@ -387,17 +395,22 @@ HIL_Transport_Status_T HIL_TRANSPORT_Receive_Bytes( HIL_Transport_Context_T* con
  * Transport operating mode. The MVP publishes at most one pending handshake
  * frame, progresses the sole reliable timeout lifecycle once, and routes
  * exhausted INITIATE, RESPONSE, or CONFIRM delivery through normal session
- * abandonment. A later call starts the replacement attempt after any old
- * control output has been committed. A host consumes a new session identity;
- * a rig returns to waiting for INITIATE. Handshake exhaustion publishes no
- * Application delivery event. The function never calls hardware; automatic
- * encoded output is retrieved through Peek_Output() and Commit_Output().
+ * abandonment. Exhausted outbound Application delivery first retains one
+ * DELIVERY_FAILED event, records DELIVERY failure, abandons the uncertain
+ * session, and returns DELIVERY_FAILED on that transition. If event capacity is
+ * unavailable, that Application transition remains pending and returns
+ * CAPACITY_EXHAUSTED until the failure event can be retained. A later call starts
+ * the replacement attempt after any old control output has been committed. A
+ * host consumes a new session identity; a rig returns to waiting for INITIATE.
+ * Handshake exhaustion publishes no Application delivery event. The function
+ * never calls hardware; automatic encoded output is retrieved through
+ * Peek_Output() and Commit_Output().
  *
  * A valid mode is recorded before state-dependent progress. A disconnected
  * context otherwise performs no work. FAULT returns INTERNAL_ERROR without
  * normal progress. A private invariant failure enters FAULT, records INTERNAL,
- * and stops normal progress until explicit Reset. Application reliability and
- * liveness scheduling remain deferred with the public Application/receive path.
+ * and stops normal progress until explicit Reset. Idle peer-liveness scheduling
+ * remains deferred.
  *
  * NORMAL, BULK_TRANSFER, and QUIET_REAL_TIME are all valid. The MVP may treat
  * them identically, but records the latest valid value in the status snapshot.
@@ -411,10 +424,14 @@ HIL_Transport_Status_T HIL_TRANSPORT_Receive_Bytes( HIL_Transport_Context_T* con
  * @retval HIL_TRANSPORT_STATUS_OK Valid mode accepted and work progressed.
  * @retval HIL_TRANSPORT_STATUS_INVALID_ARGUMENT The context is invalid or the
  * mode is outside the three defined enumeration values; no work is progressed.
- * @retval HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED Handshake recovery completed
- * safely, but the resulting SESSION_RESET event could not be retained.
+ * @retval HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED Required event/output capacity
+ * temporarily prevents a pending receive, handshake, or Application-failure
+ * transition from completing.
  * @retval HIL_TRANSPORT_STATUS_NOT_READY Pending handshake publication is
  * temporarily blocked by outstanding lifecycle ownership.
+ * @retval HIL_TRANSPORT_STATUS_DELIVERY_FAILED An accepted outbound Application
+ * message exhausted its configured retries; its failure event was retained and
+ * the uncertain session was abandoned.
  * @retval HIL_TRANSPORT_STATUS_INTERNAL_ERROR A private invariant failed and the
  * context entered terminal FAULT.
  */
@@ -503,10 +520,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_Read_Application_Data( HIL_Transport_Contex
  * INVALID_ARGUMENT, and INTERNAL_ERROR leave event unchanged. Events do not
  * instruct callers to construct ACK, recovery, or handshake frames; such output
  * remains an internal Transport responsibility. Event storage and reading are
- * implemented. Link changes, handshake establishment, and automatic session
- * abandonment generate their events; later receive, protocol, Application
- * capacity, and Application delivery paths must generate their initiating
- * events.
+ * implemented. Link changes, handshake establishment, receive/protocol errors,
+ * automatic session abandonment, and outbound Application delivery success or
+ * failure generate their events. Inbound Application capacity/delivery events
+ * remain deferred with inbound Application ownership.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[out] event Destination for one event; must not be NULL.

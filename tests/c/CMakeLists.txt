@@ -14,6 +14,7 @@ endif()
 
 set(HIL_RIG_PROTOCOL_UNIT_TEST_SOURCES
     unit/test_transport.cpp
+    unit/test_transport_application.cpp
     unit/test_transport_control_output.cpp
     unit/test_transport_events.cpp
     unit/test_transport_handshake.cpp

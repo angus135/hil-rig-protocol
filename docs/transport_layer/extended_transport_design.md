@@ -15,8 +15,8 @@ behavior; this document does not override the implemented MVP format.
 ## MVP-private three-message handshake choice
 
 The compiled MVP retains an explicit private phase model independent of public
-operating mode and every Application lifecycle. The wire frame types are
-implemented, but handshake progression remains a stub and is not public API:
+operating mode and every Application lifecycle. The wire frame types and current
+MVP handshake progression are implemented privately and are not public API:
 
 1. host sends reliable `INITIATE` carrying a fresh caller-seeded Transport
    session identity and host initial sequence information;
@@ -46,14 +46,14 @@ uses its next deterministically derived identity. It produces no Application
 Incompatible identities also cause complete abandonment and recovery rather
 than partial handshake continuation. The normative MVP wire format defines the
 binary representation of `INITIATE`, `RESPONSE`, `CONFIRM`, and `ACK`.
-Handshake progression, state transitions, retry handling, and duplicate
-behavior remain separate implementation work. A future extended profile may
-define a different versioned representation without changing the public API.
+Handshake progression, state transitions, retry handling, and duplicate behavior
+remain private MVP implementation details. A future extended profile may define
+a different versioned representation without changing the public API.
 
 The library never creates random identities. Host configuration supplies the
-starting seed. A future deterministic progression skips invalid/reserved values,
-handles wraparound, and avoids reusing an active identity. HIL-RIG adopts a
-valid host identity. Transport identity remains independent of Application test
+starting seed. The MVP deterministically advances that identity across new
+session attempts while skipping invalid/reserved values; HIL-RIG adopts a valid
+host identity. Transport identity remains independent of Application test
 identity.
 
 ## Candidate reliability behavior
