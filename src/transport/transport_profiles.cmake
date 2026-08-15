@@ -22,6 +22,7 @@ if(HIL_RIG_PROTOCOL_TRANSPORT_PROFILE_NORMALIZED STREQUAL "MVP")
         src/transport/internal/mvp/transport_profile_mvp.c
         src/transport/internal/mvp/transport_frame_codec_mvp.c
         src/transport/internal/mvp/transport_handshake_mvp.c
+        src/transport/internal/mvp/transport_receive_mvp.c
         src/transport/internal/mvp/transport_session_mvp.c
         src/transport/internal/mvp/transport_reliability_mvp.c
         src/transport/internal/mvp/transport_control_output_mvp.c

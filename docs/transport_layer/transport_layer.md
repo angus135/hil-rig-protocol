@@ -228,11 +228,14 @@ Application message.
 The parser accepts arbitrary chunk boundaries and retains an incomplete COBS
 body in caller-owned workspace. It ignores leading or consecutive delimiters,
 stops before overwriting an unread complete body, and excludes the delimiter
-from the body given to the decoder. If a body exceeds configured capacity, the
-parser discards through the next `0x00`; that delimiter is the resynchronization
-boundary and the following byte begins a clean body. A malformed body is
-consumed as one complete delimited item, so a following valid frame can be
-parsed independently.
+from the body given to the decoder. A completed body remains parser-owned while
+the receive coordinator borrows it through a non-consuming view. Only semantic
+commit, deliberate rejection, or session recovery releases that ownership. If
+a body exceeds configured capacity, the parser discards through the next
+`0x00`; it reports that delimiter separately as the resynchronization boundary
+and stops before any following input. The following byte begins a clean body. A
+malformed body is consumed as one complete delimited item, so a following valid
+frame can be parsed independently.
 
 One MVP `APPLICATION` frame always carries exactly one complete opaque
 Application message. Fragmentation, reassembly, session acceptance, duplicate
@@ -320,8 +323,20 @@ input is borrowed only during the call.
 `bytes_consumed` is required and always identifies the exact accepted prefix.
 On complete consumption it equals `data_len`. When bounded capacity temporarily
 prevents further acceptance, the caller preserves and retries only the suffix
-starting at `data + bytes_consumed`. Invalid arguments and the current public
-receive stub report zero. No return may silently discard an unreported suffix.
+starting at `data + bytes_consumed`. Invalid arguments and the disconnected-link
+policy report zero; disconnected receive returns `NOT_READY`. No return may
+silently discard an unreported suffix.
+
+The receive coordinator processes a pending oversized-body diagnostic and any
+already completed parser body before accepting new bytes. A decoded body is a
+transaction: retryable event, reliable-output, or control-output exhaustion
+returns `CAPACITY_EXHAUSTED` while leaving the body unchanged. A later call,
+including one with zero input bytes, retries semantic processing without asking
+the caller to resend bytes already accepted into parser scratch. A completed
+oversized discard has no body to retain, so a one-bit pending diagnostic blocks
+later input until its `PROTOCOL_ERROR` event can be published. The parser stops
+at that discard delimiter, leaving every following byte in the caller-owned
+suffix.
 
 Malformed, integrity-invalid, stale-session, or incompatible-sequence input is
 consumed only through the appropriate implementation resynchronization boundary
@@ -331,6 +346,24 @@ returns retry exhaustion privately; later owner policy will decide when it maps
 to `DELIVERY_FAILED`. A private invariant failure already maps to
 `INTERNAL_ERROR`. Detailed classifications remain private; no private status
 numeric value crosses the profile boundary.
+
+Ordinary malformed COBS and CRC-invalid bodies publish `PROTOCOL_ERROR` with
+status `NOT_READY`, failure `PROTOCOL`, and zero required capacity, then preserve
+the current session as if the frame were lost. Stale decoded traffic is rejected
+without abandoning a newer session. Current-session semantic incompatibility
+publishes the same diagnostic when capacity permits, abandons through the
+session coordinator regardless of event capacity, and publishes one best-effort
+RESET using the failed session identity after old control ownership is cleared.
+`Process()` waits for that RESET to be committed before starting the replacement
+session. An accepted peer RESET abandons the session but is never answered with
+another RESET.
+
+The decoder exposes payload only as a synchronous view into codec scratch. The
+receive path does not copy a structurally valid Application payload into
+`received_message` yet. Until Application delivery is implemented, that single
+dispatcher branch consumes the frame and publishes `PROTOCOL_ERROR`; it never
+sets `received_message_pending` and does not leave the public API permanently at
+`NOT_IMPLEMENTED`.
 
 ## Peek and commit
 

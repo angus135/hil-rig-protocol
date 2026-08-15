@@ -1,15 +1,15 @@
 /**
  * @file transport_profile_mvp.c
- * @brief MVP wire storage and private output lifecycles plus remaining stubs.
+ * @brief MVP wire, receive, session, and output integration plus Application stubs.
  *
  * @details The MVP uses simple session establishment, one complete
  * Application message per frame, framing plus integrity, and one outstanding
  * reliable transmission. Workspace sizing, initialization, the wire path, the
  * reliable encoded-output lifecycle, separate private one-item control storage,
  * public output arbitration, session lifecycle coordination, link-state
- * recovery, semantic handshake progression, and Process scheduling are
- * implemented. Public byte reception and Application-message orchestration
- * remain stubs.
+ * recovery, semantic handshake progression, transactional byte reception, and
+ * Process scheduling are implemented. Application-message orchestration remains
+ * stubbed.
  */
 #include "../transport_profile.h"
 
@@ -20,6 +20,7 @@
 #include "transport_handshake_mvp.h"
 #include "transport_output_mvp.h"
 #include "transport_reliability_mvp.h"
+#include "transport_receive_mvp.h"
 #include "transport_session_mvp.h"
 #include "transport_types_mvp.h"
 
@@ -301,27 +302,19 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Receive_Bytes( HIL_Transport_Contex
                                                             const uint8_t* data, size_t data_len,
                                                             size_t* bytes_consumed )
 {
-    /*
-     * TODO: Clear and require bytes_consumed, validate the borrowed chunk, accept
-     * arbitrary boundaries, and advance the exact count per accepted byte.
-     * Preserve a retryable suffix on temporary capacity exhaustion; consume
-     * malformed data only through a known resynchronization boundary; never
-     * overwrite unread output or expose partial Application messages. Map
-     * malformed/integrity/incompatible/stale private classifications to one
-     * public PROTOCOL_ERROR event after consuming through the appropriate
-     * resynchronization boundary; map capacity to CAPACITY_EXHAUSTED. Deliver an
-     * expected reliable frame once, re-ACK its exact duplicate without
-     * redelivery, and restart the complete session for incompatible traffic. A
-     * private invariant sets FAULT/INTERNAL failure and returns INTERNAL_ERROR.
-     */
-    ( void )context;
-    ( void )data;
-    ( void )data_len;
-    if ( bytes_consumed != NULL )
+    HIL_Transport_Mvp_Root_T* root;
+
+    if ( bytes_consumed == NULL )
     {
-        *bytes_consumed = 0u;
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    *bytes_consumed = 0u;
+    root            = HIL_TRANSPORT_MVP_Root_From_Context( context );
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    return HIL_TRANSPORT_MVP_Receive_Bytes( root, data, data_len, bytes_consumed );
 }
 
 HIL_Transport_Status_T
