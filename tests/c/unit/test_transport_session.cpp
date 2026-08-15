@@ -103,6 +103,9 @@ TEST( TransportSessionSequence, ClassifiesExpectedDuplicateAndIncompatibleWithou
     EXPECT_EQ( result, HIL_TRANSPORT_MVP_RX_SEQUENCE_DUPLICATE );
     ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Classify_Sequence( &session, 999u, &result ),
                HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( result, HIL_TRANSPORT_MVP_RX_SEQUENCE_STALE );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Classify_Sequence( &session, 1002u, &result ),
+               HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( result, HIL_TRANSPORT_MVP_RX_SEQUENCE_INCOMPATIBLE );
     EXPECT_EQ( 0, std::memcmp( &session, &accepted, sizeof( session ) ) );
     EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Accept_Sequence( &session, 1000u ),

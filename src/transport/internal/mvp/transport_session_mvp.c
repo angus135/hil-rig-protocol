@@ -561,6 +561,10 @@ HIL_TRANSPORT_MVP_Session_Classify_Sequence( const HIL_Transport_Mvp_Session_T* 
     {
         *result = HIL_TRANSPORT_MVP_RX_SEQUENCE_DUPLICATE;
     }
+    else if ( ( uint16_t )( sequence - session->expected_receive_sequence ) > UINT16_C( 0x8000 ) )
+    {
+        *result = HIL_TRANSPORT_MVP_RX_SEQUENCE_STALE;
+    }
     return HIL_TRANSPORT_STATUS_OK;
 }
 

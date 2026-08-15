@@ -719,6 +719,10 @@ TEST( TransportHandshake, RejectsWrongRoleIdentitySequenceAcknowledgementAndDupl
     ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host.root, &frame, &result ),
                HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE );
+    frame = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 11u, 3u, 10u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host.root, &frame, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE );
     frame = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 12u, 3u, 99u );
     ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host.root, &frame, &result ),
                HIL_TRANSPORT_STATUS_OK );
