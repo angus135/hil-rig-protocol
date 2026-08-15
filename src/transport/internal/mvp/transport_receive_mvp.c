@@ -4,6 +4,7 @@
  */
 #include "transport_receive_mvp.h"
 
+#include "transport_application_mvp.h"
 #include "transport_events_mvp.h"
 #include "transport_frame_codec_mvp.h"
 #include "transport_handshake_mvp.h"
@@ -234,11 +235,44 @@ static HIL_Transport_Mvp_Receive_Body_Outcome_T
 HIL_TRANSPORT_MVP_Receive_Dispatch_Acknowledgement( HIL_Transport_Mvp_Root_T*        root,
                                                     const HIL_Transport_Mvp_Frame_T* frame )
 {
-    /* Plan PR 9 adds Application delivery completion at this single routing seam. */
+    HIL_Transport_Mvp_Application_Ack_Result_T application_result;
+    HIL_Transport_Status_T                     status;
+
     if ( root->session.retained_reliable_frame_type == HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE )
+    {
+        status = HIL_TRANSPORT_MVP_Application_Handle_Acknowledgement( root, frame,
+                                                                       &application_result );
+        if ( status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
+        {
+            return HIL_TRANSPORT_MVP_Receive_Outcome( status,
+                                                      HIL_TRANSPORT_MVP_RECEIVE_BODY_RETAIN );
+        }
+        if ( status != HIL_TRANSPORT_STATUS_OK )
+        {
+            return HIL_TRANSPORT_MVP_Receive_Fault( root );
+        }
+        if ( application_result == HIL_TRANSPORT_MVP_APPLICATION_ACK_ACCEPTED )
+        {
+            return HIL_TRANSPORT_MVP_Receive_Outcome( HIL_TRANSPORT_STATUS_OK,
+                                                      HIL_TRANSPORT_MVP_RECEIVE_BODY_CONSUME );
+        }
+        return HIL_TRANSPORT_MVP_Receive_Reject_Retained_Body( root );
+    }
+
+    /*
+     * Once a session is established, ACK belongs only to the outbound
+     * Application stop-and-wait lifecycle. With no Application delivery active,
+     * an ACK is stale/unexpected protocol input. Do not route it through the
+     * role-specific handshake handler: a rig has no valid established-state
+     * handshake ACK transition and would otherwise classify the duplicate as
+     * incompatible and abandon an otherwise healthy session.
+     */
+    if ( ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_ESTABLISHED )
+         && ( root->session.state == HIL_TRANSPORT_SESSION_STATE_ESTABLISHED ) )
     {
         return HIL_TRANSPORT_MVP_Receive_Reject_Retained_Body( root );
     }
+
     return HIL_TRANSPORT_MVP_Receive_Dispatch_Handshake_Frame( root, frame );
 }
 

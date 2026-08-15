@@ -20,6 +20,7 @@ set(HIL_RIG_PROTOCOL_TRANSPORT_COMMON_SOURCES
 if(HIL_RIG_PROTOCOL_TRANSPORT_PROFILE_NORMALIZED STREQUAL "MVP")
     set(HIL_RIG_PROTOCOL_TRANSPORT_PROFILE_SOURCES
         src/transport/internal/mvp/transport_profile_mvp.c
+        src/transport/internal/mvp/transport_application_mvp.c
         src/transport/internal/mvp/transport_frame_codec_mvp.c
         src/transport/internal/mvp/transport_handshake_mvp.c
         src/transport/internal/mvp/transport_receive_mvp.c

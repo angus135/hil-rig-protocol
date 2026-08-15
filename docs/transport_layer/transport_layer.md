@@ -16,9 +16,10 @@ status, and reset operate across the implemented private lifecycles. Session
 initialization, link observation, establishment preparation, automatic
 abandonment, and explicit reset are coordinated by the private session module;
 link changes and abandonment produce real events. Handshake frame processing,
-received-frame and received-ACK dispatch, ACK and RESET generation,
-receive-side duplicate handling, and Application-message orchestration remain
-intentional stubs unless stated otherwise below.
+transactional arbitrary-byte receive dispatch, ACK and RESET generation, and
+outbound Application-message submission/delivery are implemented. Inbound
+Application-message ownership, duplicate handling, and public Application reads
+remain intentionally deferred unless stated otherwise below.
 
 Transport is HIL-RIG-specific but communication-medium-agnostic. It maps opaque,
 complete Application messages to opaque encoded output and received raw bytes
@@ -278,10 +279,12 @@ modes to tune private scheduling, pacing, or flow control.
 message only while public session state is `ESTABLISHED`. In `DISCONNECTED`,
 `CONNECTING`, `RECOVERING`, or `FAULT`, it returns `NOT_READY`, retains no input
 pointer, and changes no state. This initial rule is profile-independent; the MVP
-does not queue Application messages before establishment. On future success it
-copies every byte before returning. Transport owns the copy until delivery,
-failure, reset, or disconnection. The caller never constructs frames or future
-extended fragments.
+does not queue Application messages before establishment. For a nonempty payload
+with otherwise valid arguments, that readiness check occurs before the configured
+message-size limit, so an oversized pre-establishment submission still returns
+`NOT_READY`. On success Transport copies every byte before returning and owns the
+copy until delivery, failure, reset, or disconnection. The caller never constructs
+frames or future extended fragments.
 
 `HIL_TRANSPORT_Read_Application_Data()` exposes only one complete received
 Application message. No parser state, frame category, session sequence, fragment
@@ -294,25 +297,39 @@ validation and responses belong to Application integrations; their messages are
 ordinary opaque payloads through this same API.
 
 The MVP has one stop-and-wait reliable slot. The implemented primitive retains
-one already encoded reliable frame; later handshake and Application paths will
-both publish through it. `max_retries` counts retransmissions successfully
-committed to external I/O after the initial committed transmission. Merely
-scheduling or peeking a retry does not increase the count. Every retry exposes
-the exact original encoded bytes, session identity, and sequence without
+one already encoded reliable frame; both handshake traffic and outbound
+Application messages publish through it. `max_retries` counts retransmissions
+successfully committed to external I/O after the initial committed transmission.
+Merely scheduling or peeking a retry does not increase the count. Every retry
+exposes the exact original encoded bytes, session identity, and sequence without
 re-running framing, CRC, or COBS processing.
 
-An exact ACK received while the item is awaiting acknowledgement completes the
-item and advances its candidate transmit sequence once, including natural
-`uint16_t` wrap. Stale, duplicate, or out-of-state ACKs change nothing. ACK frame
-validation and receive-path dispatch are not implemented yet; unit tests call
-the private completion seam after supplying a logically validated sequence.
+For an active outbound Application delivery, an exact ACK received while the
+item is awaiting acknowledgement, or while an unpinned retry is ready, completes
+the item, releases submitted-message ownership, advances the candidate transmit
+sequence once including natural `uint16_t` wrap, and publishes exactly one
+`DELIVERY_CONFIRMED` event. Completion is transactional with event capacity: if
+the event cannot be retained, the ACK body remains parser-owned and no delivery
+ownership changes. An exact ACK for a retry that has already been peeked is
+retained until that pinned retry is committed.
 
-Retry exhaustion retains the frame type, sequence, encoded bytes, and ownership
-in `EXHAUSTED`, exposes no reliable output, and returns a private outcome to the
-future session owner. It does not publish an event, reset the session, classify
-handshake versus Application policy, advance the sequence, or report a public
-protocol error. Those policy decisions remain for the later session and
-Application-delivery work.
+Stale, duplicate, or otherwise unexpected ACKs do not alter reliable or
+submitted-message ownership and are reported through the existing
+`PROTOCOL_ERROR` path. In particular, once the session is `ESTABLISHED` and no
+outbound Application delivery is active, an ACK is treated as stale/unexpected
+for both HOST and RIG roles and is not routed back through handshake dispatch. A
+duplicate Application ACK therefore cannot reset an established rig session.
+
+The reliability primitive itself still ends at `EXHAUSTED`, retaining the frame
+type, sequence, encoded bytes, and ownership while exposing no reliable output.
+`Process()` now applies the owner policy. Handshake exhaustion abandons the
+incomplete session without an Application delivery event. Application exhaustion
+first retains exactly one `DELIVERY_FAILED` event; if the event FIFO is full the
+transition remains pending and `Process()` returns `CAPACITY_EXHAUSTED`. Once the
+event is retained, Transport records `HIL_TRANSPORT_FAILURE_DELIVERY`, abandons
+the uncertain session, clears submitted/reliable ownership through the session
+coordinator, and returns `DELIVERY_FAILED` on that transition. A replacement
+session must establish before another Application message is accepted.
 
 ## Exact receive consumption
 
@@ -336,18 +353,20 @@ the caller to resend bytes already accepted into parser scratch. `Process()`
 also progresses this pending receive work before handshake publication or retry
 expiry, and leaves reliability timing unchanged while local capacity blocks it.
 A completed oversized discard has no body to retain, so a one-bit pending
-diagnostic blocks later input until its `PROTOCOL_ERROR` event can be published. The
-parser stops at that discard delimiter, leaving every following byte in the caller-owned
-suffix.
+diagnostic blocks later input until its `PROTOCOL_ERROR` event can be published.
+The parser stops at that discard delimiter, leaving every following byte in the
+caller-owned suffix.
 
 Malformed, integrity-invalid, stale-session, or incompatible-sequence input is
 consumed only through the appropriate implementation resynchronization boundary
 and will map to `PROTOCOL_ERROR`. Capacity will map to `CAPACITY_EXHAUSTED`, and
-configured deadline expiry to `TIMEOUT`. The implemented reliability primitive
-returns retry exhaustion privately; later owner policy will decide when it maps
-to `DELIVERY_FAILED`. A private invariant failure already maps to
-`INTERNAL_ERROR`. Detailed classifications remain private; no private status
-numeric value crosses the profile boundary.
+configured deadline handling is progressed by `Process()`. The reliability
+primitive reports retry exhaustion privately; the implemented owner policy maps outbound
+Application exhaustion to `DELIVERY_FAILED` after retaining its failure event,
+while handshake exhaustion restarts session establishment without an Application
+delivery event. A private invariant failure maps to `INTERNAL_ERROR`. Detailed
+classifications remain private; no private status numeric value crosses the
+profile boundary.
 
 Ordinary malformed COBS and CRC-invalid bodies publish `PROTOCOL_ERROR` with
 status `NOT_READY`, failure `PROTOCOL`, and zero required capacity, then preserve
@@ -361,11 +380,13 @@ session. An accepted peer RESET abandons the session but is never answered with
 another RESET.
 
 The decoder exposes payload only as a synchronous view into codec scratch. The
-receive path does not copy a structurally valid Application payload into
-`received_message` yet. Until Application delivery is implemented, that single
-dispatcher branch consumes the frame and publishes `PROTOCOL_ERROR`; it never
-sets `received_message_pending` and does not leave the public API permanently at
-`NOT_IMPLEMENTED`.
+receive path does not copy a structurally valid inbound Application payload into
+`received_message` yet. Until inbound Application delivery is implemented, that
+single dispatcher branch consumes the frame and publishes `PROTOCOL_ERROR`; it
+never sets `received_message_pending`, while outbound Application submission and
+ACK completion remain fully operational. `HIL_TRANSPORT_Read_Application_Data()`
+remains the intentional `NOT_IMPLEMENTED` public stub for this deferred inbound
+path.
 
 ## Peek and commit
 
@@ -578,11 +599,14 @@ cleanup detects another private invariant failure, the physical link update and
 safe ownership release still occur, and link notification returns
 `INTERNAL_ERROR`; otherwise the notification returns `OK`.
 
-Link transitions generate `LINK_STATE_CHANGED`, and automatic abandonment
-generates `SESSION_RESET`. Later handshake, receive, protocol, capacity, and
-delivery producers will construct their complete public values and use the
-private FIFO without transferring their state transitions into the storage
-module. `HIL_TRANSPORT_Get_Status()` reports `event_pending` from the
+Link transitions generate `LINK_STATE_CHANGED`, completed handshakes generate
+`SESSION_ESTABLISHED`, receive/protocol rejection generates `PROTOCOL_ERROR`,
+outbound Application completion generates `DELIVERY_CONFIRMED`, and outbound
+Application retry exhaustion generates `DELIVERY_FAILED` before automatic
+abandonment attempts `SESSION_RESET`. Future inbound Application capacity and
+delivery producers will use the same private FIFO without transferring their
+state transitions into the storage module. `HIL_TRANSPORT_Get_Status()` reports
+`event_pending` from the
 validated FIFO. `output_pending` is set while either control or reliable
 initial/retry bytes are ready or peeked, and `reliable_delivery_pending` remains
 set in every non-IDLE reliable state, including `EXHAUSTED`. The remaining
