@@ -23,15 +23,14 @@ constexpr std::size_t EncodedCapacity     = 96u;
 
 struct ReceiveHarness
 {
-    HIL_Transport_Mvp_Root_T root{};
-    std::array<std::uint8_t, ApplicationCapacity> submitted{};
-    std::array<std::uint8_t, EncodedCapacity> encoded{};
-    std::array<std::uint8_t, EncodedCapacity - 1u> parser{};
+    HIL_Transport_Mvp_Root_T                                                       root{};
+    std::array<std::uint8_t, ApplicationCapacity>                                  submitted{};
+    std::array<std::uint8_t, EncodedCapacity>                                      encoded{};
+    std::array<std::uint8_t, EncodedCapacity - 1u>                                 parser{};
     std::array<std::uint8_t, ApplicationCapacity + HIL_TRANSPORT_MVP_RAW_OVERHEAD> codec{};
-    std::array<std::uint8_t, ApplicationCapacity> received{};
+    std::array<std::uint8_t, ApplicationCapacity>                                  received{};
 
-    void Initialize( HIL_Transport_Role_T role, std::uint64_t seed,
-                     std::uint16_t initial_sequence )
+    void Initialize( HIL_Transport_Role_T role, std::uint64_t seed, std::uint16_t initial_sequence )
     {
         root                                          = {};
         root.base.config.max_application_message_size = ApplicationCapacity;
@@ -78,8 +77,8 @@ HIL_Transport_Mvp_Frame_T EmptyFrame( HIL_Transport_Mvp_Frame_Type_T type,
 std::vector<std::uint8_t> Encode( const HIL_Transport_Mvp_Frame_T& frame )
 {
     std::array<std::uint8_t, ApplicationCapacity + HIL_TRANSPORT_MVP_RAW_OVERHEAD> raw{};
-    std::array<std::uint8_t, EncodedCapacity> output{};
-    std::size_t size = 0u;
+    std::array<std::uint8_t, EncodedCapacity>                                      output{};
+    std::size_t                                                                    size = 0u;
     EXPECT_EQ( HIL_TRANSPORT_MVP_Encode_Frame( &frame, ApplicationCapacity, raw.data(), raw.size(),
                                                output.data(), output.size(), &size ),
                HIL_TRANSPORT_STATUS_OK );
@@ -90,9 +89,9 @@ std::vector<std::uint8_t> PeekAndCommit( ReceiveHarness& endpoint, std::uint32_t
 {
     std::array<std::uint8_t, EncodedCapacity> output{};
     std::size_t                               size = 0u;
-    EXPECT_EQ( HIL_TRANSPORT_MVP_Output_Peek_Output( &endpoint.root, output.data(), output.size(),
-                                                     &size ),
-               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ(
+        HIL_TRANSPORT_MVP_Output_Peek_Output( &endpoint.root, output.data(), output.size(), &size ),
+        HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( HIL_TRANSPORT_MVP_Output_Commit_Output( &endpoint.root, now_ms ),
                HIL_TRANSPORT_STATUS_OK );
     return std::vector<std::uint8_t>( output.begin(), output.begin() + size );
@@ -101,13 +100,13 @@ std::vector<std::uint8_t> PeekAndCommit( ReceiveHarness& endpoint, std::uint32_t
 HIL_Transport_Mvp_Frame_T DecodeTransmission( const std::vector<std::uint8_t>& transmission )
 {
     std::array<std::uint8_t, ApplicationCapacity + HIL_TRANSPORT_MVP_RAW_OVERHEAD> raw{};
-    HIL_Transport_Mvp_Frame_T frame{};
+    HIL_Transport_Mvp_Frame_T                                                      frame{};
     HIL_Transport_Mvp_Decode_Result_T result = HIL_TRANSPORT_MVP_DECODE_MALFORMED;
     EXPECT_GE( transmission.size(), 2u );
     EXPECT_EQ( transmission.back(), 0u );
-    EXPECT_EQ( HIL_TRANSPORT_MVP_Decode_Frame_View(
-                   transmission.data(), transmission.size() - 1u, raw.data(), raw.size(),
-                   ApplicationCapacity, &frame, &result ),
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Decode_Frame_View( transmission.data(), transmission.size() - 1u,
+                                                    raw.data(), raw.size(), ApplicationCapacity,
+                                                    &frame, &result ),
                HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( result, HIL_TRANSPORT_MVP_DECODE_VALID );
     frame.payload = nullptr;
@@ -129,8 +128,7 @@ void FillEvents( ReceiveHarness& endpoint )
 HIL_Transport_Event_T ReadEvent( ReceiveHarness& endpoint )
 {
     HIL_Transport_Event_T event{};
-    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Read( &endpoint.root, &event ),
-               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Read( &endpoint.root, &event ), HIL_TRANSPORT_STATUS_OK );
     return event;
 }
 
@@ -158,15 +156,15 @@ TEST( TransportReceive, PublicApiCompletesHandshakeAcrossArbitraryChunkBoundarie
     for ( std::size_t index = 0u; index < initiate.size(); ++index )
     {
         std::size_t consumed = 0u;
-        ASSERT_EQ( HIL_TRANSPORT_Receive_Bytes( &rig_context, initiate.data() + index, 1u,
-                                                &consumed ),
-                   HIL_TRANSPORT_STATUS_OK );
+        ASSERT_EQ(
+            HIL_TRANSPORT_Receive_Bytes( &rig_context, initiate.data() + index, 1u, &consumed ),
+            HIL_TRANSPORT_STATUS_OK );
         ASSERT_EQ( consumed, 1u );
     }
 
     ASSERT_EQ( HIL_TRANSPORT_Process( &rig_context, 3u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
                HIL_TRANSPORT_STATUS_OK );
-    auto response = PeekAndCommit( rig, 4u );
+    auto        response = PeekAndCommit( rig, 4u );
     std::size_t consumed = 0u;
     ASSERT_EQ( HIL_TRANSPORT_Receive_Bytes( &host_context, response.data(), 7u, &consumed ),
                HIL_TRANSPORT_STATUS_OK );
@@ -196,13 +194,13 @@ TEST( TransportReceive, RetainsMalformedBodyUntilProtocolEventCapacityReturns )
     ReceiveHarness rig;
     rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 5u );
     FillEvents( rig );
-    auto context = rig.Context();
+    auto                                  context = rig.Context();
     constexpr std::array<std::uint8_t, 4> Malformed{ 0x02u, 0xFFu, 0xAAu, 0u };
 
     std::size_t consumed = 0u;
-    EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, Malformed.data(), Malformed.size(),
-                                            &consumed ),
-               HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
+    EXPECT_EQ(
+        HIL_TRANSPORT_Receive_Bytes( &context, Malformed.data(), Malformed.size(), &consumed ),
+        HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
     EXPECT_EQ( consumed, Malformed.size() );
     EXPECT_EQ( rig.root.parser.body_ready, 1u );
 
@@ -273,7 +271,7 @@ TEST( TransportReceive, PinnedInitiateRetryDefersResponseWithoutCallerResend )
     std::size_t                               retry_size = 0u;
     ASSERT_EQ( HIL_TRANSPORT_Peek_Output( &context, retry.data(), retry.size(), &retry_size ),
                HIL_TRANSPORT_STATUS_OK );
-    auto response = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 77u, 500u, 10u ) );
+    auto        response = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 77u, 500u, 10u ) );
     std::size_t consumed = 0u;
     EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, response.data(), response.size(), &consumed ),
                HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
@@ -352,8 +350,7 @@ TEST( TransportReceive, IncompatibilityAbandonsBodyPublishesResetAndWaitsForItsC
     ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
                HIL_TRANSPORT_STATUS_OK );
     ( void )PeekAndCommit( host, 2u );
-    auto incompatible =
-        Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 77u, 500u, 999u ) );
+    auto incompatible = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 77u, 500u, 999u ) );
 
     std::size_t consumed = 0u;
     ASSERT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, incompatible.data(), incompatible.size(),
@@ -384,8 +381,7 @@ TEST( TransportReceive, FullEventsCannotPreventMandatoryIncompatibilityRecovery 
                HIL_TRANSPORT_STATUS_OK );
     ( void )PeekAndCommit( host, 2u );
     FillEvents( host );
-    auto incompatible =
-        Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 77u, 500u, 999u ) );
+    auto incompatible = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 77u, 500u, 999u ) );
 
     std::size_t consumed = 0u;
     EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, incompatible.data(), incompatible.size(),
@@ -409,9 +405,9 @@ TEST( TransportReceive, StaleResetDoesNotAbandonNewerSession )
     const auto stale_reset = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESET, 76u, 0u, 0u ) );
 
     std::size_t consumed = 0u;
-    EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, stale_reset.data(), stale_reset.size(),
-                                            &consumed ),
-               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ(
+        HIL_TRANSPORT_Receive_Bytes( &context, stale_reset.data(), stale_reset.size(), &consumed ),
+        HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( consumed, stale_reset.size() );
     EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
     EXPECT_EQ( host.root.session.session_identifier, 77u );
@@ -466,8 +462,8 @@ TEST( TransportReceive, UnsupportedApplicationIsConsumedWithoutPublishingMessage
     ReceiveHarness rig;
     rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 5u );
     const std::array<std::uint8_t, 3> payload{ 1u, 2u, 3u };
-    const HIL_Transport_Mvp_Frame_T frame{ HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE, 77u,
-                                           10u, 0u, payload.data(), payload.size() };
+    const HIL_Transport_Mvp_Frame_T   frame{
+        HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE, 77u, 10u, 0u, payload.data(), payload.size() };
 
     ReceiveWhole( rig, Encode( frame ) );
     EXPECT_EQ( rig.root.received_message_pending, 0u );
@@ -480,11 +476,11 @@ TEST( TransportReceive, CorruptDelimitedFrameReportsLossWithoutAbandoningEstabli
 {
     ReceiveHarness rig;
     rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 5u );
-    rig.root.base.session_state                = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
-    rig.root.session.state                     = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
-    rig.root.session.handshake_phase           = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
-    rig.root.session.session_identifier        = 77u;
-    rig.root.session.session_identifier_valid  = 1u;
+    rig.root.base.session_state               = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    rig.root.session.state                    = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    rig.root.session.handshake_phase          = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
+    rig.root.session.session_identifier       = 77u;
+    rig.root.session.session_identifier_valid = 1u;
     auto corrupted = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESET, 77u, 0u, 0u ) );
     corrupted[corrupted.size() - 2u] ^= 0x01u;
 
@@ -534,7 +530,7 @@ TEST( TransportReceive, ValidatesArgumentsDisconnectedPolicyAndPendingFlagInvari
 {
     ReceiveHarness host;
     host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
-    auto context = host.Context();
+    auto        context  = host.Context();
     std::size_t consumed = 99u;
     EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, nullptr, 1u, &consumed ),
                HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
@@ -549,9 +545,9 @@ TEST( TransportReceive, ValidatesArgumentsDisconnectedPolicyAndPendingFlagInvari
                HIL_TRANSPORT_STATUS_NOT_READY );
     EXPECT_EQ( consumed, 0u );
 
-    host.root.base.link_state                  = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    host.root.session.link_state               = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    host.root.receive_protocol_error_pending   = 2u;
+    host.root.base.link_state                = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    host.root.session.link_state             = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    host.root.receive_protocol_error_pending = 2u;
     EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, nullptr, 0u, &consumed ),
                HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
     EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_FAULT );

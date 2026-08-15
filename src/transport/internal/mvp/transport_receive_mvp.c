@@ -37,9 +37,8 @@ static HIL_Transport_Mvp_Receive_Body_Outcome_T
 HIL_TRANSPORT_MVP_Receive_Fault( HIL_Transport_Mvp_Root_T* root )
 {
     ( void )HIL_TRANSPORT_MVP_Session_Enter_Fault( root );
-    return HIL_TRANSPORT_MVP_Receive_Outcome(
-        HIL_TRANSPORT_STATUS_INTERNAL_ERROR,
-        HIL_TRANSPORT_MVP_RECEIVE_BODY_ALREADY_RELEASED );
+    return HIL_TRANSPORT_MVP_Receive_Outcome( HIL_TRANSPORT_STATUS_INTERNAL_ERROR,
+                                              HIL_TRANSPORT_MVP_RECEIVE_BODY_ALREADY_RELEASED );
 }
 
 static HIL_Transport_Status_T
@@ -70,13 +69,11 @@ HIL_TRANSPORT_MVP_Receive_Validate_Root( HIL_Transport_Mvp_Root_T* root )
          || ( root->session.state != root->base.session_state )
          || ( root->session.last_failure != root->base.last_failure )
          || ( root->base.config.max_application_message_size == 0u )
-         || ( root->base.config.max_encoded_frame_size == 0u )
-         || ( root->codec_scratch == NULL )
+         || ( root->base.config.max_encoded_frame_size == 0u ) || ( root->codec_scratch == NULL )
          || ( root->base.config.max_application_message_size
               > ( SIZE_MAX - HIL_TRANSPORT_MVP_RAW_OVERHEAD ) )
-         || ( root->codec_scratch_size
-              < ( root->base.config.max_application_message_size
-                  + HIL_TRANSPORT_MVP_RAW_OVERHEAD ) )
+         || ( root->codec_scratch_size < ( root->base.config.max_application_message_size
+                                           + HIL_TRANSPORT_MVP_RAW_OVERHEAD ) )
          || ( root->parser.scratch_buffer_size
               != ( root->base.config.max_encoded_frame_size - 1u ) ) )
     {
@@ -144,8 +141,7 @@ HIL_TRANSPORT_MVP_Receive_Reject_Retained_Body( HIL_Transport_Mvp_Root_T* root )
     }
     if ( status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
     {
-        return HIL_TRANSPORT_MVP_Receive_Outcome( status,
-                                                  HIL_TRANSPORT_MVP_RECEIVE_BODY_RETAIN );
+        return HIL_TRANSPORT_MVP_Receive_Outcome( status, HIL_TRANSPORT_MVP_RECEIVE_BODY_RETAIN );
     }
     return HIL_TRANSPORT_MVP_Receive_Fault( root );
 }
@@ -159,7 +155,7 @@ HIL_TRANSPORT_MVP_Receive_Abandon_Incompatible_Session( HIL_Transport_Mvp_Root_T
     uint64_t               failed_session_identifier;
     uint8_t                failed_session_identifier_valid;
 
-    failed_session_identifier       = root->session.session_identifier;
+    failed_session_identifier = root->session.session_identifier;
     failed_session_identifier_valid =
         ( uint8_t )( ( root->session.session_identifier_valid != 0u )
                      && ( failed_session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID )
@@ -176,8 +172,7 @@ HIL_TRANSPORT_MVP_Receive_Abandon_Incompatible_Session( HIL_Transport_Mvp_Root_T
      */
     if ( failed_session_identifier_valid != 0u )
     {
-        reset_status =
-            HIL_TRANSPORT_MVP_Handshake_Publish_Reset( root, failed_session_identifier );
+        reset_status = HIL_TRANSPORT_MVP_Handshake_Publish_Reset( root, failed_session_identifier );
     }
 
     if ( ( event_status == HIL_TRANSPORT_STATUS_INTERNAL_ERROR )
@@ -191,16 +186,15 @@ HIL_TRANSPORT_MVP_Receive_Abandon_Incompatible_Session( HIL_Transport_Mvp_Root_T
          || ( abandon_status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
          || ( reset_status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED ) )
     {
-        return HIL_TRANSPORT_MVP_Receive_Outcome(
-            HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED,
-            HIL_TRANSPORT_MVP_RECEIVE_BODY_ALREADY_RELEASED );
+        return HIL_TRANSPORT_MVP_Receive_Outcome( HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED,
+                                                  HIL_TRANSPORT_MVP_RECEIVE_BODY_ALREADY_RELEASED );
     }
-    return HIL_TRANSPORT_MVP_Receive_Outcome(
-        HIL_TRANSPORT_STATUS_OK, HIL_TRANSPORT_MVP_RECEIVE_BODY_ALREADY_RELEASED );
+    return HIL_TRANSPORT_MVP_Receive_Outcome( HIL_TRANSPORT_STATUS_OK,
+                                              HIL_TRANSPORT_MVP_RECEIVE_BODY_ALREADY_RELEASED );
 }
 
 static HIL_Transport_Mvp_Receive_Body_Outcome_T
-HIL_TRANSPORT_MVP_Receive_Dispatch_Handshake_Frame( HIL_Transport_Mvp_Root_T*       root,
+HIL_TRANSPORT_MVP_Receive_Dispatch_Handshake_Frame( HIL_Transport_Mvp_Root_T*        root,
                                                     const HIL_Transport_Mvp_Frame_T* frame )
 {
     HIL_Transport_Mvp_Handshake_Frame_Result_T result;
@@ -210,8 +204,9 @@ HIL_TRANSPORT_MVP_Receive_Dispatch_Handshake_Frame( HIL_Transport_Mvp_Root_T*   
     if ( status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
     {
         return HIL_TRANSPORT_MVP_Receive_Outcome(
-            status, root->parser.body_ready != 0u ? HIL_TRANSPORT_MVP_RECEIVE_BODY_RETAIN
-                                                   : HIL_TRANSPORT_MVP_RECEIVE_BODY_ALREADY_RELEASED );
+            status, root->parser.body_ready != 0u
+                        ? HIL_TRANSPORT_MVP_RECEIVE_BODY_RETAIN
+                        : HIL_TRANSPORT_MVP_RECEIVE_BODY_ALREADY_RELEASED );
     }
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
@@ -223,10 +218,9 @@ HIL_TRANSPORT_MVP_Receive_Dispatch_Handshake_Frame( HIL_Transport_Mvp_Root_T*   
         case HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_ACCEPTED:
         case HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_DUPLICATE:
             return HIL_TRANSPORT_MVP_Receive_Outcome(
-                HIL_TRANSPORT_STATUS_OK,
-                root->parser.body_ready != 0u
-                    ? HIL_TRANSPORT_MVP_RECEIVE_BODY_CONSUME
-                    : HIL_TRANSPORT_MVP_RECEIVE_BODY_ALREADY_RELEASED );
+                HIL_TRANSPORT_STATUS_OK, root->parser.body_ready != 0u
+                                             ? HIL_TRANSPORT_MVP_RECEIVE_BODY_CONSUME
+                                             : HIL_TRANSPORT_MVP_RECEIVE_BODY_ALREADY_RELEASED );
         case HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE:
             return HIL_TRANSPORT_MVP_Receive_Reject_Retained_Body( root );
         case HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE:
@@ -237,12 +231,11 @@ HIL_TRANSPORT_MVP_Receive_Dispatch_Handshake_Frame( HIL_Transport_Mvp_Root_T*   
 }
 
 static HIL_Transport_Mvp_Receive_Body_Outcome_T
-HIL_TRANSPORT_MVP_Receive_Dispatch_Acknowledgement( HIL_Transport_Mvp_Root_T*       root,
+HIL_TRANSPORT_MVP_Receive_Dispatch_Acknowledgement( HIL_Transport_Mvp_Root_T*        root,
                                                     const HIL_Transport_Mvp_Frame_T* frame )
 {
     /* Plan PR 9 adds Application delivery completion at this single routing seam. */
-    if ( root->session.retained_reliable_frame_type
-         == HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE )
+    if ( root->session.retained_reliable_frame_type == HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE )
     {
         return HIL_TRANSPORT_MVP_Receive_Reject_Retained_Body( root );
     }
@@ -250,7 +243,7 @@ HIL_TRANSPORT_MVP_Receive_Dispatch_Acknowledgement( HIL_Transport_Mvp_Root_T*   
 }
 
 static HIL_Transport_Mvp_Receive_Body_Outcome_T
-HIL_TRANSPORT_MVP_Receive_Dispatch_Frame( HIL_Transport_Mvp_Root_T*       root,
+HIL_TRANSPORT_MVP_Receive_Dispatch_Frame( HIL_Transport_Mvp_Root_T*        root,
                                           const HIL_Transport_Mvp_Frame_T* frame )
 {
     switch ( frame->type )
@@ -277,11 +270,11 @@ HIL_TRANSPORT_MVP_Receive_Dispatch_Frame( HIL_Transport_Mvp_Root_T*       root,
 static HIL_Transport_Mvp_Receive_Body_Outcome_T
 HIL_TRANSPORT_MVP_Receive_Decode_Retained_Body( HIL_Transport_Mvp_Root_T* root )
 {
-    const uint8_t*                   encoded_body;
-    size_t                           encoded_body_size;
-    HIL_Transport_Mvp_Frame_T        frame;
+    const uint8_t*                    encoded_body;
+    size_t                            encoded_body_size;
+    HIL_Transport_Mvp_Frame_T         frame;
     HIL_Transport_Mvp_Decode_Result_T decode_result;
-    HIL_Transport_Status_T           status;
+    HIL_Transport_Status_T            status;
 
     status = HIL_TRANSPORT_Parser_Peek_Body( &root->parser, &encoded_body, &encoded_body_size );
     if ( status != HIL_TRANSPORT_STATUS_OK )
