@@ -607,6 +607,57 @@ TEST( TransportParser, ReadBodySupportsExactScratchAlias )
     EXPECT_EQ( body_size, 0u );
 }
 
+TEST( TransportParser, PeekAndConsumeMakeBodyOwnershipExplicitWithoutClearingScratch )
+{
+    constexpr std::array<std::uint8_t, 5> Frame{ 0x11u, 0x22u, 0x33u, 0x44u, 0u };
+    std::array<std::uint8_t, 8>           scratch{};
+    HIL_Transport_Parser_T                parser{};
+    ASSERT_EQ( HIL_TRANSPORT_Parser_Init( &parser, scratch.data(), scratch.size() ),
+               HIL_TRANSPORT_STATUS_OK );
+
+    const std::uint8_t* body      = reinterpret_cast<const std::uint8_t*>( 1u );
+    std::size_t         body_size = 99u;
+    EXPECT_EQ( HIL_TRANSPORT_Parser_Peek_Body( &parser, &body, &body_size ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+    EXPECT_EQ( body, nullptr );
+    EXPECT_EQ( body_size, 0u );
+
+    std::size_t consumed = 0u;
+    ASSERT_EQ( HIL_TRANSPORT_Parser_Push_Bytes( &parser, Frame.data(), Frame.size(), &consumed ),
+               HIL_TRANSPORT_PARSER_RESULT_BODY_READY );
+    ASSERT_EQ( HIL_TRANSPORT_Parser_Peek_Body( &parser, &body, &body_size ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( body, scratch.data() );
+    EXPECT_EQ( body_size, Frame.size() - 1u );
+    EXPECT_EQ( parser.body_ready, 1u );
+    const auto retained = scratch;
+
+    ASSERT_EQ( HIL_TRANSPORT_Parser_Consume_Body( &parser ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( parser.scratch_buffer, scratch.data() );
+    EXPECT_EQ( parser.scratch_buffer_size, scratch.size() );
+    EXPECT_EQ( parser.accumulated_size, 0u );
+    EXPECT_EQ( parser.body_ready, 0u );
+    EXPECT_EQ( scratch, retained );
+    EXPECT_EQ( HIL_TRANSPORT_Parser_Consume_Body( &parser ), HIL_TRANSPORT_STATUS_NOT_READY );
+}
+
+TEST( TransportParser, PeekAndConsumeRejectInconsistentPrivateState )
+{
+    std::array<std::uint8_t, 8> scratch{};
+    HIL_Transport_Parser_T      parser{};
+    ASSERT_EQ( HIL_TRANSPORT_Parser_Init( &parser, scratch.data(), scratch.size() ),
+               HIL_TRANSPORT_STATUS_OK );
+    parser.body_ready = 1u;
+
+    const std::uint8_t* body      = reinterpret_cast<const std::uint8_t*>( 1u );
+    std::size_t         body_size = 99u;
+    EXPECT_EQ( HIL_TRANSPORT_Parser_Peek_Body( &parser, &body, &body_size ),
+               HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( body, nullptr );
+    EXPECT_EQ( body_size, 0u );
+    EXPECT_EQ( HIL_TRANSPORT_Parser_Consume_Body( &parser ), HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+}
+
 TEST( TransportParser, ReadBodySupportsForwardPartialOverlap )
 {
     constexpr std::array<std::uint8_t, 5> Frame{ 0x21u, 0x32u, 0x43u, 0x54u, 0u };
@@ -738,7 +789,7 @@ TEST( TransportParser, DiscardsOversizeThroughDelimiterThenRecovers )
 
     std::size_t consumed = 0u;
     EXPECT_EQ( HIL_TRANSPORT_Parser_Push_Bytes( &parser, stream.data(), stream.size(), &consumed ),
-               HIL_TRANSPORT_PARSER_RESULT_DISCARDING );
+               HIL_TRANSPORT_PARSER_RESULT_DISCARDED_BODY );
     EXPECT_EQ( consumed, 6u );
     EXPECT_EQ( parser.discarding, 0u );
     EXPECT_EQ( parser.accumulated_size, 0u );

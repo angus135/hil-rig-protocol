@@ -35,6 +35,9 @@ typedef enum
     /** The current body overflowed and input is discarded until a delimiter. */
     HIL_TRANSPORT_PARSER_RESULT_DISCARDING,
 
+    /** The delimiter ending one oversized discarded body was consumed. */
+    HIL_TRANSPORT_PARSER_RESULT_DISCARDED_BODY,
+
     /** A pointer, size combination, or private parser invariant is invalid. */
     HIL_TRANSPORT_PARSER_RESULT_ERROR
 } HIL_Transport_Parser_Result_T;
@@ -103,6 +106,24 @@ HIL_Transport_Parser_Result_T HIL_TRANSPORT_Parser_Push_Bytes( HIL_Transport_Par
 HIL_Transport_Status_T HIL_TRANSPORT_Parser_Read_Body( HIL_Transport_Parser_T* parser,
                                                        uint8_t* out_buffer, size_t out_buffer_size,
                                                        size_t* body_size );
+
+/**
+ * @brief Borrow the unread encoded body without consuming it.
+ *
+ * @details On OK, body points at parser scratch and body_size excludes the zero
+ * delimiter. The pointer remains valid until the body is consumed or the parser
+ * is reset. Outputs are cleared before validation and parser state is unchanged.
+ */
+HIL_Transport_Status_T HIL_TRANSPORT_Parser_Peek_Body( const HIL_Transport_Parser_T* parser,
+                                                       const uint8_t** body, size_t* body_size );
+
+/**
+ * @brief Consume exactly one unread encoded body without clearing inactive bytes.
+ *
+ * @details Success clears only body_ready and accumulated_size while retaining
+ * the configured scratch pointer and capacity.
+ */
+HIL_Transport_Status_T HIL_TRANSPORT_Parser_Consume_Body( HIL_Transport_Parser_T* parser );
 
 /**
  * @brief Clear accumulated, ready, and discard state while retaining scratch.
