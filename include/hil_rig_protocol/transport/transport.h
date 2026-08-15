@@ -33,9 +33,9 @@
  * coordinated through the MVP session module. The private semantic handshake,
  * ACK/RESET production, duplicate recovery, handshake retry policy, and public
  * Process() scheduling are implemented; link, establishment, and abandonment
- * transitions produce events. Public arbitrary-byte receive dispatch and
- * Application submission/reception remain intentional
- * HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED stubs.
+ * transitions produce events. Public arbitrary-byte receive dispatch now
+ * transactionally drives that handshake. Application submission/reception
+ * remain intentional HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED stubs.
  */
 #ifndef HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
 #define HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
@@ -345,7 +345,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_Submit_Application_Data( HIL_Transport_Cont
  * @brief Supply an arbitrary chunk from the caller-owned byte-stream receiver.
  *
  * @details Chunks may end at any byte and may contain no frame, one frame, or
- * several frames. On future return bytes_consumed is the exact accepted prefix.
+ * several frames. On return bytes_consumed is the exact accepted prefix.
  * The caller retries only data + bytes_consumed when less than data_len was
  * consumed. Temporary capacity exhaustion may therefore consume a prefix and
  * return CAPACITY_EXHAUSTED. Structurally malformed input is consumed through
@@ -355,16 +355,26 @@ HIL_Transport_Status_T HIL_TRANSPORT_Submit_Application_Data( HIL_Transport_Cont
  * integrity, stale-session, and sequence classifications remain private and no
  * private numeric status escapes this facade.
  *
- * The input is borrowed only for this call. INVALID_ARGUMENT reports zero
- * consumption. The current stub also reports zero and returns NOT_IMPLEMENTED.
+ * Complete parser bodies remain internally owned until semantic handling can
+ * commit them. If event, reliable-output, or control-output capacity blocks
+ * acceptance, the already accepted body remains retained and a later call,
+ * including a zero-byte call, retries it without caller resubmission. An
+ * oversized body is discarded through its delimiter; if its error event is
+ * blocked, only the later unconsumed suffix remains caller-owned.
+ *
+ * Receive accepts no bytes while the reported link is DISCONNECTED and returns
+ * NOT_READY. Structurally valid Application frames are currently consumed and
+ * reported as PROTOCOL_ERROR because inbound Application ownership is deferred;
+ * they do not make received-message storage visible. The input is borrowed only
+ * for this call. INVALID_ARGUMENT and NOT_READY report zero consumption.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[in] data Received bytes; may be NULL only when data_len is zero.
  * @param[in] data_len Bytes offered in this call.
  * @param[out] bytes_consumed Required output receiving the exact accepted prefix.
- * @return OK for complete consumption, CAPACITY_EXHAUSTED for a retryable
- * suffix, INTERNAL_ERROR for a detected invariant failure, INVALID_ARGUMENT, or
- * current NOT_IMPLEMENTED stub result.
+ * @return OK for complete consumption, CAPACITY_EXHAUSTED for retryable
+ * blockage, NOT_READY while disconnected, INVALID_ARGUMENT, or INTERNAL_ERROR
+ * for a detected invariant failure.
  */
 HIL_Transport_Status_T HIL_TRANSPORT_Receive_Bytes( HIL_Transport_Context_T* context,
                                                     const uint8_t* data, size_t data_len,

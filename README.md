@@ -91,13 +91,20 @@ It reuses the codec and output lifecycles, supports exact duplicate recovery and
 timed retries, and abandons exhausted attempts through the existing session
 recovery path. `HIL_TRANSPORT_Process()` validates and records all three MVP
 operating modes, publishes pending handshake work, advances reliable timing, and
-starts later recovery attempts. Tests inject decoded frames directly because
-public arbitrary-byte receive dispatch remains deferred.
+starts later recovery attempts. Public `Receive_Bytes()` now feeds arbitrary
+stream chunks through the bounded parser and non-copying decoder view, then
+dispatches complete frames into that coordinator transactionally. A completed
+parser body remains retained across temporary event, reliable-output, or
+control-output blockage, so callers retry only the exact unconsumed input suffix.
+Oversized bodies resynchronize at their delimiter and retain a pending error
+notification if the event FIFO is temporarily full.
 
-Public `Receive_Bytes()`, Application submission, and Application reception are
-still intentional `HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs. Parser-to-codec
-dispatch, Application delivery events, fragmentation, and reassembly are not
-implemented, so the public send/receive workflow is not yet operational end to
+Application submission and Application reception are still intentional
+`HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED` stubs. Structurally valid inbound
+Application frames are isolated in one receive-dispatch branch, consumed, and
+reported as protocol errors without copying into received-message storage.
+Application delivery events, fragmentation, and reassembly are not implemented,
+so the public Application send/receive workflow is not yet operational end to
 end.
 
 The default MVP Transport profile is designed for one complete Application

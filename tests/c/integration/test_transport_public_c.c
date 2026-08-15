@@ -72,8 +72,8 @@ int main( void )
 
     if ( HIL_TRANSPORT_Receive_Bytes( &context, encoded_output, sizeof( encoded_output ),
                                       &bytes_consumed )
-             != HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED
-         || bytes_consumed != 0u )
+             != HIL_TRANSPORT_STATUS_OK
+         || bytes_consumed != sizeof( encoded_output ) )
     {
         return 3;
     }

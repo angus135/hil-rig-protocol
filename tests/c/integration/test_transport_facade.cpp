@@ -112,7 +112,7 @@ TEST( TransportFacadeApiDesign, IntendedCallerWorkflowCompilesAndLinks )
     HIL_Transport_Context_T context{};
     std::size_t             bytes_consumed = 99u;
     EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, nullptr, 0u, &bytes_consumed ),
-               HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED );
+               HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
     EXPECT_EQ( bytes_consumed, 0u );
 }
 
