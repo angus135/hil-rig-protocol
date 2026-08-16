@@ -1,6 +1,6 @@
 /**
  * @file transport_profile_mvp.c
- * @brief MVP wire, receive, session, output, and outbound Application integration.
+ * @brief MVP wire, receive, session, output, and Application-delivery integration.
  *
  * @details The MVP uses simple session establishment, one complete
  * Application message per frame, framing plus integrity, and one outstanding
@@ -8,8 +8,7 @@
  * reliable encoded-output lifecycle, separate private one-item control storage,
  * public output arbitration, session lifecycle coordination, link-state
  * recovery, semantic handshake progression, transactional byte reception, and
- * Process scheduling and outbound Application-message delivery are implemented.
- * Inbound Application-message delivery remains intentionally deferred.
+ * Process scheduling and bidirectional one-message-at-a-time Application delivery are implemented.
  */
 #include "../transport_profile.h"
 
@@ -456,20 +455,17 @@ HIL_Transport_Status_T
 HIL_TRANSPORT_PROFILE_Read_Application_Data( HIL_Transport_Context_T* context, uint8_t* out_buffer,
                                              size_t out_buffer_size, size_t* message_size )
 {
-    /*
-     * TODO: Clear and require message_size, expose only the oldest complete
-     * message, support a size query, leave it unchanged on insufficient output,
-     * and release private storage only after a complete successful copy. Report
-     * Transport delivery only, never Application semantic acceptance.
-     */
-    ( void )context;
-    ( void )out_buffer;
-    ( void )out_buffer_size;
-    if ( message_size != NULL )
+    HIL_Transport_Mvp_Root_T* root = HIL_TRANSPORT_MVP_Root_From_Context( context );
+
+    if ( root == NULL )
     {
-        *message_size = 0u;
+        if ( message_size != NULL )
+        {
+            *message_size = 0u;
+        }
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    return HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED;
+    return HIL_TRANSPORT_MVP_Application_Read( root, out_buffer, out_buffer_size, message_size );
 }
 
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Read_Event( HIL_Transport_Context_T* context,
@@ -491,6 +487,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Get_Status( const HIL_Transport_Con
     HIL_Transport_Status_T    result;
     uint8_t                   output_pending;
     uint8_t                   delivery_pending;
+    uint8_t                   application_message_pending;
     uint8_t                   event_pending;
 
     if ( status == NULL )
@@ -509,6 +506,11 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Get_Status( const HIL_Transport_Con
     {
         return result;
     }
+    result = HIL_TRANSPORT_MVP_Application_Get_Pending_Status( root, &application_message_pending );
+    if ( result != HIL_TRANSPORT_STATUS_OK )
+    {
+        return result;
+    }
     result = HIL_TRANSPORT_MVP_Events_Get_Pending_Status( root, &event_pending );
     if ( result != HIL_TRANSPORT_STATUS_OK )
     {
@@ -521,7 +523,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Get_Status( const HIL_Transport_Con
     status->operating_mode              = root->base.operating_mode;
     status->operating_mode_valid        = root->base.operating_mode_valid;
     status->output_pending              = output_pending;
-    status->application_message_pending = root->received_message_pending;
+    status->application_message_pending = application_message_pending;
     status->event_pending               = event_pending;
     status->reliable_delivery_pending   = delivery_pending;
     status->last_failure                = root->base.last_failure;

@@ -289,13 +289,34 @@ HIL_TRANSPORT_MVP_Receive_Dispatch_Frame( HIL_Transport_Mvp_Root_T*        root,
             return HIL_TRANSPORT_MVP_Receive_Dispatch_Handshake_Frame( root, frame );
         case HIL_TRANSPORT_MVP_FRAME_ACK:
             return HIL_TRANSPORT_MVP_Receive_Dispatch_Acknowledgement( root, frame );
-        case HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE:
-            /*
-             * Inbound Application ownership belongs to Plan PR 10. Until then,
-             * reject one structurally valid frame as protocol input without
-             * copying into received_message or making that storage visible.
-             */
-            return HIL_TRANSPORT_MVP_Receive_Reject_Retained_Body( root );
+        case HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE: {
+            HIL_Transport_Mvp_Application_Frame_Result_T application_result;
+            HIL_Transport_Status_T status = HIL_TRANSPORT_MVP_Application_Handle_Received_Frame(
+                root, frame, &application_result );
+
+            if ( status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
+            {
+                return HIL_TRANSPORT_MVP_Receive_Outcome( status,
+                                                          HIL_TRANSPORT_MVP_RECEIVE_BODY_RETAIN );
+            }
+            if ( status != HIL_TRANSPORT_STATUS_OK )
+            {
+                return HIL_TRANSPORT_MVP_Receive_Fault( root );
+            }
+            switch ( application_result )
+            {
+                case HIL_TRANSPORT_MVP_APPLICATION_FRAME_ACCEPTED:
+                case HIL_TRANSPORT_MVP_APPLICATION_FRAME_DUPLICATE:
+                    return HIL_TRANSPORT_MVP_Receive_Outcome(
+                        HIL_TRANSPORT_STATUS_OK, HIL_TRANSPORT_MVP_RECEIVE_BODY_CONSUME );
+                case HIL_TRANSPORT_MVP_APPLICATION_FRAME_STALE:
+                    return HIL_TRANSPORT_MVP_Receive_Reject_Retained_Body( root );
+                case HIL_TRANSPORT_MVP_APPLICATION_FRAME_INCOMPATIBLE:
+                    return HIL_TRANSPORT_MVP_Receive_Abandon_Incompatible_Session( root );
+                default:
+                    return HIL_TRANSPORT_MVP_Receive_Fault( root );
+            }
+        }
         default:
             return HIL_TRANSPORT_MVP_Receive_Fault( root );
     }

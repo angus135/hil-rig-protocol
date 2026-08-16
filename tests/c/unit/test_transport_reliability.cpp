@@ -1264,6 +1264,7 @@ TEST_F( TransportReliabilityTest, PublicStatusReportsCompleteImplementedSnapshot
     root_.base.operating_mode       = HIL_TRANSPORT_OPERATING_MODE_BULK_TRANSFER;
     root_.base.operating_mode_valid = 1u;
     root_.base.last_failure         = HIL_TRANSPORT_FAILURE_PROTOCOL;
+    root_.received_message_size     = 1u;
     root_.received_message_pending  = 1u;
     const HIL_Transport_Event_T event{ HIL_TRANSPORT_EVENT_PROTOCOL_ERROR,
                                        HIL_TRANSPORT_STATUS_INVALID_ARGUMENT,

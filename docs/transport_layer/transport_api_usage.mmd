@@ -19,15 +19,15 @@ subgraph Runtime["Caller-driven service loop"]
     I{"Raw received bytes available?"}
     J["HIL_TRANSPORT_Receive_Bytes"]
     Ja{"All bytes consumed?"}
-    Jb["Retain and later retry exact suffix"]
+    Jb["Retain and later retry exact suffix<br/>completed blocked bodies remain Transport-owned"]
     K["HIL_TRANSPORT_Process<br/>monotonic time + local Transport mode"]
     L["HIL_TRANSPORT_Peek_Output"]
     M{"Complete output available?"}
     N["Offer opaque bytes to external I/O"]
     O{"External I/O accepted all bytes?"}
     P["HIL_TRANSPORT_Commit_Output"]
-    Q["Drain complete Application messages"]
-    R["Drain high-level events and status"]
+    Q["Drain complete Application messages<br/>frees the sole unread-message slot"]
+    R["Drain high-level events and status<br/>restores bounded event capacity"]
 end
 
 Caller --> A --> B --> C --> D --> Da --> Db --> E
