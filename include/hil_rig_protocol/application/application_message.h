@@ -26,8 +26,8 @@ extern "C"
 #endif
 
 #define HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE_BYTES ( 65536u )
-#define HIL_APPLICATION_MESSAGE_TYPE_SIZE_BYTES 1
-#define HIL_APPLICATION_MESSAGE_SUB_TYPE_SIZE_BYTES 1
+#define HIL_APPLICATION_MESSAGE_TYPE_SIZE_BYTES 4
+#define HIL_APPLICATION_MESSAGE_SUB_TYPE_SIZE_BYTES 4
 #define HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES 16
 #define HIL_APPLICATION_HEADER_SIZE_BYTES                                                          \
     ( HIL_APPLICATION_TEST_ID_SIZE + HIL_APPLICATION_MESSAGE_TYPE_SIZE_BYTES                       \
@@ -147,6 +147,10 @@ typedef struct
         HIL_Application_Error_T error;
     } body;
 } HIL_Application_Message_T;
+
+HIL_Application_Status_T HIL_APPLICATION_Header_Encoding( const HIL_Application_Message_T* message,
+                                                          const HIL_Application_Context_T* context,
+                                                          uint8_t*                         dest );
 
 #ifdef __cplusplus
 }
