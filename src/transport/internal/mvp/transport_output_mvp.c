@@ -48,7 +48,20 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Output_Validate_State(
         || ( root->session.reliable_state == HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_PEEKED );
     control_peeked = root->control_output_state == HIL_TRANSPORT_MVP_CONTROL_OUTPUT_PEEKED;
 
-    if ( ( root->output_selection < HIL_TRANSPORT_MVP_OUTPUT_NONE )
+    if ( ( root->recovery_reset_pending > 1u )
+         || ( ( root->recovery_reset_pending == 0u )
+              && ( root->recovery_reset_session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID ) )
+         || ( ( root->recovery_reset_pending != 0u )
+              && ( ( root->base.session_state != HIL_TRANSPORT_SESSION_STATE_RECOVERING )
+                   || ( root->session.state != HIL_TRANSPORT_SESSION_STATE_RECOVERING )
+                   || ( root->base.link_state != HIL_TRANSPORT_LINK_STATE_CONNECTED )
+                   || ( root->session.link_state != HIL_TRANSPORT_LINK_STATE_CONNECTED )
+                   || ( root->recovery_reset_session_identifier
+                        == HIL_TRANSPORT_SESSION_SEED_INVALID )
+                   || ( root->recovery_reset_session_identifier
+                        == HIL_TRANSPORT_SESSION_SEED_RESERVED )
+                   || ( root->control_output_state == HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE ) ) )
+         || ( root->output_selection < HIL_TRANSPORT_MVP_OUTPUT_NONE )
          || ( root->output_selection > HIL_TRANSPORT_MVP_OUTPUT_CONTROL )
          || ( reliable_peeked && control_peeked ) )
     {
@@ -201,6 +214,12 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Output_Commit_Output( HIL_Transport_Mvp
 
     if ( status == HIL_TRANSPORT_STATUS_OK )
     {
+        if ( ( root->output_selection == HIL_TRANSPORT_MVP_OUTPUT_CONTROL )
+             && ( root->recovery_reset_pending != 0u ) )
+        {
+            root->recovery_reset_pending            = 0u;
+            root->recovery_reset_session_identifier = HIL_TRANSPORT_SESSION_SEED_INVALID;
+        }
         root->output_selection = HIL_TRANSPORT_MVP_OUTPUT_NONE;
     }
     return status;

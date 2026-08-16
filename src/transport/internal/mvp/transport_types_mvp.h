@@ -268,6 +268,16 @@ typedef struct
     /** Independent ownership state for the one-item control slot. */
     HIL_Transport_Mvp_Control_Output_State_T control_output_state;
 
+    /**
+     * Nonzero only while a locally generated recovery RESET must remain owned
+     * until external I/O commits it. This semantic tag prevents later recovery
+     * work from accidentally clearing the synchronization barrier.
+     */
+    uint8_t recovery_reset_pending;
+
+    /** Session identity carried by the pending locally generated recovery RESET. */
+    uint64_t recovery_reset_session_identifier;
+
     uint8_t* codec_scratch;
     size_t   codec_scratch_size;
     uint8_t* received_message;

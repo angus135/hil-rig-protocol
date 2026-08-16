@@ -453,12 +453,12 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Try_Complete_Host_From_Applic
     {
         return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
     }
-    if ( ( sequence_result == HIL_TRANSPORT_MVP_RX_SEQUENCE_DUPLICATE )
-         || ( sequence_result == HIL_TRANSPORT_MVP_RX_SEQUENCE_STALE ) )
-    {
-        *result = HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_STALE;
-        return HIL_TRANSPORT_STATUS_OK;
-    }
+    /*
+     * The previously accepted peer sequence belongs to RESPONSE, not
+     * APPLICATION. Reusing it (or any older/current-session sequence) for a
+     * different reliable frame type is incompatible rather than a duplicate
+     * Application. Only the exact next sequence can prove CONFIRM acceptance.
+     */
     if ( sequence_result != HIL_TRANSPORT_MVP_RX_SEQUENCE_EXPECTED )
     {
         *result = HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_INCOMPATIBLE;
@@ -914,6 +914,8 @@ HIL_TRANSPORT_MVP_Handshake_Begin_Local_Recovery( HIL_Transport_Mvp_Root_T* root
         {
             return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
         }
+        root->recovery_reset_pending            = 1u;
+        root->recovery_reset_session_identifier = failed_session_identifier;
     }
 
     return abandon_status;

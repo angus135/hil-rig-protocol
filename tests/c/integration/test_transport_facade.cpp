@@ -462,6 +462,141 @@ TEST( TransportFacadeRecovery, RigExplicitResetNotifiesHostAndReestablishes )
     EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
 }
 
+TEST( TransportFacadeRecovery, InFlightPeerTrafficCannotClearPendingRecoveryReset )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xA123 ), 10u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u, 10u, 0u );
+    EstablishPublicPair( host, rig );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    const std::array<std::uint8_t, 3u> host_payload{ 1u, 2u, 3u };
+    const std::array<std::uint8_t, 3u> rig_payload{ 4u, 5u, 6u };
+
+    ASSERT_EQ( HIL_TRANSPORT_Submit_Application_Data( &host.context, host_payload.data(),
+                                                      host_payload.size() ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto delayed_host_application = TakeOneOutput( host, 20u );
+    ASSERT_FALSE( delayed_host_application.empty() );
+
+    ASSERT_EQ( HIL_TRANSPORT_Submit_Application_Data( &rig.context, rig_payload.data(),
+                                                      rig_payload.size() ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto dropped_rig_application = TakeOneOutput( rig, 21u );
+    ASSERT_FALSE( dropped_rig_application.empty() );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 31u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_DELIVERY_FAILED );
+
+    HIL_Transport_Status_Snapshot_T rig_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    ASSERT_EQ( rig_status.output_pending, 1u );
+
+    /*
+     * This frame was already accepted by external I/O before the rig abandoned
+     * the old session. Receiving it during recovery must not clear RESET(old).
+     */
+    DeliverBytes( rig, delayed_host_application.data(), delayed_host_application.size() );
+
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( rig_status.output_pending, 1u );
+
+    const auto recovery_reset = TakeOneOutput( rig, 32u );
+    ASSERT_FALSE( recovery_reset.empty() );
+    DeliverBytes( host, recovery_reset.data(), recovery_reset.size() );
+
+    HIL_Transport_Status_Snapshot_T host_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &host.context, &host_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 33u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+}
+
+TEST( TransportFacadeRecovery, ExplicitResetAfterDeliveryFailureKeepsRecoveryReset )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xA1A3 ), 10u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u, 10u, 0u );
+    EstablishPublicPair( host, rig );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    const std::array<std::uint8_t, 2u> payload{ 0x11u, 0x22u };
+    ASSERT_EQ(
+        HIL_TRANSPORT_Submit_Application_Data( &rig.context, payload.data(), payload.size() ),
+        HIL_TRANSPORT_STATUS_OK );
+    const auto dropped_application = TakeOneOutput( rig, 20u );
+    ASSERT_FALSE( dropped_application.empty() );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 30u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_DELIVERY_FAILED );
+
+    /* Caller-requested recovery must not erase the RESET produced by exhaustion. */
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &rig.context ), HIL_TRANSPORT_STATUS_OK );
+
+    HIL_Transport_Status_Snapshot_T rig_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( rig_status.output_pending, 1u );
+
+    const auto recovery_reset = TakeOneOutput( rig, 31u );
+    ASSERT_FALSE( recovery_reset.empty() );
+    DeliverBytes( host, recovery_reset.data(), recovery_reset.size() );
+
+    HIL_Transport_Status_Snapshot_T host_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &host.context, &host_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+}
+
+TEST( TransportFacadeRecovery, RepeatedExplicitResetPreservesPeerSynchronization )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xA223 ), 10u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u );
+    EstablishPublicPair( host, rig );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &rig.context ), HIL_TRANSPORT_STATUS_OK );
+
+    /* A second Reset while RESET(old) is still READY must preserve it. */
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &rig.context ), HIL_TRANSPORT_STATUS_OK );
+
+    std::array<std::uint8_t, MaxOutput> first_peek{};
+    std::size_t                         first_size = 0u;
+    ASSERT_EQ( HIL_TRANSPORT_Peek_Output( &rig.context, first_peek.data(), first_peek.size(),
+                                          &first_size ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_GT( first_size, 0u );
+
+    /* Explicit Reset may invalidate a prior peek, but it must re-own RESET(old). */
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &rig.context ), HIL_TRANSPORT_STATUS_OK );
+
+    HIL_Transport_Status_Snapshot_T rig_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( rig_status.output_pending, 1u );
+
+    const auto recovery_reset = TakeOneOutput( rig, 20u );
+    ASSERT_EQ( recovery_reset.size(), first_size );
+    EXPECT_TRUE( std::equal( recovery_reset.begin(), recovery_reset.end(), first_peek.begin() ) );
+
+    DeliverBytes( host, recovery_reset.data(), recovery_reset.size() );
+
+    HIL_Transport_Status_Snapshot_T host_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &host.context, &host_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+}
+
 TEST( TransportFacadeRecovery, ResetAndReplacementInitiateCanShareOneReceiveChunk )
 {
     PublicEndpoint host;
