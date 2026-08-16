@@ -364,19 +364,25 @@ silently discard an unreported suffix.
 The receive coordinator processes a pending oversized-body diagnostic and any
 already completed parser body before accepting new bytes. If local recovery is
 waiting only for its RESET output to be committed, the receive path also enters
-fresh establishment before parsing new bytes once that output barrier is gone.
+fresh establishment before parsing a new frame once that output barrier is gone.
+The same recovery eligibility is reconsidered whenever receive processing reaches
+a clean parser boundary, including after a stale/retained body is consumed and
+after an oversized body finishes being discarded. A replacement handshake frame
+that follows such old-session input in the same supplied chunk is therefore
+interpreted in fresh establishment rather than against the recovering session.
 This makes `Commit_Output()` followed directly by `Receive_Bytes()` equivalent
-to inserting a `Process()` call between them. A decoded body is a transaction:
-retryable event, unread-message, reliable-output, or control-output exhaustion
-returns `CAPACITY_EXHAUSTED` while leaving the body unchanged. A later call,
-including one with zero input bytes, retries semantic processing without asking
-the caller to resend bytes already accepted into parser scratch. `Process()`
-also progresses this pending receive work before handshake publication or retry
-expiry, and leaves reliability timing unchanged while local capacity blocks it.
-A completed oversized discard has no body to retain, so a one-bit pending
-diagnostic blocks later input until its `PROTOCOL_ERROR` event can be published.
-The parser stops at that discard delimiter, leaving every following byte in the
-caller-owned suffix.
+to inserting a `Process()` call between them and keeps the result independent of
+arbitrary byte-stream chunking. A decoded body is a transaction: retryable event,
+unread-message, reliable-output, or control-output exhaustion returns
+`CAPACITY_EXHAUSTED` while leaving the body unchanged. A later call, including
+one with zero input bytes, retries semantic processing without asking the caller
+to resend bytes already accepted into parser scratch. `Process()` also progresses
+this pending receive work before handshake publication or retry expiry, and leaves
+reliability timing unchanged while local capacity blocks it. A completed oversized
+discard has no body to retain, so a one-bit pending diagnostic blocks later input
+until its `PROTOCOL_ERROR` event can be published. When that publication is
+backpressured, receive stops before consuming the following frame and the remaining
+suffix stays caller-owned for retry.
 
 Malformed, integrity-invalid, stale-session, or incompatible-sequence input is
 consumed only through the appropriate implementation resynchronization boundary

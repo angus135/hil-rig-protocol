@@ -756,6 +756,116 @@ TEST( TransportFacadeRecovery, DelayedOldApplicationBeforeReplacementInitiateDoe
     EXPECT_EQ( rig_status.output_pending, 1u );
 }
 
+TEST( TransportFacadeRecovery, PartialOldFrameThenReplacementInitiateAdvancesBetweenFrames )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xE2A3 ), 10u, 0u, 0u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u, 0u, 0u );
+    EstablishPublicPair( host, rig );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    const std::array<std::uint8_t, 3u> payload{ 0x2Au, 0x2Bu, 0x2Cu };
+    ASSERT_EQ(
+        HIL_TRANSPORT_Submit_Application_Data( &host.context, payload.data(), payload.size() ),
+        HIL_TRANSPORT_STATUS_OK );
+    const auto delayed_old_application = TakeOneOutput( host, 20u );
+    ASSERT_GT( delayed_old_application.size(), 1u );
+    ASSERT_EQ( delayed_old_application.back(), 0u );
+
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &rig.context ), HIL_TRANSPORT_STATUS_OK );
+
+    /*
+     * Leave the parser holding an incomplete frame from the abandoned session.
+     * This deliberately prevents receive-entry recovery progression.
+     */
+    std::size_t consumed = 0u;
+    ASSERT_EQ( HIL_TRANSPORT_Receive_Bytes( &rig.context, delayed_old_application.data(),
+                                            delayed_old_application.size() - 1u, &consumed ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( consumed, delayed_old_application.size() - 1u );
+
+    const auto reset = TakeOneOutput( rig, 21u );
+    ASSERT_FALSE( reset.empty() );
+    DeliverBytes( host, reset.data(), reset.size() );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 22u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto initiate = TakeOneOutput( host, 23u );
+    ASSERT_FALSE( initiate.empty() );
+
+    /*
+     * The old frame becomes complete first. Once it is rejected and consumed,
+     * recovery must be reconsidered before the following INITIATE is parsed.
+     */
+    std::vector<std::uint8_t> combined{ delayed_old_application.back() };
+    combined.insert( combined.end(), initiate.begin(), initiate.end() );
+    DeliverBytes( rig, combined.data(), combined.size() );
+
+    HIL_Transport_Status_Snapshot_T rig_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( rig_status.application_message_pending, 0u );
+    EXPECT_EQ( rig_status.output_pending, 0u );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 24u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.output_pending, 1u );
+    EXPECT_EQ( rig_status.reliable_delivery_pending, 1u );
+}
+
+TEST( TransportFacadeRecovery, DiscardedOldBodyThenReplacementInitiateAdvancesBetweenFrames )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xE2B3 ), 10u, 0u, 0u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u, 0u, 0u );
+    EstablishPublicPair( host, rig );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &rig.context ), HIL_TRANSPORT_STATUS_OK );
+
+    /*
+     * Fill the parser beyond its retained-body capacity without a delimiter so
+     * it is discarding abandoned-session input when RESET is committed.
+     */
+    const std::vector<std::uint8_t> oversized_old_body( MaxOutput, 0x55u );
+    std::size_t                     consumed = 0u;
+    ASSERT_EQ( HIL_TRANSPORT_Receive_Bytes( &rig.context, oversized_old_body.data(),
+                                            oversized_old_body.size(), &consumed ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( consumed, oversized_old_body.size() );
+
+    const auto reset = TakeOneOutput( rig, 20u );
+    ASSERT_FALSE( reset.empty() );
+    DeliverBytes( host, reset.data(), reset.size() );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 21u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto initiate = TakeOneOutput( host, 22u );
+    ASSERT_FALSE( initiate.empty() );
+
+    /*
+     * The delimiter finishes the discard. After its diagnostic is retained, the
+     * following replacement INITIATE in the same chunk must see fresh establishment.
+     */
+    std::vector<std::uint8_t> combined{ 0u };
+    combined.insert( combined.end(), initiate.begin(), initiate.end() );
+    DeliverBytes( rig, combined.data(), combined.size() );
+
+    HIL_Transport_Status_Snapshot_T rig_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( rig_status.output_pending, 0u );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 23u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.output_pending, 1u );
+    EXPECT_EQ( rig_status.reliable_delivery_pending, 1u );
+}
+
 TEST( TransportFacadeRecovery, DeferredStaleDiagnosticAfterResetCommitDoesNotEnterFault )
 {
     PublicEndpoint host;
