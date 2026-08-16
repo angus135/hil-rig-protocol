@@ -15,6 +15,7 @@ namespace {
 
 constexpr std::size_t   RetainedCapacity        = 16u;
 constexpr std::size_t   WorkspaceRegionCapacity = 8u;
+constexpr std::size_t   CodecRegionCapacity     = 64u;
 constexpr std::size_t   FrameSize               = 11u;
 constexpr std::uint16_t InitialSequence         = 0x3456u;
 constexpr std::uint32_t TimeoutMs               = 10u;
@@ -236,7 +237,7 @@ protected:
     std::array<std::uint8_t, RetainedCapacity>        original_bytes_{};
     std::array<std::uint8_t, WorkspaceRegionCapacity> submitted_{};
     std::array<std::uint8_t, WorkspaceRegionCapacity> parser_storage_{};
-    std::array<std::uint8_t, WorkspaceRegionCapacity> codec_storage_{};
+    std::array<std::uint8_t, CodecRegionCapacity>     codec_storage_{};
     std::array<std::uint8_t, WorkspaceRegionCapacity> received_{};
 };
 
@@ -1214,14 +1215,15 @@ TEST_F( TransportReliabilityTest, PublicDisconnectedResetClearsAllSessionScopedS
     EXPECT_EQ( received_, received_bytes );
 }
 
-TEST_F( TransportReliabilityTest, PublicConnectedResetEntersRecoveryWithoutStartingHandshake )
+TEST_F( TransportReliabilityTest, PublicConnectedResetPublishesResetBeforeRestartingHandshake )
 {
     HIL_Transport_Context_T context = Context();
     PopulateSessionScopedState();
-    root_.base.link_state    = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    root_.session.link_state = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    root_.base.session_state = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
-    root_.session.state      = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root_.base.link_state             = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root_.session.link_state          = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root_.session.link_state_observed = 1u;
+    root_.base.session_state          = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root_.session.state               = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
 
     ASSERT_EQ( HIL_TRANSPORT_Reset( &context ), HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( root_.base.link_state, HIL_TRANSPORT_LINK_STATE_CONNECTED );
@@ -1233,6 +1235,11 @@ TEST_F( TransportReliabilityTest, PublicConnectedResetEntersRecoveryWithoutStart
     EXPECT_EQ( root_.session.last_failure, HIL_TRANSPORT_FAILURE_LOCAL_RESET );
     EXPECT_EQ( root_.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE );
     EXPECT_EQ( root_.encoded_output_size, 0u );
+    EXPECT_EQ( root_.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( root_.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
 }
 
 TEST_F( TransportReliabilityTest, PublicResetClearsFaultUsingRetainedLinkObservation )
@@ -1252,20 +1259,27 @@ TEST_F( TransportReliabilityTest, PublicResetClearsFaultUsingRetainedLinkObserva
     EXPECT_EQ( root_.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE );
     EXPECT_EQ( root_.encoded_output_size, 0u );
     EXPECT_EQ( root_.output_selection, HIL_TRANSPORT_MVP_OUTPUT_NONE );
+    EXPECT_EQ( root_.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE );
 }
 
 TEST_F( TransportReliabilityTest, PublicStatusReportsCompleteImplementedSnapshot )
 {
     HIL_Transport_Context_T context = Context();
     Publish();
-    root_.base.role                 = HIL_TRANSPORT_ROLE_RIG;
-    root_.base.link_state           = HIL_TRANSPORT_LINK_STATE_CONNECTED;
-    root_.base.session_state        = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
-    root_.base.operating_mode       = HIL_TRANSPORT_OPERATING_MODE_BULK_TRANSFER;
-    root_.base.operating_mode_valid = 1u;
-    root_.base.last_failure         = HIL_TRANSPORT_FAILURE_PROTOCOL;
-    root_.received_message_size     = 1u;
-    root_.received_message_pending  = 1u;
+    root_.base.role                   = HIL_TRANSPORT_ROLE_RIG;
+    root_.session.role                = HIL_TRANSPORT_ROLE_RIG;
+    root_.base.link_state             = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root_.session.link_state          = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root_.session.link_state_observed = 1u;
+    root_.base.session_state          = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root_.session.state               = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root_.session.handshake_phase     = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
+    root_.base.operating_mode         = HIL_TRANSPORT_OPERATING_MODE_BULK_TRANSFER;
+    root_.base.operating_mode_valid   = 1u;
+    root_.base.last_failure           = HIL_TRANSPORT_FAILURE_PROTOCOL;
+    root_.session.last_failure        = HIL_TRANSPORT_FAILURE_PROTOCOL;
+    root_.received_message_size       = 1u;
+    root_.received_message_pending    = 1u;
     const HIL_Transport_Event_T event{ HIL_TRANSPORT_EVENT_PROTOCOL_ERROR,
                                        HIL_TRANSPORT_STATUS_INVALID_ARGUMENT,
                                        HIL_TRANSPORT_FAILURE_PROTOCOL, 0u };
@@ -1283,6 +1297,30 @@ TEST_F( TransportReliabilityTest, PublicStatusReportsCompleteImplementedSnapshot
     EXPECT_EQ( status.application_message_pending, 1u );
     EXPECT_EQ( status.event_pending, 1u );
     EXPECT_EQ( status.last_failure, HIL_TRANSPORT_FAILURE_PROTOCOL );
+}
+
+TEST_F( TransportReliabilityTest, PublicStatusRejectsInvalidOperatingModeValidityMetadata )
+{
+    HIL_Transport_Context_T context = Context();
+    root_.base.operating_mode_valid = 2u;
+    HIL_Transport_Status_Snapshot_T status{};
+
+    EXPECT_EQ( HIL_TRANSPORT_Get_Status( &context, &status ), HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( root_.base.session_state, HIL_TRANSPORT_SESSION_STATE_FAULT );
+    EXPECT_EQ( root_.session.state, HIL_TRANSPORT_SESSION_STATE_FAULT );
+    EXPECT_EQ( status.operating_mode_valid, 0u );
+}
+
+TEST_F( TransportReliabilityTest, PublicStatusRejectsCoreStateMirrorMismatch )
+{
+    HIL_Transport_Context_T context = Context();
+    root_.base.link_state           = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root_.session.link_state        = HIL_TRANSPORT_LINK_STATE_DISCONNECTED;
+    HIL_Transport_Status_Snapshot_T status{};
+
+    EXPECT_EQ( HIL_TRANSPORT_Get_Status( &context, &status ), HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( root_.base.session_state, HIL_TRANSPORT_SESSION_STATE_FAULT );
+    EXPECT_EQ( root_.session.state, HIL_TRANSPORT_SESSION_STATE_FAULT );
 }
 
 TEST( TransportReliabilityPublicArguments, InvalidContextsAndPointerCombinationsAreRejected )

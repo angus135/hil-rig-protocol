@@ -402,6 +402,108 @@ HIL_TRANSPORT_MVP_Handshake_Handle_Host_Ack( HIL_Transport_Mvp_Root_T*          
     return HIL_TRANSPORT_STATUS_OK;
 }
 
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Try_Complete_Host_From_Application(
+    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
+    HIL_Transport_Mvp_Handshake_Application_Proof_Result_T* result )
+{
+    HIL_Transport_Mvp_Rx_Sequence_Result_T sequence_result;
+    HIL_Transport_Status_T                 status;
+
+    if ( result == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    *result = HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_NOT_APPLICABLE;
+    if ( ( root == NULL ) || ( frame == NULL )
+         || ( frame->type != HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE ) )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    if ( HIL_TRANSPORT_MVP_Handshake_Validate_Root( root ) != HIL_TRANSPORT_STATUS_OK )
+    {
+        return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    }
+    if ( ( root->session.role != HIL_TRANSPORT_ROLE_HOST )
+         || ( root->session.state != HIL_TRANSPORT_SESSION_STATE_CONNECTING )
+         || ( root->session.handshake_phase
+              != HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK ) )
+    {
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    if ( frame->session_identifier != root->session.session_identifier )
+    {
+        *result = HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Previous(
+                      root->session.session_identifier, frame->session_identifier )
+                      ? HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_STALE
+                      : HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( ( frame->payload == NULL ) || ( frame->payload_size == 0u )
+         || ( frame->payload_size > root->base.config.max_application_message_size )
+         || ( frame->acknowledgement_sequence != 0u ) )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    status = HIL_TRANSPORT_MVP_Session_Classify_Sequence( &root->session, frame->sequence,
+                                                          &sequence_result );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+    }
+    if ( ( sequence_result == HIL_TRANSPORT_MVP_RX_SEQUENCE_DUPLICATE )
+         || ( sequence_result == HIL_TRANSPORT_MVP_RX_SEQUENCE_STALE ) )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_STALE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( sequence_result != HIL_TRANSPORT_MVP_RX_SEQUENCE_EXPECTED )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    if ( root->session.retained_reliable_frame_type != HIL_TRANSPORT_MVP_FRAME_CONFIRM )
+    {
+        return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+    }
+    if ( ( root->session.reliable_state == HIL_TRANSPORT_MVP_RELIABLE_PEEKED )
+         || ( root->session.reliable_state == HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_PEEKED ) )
+    {
+        /* Caller-owned peeked bytes cannot be invalidated until their routed commit. */
+        return HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED;
+    }
+    if ( ( root->session.reliable_state != HIL_TRANSPORT_MVP_RELIABLE_AWAITING_ACK )
+         && ( root->session.reliable_state != HIL_TRANSPORT_MVP_RELIABLE_RETRANSMIT_READY ) )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    status = HIL_TRANSPORT_MVP_Events_Check_Capacity( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    status = HIL_TRANSPORT_MVP_Handshake_Complete_Acknowledgement(
+        root, root->session.retained_transmit_sequence, HIL_TRANSPORT_MVP_FRAME_CONFIRM );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+
+    HIL_TRANSPORT_MVP_Handshake_Set_Established( root );
+    status = HIL_TRANSPORT_MVP_Handshake_Publish_Established_Event( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+    }
+    *result = HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_ACCEPTED;
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
 static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Rig_Initiate(
     HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
     HIL_Transport_Mvp_Handshake_Frame_Result_T* result )
@@ -616,6 +718,22 @@ HIL_TRANSPORT_MVP_Handshake_Handle_Reset( HIL_Transport_Mvp_Root_T*             
     {
         return status;
     }
+
+    /*
+     * Peer RESET already provides the required synchronization signal. Prepare
+     * the connected endpoint for replacement establishment immediately so a
+     * following INITIATE in the same byte chunk cannot be consumed as stale.
+     */
+    if ( root->session.link_state == HIL_TRANSPORT_LINK_STATE_CONNECTED )
+    {
+        HIL_Transport_Status_T establishment_status =
+            HIL_TRANSPORT_MVP_Session_Begin_Establishment( root );
+        if ( establishment_status != HIL_TRANSPORT_STATUS_OK )
+        {
+            return establishment_status;
+        }
+    }
+
     *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_ACCEPTED;
     return status;
 }
@@ -758,4 +876,45 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Publish_Reset( HIL_Transport_
     }
     return HIL_TRANSPORT_MVP_Handshake_Publish_Control( root, HIL_TRANSPORT_MVP_FRAME_RESET,
                                                         session_identifier, 0u );
+}
+
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Begin_Local_Recovery( HIL_Transport_Mvp_Root_T* root,
+                                                  HIL_Transport_Failure_T   failure )
+{
+    HIL_Transport_Status_T abandon_status;
+    HIL_Transport_Status_T reset_status = HIL_TRANSPORT_STATUS_OK;
+    uint64_t               failed_session_identifier;
+    uint8_t                failed_session_identifier_valid;
+
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+
+    failed_session_identifier = root->session.session_identifier;
+    failed_session_identifier_valid =
+        ( uint8_t )( ( root->session.link_state == HIL_TRANSPORT_LINK_STATE_CONNECTED )
+                     && ( root->session.session_identifier_valid != 0u )
+                     && HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Valid(
+                         failed_session_identifier ) );
+
+    abandon_status = HIL_TRANSPORT_MVP_Session_Abandon( root, failure );
+    if ( ( abandon_status != HIL_TRANSPORT_STATUS_OK )
+         && ( abandon_status != HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED ) )
+    {
+        return abandon_status;
+    }
+
+    /* Event backpressure is observational; it must not suppress wire recovery. */
+    if ( failed_session_identifier_valid != 0u )
+    {
+        reset_status = HIL_TRANSPORT_MVP_Handshake_Publish_Reset( root, failed_session_identifier );
+        if ( reset_status != HIL_TRANSPORT_STATUS_OK )
+        {
+            return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
+        }
+    }
+
+    return abandon_status;
 }

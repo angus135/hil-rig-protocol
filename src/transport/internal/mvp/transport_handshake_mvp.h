@@ -26,6 +26,15 @@ typedef enum
     HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE
 } HIL_Transport_Mvp_Handshake_Frame_Result_T;
 
+/** Semantic result when an Application frame is considered as final host-handshake evidence. */
+typedef enum
+{
+    HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_NOT_APPLICABLE = 0,
+    HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_ACCEPTED,
+    HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_STALE,
+    HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_INCOMPATIBLE
+} HIL_Transport_Mvp_Handshake_Application_Proof_Result_T;
+
 /** Publish at most one pending INITIATE, RESPONSE, or CONFIRM. */
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Process( HIL_Transport_Mvp_Root_T* root,
                                                             uint32_t                  now_ms );
@@ -41,6 +50,31 @@ HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Handshake_Handle_Frame( HIL_Transport_Mvp_Root_T*                   root,
                                           const HIL_Transport_Mvp_Frame_T*            frame,
                                           HIL_Transport_Mvp_Handshake_Frame_Result_T* result );
+
+/**
+ * Abandon one locally failed active session and notify the peer with RESET.
+ *
+ * @details Session cleanup always occurs before RESET publication so previous
+ * reliable/control ownership cannot block recovery. A SESSION_RESET event may
+ * be backpressured, but that never prevents the mandatory RESET attempt. Peer-
+ * initiated RESET and physical-link loss must continue to use Session_Abandon()
+ * directly so RESET is not echoed.
+ */
+HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Handshake_Begin_Local_Recovery( HIL_Transport_Mvp_Root_T* root,
+                                                  HIL_Transport_Failure_T   failure );
+
+/**
+ * Complete the host's final handshake from a valid post-CONFIRM Application frame.
+ *
+ * @details This is narrowly valid only while the host is waiting for the final
+ * CONFIRM ACK. A same-session, exact-next-sequence Application frame proves the
+ * rig accepted CONFIRM. The retained CONFIRM is completed exactly as though its
+ * ACK arrived, subject to the existing pinned-output and event-capacity rules.
+ */
+HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Try_Complete_Host_From_Application(
+    HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
+    HIL_Transport_Mvp_Handshake_Application_Proof_Result_T* result );
 
 /** Encode and publish one best-effort, non-reliable RESET control frame. */
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Publish_Reset( HIL_Transport_Mvp_Root_T* root,

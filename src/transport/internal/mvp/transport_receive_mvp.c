@@ -151,41 +151,35 @@ static HIL_Transport_Mvp_Receive_Body_Outcome_T
 HIL_TRANSPORT_MVP_Receive_Abandon_Incompatible_Session( HIL_Transport_Mvp_Root_T* root )
 {
     HIL_Transport_Status_T event_status;
-    HIL_Transport_Status_T abandon_status;
-    HIL_Transport_Status_T reset_status = HIL_TRANSPORT_STATUS_OK;
-    uint64_t               failed_session_identifier;
-    uint8_t                failed_session_identifier_valid;
+    HIL_Transport_Status_T recovery_status;
 
-    failed_session_identifier = root->session.session_identifier;
-    failed_session_identifier_valid =
-        ( uint8_t )( ( root->session.session_identifier_valid != 0u )
-                     && ( failed_session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID )
-                     && ( failed_session_identifier != HIL_TRANSPORT_SESSION_SEED_RESERVED ) );
-
-    event_status   = HIL_TRANSPORT_MVP_Receive_Publish_Protocol_Error( root );
-    abandon_status = HIL_TRANSPORT_MVP_Session_Abandon( root, HIL_TRANSPORT_FAILURE_PROTOCOL );
+    event_status = HIL_TRANSPORT_MVP_Receive_Publish_Protocol_Error( root );
 
     /*
-     * The existing RESET producer is the wire recovery mechanism for locally
-     * detected incompatibility. Abandonment runs first so old control ownership
-     * cannot block RESET and Process() waits for its commit before restarting.
-     * Accepted peer RESET follows the handshake path and never reaches here.
+     * Locally detected incompatibility uses the common recovery policy: old
+     * session work is abandoned and the peer is notified with RESET. Event
+     * backpressure must not suppress that mandatory wire-recovery attempt.
      */
-    if ( failed_session_identifier_valid != 0u )
-    {
-        reset_status = HIL_TRANSPORT_MVP_Handshake_Publish_Reset( root, failed_session_identifier );
-    }
+    recovery_status =
+        HIL_TRANSPORT_MVP_Handshake_Begin_Local_Recovery( root, HIL_TRANSPORT_FAILURE_PROTOCOL );
 
     if ( ( event_status == HIL_TRANSPORT_STATUS_INTERNAL_ERROR )
-         || ( abandon_status == HIL_TRANSPORT_STATUS_INTERNAL_ERROR )
-         || ( ( reset_status != HIL_TRANSPORT_STATUS_OK )
-              && ( reset_status != HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED ) ) )
+         || ( recovery_status == HIL_TRANSPORT_STATUS_INTERNAL_ERROR ) )
+    {
+        return HIL_TRANSPORT_MVP_Receive_Fault( root );
+    }
+    if ( ( event_status != HIL_TRANSPORT_STATUS_OK )
+         && ( event_status != HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED ) )
+    {
+        return HIL_TRANSPORT_MVP_Receive_Fault( root );
+    }
+    if ( ( recovery_status != HIL_TRANSPORT_STATUS_OK )
+         && ( recovery_status != HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED ) )
     {
         return HIL_TRANSPORT_MVP_Receive_Fault( root );
     }
     if ( ( event_status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
-         || ( abandon_status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
-         || ( reset_status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED ) )
+         || ( recovery_status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED ) )
     {
         return HIL_TRANSPORT_MVP_Receive_Outcome( HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED,
                                                   HIL_TRANSPORT_MVP_RECEIVE_BODY_ALREADY_RELEASED );
@@ -290,10 +284,38 @@ HIL_TRANSPORT_MVP_Receive_Dispatch_Frame( HIL_Transport_Mvp_Root_T*        root,
         case HIL_TRANSPORT_MVP_FRAME_ACK:
             return HIL_TRANSPORT_MVP_Receive_Dispatch_Acknowledgement( root, frame );
         case HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE: {
-            HIL_Transport_Mvp_Application_Frame_Result_T application_result;
-            HIL_Transport_Status_T status = HIL_TRANSPORT_MVP_Application_Handle_Received_Frame(
-                root, frame, &application_result );
+            HIL_Transport_Mvp_Application_Frame_Result_T           application_result;
+            HIL_Transport_Mvp_Handshake_Application_Proof_Result_T proof_result;
+            HIL_Transport_Status_T                                 status;
 
+            /*
+             * A rig can legitimately send Application traffic after accepting
+             * CONFIRM even when the host's final ACK was lost. In that one
+             * host-only phase, a valid next-sequence Application is equivalent
+             * evidence that CONFIRM completed.
+             */
+            status = HIL_TRANSPORT_MVP_Handshake_Try_Complete_Host_From_Application(
+                root, frame, &proof_result );
+            if ( status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
+            {
+                return HIL_TRANSPORT_MVP_Receive_Outcome( status,
+                                                          HIL_TRANSPORT_MVP_RECEIVE_BODY_RETAIN );
+            }
+            if ( status != HIL_TRANSPORT_STATUS_OK )
+            {
+                return HIL_TRANSPORT_MVP_Receive_Fault( root );
+            }
+            if ( proof_result == HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_STALE )
+            {
+                return HIL_TRANSPORT_MVP_Receive_Reject_Retained_Body( root );
+            }
+            if ( proof_result == HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_INCOMPATIBLE )
+            {
+                return HIL_TRANSPORT_MVP_Receive_Abandon_Incompatible_Session( root );
+            }
+
+            status = HIL_TRANSPORT_MVP_Application_Handle_Received_Frame( root, frame,
+                                                                          &application_result );
             if ( status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
             {
                 return HIL_TRANSPORT_MVP_Receive_Outcome( status,
