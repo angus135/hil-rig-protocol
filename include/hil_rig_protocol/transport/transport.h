@@ -258,8 +258,12 @@ HIL_Transport_Status_T HIL_TRANSPORT_Init( HIL_Transport_Context_T*       contex
  * messages, and every queued event. It does not enqueue SESSION_RESET for this
  * explicit caller-initiated action. It retains copied configuration, workspace
  * ownership, endpoint role, and the latest caller-reported link observation.
- * If connected, later Process() begins a fresh session rather than continuing
- * the previous sequence/acknowledgement state. It records
+ * If connected and the previous active session identity is coherent, Reset
+ * publishes one best-effort RESET for that identity after local cleanup; later
+ * Process() waits for that control output to be committed before beginning a fresh
+ * session rather
+ * than continuing the previous sequence/acknowledgement state. A reset used to
+ * repair FAULT does not transmit an identity that cannot be trusted. It records
  * HIL_TRANSPORT_FAILURE_LOCAL_RESET in status, enters DISCONNECTED if the link
  * is disconnected, or enters RECOVERING if it remains connected so later
  * Process() can start a fresh session. A host uses a new derived identity. This
@@ -380,8 +384,14 @@ HIL_Transport_Status_T HIL_TRANSPORT_Submit_Application_Data( HIL_Transport_Cont
  * or control-output pressure retains the completed parser body and returns
  * CAPACITY_EXHAUSTED. Incompatible current-session sequence/identity follows normal
  * protocol recovery; immediately previous-session Application traffic is rejected
- * as stale without abandoning the current session. The input is borrowed only for
- * this call. INVALID_ARGUMENT and NOT_READY report zero consumption.
+ * as stale without abandoning the current session. A valid peer RESET immediately
+ * prepares fresh establishment before receive continues, so a RIG may accept the
+ * replacement INITIATE from the same offered byte chunk. While a HOST is waiting
+ * specifically for the final CONFIRM ACK, a valid same-session exact-next-sequence
+ * Application frame proves the RIG accepted CONFIRM and may complete establishment
+ * before that frame is handled normally. Peeked CONFIRM bytes remain pinned, so
+ * this proof is backpressured until their routed commit. The input is borrowed only
+ * for this call. INVALID_ARGUMENT and NOT_READY report zero consumption.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[in] data Received bytes; may be NULL only when data_len is zero.
@@ -401,10 +411,13 @@ HIL_Transport_Status_T HIL_TRANSPORT_Receive_Bytes( HIL_Transport_Context_T* con
  * @details The owner calls this regularly with current monotonic time and local
  * Transport operating mode. The MVP publishes at most one pending handshake
  * frame, progresses the sole reliable timeout lifecycle once, and routes
- * exhausted INITIATE, RESPONSE, or CONFIRM delivery through normal session
- * abandonment. Exhausted outbound Application delivery first retains one
+ * exhausted INITIATE, RESPONSE, or CONFIRM delivery through local session
+ * recovery. That recovery abandons the uncertain session and publishes RESET for
+ * the failed identity before replacement establishment can begin. Exhausted outbound
+ * Application delivery first retains one
  * DELIVERY_FAILED event, records DELIVERY failure, abandons the uncertain
- * session, and returns DELIVERY_FAILED on that transition. If event capacity is
+ * session, publishes the same RESET synchronization signal, and returns
+ * DELIVERY_FAILED on that transition. If event capacity is
  * unavailable, that Application transition remains pending and returns
  * CAPACITY_EXHAUSTED until the failure event can be retained. A later call starts
  * the replacement attempt after any old control output has been committed. A
@@ -550,9 +563,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_Read_Event( HIL_Transport_Context_T* contex
  * handles it. Event pending is a boolean derived from the validated private
  * FIFO; the snapshot never exposes its count or capacity. The snapshot does not
  * expose output type, private profile state, sequences, retry counts, borrowed
- * workspace pointers, or mutable handles. Private pending-state metadata is
- * validated before it is copied into the snapshot; invariant failure returns
- * INTERNAL_ERROR rather than exposing inconsistent boolean state.
+ * workspace pointers, or mutable handles. Core role/link/session/failure mirrors,
+ * operating-mode metadata, and private pending-state metadata are validated before
+ * they are copied into the snapshot; invariant failure returns INTERNAL_ERROR rather
+ * than exposing invalid enums, booleans, or inconsistent state.
  *
  * @param[in] context Initialized single-owner context.
  * @param[out] status Snapshot destination; must not be NULL.

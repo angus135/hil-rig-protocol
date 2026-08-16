@@ -7,6 +7,7 @@
 #include "transport_control_output_mvp.h"
 #include "transport_events_mvp.h"
 #include "transport_frame_codec_mvp.h"
+#include "transport_handshake_mvp.h"
 #include "transport_reliability_mvp.h"
 #include "transport_session_mvp.h"
 
@@ -457,7 +458,8 @@ HIL_TRANSPORT_MVP_Application_Handle_Retry_Exhaustion( HIL_Transport_Mvp_Root_T*
         return HIL_TRANSPORT_MVP_Application_Record_Invariant_Failure( root );
     }
 
-    status = HIL_TRANSPORT_MVP_Session_Abandon( root, HIL_TRANSPORT_FAILURE_DELIVERY );
+    status =
+        HIL_TRANSPORT_MVP_Handshake_Begin_Local_Recovery( root, HIL_TRANSPORT_FAILURE_DELIVERY );
     if ( status == HIL_TRANSPORT_STATUS_INTERNAL_ERROR )
     {
         return status;

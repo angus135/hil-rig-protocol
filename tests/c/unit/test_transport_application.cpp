@@ -575,6 +575,36 @@ TEST( TransportApplication, RetryExhaustionReportsFailureAndStartsFreshSessionRe
     EXPECT_EQ( event.failure, HIL_TRANSPORT_FAILURE_DELIVERY );
 }
 
+TEST( TransportApplication, RigRetryExhaustionPublishesResetBeforeWaitingForNewInitiate )
+{
+    Harness harness;
+    harness.InitializeEstablished( 10u, 0u, HIL_TRANSPORT_ROLE_RIG );
+    const std::array<std::uint8_t, 4u> payload{ 1u, 2u, 3u, 4u };
+    SubmitPeekCommit( harness, payload, 100u );
+
+    EXPECT_EQ( HIL_TRANSPORT_Process( &harness.context, 110u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_DELIVERY_FAILED );
+    EXPECT_EQ( harness.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( harness.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY );
+    EXPECT_EQ( harness.root.submitted_message_pending, 0u );
+
+    std::array<std::uint8_t, ApplicationCapacity> decoded_payload{};
+    std::size_t                                   decoded_size = 0u;
+    const auto reset = PeekDecodeOutput( harness, &decoded_payload, &decoded_size );
+    EXPECT_EQ( reset.type, HIL_TRANSPORT_MVP_FRAME_RESET );
+    EXPECT_EQ( reset.session_identifier, SessionIdentifier );
+    EXPECT_EQ( reset.sequence, 0u );
+    EXPECT_EQ( reset.acknowledgement_sequence, 0u );
+    ASSERT_EQ( HIL_TRANSPORT_Commit_Output( &harness.context, 111u ), HIL_TRANSPORT_STATUS_OK );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &harness.context, 112u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( harness.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( harness.root.session.handshake_phase,
+               HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_INITIATE );
+    EXPECT_EQ( harness.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE );
+}
+
 TEST( TransportApplication, RetryExhaustionWaitsForFailureEventCapacityBeforeAbandoningSession )
 {
     Harness harness;

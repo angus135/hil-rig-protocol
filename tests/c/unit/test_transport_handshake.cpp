@@ -819,7 +819,7 @@ TEST( TransportHandshake, HandshakeTransmitAndReceiveSequencesWrapNaturally )
     EXPECT_EQ( confirm.acknowledgement_sequence, UINT16_MAX );
 }
 
-TEST( TransportHandshake, ActiveResetAbandonsEveryHandshakePhaseAndClearsDuplicateMetadata )
+TEST( TransportHandshake, ActivePeerResetPreparesFreshHandshakeAndClearsDuplicateMetadata )
 {
     constexpr std::array<HIL_Transport_Mvp_Handshake_Phase_T, 4> phases{
         HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INITIATE_PENDING,
@@ -842,8 +842,10 @@ TEST( TransportHandshake, ActiveResetAbandonsEveryHandshakePhaseAndClearsDuplica
         ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host.root, &reset, &result ),
                    HIL_TRANSPORT_STATUS_OK );
         EXPECT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_ACCEPTED );
-        EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
-        EXPECT_EQ( host.root.session.handshake_phase, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE );
+        EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+        EXPECT_EQ( host.root.session.handshake_phase,
+                   HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INITIATE_PENDING );
+        EXPECT_EQ( host.root.session.session_identifier, 31u );
         EXPECT_EQ( host.root.session.accepted_receive_sequence_valid, 0u );
         EXPECT_EQ( host.root.session.last_accepted_receive_frame_type,
                    HIL_TRANSPORT_MVP_FRAME_INVALID );
@@ -1135,12 +1137,89 @@ TEST( TransportHandshakeProcess,
     EXPECT_EQ( event.type, HIL_TRANSPORT_EVENT_SESSION_RESET );
     EXPECT_NE( event.type, HIL_TRANSPORT_EVENT_DELIVERY_FAILED );
 
-    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 111u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+    EXPECT_EQ( host.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY );
+    HIL_Transport_Mvp_Frame_T reset{};
+    ASSERT_TRUE( PeekDecodeCommit( host, 111u, &reset ) );
+    EXPECT_EQ( reset.type, HIL_TRANSPORT_MVP_FRAME_RESET );
+    EXPECT_EQ( reset.session_identifier, 70u );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 112u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
                HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( host.root.session.session_identifier, 71u );
     EXPECT_EQ( host.root.session.next_host_session_identifier, 72u );
     EXPECT_EQ( host.root.session.handshake_phase,
                HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_RESPONSE );
+}
+
+TEST( TransportHandshakeProcess, HostConfirmExhaustionResetsEstablishedOrHalfEstablishedPeer )
+{
+    Harness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 70u, 8u );
+    host.root.base.config.max_retries = 0u;
+    auto context                      = Context( host );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 0u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    HIL_Transport_Mvp_Frame_T initiate{};
+    ASSERT_TRUE( PeekDecodeCommit( host, 10u, &initiate ) );
+    ASSERT_EQ( initiate.type, HIL_TRANSPORT_MVP_FRAME_INITIATE );
+
+    HIL_Transport_Mvp_Handshake_Frame_Result_T result{};
+    const auto                                 response =
+        EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 70u, 40u, initiate.sequence );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host.root, &response, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_ACCEPTED );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 20u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    HIL_Transport_Mvp_Frame_T confirm{};
+    ASSERT_TRUE( PeekDecodeCommit( host, 100u, &confirm ) );
+    ASSERT_EQ( confirm.type, HIL_TRANSPORT_MVP_FRAME_CONFIRM );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 110u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( host.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY );
+
+    HIL_Transport_Mvp_Frame_T reset{};
+    ASSERT_TRUE( PeekDecodeCommit( host, 111u, &reset ) );
+    EXPECT_EQ( reset.type, HIL_TRANSPORT_MVP_FRAME_RESET );
+    EXPECT_EQ( reset.session_identifier, 70u );
+}
+
+TEST( TransportHandshakeProcess, RigResponseExhaustionNotifiesHostBeforeWaitingForInitiate )
+{
+    Harness rig;
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, 0u, 40u );
+    rig.root.base.config.max_retries = 0u;
+    HIL_Transport_Mvp_Handshake_Frame_Result_T result{};
+    const auto initiate = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_INITIATE, 60u, 7u, 0u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &initiate, &result ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_ACCEPTED );
+
+    auto context = Context( rig );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    HIL_Transport_Mvp_Frame_T response{};
+    ASSERT_TRUE( PeekDecodeCommit( rig, 100u, &response ) );
+    ASSERT_EQ( response.type, HIL_TRANSPORT_MVP_FRAME_RESPONSE );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 110u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( rig.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY );
+    HIL_Transport_Mvp_Frame_T reset{};
+    ASSERT_TRUE( PeekDecodeCommit( rig, 111u, &reset ) );
+    EXPECT_EQ( reset.type, HIL_TRANSPORT_MVP_FRAME_RESET );
+    EXPECT_EQ( reset.session_identifier, 60u );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 112u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( rig.root.session.handshake_phase,
+               HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_INITIATE );
 }
 
 TEST( TransportHandshakeProcess, ExhaustionPreservesFullEventFifoAndReportsCapacity )
@@ -1166,6 +1245,11 @@ TEST( TransportHandshakeProcess, ExhaustionPreservesFullEventFifoAndReportsCapac
                HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
     EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
     EXPECT_EQ( host.root.event_count, HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY );
+    EXPECT_EQ( host.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY );
+    HIL_Transport_Mvp_Frame_T reset{};
+    ASSERT_TRUE( PeekDecode( host, &reset ) );
+    EXPECT_EQ( reset.type, HIL_TRANSPORT_MVP_FRAME_RESET );
+    EXPECT_EQ( reset.session_identifier, 80u );
 }
 
 TEST( TransportHandshakeProcess, ZeroTimeoutDisablesRetryAndTimerWrapUsesUnsignedElapsedTime )

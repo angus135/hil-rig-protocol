@@ -67,6 +67,48 @@ HIL_TRANSPORT_MVP_Root_From_Context( const HIL_Transport_Context_T* context )
     return ( HIL_Transport_Mvp_Root_T* )context->implementation;
 }
 
+static int
+HIL_TRANSPORT_MVP_Profile_Has_Trustworthy_Active_Session( const HIL_Transport_Mvp_Root_T* root )
+{
+    return ( root != NULL ) && ( root->session.role >= HIL_TRANSPORT_ROLE_HOST )
+           && ( root->session.role <= HIL_TRANSPORT_ROLE_RIG )
+           && ( root->base.role == root->session.role )
+           && ( root->session.link_state == HIL_TRANSPORT_LINK_STATE_CONNECTED )
+           && ( root->base.link_state == root->session.link_state )
+           && ( root->session.link_state_observed != 0u )
+           && ( root->session.state >= HIL_TRANSPORT_SESSION_STATE_CONNECTING )
+           && ( root->session.state <= HIL_TRANSPORT_SESSION_STATE_ESTABLISHED )
+           && ( root->base.session_state == root->session.state )
+           && ( root->base.last_failure == root->session.last_failure )
+           && ( root->session.session_identifier_valid != 0u )
+           && ( root->session.session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID )
+           && ( root->session.session_identifier != HIL_TRANSPORT_SESSION_SEED_RESERVED );
+}
+
+static HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Profile_Validate_Status_Metadata( HIL_Transport_Mvp_Root_T* root )
+{
+    if ( ( root->base.role < HIL_TRANSPORT_ROLE_HOST )
+         || ( root->base.role > HIL_TRANSPORT_ROLE_RIG )
+         || ( root->session.role != root->base.role )
+         || ( root->base.link_state < HIL_TRANSPORT_LINK_STATE_DISCONNECTED )
+         || ( root->base.link_state > HIL_TRANSPORT_LINK_STATE_CONNECTED )
+         || ( root->session.link_state != root->base.link_state )
+         || ( root->base.session_state < HIL_TRANSPORT_SESSION_STATE_DISCONNECTED )
+         || ( root->base.session_state > HIL_TRANSPORT_SESSION_STATE_FAULT )
+         || ( root->session.state != root->base.session_state )
+         || ( root->base.operating_mode < HIL_TRANSPORT_OPERATING_MODE_NORMAL )
+         || ( root->base.operating_mode > HIL_TRANSPORT_OPERATING_MODE_QUIET_REAL_TIME )
+         || ( root->base.operating_mode_valid > 1u )
+         || ( root->base.last_failure < HIL_TRANSPORT_FAILURE_NONE )
+         || ( root->base.last_failure > HIL_TRANSPORT_FAILURE_INTERNAL )
+         || ( root->session.last_failure != root->base.last_failure ) )
+    {
+        return HIL_TRANSPORT_MVP_Session_Enter_Fault( root );
+    }
+    return HIL_TRANSPORT_STATUS_OK;
+}
+
 static HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Validate_Config_And_Size( const HIL_Transport_Config_T* config,
                                             size_t*                       required_size )
@@ -253,12 +295,42 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Init( HIL_Transport_Context_T*     
 HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* context )
 {
     HIL_Transport_Mvp_Root_T* root = HIL_TRANSPORT_MVP_Root_From_Context( context );
+    HIL_Transport_Status_T    status;
+    uint64_t                  reset_session_identifier = HIL_TRANSPORT_SESSION_SEED_INVALID;
+    uint8_t                   notify_peer              = 0u;
 
     if ( root == NULL )
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
-    return HIL_TRANSPORT_MVP_Session_Explicit_Reset( root );
+
+    /*
+     * Capture the old identity only from coherent non-FAULT state. Explicit
+     * Reset is also the repair path for private corruption, so untrustworthy
+     * metadata must never be copied onto the wire.
+     */
+    if ( HIL_TRANSPORT_MVP_Profile_Has_Trustworthy_Active_Session( root ) )
+    {
+        reset_session_identifier = root->session.session_identifier;
+        notify_peer              = 1u;
+    }
+
+    status = HIL_TRANSPORT_MVP_Session_Explicit_Reset( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return status;
+    }
+    if ( notify_peer == 0u )
+    {
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    status = HIL_TRANSPORT_MVP_Handshake_Publish_Reset( root, reset_session_identifier );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
+    {
+        return HIL_TRANSPORT_MVP_Session_Enter_Fault( root );
+    }
+    return HIL_TRANSPORT_STATUS_OK;
 }
 
 HIL_Transport_Status_T
@@ -413,7 +485,8 @@ HIL_TRANSPORT_PROFILE_Process( HIL_Transport_Context_T* context, uint32_t now_ms
              || ( retained_type == HIL_TRANSPORT_MVP_FRAME_RESPONSE )
              || ( retained_type == HIL_TRANSPORT_MVP_FRAME_CONFIRM ) )
         {
-            return HIL_TRANSPORT_MVP_Session_Abandon( root, HIL_TRANSPORT_FAILURE_DELIVERY );
+            return HIL_TRANSPORT_MVP_Handshake_Begin_Local_Recovery(
+                root, HIL_TRANSPORT_FAILURE_DELIVERY );
         }
     }
     return HIL_TRANSPORT_STATUS_OK;
@@ -499,6 +572,11 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Get_Status( const HIL_Transport_Con
     if ( root == NULL )
     {
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+    result = HIL_TRANSPORT_MVP_Profile_Validate_Status_Metadata( root );
+    if ( result != HIL_TRANSPORT_STATUS_OK )
+    {
+        return result;
     }
     result =
         HIL_TRANSPORT_MVP_Output_Get_Pending_Status( root, &output_pending, &delivery_pending );

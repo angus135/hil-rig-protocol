@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <type_traits>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -106,18 +107,22 @@ struct PublicEndpoint
     alignas(
         HIL_TRANSPORT_WORKSPACE_ALIGNMENT ) std::array<std::uint8_t, WorkspaceSize> workspace{};
 
-    void Initialize( HIL_Transport_Role_T role, std::uint64_t seed, std::uint16_t initial_sequence )
+    void Initialize( HIL_Transport_Role_T role, std::uint64_t seed, std::uint16_t initial_sequence,
+                     std::uint32_t retransmit_timeout_ms = 10u, std::uint8_t max_retries = 2u )
     {
         HIL_TRANSPORT_Default_Config( &config );
         config.session_seed              = seed;
         config.initial_reliable_sequence = initial_sequence;
-        config.retransmit_timeout_ms     = 10u;
-        config.max_retries               = 2u;
-        std::size_t required             = 0u;
+        config.retransmit_timeout_ms     = retransmit_timeout_ms;
+        config.max_retries               = max_retries;
+
+        std::size_t required = 0u;
         ASSERT_EQ( HIL_TRANSPORT_Required_Storage_Size( &config, &required ),
                    HIL_TRANSPORT_STATUS_OK );
         ASSERT_LE( required, workspace.size() );
+
         HIL_Transport_Storage_T storage{ workspace.data(), required };
+
         ASSERT_EQ( HIL_TRANSPORT_Init( &context, role, &config, &storage ),
                    HIL_TRANSPORT_STATUS_OK );
         ASSERT_EQ(
@@ -138,6 +143,38 @@ void TransferOneOutput( PublicEndpoint& from, PublicEndpoint& to, std::uint32_t 
     ASSERT_EQ( HIL_TRANSPORT_Receive_Bytes( &to.context, bytes.data(), size, &consumed ),
                HIL_TRANSPORT_STATUS_OK );
     ASSERT_EQ( consumed, size );
+}
+
+std::vector<std::uint8_t> TakeOneOutput( PublicEndpoint& endpoint, std::uint32_t now_ms )
+{
+    std::array<std::uint8_t, MaxOutput> bytes{};
+    std::size_t                         size = 0u;
+    EXPECT_EQ( HIL_TRANSPORT_Peek_Output( &endpoint.context, bytes.data(), bytes.size(), &size ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_GT( size, 0u );
+    if ( size == 0u || size > bytes.size() )
+    {
+        return {};
+    }
+    EXPECT_EQ( HIL_TRANSPORT_Commit_Output( &endpoint.context, now_ms ), HIL_TRANSPORT_STATUS_OK );
+    return std::vector<std::uint8_t>( bytes.begin(),
+                                      bytes.begin() + static_cast<std::ptrdiff_t>( size ) );
+}
+
+void DeliverBytes( PublicEndpoint& endpoint, const std::uint8_t* bytes, std::size_t size )
+{
+    std::size_t consumed = 0u;
+    ASSERT_EQ( HIL_TRANSPORT_Receive_Bytes( &endpoint.context, bytes, size, &consumed ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( consumed, size );
+}
+
+void DrainEvents( PublicEndpoint& endpoint )
+{
+    HIL_Transport_Event_T event{};
+    while ( HIL_TRANSPORT_Read_Event( &endpoint.context, &event ) == HIL_TRANSPORT_STATUS_OK )
+    {
+    }
 }
 
 void EstablishPublicPair( PublicEndpoint& host, PublicEndpoint& rig )
@@ -334,4 +371,176 @@ TEST( TransportFacadeApplicationDelivery,
     EXPECT_EQ( rig_status.reliable_delivery_pending, 0u );
     EXPECT_EQ( host_status.application_message_pending, 0u );
     EXPECT_EQ( rig_status.application_message_pending, 0u );
+}
+
+TEST( TransportFacadeRecovery, RigDeliveryExhaustionResetsPeerAndReestablishes )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xA123 ), 10u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u, 10u, 0u );
+    EstablishPublicPair( host, rig );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    const std::array<std::uint8_t, 3u> payload{ 9u, 8u, 7u };
+    ASSERT_EQ(
+        HIL_TRANSPORT_Submit_Application_Data( &rig.context, payload.data(), payload.size() ),
+        HIL_TRANSPORT_STATUS_OK );
+    const auto dropped_application = TakeOneOutput( rig, 20u );
+    ASSERT_FALSE( dropped_application.empty() );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 31u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_DELIVERY_FAILED );
+    HIL_Transport_Status_Snapshot_T rig_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( rig_status.output_pending, 1u );
+
+    TransferOneOutput( rig, host, 32u );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 33u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+
+    HIL_Transport_Status_Snapshot_T host_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &host.context, &host_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 34u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+
+    TransferOneOutput( host, rig, 35u );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 36u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( rig, host, 37u );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 38u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( host, rig, 39u );
+    TransferOneOutput( rig, host, 40u );
+
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &host.context, &host_status ), HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host_status.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+}
+
+TEST( TransportFacadeRecovery, RigExplicitResetNotifiesHostAndReestablishes )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xD123 ), 10u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u );
+    EstablishPublicPair( host, rig );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &rig.context ), HIL_TRANSPORT_STATUS_OK );
+    HIL_Transport_Status_Snapshot_T rig_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( rig_status.output_pending, 1u );
+
+    TransferOneOutput( rig, host, 20u );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 21u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 22u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+
+    TransferOneOutput( host, rig, 23u );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 24u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( rig, host, 25u );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 26u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( host, rig, 27u );
+    TransferOneOutput( rig, host, 28u );
+
+    HIL_Transport_Status_Snapshot_T host_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &host.context, &host_status ), HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host_status.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+}
+
+TEST( TransportFacadeRecovery, ResetAndReplacementInitiateCanShareOneReceiveChunk )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xB123 ), 10u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u );
+    EstablishPublicPair( host, rig );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &host.context ), HIL_TRANSPORT_STATUS_OK );
+    const auto reset = TakeOneOutput( host, 20u );
+    ASSERT_FALSE( reset.empty() );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 21u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto initiate = TakeOneOutput( host, 22u );
+    ASSERT_FALSE( initiate.empty() );
+
+    std::vector<std::uint8_t> combined = reset;
+    combined.insert( combined.end(), initiate.begin(), initiate.end() );
+    DeliverBytes( rig, combined.data(), combined.size() );
+
+    HIL_Transport_Status_Snapshot_T rig_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( rig_status.output_pending, 0u );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 23u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.output_pending, 1u );
+    EXPECT_EQ( rig_status.reliable_delivery_pending, 1u );
+}
+
+TEST( TransportFacadeRecovery, ApplicationCompletesHostHandshakeWhenFinalAckIsLost )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xC123 ), 10u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( host, rig, 2u );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 3u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( rig, host, 4u );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 5u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( host, rig, 6u );
+
+    HIL_Transport_Status_Snapshot_T host_status{};
+    HIL_Transport_Status_Snapshot_T rig_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &host.context, &host_status ), HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( host_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    ASSERT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+
+    const auto dropped_final_ack = TakeOneOutput( rig, 7u );
+    ASSERT_FALSE( dropped_final_ack.empty() );
+
+    const std::array<std::uint8_t, 4u> payload{ 1u, 3u, 5u, 7u };
+    ASSERT_EQ(
+        HIL_TRANSPORT_Submit_Application_Data( &rig.context, payload.data(), payload.size() ),
+        HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( rig, host, 8u );
+
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &host.context, &host_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host_status.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+    EXPECT_EQ( host_status.application_message_pending, 1u );
+
+    std::array<std::uint8_t, MaxMessage> received{};
+    std::size_t                          received_size = 0u;
+    ASSERT_EQ( HIL_TRANSPORT_Read_Application_Data( &host.context, received.data(), received.size(),
+                                                    &received_size ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( received_size, payload.size() );
+    EXPECT_TRUE( std::equal( payload.begin(), payload.end(), received.begin() ) );
+
+    TransferOneOutput( host, rig, 9u );
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.reliable_delivery_pending, 0u );
 }

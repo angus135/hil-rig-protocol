@@ -324,13 +324,19 @@ duplicate Application ACK therefore cannot reset an established rig session.
 The reliability primitive itself still ends at `EXHAUSTED`, retaining the frame
 type, sequence, encoded bytes, and ownership while exposing no reliable output.
 `Process()` now applies the owner policy. Handshake exhaustion abandons the
-incomplete session without an Application delivery event. Application exhaustion
-first retains exactly one `DELIVERY_FAILED` event; if the event FIFO is full the
+incomplete session without an Application delivery event and publishes one
+best-effort RESET using the failed session identity. Application exhaustion first
+retains exactly one `DELIVERY_FAILED` event; if the event FIFO is full the
 transition remains pending and `Process()` returns `CAPACITY_EXHAUSTED`. Once the
 event is retained, Transport records `HIL_TRANSPORT_FAILURE_DELIVERY`, abandons
 the uncertain session, clears submitted/reliable ownership through the session
-coordinator, and returns `DELIVERY_FAILED` on that transition. A replacement
-session must establish before another Application message is accepted.
+coordinator, publishes RESET for the failed identity, and returns `DELIVERY_FAILED`
+on that transition. `Process()` does not start replacement establishment until
+that RESET control output is committed. RESET remains a best-effort, non-reliable
+control item in the MVP: these recovery rules synchronize the peer when RESET is
+delivered, but loss of RESET itself is not repaired by a RESET retransmission or
+keepalive mechanism. A replacement session must establish before another
+Application message is accepted.
 
 ## Exact receive consumption
 
@@ -378,7 +384,24 @@ session coordinator regardless of event capacity, and publishes one best-effort
 RESET using the failed session identity after old control ownership is cleared.
 `Process()` waits for that RESET to be committed before starting the replacement
 session. An accepted peer RESET abandons the session but is never answered with
-another RESET.
+another RESET. Because the peer has already supplied the synchronization signal,
+the connected endpoint immediately prepares fresh establishment before receive
+continues. A RIG can therefore accept a following replacement INITIATE from the
+same offered byte chunk instead of consuming it as stale while waiting for a
+separate `Process()` call. If event capacity stops the call after RESET, the
+unconsumed INITIATE suffix remains caller-owned and is valid when retried.
+
+
+While a HOST is specifically waiting for the final ACK of its committed CONFIRM,
+a valid same-session Application frame carrying the exact next expected peer
+sequence is also sufficient evidence that the RIG accepted CONFIRM. The HOST
+completes the retained CONFIRM exactly as though its ACK arrived, publishes
+`SESSION_ESTABLISHED`, and then passes the same frame through the ordinary
+Application receive transaction. This exception is deliberately narrow: wrong
+session identities, stale/future sequences, nonzero acknowledgement metadata, or
+invalid Application payloads do not establish the HOST. A peeked initial or retry
+CONFIRM remains caller-owned until commit, so such an Application body is retained
+and returns `CAPACITY_EXHAUSTED` rather than invalidating pinned output.
 
 The decoder exposes Application payload only as a synchronous view into codec
 scratch. For an expected same-session APPLICATION frame, the Application owner
@@ -521,8 +544,9 @@ This lifecycle supplies private storage to the public output arbiter. When no
 item is already pinned, public peek selects ready control output before reliable
 output. Successful control peek pins that item, public commit releases it
 immediately, and the next peek can expose still-ready reliable output. The
-arbiter does not itself generate ACK or RESET frames; no producer generates
-either control frame yet.
+arbiter does not itself generate ACK or RESET frames. Semantic handshake,
+Application receive, and recovery coordinators produce those control frames and
+publish them through this slot.
 
 ## Link, reset, events, and status
 
@@ -560,11 +584,15 @@ before calling abandonment.
 `HIL_TRANSPORT_Reset()` clears all session negotiation, sequences, ACKs,
 retransmission ownership, timers, partial input, pinned output, submitted
 messages, unread received messages, and every queued event. Because the caller
-initiated it, explicit reset does not enqueue `SESSION_RESET`. It retains copied
+initiated it, explicit reset does not enqueue `SESSION_RESET`. If the link is
+connected and the previous active session identity is coherent, explicit reset
+publishes one best-effort RESET for that old identity after cleanup; `Process()`
+waits for its commit before starting replacement establishment. FAULT recovery
+does not transmit an identity that cannot be trusted. Reset retains copied
 configuration, workspace ownership, endpoint role, and latest link observation;
 records `HIL_TRANSPORT_FAILURE_LOCAL_RESET`; and enters `DISCONNECTED` for a
-disconnected link or `RECOVERING` for a connected link. A later `Process` may
-then start a fresh session. Reset canonicalizes the private link-observed flag
+disconnected link or `RECOVERING` for a connected link. Reset canonicalizes the
+private link-observed flag
 to zero or one and reconstructs repairable private role and link mirrors from
 their retained public values. It preserves a valid advanced host identity
 cursor rather than returning to the configured seed. If essential retained
@@ -600,6 +628,18 @@ following `SESSION_RESET` publication fails. Repeating that same link
 observation does not retry either event. Result precedence is
 `INTERNAL_ERROR`, then `CAPACITY_EXHAUSTED`, then `OK`.
 
+
+Event draining is therefore part of normal Transport servicing rather than only
+diagnostic consumption. Some semantic transitions, including Application
+delivery confirmation and the `DELIVERY_FAILED` event that precedes automatic
+Application recovery, are intentionally transactional with event capacity. If
+the FIFO is allowed to remain full, receive or `Process()` may return
+`CAPACITY_EXHAUSTED` and retain protocol work until the caller consumes an event.
+Integrations should service `HIL_TRANSPORT_Read_Event()` regularly alongside
+receive, process, and output handling. Mandatory physical/session cleanup and
+RESET publication still proceed where documented even if the corresponding
+best-effort `SESSION_RESET` event cannot be retained.
+
 `HIL_TRANSPORT_Read_Event()` validates the queue, copies the oldest complete
 event, and consumes exactly that event on success. FIFO order is preserved
 through wraparound. `NOT_READY`, invalid arguments, and internal errors leave
@@ -633,11 +673,13 @@ validated FIFO. `output_pending` is set while either control or reliable
 initial/retry bytes are ready or peeked, and `reliable_delivery_pending` remains
 set in every non-IDLE reliable state, including `EXHAUSTED`. The remaining
 fields expose role, link, high-level session state, local operating mode,
-received-message state, and high-level failure. Before exposing
-`application_message_pending`, `Get_Status()` validates the unread-message pending/size
-ownership metadata; corrupt private combinations fail with `INTERNAL_ERROR` rather than
-producing an invalid public snapshot. Handshake phases, parser states, event count and
-capacity, sequence numbers, and retry counts remain private.
+received-message state, and high-level failure. Before exposing the snapshot,
+`Get_Status()` validates the public/private role,
+link, session-state, and failure mirrors, the operating-mode enum/validity flag,
+and the unread-message pending/size ownership metadata. Corrupt combinations
+fail with `INTERNAL_ERROR` rather than producing invalid public enums, booleans,
+or inconsistent state. Handshake phases, parser states, event count and capacity,
+sequence numbers, and retry counts remain private.
 Control ownership never sets
 `reliable_delivery_pending`. Any future extended fragmentation, reassembly,
 window, keepalive or queueing metadata also remains private.
@@ -675,13 +717,17 @@ ordinary COBS implementation, and delimited-body parser. The vendored
 `7afcc42cf7a7efa84f77360ec27bfc979e3cf93d`; only ordinary COBS is included.
 The MVP owns its minimal frame codec, private
 INITIATE/RESPONSE/CONFIRM session choice, sequence/ACK state and implemented
-one-item stop-and-wait byte-retention model. Handshake and data work will share
-the public `retransmit_timeout_ms` and `max_retries` when their owners are
-implemented. The MVP has no fragment, reassembly, advertised-window, keepalive,
+one-item stop-and-wait byte-retention model. Handshake and Application reliable
+work share the public `retransmit_timeout_ms` and `max_retries`; owner policy
+handles exhaustion and session recovery above the common retained-byte lifecycle.
+The MVP has no fragment, reassembly, advertised-window, keepalive,
 flow-policy or multi-message queue types. Those concepts and their uncompiled
 frame codec live only under `internal/extended`.
 
 The private MVP handshake completes asymmetrically: the rig enters ESTABLISHED
-after a valid CONFIRM and makes its ACK available, while the host enters
-ESTABLISHED only after receiving that matching ACK. The private details and
+after a valid CONFIRM and makes its ACK available, while the host normally enters
+ESTABLISHED after receiving that matching ACK. If the ACK is lost, a valid
+same-session exact-next-sequence Application from the already-established rig
+provides equivalent proof that CONFIRM was accepted and can complete the host
+transition without adding another handshake message. The private details and
 wire representation are not public API.
