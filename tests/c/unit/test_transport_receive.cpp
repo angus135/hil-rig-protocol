@@ -747,14 +747,15 @@ TEST( TransportReceive, FullEventQueueCannotCarryOldSessionBodyPastRecoveryReset
                HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( consumed, 0u );
     EXPECT_EQ( rig.root.receive_protocol_error_pending, 0u );
-    EXPECT_EQ( rig.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
     EXPECT_EQ( rig.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE );
-
-    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 6u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
-               HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( rig.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
     EXPECT_EQ( rig.root.session.handshake_phase,
                HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_INITIATE );
+
+    /* Zero-length receive may cross the completed recovery boundary itself. */
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 6u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
 }
 
 TEST( TransportReceive, NonExpectedApplicationSequencesCannotCompleteHostHandshake )

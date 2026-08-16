@@ -32,6 +32,33 @@ static void HIL_TRANSPORT_MVP_Session_Set_Fault( HIL_Transport_Mvp_Root_T* root 
     HIL_TRANSPORT_MVP_Session_Set_Failure( root, HIL_TRANSPORT_FAILURE_INTERNAL );
 }
 
+static int HIL_TRANSPORT_MVP_Session_Identifier_Is_Valid( uint64_t session_identifier )
+{
+    return ( session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID )
+           && ( session_identifier != HIL_TRANSPORT_SESSION_SEED_RESERVED );
+}
+
+static void HIL_TRANSPORT_MVP_Session_Clear_Recently_Abandoned( HIL_Transport_Mvp_Root_T* root )
+{
+    root->recently_abandoned_session_identifier       = HIL_TRANSPORT_SESSION_SEED_INVALID;
+    root->recently_abandoned_session_identifier_valid = 0u;
+}
+
+static int HIL_TRANSPORT_MVP_Session_Recently_Abandoned_Metadata_Is_Valid(
+    const HIL_Transport_Mvp_Root_T* root )
+{
+    if ( root->recently_abandoned_session_identifier_valid > 1u )
+    {
+        return 0;
+    }
+    if ( root->recently_abandoned_session_identifier_valid == 0u )
+    {
+        return root->recently_abandoned_session_identifier == HIL_TRANSPORT_SESSION_SEED_INVALID;
+    }
+    return HIL_TRANSPORT_MVP_Session_Identifier_Is_Valid(
+        root->recently_abandoned_session_identifier );
+}
+
 static HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Session_Clear_Scoped_Work( HIL_Transport_Mvp_Root_T* root )
 {
@@ -189,7 +216,8 @@ HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root )
          || ( session->state < HIL_TRANSPORT_SESSION_STATE_DISCONNECTED )
          || ( session->state > HIL_TRANSPORT_SESSION_STATE_FAULT )
          || ( root->base.session_state != session->state )
-         || ( root->base.last_failure != session->last_failure ) )
+         || ( root->base.last_failure != session->last_failure )
+         || !HIL_TRANSPORT_MVP_Session_Recently_Abandoned_Metadata_Is_Valid( root ) )
     {
         return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
     }
@@ -273,6 +301,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Abandon( HIL_Transport_Mvp_Root
     HIL_Transport_Status_T event_status;
     HIL_Transport_Status_T associated_status;
     HIL_Transport_Event_T  event;
+    uint64_t               abandoned_session_identifier;
+    uint8_t                abandoned_session_identifier_valid;
 
     if ( root == NULL )
     {
@@ -297,6 +327,12 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Abandon( HIL_Transport_Mvp_Root
         return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
     }
 
+    abandoned_session_identifier = root->session.session_identifier;
+    abandoned_session_identifier_valid =
+        ( uint8_t )( ( root->session.session_identifier_valid == 1u )
+                     && HIL_TRANSPORT_MVP_Session_Identifier_Is_Valid(
+                         abandoned_session_identifier ) );
+
     if ( HIL_TRANSPORT_MVP_Session_Clear_Scoped_Work( root ) != HIL_TRANSPORT_STATUS_OK )
     {
         HIL_TRANSPORT_MVP_Session_Set_Fault( root );
@@ -306,6 +342,12 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Abandon( HIL_Transport_Mvp_Root
     {
         HIL_TRANSPORT_MVP_Session_Set_Failure( root, HIL_TRANSPORT_FAILURE_INTERNAL );
         return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    }
+
+    if ( abandoned_session_identifier_valid != 0u )
+    {
+        root->recently_abandoned_session_identifier       = abandoned_session_identifier;
+        root->recently_abandoned_session_identifier_valid = 1u;
     }
 
     HIL_TRANSPORT_MVP_Session_Set_Failure( root, failure );
@@ -346,6 +388,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Explicit_Reset( HIL_Transport_M
         return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
     }
     cleanup_status = HIL_TRANSPORT_MVP_Session_Clear_Scoped_Work( root );
+    if ( !HIL_TRANSPORT_MVP_Session_Recently_Abandoned_Metadata_Is_Valid( root ) )
+    {
+        HIL_TRANSPORT_MVP_Session_Clear_Recently_Abandoned( root );
+    }
     ( void )HIL_TRANSPORT_MVP_Events_Reset( root );
     root->session.link_state_observed = ( uint8_t )( root->session.link_state_observed != 0u );
     retained_role_is_valid            = ( root->base.role == HIL_TRANSPORT_ROLE_HOST )
@@ -426,6 +472,7 @@ HIL_TRANSPORT_MVP_Session_Notify_Link_State( HIL_Transport_Mvp_Root_T*  root,
         if ( link_state == HIL_TRANSPORT_LINK_STATE_DISCONNECTED )
         {
             cleanup_status = HIL_TRANSPORT_MVP_Session_Clear_Scoped_Work( root );
+            HIL_TRANSPORT_MVP_Session_Clear_Recently_Abandoned( root );
         }
         HIL_TRANSPORT_MVP_Session_Set_Fault( root );
         return cleanup_status;
@@ -457,6 +504,7 @@ HIL_TRANSPORT_MVP_Session_Notify_Link_State( HIL_Transport_Mvp_Root_T*  root,
     HIL_TRANSPORT_MVP_Session_Set_Link_State( root, link_state );
     if ( !was_observed && ( link_state == HIL_TRANSPORT_LINK_STATE_DISCONNECTED ) )
     {
+        HIL_TRANSPORT_MVP_Session_Clear_Recently_Abandoned( root );
         return HIL_TRANSPORT_STATUS_OK;
     }
 
@@ -475,6 +523,7 @@ HIL_TRANSPORT_MVP_Session_Notify_Link_State( HIL_Transport_Mvp_Root_T*  root,
     {
         transition_status =
             HIL_TRANSPORT_MVP_Session_Abandon( root, HIL_TRANSPORT_FAILURE_LINK_LOST );
+        HIL_TRANSPORT_MVP_Session_Clear_Recently_Abandoned( root );
     }
     else
     {

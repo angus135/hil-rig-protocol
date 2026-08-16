@@ -278,6 +278,17 @@ typedef struct
     /** Session identity carried by the pending locally generated recovery RESET. */
     uint64_t recovery_reset_session_identifier;
 
+    /**
+     * Most recently adopted session identity abandoned while this physical link
+     * remained connected. Only one identity is retained for the MVP so delayed
+     * traffic from the immediately abandoned session cannot invalidate its
+     * replacement.
+     */
+    uint64_t recently_abandoned_session_identifier;
+
+    /** Nonzero when recently_abandoned_session_identifier owns a valid identity. */
+    uint8_t recently_abandoned_session_identifier_valid;
+
     uint8_t* codec_scratch;
     size_t   codec_scratch_size;
     uint8_t* received_message;

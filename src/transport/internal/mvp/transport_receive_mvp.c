@@ -42,6 +42,27 @@ HIL_TRANSPORT_MVP_Receive_Fault( HIL_Transport_Mvp_Root_T* root )
                                               HIL_TRANSPORT_MVP_RECEIVE_BODY_ALREADY_RELEASED );
 }
 
+static int HIL_TRANSPORT_MVP_Receive_Session_Identifier_Is_Valid( uint64_t session_identifier )
+{
+    return ( session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID )
+           && ( session_identifier != HIL_TRANSPORT_SESSION_SEED_RESERVED );
+}
+
+static int HIL_TRANSPORT_MVP_Receive_Recently_Abandoned_Metadata_Is_Valid(
+    const HIL_Transport_Mvp_Root_T* root )
+{
+    if ( root->recently_abandoned_session_identifier_valid > 1u )
+    {
+        return 0;
+    }
+    if ( root->recently_abandoned_session_identifier_valid == 0u )
+    {
+        return root->recently_abandoned_session_identifier == HIL_TRANSPORT_SESSION_SEED_INVALID;
+    }
+    return HIL_TRANSPORT_MVP_Receive_Session_Identifier_Is_Valid(
+        root->recently_abandoned_session_identifier );
+}
+
 static HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Receive_Validate_Root( HIL_Transport_Mvp_Root_T* root )
 {
@@ -59,6 +80,7 @@ HIL_TRANSPORT_MVP_Receive_Validate_Root( HIL_Transport_Mvp_Root_T* root )
         return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
     }
     if ( ( root->receive_protocol_error_pending > 1u ) || ( root->recovery_reset_pending > 1u )
+         || !HIL_TRANSPORT_MVP_Receive_Recently_Abandoned_Metadata_Is_Valid( root )
          || ( root->base.role < HIL_TRANSPORT_ROLE_HOST )
          || ( root->base.role > HIL_TRANSPORT_ROLE_RIG )
          || ( root->session.role != root->base.role )
@@ -145,6 +167,51 @@ HIL_TRANSPORT_MVP_Receive_Reject_Retained_Body( HIL_Transport_Mvp_Root_T* root )
         return HIL_TRANSPORT_MVP_Receive_Outcome( status, HIL_TRANSPORT_MVP_RECEIVE_BODY_RETAIN );
     }
     return HIL_TRANSPORT_MVP_Receive_Fault( root );
+}
+
+static HIL_Transport_Mvp_Receive_Body_Outcome_T
+HIL_TRANSPORT_MVP_Receive_Reject_Obsolete_Body( HIL_Transport_Mvp_Root_T* root )
+{
+    HIL_Transport_Status_T status = HIL_TRANSPORT_MVP_Receive_Publish_Protocol_Error( root );
+
+    if ( status == HIL_TRANSPORT_STATUS_OK )
+    {
+        return HIL_TRANSPORT_MVP_Receive_Outcome( HIL_TRANSPORT_STATUS_OK,
+                                                  HIL_TRANSPORT_MVP_RECEIVE_BODY_CONSUME );
+    }
+    if ( status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
+    {
+        /*
+         * This body is already known to be irrelevant to the replacement
+         * session. Consume it even when the diagnostic FIFO is full so it can
+         * never be reinterpreted after recovery; retain only the event
+         * publication obligation.
+         */
+        root->receive_protocol_error_pending = 1u;
+        return HIL_TRANSPORT_MVP_Receive_Outcome( status, HIL_TRANSPORT_MVP_RECEIVE_BODY_CONSUME );
+    }
+    return HIL_TRANSPORT_MVP_Receive_Fault( root );
+}
+
+static int
+HIL_TRANSPORT_MVP_Receive_Frame_Is_Recently_Abandoned( const HIL_Transport_Mvp_Root_T*  root,
+                                                       const HIL_Transport_Mvp_Frame_T* frame )
+{
+    return ( root->recently_abandoned_session_identifier_valid != 0u )
+           && ( frame->session_identifier == root->recently_abandoned_session_identifier )
+           && ( ( root->session.session_identifier_valid == 0u )
+                || ( frame->session_identifier != root->session.session_identifier ) );
+}
+
+static int HIL_TRANSPORT_MVP_Receive_Rig_Is_Waiting_Unbound_For_Initiate(
+    const HIL_Transport_Mvp_Root_T* root )
+{
+    return ( root->session.role == HIL_TRANSPORT_ROLE_RIG )
+           && ( root->session.state == HIL_TRANSPORT_SESSION_STATE_CONNECTING )
+           && ( root->session.handshake_phase
+                == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_INITIATE )
+           && ( root->session.session_identifier_valid == 0u )
+           && ( root->session.session_identifier == HIL_TRANSPORT_SESSION_SEED_INVALID );
 }
 
 static HIL_Transport_Mvp_Receive_Body_Outcome_T
@@ -314,6 +381,23 @@ static HIL_Transport_Mvp_Receive_Body_Outcome_T
 HIL_TRANSPORT_MVP_Receive_Dispatch_Frame( HIL_Transport_Mvp_Root_T*        root,
                                           const HIL_Transport_Mvp_Frame_T* frame )
 {
+    if ( HIL_TRANSPORT_MVP_Receive_Frame_Is_Recently_Abandoned( root, frame ) )
+    {
+        return HIL_TRANSPORT_MVP_Receive_Reject_Obsolete_Body( root );
+    }
+
+    /*
+     * An unbound rig has no current session to abandon. Delayed ACK, RESET,
+     * Application, RESPONSE, or CONFIRM traffic is therefore diagnostic noise,
+     * not a reason to enter another recovery cycle. Stay ready for the next
+     * valid INITIATE.
+     */
+    if ( HIL_TRANSPORT_MVP_Receive_Rig_Is_Waiting_Unbound_For_Initiate( root )
+         && ( frame->type != HIL_TRANSPORT_MVP_FRAME_INITIATE ) )
+    {
+        return HIL_TRANSPORT_MVP_Receive_Reject_Obsolete_Body( root );
+    }
+
     switch ( frame->type )
     {
         case HIL_TRANSPORT_MVP_FRAME_INITIATE:
@@ -489,6 +573,28 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Receive_Bytes( HIL_Transport_Mvp_Root_T
     if ( root->parser.body_ready != 0u )
     {
         status = HIL_TRANSPORT_MVP_Receive_Process_Retained_Body( root );
+        if ( status != HIL_TRANSPORT_STATUS_OK )
+        {
+            return status;
+        }
+    }
+
+    /*
+     * Once a locally generated recovery RESET has been committed, newly
+     * supplied bytes must be interpreted in the replacement establishment
+     * state even if the caller has not made an intervening Process() call.
+     * This keeps Commit -> Receive and Commit -> Process -> Receive equivalent.
+     */
+    if ( ( root->session.state == HIL_TRANSPORT_SESSION_STATE_RECOVERING )
+         && ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_RECOVERING )
+         && ( root->recovery_reset_pending == 0u )
+         && ( root->control_output_state == HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE )
+         && ( root->control_output_size == 0u )
+         && ( root->output_selection == HIL_TRANSPORT_MVP_OUTPUT_NONE )
+         && ( root->receive_protocol_error_pending == 0u ) && ( root->parser.body_ready == 0u )
+         && ( root->parser.accumulated_size == 0u ) && ( root->parser.discarding == 0u ) )
+    {
+        status = HIL_TRANSPORT_MVP_Session_Begin_Establishment( root );
         if ( status != HIL_TRANSPORT_STATUS_OK )
         {
             return status;

@@ -377,6 +377,9 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* con
         return HIL_TRANSPORT_STATUS_OK;
     }
 
+    root->recently_abandoned_session_identifier       = reset_session_identifier;
+    root->recently_abandoned_session_identifier_valid = 1u;
+
     status = HIL_TRANSPORT_MVP_Handshake_Publish_Reset( root, reset_session_identifier );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
@@ -480,6 +483,21 @@ HIL_TRANSPORT_PROFILE_Process( HIL_Transport_Context_T* context, uint32_t now_ms
         return HIL_TRANSPORT_STATUS_OK;
     }
 
+    /*
+     * Resolve receive work before crossing a recovery boundary. A deferred
+     * protocol diagnostic is ordinary bounded backpressure, not an invariant
+     * failure, and must therefore be allowed to drain before the strict fresh
+     * establishment checks run.
+     */
+    if ( ( root->receive_protocol_error_pending != 0u ) || ( root->parser.body_ready != 0u ) )
+    {
+        status = HIL_TRANSPORT_MVP_Receive_Bytes( root, NULL, 0u, &receive_bytes_consumed );
+        if ( status != HIL_TRANSPORT_STATUS_OK )
+        {
+            return status;
+        }
+    }
+
     if ( ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_RECOVERING )
          || ( root->session.state == HIL_TRANSPORT_SESSION_STATE_RECOVERING ) )
     {
@@ -500,16 +518,17 @@ HIL_TRANSPORT_PROFILE_Process( HIL_Transport_Context_T* context, uint32_t now_ms
         {
             return HIL_TRANSPORT_STATUS_OK;
         }
-        status = HIL_TRANSPORT_MVP_Session_Begin_Establishment( root );
-        if ( status != HIL_TRANSPORT_STATUS_OK )
+        /*
+         * A partial parser body can legitimately span caller input calls. Do
+         * not turn that recoverable condition into FAULT merely because the
+         * recovery RESET has already been committed. The receive path will
+         * finish or discard it before attempting establishment.
+         */
+        if ( ( root->parser.accumulated_size != 0u ) || ( root->parser.discarding != 0u ) )
         {
-            return status;
+            return HIL_TRANSPORT_STATUS_OK;
         }
-    }
-
-    if ( ( root->receive_protocol_error_pending != 0u ) || ( root->parser.body_ready != 0u ) )
-    {
-        status = HIL_TRANSPORT_MVP_Receive_Bytes( root, NULL, 0u, &receive_bytes_consumed );
+        status = HIL_TRANSPORT_MVP_Session_Begin_Establishment( root );
         if ( status != HIL_TRANSPORT_STATUS_OK )
         {
             return status;

@@ -205,6 +205,25 @@ TEST_F( RootFixture, ConnectedBeginsHostAndRepeatedCallDoesNotAdvance )
     EXPECT_EQ( root.event_count, 1u );
 }
 
+TEST_F( RootFixture, AbandonRetainsOneSessionIdentityAcrossReplacementEstablishment )
+{
+    ASSERT_EQ(
+        HIL_TRANSPORT_MVP_Session_Notify_Link_State( &root, HIL_TRANSPORT_LINK_STATE_CONNECTED ),
+        HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( root.session.session_identifier, 5u );
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Abandon( &root, HIL_TRANSPORT_FAILURE_PROTOCOL ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( root.recently_abandoned_session_identifier_valid, 1u );
+    EXPECT_EQ( root.recently_abandoned_session_identifier, 5u );
+    EXPECT_EQ( root.session.session_identifier_valid, 0u );
+    EXPECT_EQ( root.session.state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( root.session.session_identifier, 6u );
+    EXPECT_EQ( root.recently_abandoned_session_identifier, 5u );
+}
+
 TEST_F( RootFixture, HostCursorWrapsReservedValues )
 {
     root.session.next_host_session_identifier = UINT64_MAX - 1u;
@@ -483,6 +502,8 @@ TEST_F( RootFixture, ReconnectionAllocatesNewIdentityAndNeverResumesOldWork )
     EXPECT_EQ( root.received_message_pending, 0u );
     EXPECT_EQ( root.parser.accumulated_size, 0u );
     EXPECT_EQ( root.session.next_transmit_sequence, 9u );
+    EXPECT_EQ( root.recently_abandoned_session_identifier_valid, 0u );
+    EXPECT_EQ( root.recently_abandoned_session_identifier, HIL_TRANSPORT_SESSION_SEED_INVALID );
     EXPECT_EQ( root.session.expected_receive_sequence, 9u );
     EXPECT_EQ( root.session.accepted_receive_sequence_valid, 0u );
 
