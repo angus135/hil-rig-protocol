@@ -383,10 +383,15 @@ HIL_Transport_Status_T HIL_TRANSPORT_Submit_Application_Data( HIL_Transport_Cont
  * Application sequence is re-ACKed without redelivery. Temporary unread-message
  * or control-output pressure retains the completed parser body and returns
  * CAPACITY_EXHAUSTED. Incompatible current-session sequence/identity follows normal
- * protocol recovery; immediately previous-session Application traffic is rejected
- * as stale without abandoning the current session. A valid peer RESET immediately
- * prepares fresh establishment before receive continues, so a RIG may accept the
- * replacement INITIATE from the same offered byte chunk. While a HOST is waiting
+ * protocol recovery. Traffic carrying the most recently abandoned session
+ * identity is rejected as stale without abandoning a replacement session, and an
+ * unbound RIG waiting for INITIATE rejects other frame types without starting a
+ * second recovery cycle. After a locally generated recovery RESET has been
+ * committed, Receive_Bytes() may enter replacement establishment before consuming
+ * new input, so callers do not need an intervening Process() call. A valid peer
+ * RESET likewise prepares fresh establishment before receive continues, so a RIG
+ * may accept the replacement INITIATE from the same offered byte chunk. While a
+ * HOST is waiting
  * specifically for the final CONFIRM ACK, a valid same-session exact-next-sequence
  * Application frame proves the RIG accepted CONFIRM and may complete establishment
  * before that frame is handled normally. Peeked CONFIRM bytes remain pinned, so
@@ -419,9 +424,12 @@ HIL_Transport_Status_T HIL_TRANSPORT_Receive_Bytes( HIL_Transport_Context_T* con
  * session, publishes the same RESET synchronization signal, and returns
  * DELIVERY_FAILED on that transition. If event capacity is
  * unavailable, that Application transition remains pending and returns
- * CAPACITY_EXHAUSTED until the failure event can be retained. A later call starts
- * the replacement attempt after any old control output has been committed. A
- * host consumes a new session identity; a rig returns to waiting for INITIATE.
+ * CAPACITY_EXHAUSTED until the failure event can be retained. Deferred receive
+ * diagnostics are serviced before replacement establishment, so event backpressure
+ * after RESET commit remains retryable rather than becoming an invariant fault. A
+ * later Process() or Receive_Bytes() call starts the replacement attempt after any
+ * old control output has been committed. A host consumes a new session identity; a
+ * rig returns to waiting for INITIATE.
  * Handshake exhaustion publishes no Application delivery event. The function
  * never calls hardware; automatic encoded output is retrieved through
  * Peek_Output() and Commit_Output().

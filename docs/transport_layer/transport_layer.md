@@ -264,10 +264,12 @@ read complete messages/events/status <- receive bytes |  external I/O
 
 The Mermaid source is in `transport_api_usage.mmd`.
 
-`HIL_TRANSPORT_Process()` is the only caller-driven progress point for timers
-and automatic protocol work. The local operating mode is a Transport policy
-input. It is not the session state, Application state, or firmware lifecycle,
-and it is not synchronized with the peer. `NORMAL`, `BULK_TRANSFER`, and
+`HIL_TRANSPORT_Process()` is the caller-driven progress point for timers and
+scheduled protocol work. `HIL_TRANSPORT_Receive_Bytes()` may also complete a
+finished recovery boundary before accepting newly supplied bytes so callers do
+not need a special Commit -> Process -> Receive ordering. The local operating
+mode is a Transport policy input. It is not the session state, Application
+state, or firmware lifecycle, and it is not synchronized with the peer. `NORMAL`, `BULK_TRANSFER`, and
 `QUIET_REAL_TIME` are all valid for the MVP; the MVP may treat them identically
 and records the latest valid value in status. A numeric value outside those
 enumerators returns `INVALID_ARGUMENT`, preserves the previous valid mode, and
@@ -340,7 +342,10 @@ explicit Reset may invalidate a caller-owned peek as part of its normal reset
 semantics, but it re-publishes the same RESET for the failed session afterwards.
 RESET remains a best-effort, non-reliable control item in the MVP: these recovery
 rules synchronize the peer when RESET is delivered, but loss of RESET itself is
-not repaired by a RESET retransmission or keepalive mechanism. A replacement
+not repaired by a RESET retransmission or keepalive mechanism. The most recently
+adopted session identity is retained while the physical link remains connected
+so delayed traffic from that abandoned session can be rejected without tearing
+down its replacement. Only one abandoned identity is retained. A replacement
 session must establish before another Application message is accepted.
 
 ## Exact receive consumption
@@ -357,8 +362,12 @@ policy report zero; disconnected receive returns `NOT_READY`. No return may
 silently discard an unreported suffix.
 
 The receive coordinator processes a pending oversized-body diagnostic and any
-already completed parser body before accepting new bytes. A decoded body is a
-transaction: retryable event, unread-message, reliable-output, or control-output exhaustion
+already completed parser body before accepting new bytes. If local recovery is
+waiting only for its RESET output to be committed, the receive path also enters
+fresh establishment before parsing new bytes once that output barrier is gone.
+This makes `Commit_Output()` followed directly by `Receive_Bytes()` equivalent
+to inserting a `Process()` call between them. A decoded body is a transaction:
+retryable event, unread-message, reliable-output, or control-output exhaustion
 returns `CAPACITY_EXHAUSTED` while leaving the body unchanged. A later call,
 including one with zero input bytes, retries semantic processing without asking
 the caller to resend bytes already accepted into parser scratch. `Process()`
@@ -389,10 +398,17 @@ profile boundary.
 Ordinary malformed COBS and CRC-invalid bodies publish `PROTOCOL_ERROR` with
 status `NOT_READY`, failure `PROTOCOL`, and zero required capacity, then preserve
 the current session as if the frame were lost. Stale decoded traffic is rejected
-without abandoning a newer session. Current-session semantic incompatibility
-publishes the same diagnostic when capacity permits, abandons through the
-session coordinator regardless of event capacity, and publishes one best-effort
-RESET using the failed session identity after old control ownership is cleared.
+without abandoning a newer session. Frames carrying the one recently abandoned
+session identity are classified before frame-specific handshake/Application
+semantics, consumed as obsolete traffic, and never allowed to invalidate a
+replacement handshake. If the event FIFO is full, the stale body is still
+consumed and only its `PROTOCOL_ERROR` publication remains pending. While an
+unbound RIG is waiting for a fresh INITIATE, other valid frame types are likewise
+reported/rejected without starting another recovery cycle because there is no
+current session to abandon. Current-session semantic incompatibility publishes
+the same diagnostic when capacity permits, abandons through the session
+coordinator regardless of event capacity, and publishes one best-effort RESET
+using the failed session identity after old control ownership is cleared.
 `Process()` waits for that RESET to be committed before starting the replacement
 session. If further incompatible frames arrive while that local recovery RESET
 is still pending, they are rejected and may publish `PROTOCOL_ERROR`, but they do
@@ -405,6 +421,23 @@ continues. A RIG can therefore accept a following replacement INITIATE from the
 same offered byte chunk instead of consuming it as stale while waiting for a
 separate `Process()` call. If event capacity stops the call after RESET, the
 unconsumed INITIATE suffix remains caller-owned and is valid when retried.
+
+
+### MVP recovery limits and hard recovery
+
+The MVP deliberately does not make RESET reliable. RESET is not acknowledged or
+retransmitted, there is no peer-liveness/keepalive timer, and automatic
+convergence is not guaranteed for every simultaneous two-sided recovery ordering.
+Only the most recently abandoned session identity is remembered. These are
+accepted MVP limits rather than reasons to expand the wire protocol.
+
+If peers fail to converge after recovery, the supported hard-recovery path is to
+stop forwarding old link bytes, notify Transport of `DISCONNECTED`, restart or
+re-establish the underlying link, notify `CONNECTED`, and resume the normal
+Process/receive/peek/commit loop. Physical disconnect clears active recovery and
+stale-session history, so a subsequent connection starts a fresh protocol
+universe. A peer restart that does not produce a physical link-state transition
+may therefore require retransmission or this explicit link restart.
 
 
 While a HOST is specifically waiting for the final ACK of its committed CONFIRM,
@@ -582,12 +615,13 @@ CONNECTING or ESTABLISHED returns `NOT_READY` through the private seam and does
 not consume another identity.
 
 A CONNECTED-to-DISCONNECTED change records the physical state first, publishes
-`LINK_STATE_CHANGED` with LINK_LOST, clears all session-scoped ownership, enters
-DISCONNECTED, and attempts to append `SESSION_RESET`. A later reconnection
-starts from the configured initial sequences with cleared parser, message,
-duplicate, output, retry, and handshake ownership and consumes a new host
-identity. Repeated same-state notifications return `OK`, do not restart work,
-and do not retry event publication that previously failed. `now_ms` is accepted
+`LINK_STATE_CHANGED` with LINK_LOST, clears all session-scoped ownership and the
+recently abandoned session history, enters DISCONNECTED, and attempts to append
+`SESSION_RESET`. A later reconnection starts from the configured initial
+sequences with cleared parser, message, duplicate, output, retry, handshake, and
+stale-session ownership and consumes a new host identity. Repeated same-state
+notifications return `OK`, do not restart work, and do not retry event
+publication that previously failed. `now_ms` is accepted
 but unused by the MVP because nonzero connection timeout is unsupported and no
 link-liveness timer exists.
 
@@ -605,8 +639,10 @@ retransmission ownership, timers, partial input, pinned output, submitted
 messages, unread received messages, and every queued event. Because the caller
 initiated it, explicit reset does not enqueue `SESSION_RESET`. If the link is
 connected and the previous active session identity is coherent, explicit reset
-publishes one best-effort RESET for that old identity after cleanup; `Process()`
-waits for its commit before starting replacement establishment. If an earlier
+publishes one best-effort RESET for that old identity after cleanup and records
+that identity as the recently abandoned session. Replacement establishment waits
+for RESET commit, but either `Process()` or a later `Receive_Bytes()` call can
+advance across that completed recovery boundary. If an earlier
 automatic/local recovery already owns a pending RESET, another explicit reset
 preserves that failed-session identity and re-publishes the RESET after cleanup,
 including when the old RESET was READY or already PEEKED. FAULT recovery does
@@ -659,8 +695,11 @@ delivery confirmation and the `DELIVERY_FAILED` event that precedes automatic
 Application recovery, are intentionally transactional with event capacity. If
 the FIFO is allowed to remain full, receive or `Process()` may return
 `CAPACITY_EXHAUSTED` and retain protocol work until the caller consumes an event.
-Integrations should service `HIL_TRANSPORT_Read_Event()` regularly alongside
-receive, process, and output handling. Mandatory physical/session cleanup and
+After recovery RESET commit, any deferred receive diagnostic is serviced before
+fresh establishment begins; event backpressure therefore remains retryable rather
+than becoming an `INTERNAL_ERROR`/FAULT transition. Integrations should service
+`HIL_TRANSPORT_Read_Event()` regularly alongside receive, process, and output
+handling. Mandatory physical/session cleanup and
 RESET publication still proceed where documented even if the corresponding
 best-effort `SESSION_RESET` event cannot be retained.
 

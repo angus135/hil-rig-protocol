@@ -679,3 +679,253 @@ TEST( TransportFacadeRecovery, ApplicationCompletesHostHandshakeWhenFinalAckIsLo
     ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( rig_status.reliable_delivery_pending, 0u );
 }
+
+TEST( TransportFacadeRecovery, RecoveryResetCommitThenReceiveInitiateDoesNotRequireProcessFirst )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xE123 ), 10u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u );
+    EstablishPublicPair( host, rig );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &rig.context ), HIL_TRANSPORT_STATUS_OK );
+    const auto reset = TakeOneOutput( rig, 20u );
+    ASSERT_FALSE( reset.empty() );
+    DeliverBytes( host, reset.data(), reset.size() );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 21u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto initiate = TakeOneOutput( host, 22u );
+    ASSERT_FALSE( initiate.empty() );
+
+    /* No Process() call is made on the rig between RESET commit and receive. */
+    DeliverBytes( rig, initiate.data(), initiate.size() );
+
+    HIL_Transport_Status_Snapshot_T rig_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( rig_status.output_pending, 0u );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 23u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.output_pending, 1u );
+    EXPECT_EQ( rig_status.reliable_delivery_pending, 1u );
+}
+
+TEST( TransportFacadeRecovery, DelayedOldApplicationBeforeReplacementInitiateDoesNotAbortHandshake )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xE223 ), 10u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u );
+    EstablishPublicPair( host, rig );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    const std::array<std::uint8_t, 3u> payload{ 0x21u, 0x22u, 0x23u };
+    ASSERT_EQ(
+        HIL_TRANSPORT_Submit_Application_Data( &host.context, payload.data(), payload.size() ),
+        HIL_TRANSPORT_STATUS_OK );
+    const auto delayed_old_application = TakeOneOutput( host, 20u );
+    ASSERT_FALSE( delayed_old_application.empty() );
+
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &rig.context ), HIL_TRANSPORT_STATUS_OK );
+    const auto reset = TakeOneOutput( rig, 21u );
+    ASSERT_FALSE( reset.empty() );
+    DeliverBytes( host, reset.data(), reset.size() );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 22u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto initiate = TakeOneOutput( host, 23u );
+    ASSERT_FALSE( initiate.empty() );
+
+    std::vector<std::uint8_t> combined = delayed_old_application;
+    combined.insert( combined.end(), initiate.begin(), initiate.end() );
+    DeliverBytes( rig, combined.data(), combined.size() );
+
+    HIL_Transport_Status_Snapshot_T rig_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( rig_status.application_message_pending, 0u );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 24u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.output_pending, 1u );
+}
+
+TEST( TransportFacadeRecovery, DeferredStaleDiagnosticAfterResetCommitDoesNotEnterFault )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xE323 ), 10u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u );
+    EstablishPublicPair( host, rig );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    const std::array<std::uint8_t, 2u> payload{ 0x31u, 0x32u };
+    ASSERT_EQ(
+        HIL_TRANSPORT_Submit_Application_Data( &host.context, payload.data(), payload.size() ),
+        HIL_TRANSPORT_STATUS_OK );
+    const auto delayed_old_application = TakeOneOutput( host, 20u );
+    ASSERT_FALSE( delayed_old_application.empty() );
+
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &rig.context ), HIL_TRANSPORT_STATUS_OK );
+
+    /* Fill the four-entry event FIFO with stale-session diagnostics. */
+    for ( std::size_t index = 0u; index < 4u; ++index )
+    {
+        DeliverBytes( rig, delayed_old_application.data(), delayed_old_application.size() );
+    }
+
+    std::size_t consumed = 0u;
+    EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &rig.context, delayed_old_application.data(),
+                                            delayed_old_application.size(), &consumed ),
+               HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
+    EXPECT_EQ( consumed, delayed_old_application.size() );
+
+    /* Commit RESET while the protocol-error publication is still deferred. */
+    const auto reset = TakeOneOutput( rig, 21u );
+    ASSERT_FALSE( reset.empty() );
+
+    HIL_Transport_Event_T event{};
+    ASSERT_EQ( HIL_TRANSPORT_Read_Event( &rig.context, &event ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( event.type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
+
+    EXPECT_EQ( HIL_TRANSPORT_Process( &rig.context, 22u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+
+    HIL_Transport_Status_Snapshot_T rig_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_NE( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_FAULT );
+}
+
+TEST( TransportFacadeRecovery, UnboundRigRejectsIrrelevantApplicationWithoutStartingRecovery )
+{
+    PublicEndpoint source_host;
+    PublicEndpoint source_rig;
+    source_host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xE423 ), 10u );
+    source_rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u );
+    EstablishPublicPair( source_host, source_rig );
+    DrainEvents( source_host );
+    DrainEvents( source_rig );
+
+    const std::array<std::uint8_t, 2u> payload{ 0x41u, 0x42u };
+    ASSERT_EQ( HIL_TRANSPORT_Submit_Application_Data( &source_host.context, payload.data(),
+                                                      payload.size() ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto unrelated_application = TakeOneOutput( source_host, 20u );
+    ASSERT_FALSE( unrelated_application.empty() );
+
+    PublicEndpoint waiting_rig;
+    waiting_rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 700u );
+    DrainEvents( waiting_rig );
+
+    DeliverBytes( waiting_rig, unrelated_application.data(), unrelated_application.size() );
+
+    HIL_Transport_Status_Snapshot_T status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &waiting_rig.context, &status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( status.output_pending, 0u );
+    EXPECT_EQ( status.application_message_pending, 0u );
+}
+
+TEST( TransportFacadeRecovery, RecentlyAbandonedInitiateIsRejectedUntilPhysicalReconnect )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xE523 ), 10u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto old_initiate = TakeOneOutput( host, 2u );
+    ASSERT_FALSE( old_initiate.empty() );
+    DeliverBytes( rig, old_initiate.data(), old_initiate.size() );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 3u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( rig, host, 4u );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 5u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( host, rig, 6u );
+    TransferOneOutput( rig, host, 7u );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &rig.context ), HIL_TRANSPORT_STATUS_OK );
+    const auto reset = TakeOneOutput( rig, 20u );
+    ASSERT_FALSE( reset.empty() );
+
+    /* RESET is committed, so receive auto-enters WAITING_FOR_INITIATE. */
+    DeliverBytes( rig, old_initiate.data(), old_initiate.size() );
+
+    HIL_Transport_Status_Snapshot_T status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( status.output_pending, 0u );
+
+    /* Physical link restart is the MVP hard-recovery boundary and clears history. */
+    ASSERT_EQ(
+        HIL_TRANSPORT_Notify_Link_State( &rig.context, HIL_TRANSPORT_LINK_STATE_DISCONNECTED, 21u ),
+        HIL_TRANSPORT_STATUS_OK );
+    DrainEvents( rig );
+    ASSERT_EQ(
+        HIL_TRANSPORT_Notify_Link_State( &rig.context, HIL_TRANSPORT_LINK_STATE_CONNECTED, 22u ),
+        HIL_TRANSPORT_STATUS_OK );
+    DrainEvents( rig );
+
+    DeliverBytes( rig, old_initiate.data(), old_initiate.size() );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 23u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( status.output_pending, 1u );
+}
+
+TEST( TransportFacadeRecovery, DelayedOldAckBeforeReplacementInitiateDoesNotAbortHandshake )
+{
+    PublicEndpoint host;
+    PublicEndpoint rig;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, UINT64_C( 0xE623 ), 10u );
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u );
+    EstablishPublicPair( host, rig );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    const std::array<std::uint8_t, 2u> payload{ 0x61u, 0x62u };
+    ASSERT_EQ(
+        HIL_TRANSPORT_Submit_Application_Data( &rig.context, payload.data(), payload.size() ),
+        HIL_TRANSPORT_STATUS_OK );
+    const auto old_application = TakeOneOutput( rig, 20u );
+    ASSERT_FALSE( old_application.empty() );
+    DeliverBytes( host, old_application.data(), old_application.size() );
+    const auto delayed_old_ack = TakeOneOutput( host, 21u );
+    ASSERT_FALSE( delayed_old_ack.empty() );
+
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &rig.context ), HIL_TRANSPORT_STATUS_OK );
+    const auto reset = TakeOneOutput( rig, 22u );
+    ASSERT_FALSE( reset.empty() );
+    DeliverBytes( host, reset.data(), reset.size() );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &host.context, 23u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto initiate = TakeOneOutput( host, 24u );
+    ASSERT_FALSE( initiate.empty() );
+
+    std::vector<std::uint8_t> combined = delayed_old_ack;
+    combined.insert( combined.end(), initiate.begin(), initiate.end() );
+    DeliverBytes( rig, combined.data(), combined.size() );
+
+    HIL_Transport_Status_Snapshot_T rig_status{};
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( rig_status.application_message_pending, 0u );
+
+    ASSERT_EQ( HIL_TRANSPORT_Process( &rig.context, 25u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Get_Status( &rig.context, &rig_status ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.output_pending, 1u );
+}
