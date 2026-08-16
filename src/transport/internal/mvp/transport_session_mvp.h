@@ -115,7 +115,7 @@ HIL_TRANSPORT_MVP_Session_Reserve_Sequence( HIL_Transport_Mvp_Session_T* session
  * last accepted value is duplicate, an older value in the uint16 serial-number
  * half-range is stale, and a future or ambiguous half-range value is
  * incompatible. Semantic type and acknowledgement metadata are checked
- * separately by the owning handshake or future Application receive path.
+ * separately by the owning handshake or Application receive path.
  */
 HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Session_Classify_Sequence( const HIL_Transport_Mvp_Session_T*      session,

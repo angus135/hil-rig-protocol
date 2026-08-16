@@ -109,18 +109,21 @@ session and starting replacement-session recovery. Established-session ACKs with
 no active Application delivery are treated as stale protocol input for both host
 and rig roles rather than being reinterpreted as handshake traffic.
 
-Application reception remains intentionally deferred. Structurally valid inbound
-Application frames are isolated in one receive-dispatch branch, consumed, and
-reported as protocol errors without copying into received-message storage, and
-`HIL_TRANSPORT_Read_Application_Data()` remains `NOT_IMPLEMENTED`. Fragmentation
-and reassembly are also not implemented, so the public Application send/receive
-workflow is not yet operational end to end.
+Inbound Application delivery is also implemented for the MVP. An expected
+APPLICATION_MESSAGE is copied into the sole unread-message region only when the
+required ACK can also be retained; the receive sequence is committed after that
+ACK publication succeeds. A repeat of the last accepted Application sequence is re-ACKed
+without exposing the payload twice. A new expected frame is retained
+transactionally when the unread-message slot or control-output slot is occupied,
+and `HIL_TRANSPORT_Read_Application_Data()` supports size query, undersized retry,
+and consume-on-success reads of complete opaque messages. Fragmentation,
+reassembly, receive queues, and reorder windows remain unimplemented.
 
 The default MVP Transport profile is designed for one complete Application
 message per frame and one outstanding reliable transmission. The private event
 FIFO does not imply message or output queueing. Extended fragmentation,
 reassembly, flow control, keepalives, and message queueing remain future design
-only. Public headers, documentation, and compile-level tests currently define
+only. Public headers, documentation, unit tests, and public two-endpoint integration tests define
 the integration contracts.
 
 ## Build and test

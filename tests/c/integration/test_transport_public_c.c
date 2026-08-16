@@ -92,7 +92,7 @@ int main( void )
 
     if ( HIL_TRANSPORT_Read_Application_Data( &context, application_message,
                                               sizeof( application_message ), &message_size )
-             != HIL_TRANSPORT_STATUS_NOT_IMPLEMENTED
+             != HIL_TRANSPORT_STATUS_NOT_READY
          || message_size != 0u )
     {
         return 5;

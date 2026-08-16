@@ -85,8 +85,9 @@ begins.
 
 ## Candidate fragmentation and reassembly
 
-The public facade already uses complete Application messages, so a future
-extended profile can add transparent fragmentation without caller changes. A
+The implemented MVP public facade already sends and receives complete Application
+messages with one unread inbound slot, so a future extended profile can add
+transparent fragmentation without caller changes. A
 candidate private frame design must represent:
 
 - an identity shared by fragments of one Application message;

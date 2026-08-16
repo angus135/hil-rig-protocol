@@ -36,8 +36,9 @@
  * transitions produce events. Public arbitrary-byte receive dispatch now
  * transactionally drives that handshake. Outbound Application submission, exact
  * ACK completion, delivery confirmation, retry exhaustion, and delivery-failure
- * recovery are implemented. Inbound Application-message ownership and public
- * Application reads remain intentionally deferred.
+ * recovery are implemented. Expected inbound Application messages, duplicate
+ * re-ACK without redelivery, unread-message backpressure, and public complete-message
+ * reads are implemented.
  */
 #ifndef HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
 #define HIL_RIG_PROTOCOL_TRANSPORT_TRANSPORT_H
@@ -371,10 +372,16 @@ HIL_Transport_Status_T HIL_TRANSPORT_Submit_Application_Data( HIL_Transport_Cont
  * outbound Application delivery that it exactly matches. Stale, duplicate, or
  * otherwise unexpected established-session ACKs are reported as PROTOCOL_ERROR
  * without abandoning the session and are not reinterpreted as handshake input.
- * Structurally valid Application frames are currently consumed and reported as
- * PROTOCOL_ERROR because inbound Application ownership is deferred; they do not
- * make received-message storage visible. The input is borrowed only for this
- * call. INVALID_ARGUMENT and NOT_READY report zero consumption.
+ * An expected same-session Application frame is accepted only when the sole
+ * unread-message slot and required ACK control output can both commit. Its payload
+ * is copied before ACK encoding reuses decode scratch, then receive sequence and
+ * message ownership are committed after ACK publication succeeds. A repeat of the last accepted
+ * Application sequence is re-ACKed without redelivery. Temporary unread-message
+ * or control-output pressure retains the completed parser body and returns
+ * CAPACITY_EXHAUSTED. Incompatible current-session sequence/identity follows normal
+ * protocol recovery; immediately previous-session Application traffic is rejected
+ * as stale without abandoning the current session. The input is borrowed only for
+ * this call. INVALID_ARGUMENT and NOT_READY report zero consumption.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[in] data Received bytes; may be NULL only when data_len is zero.
@@ -504,7 +511,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_Commit_Output( HIL_Transport_Context_T* con
  * @param[out] out_buffer Caller destination, or NULL only with size zero.
  * @param[in] out_buffer_size Writable destination bytes.
  * @param[out] message_size Copied/required complete-message size or zero.
- * @return OK, BUFFER_TOO_SMALL, NOT_READY, INVALID_ARGUMENT, or NOT_IMPLEMENTED.
+ * @return OK, BUFFER_TOO_SMALL, NOT_READY, INVALID_ARGUMENT, or INTERNAL_ERROR.
  */
 HIL_Transport_Status_T HIL_TRANSPORT_Read_Application_Data( HIL_Transport_Context_T* context,
                                                             uint8_t*                 out_buffer,
@@ -522,8 +529,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_Read_Application_Data( HIL_Transport_Contex
  * remains an internal Transport responsibility. Event storage and reading are
  * implemented. Link changes, handshake establishment, receive/protocol errors,
  * automatic session abandonment, and outbound Application delivery success or
- * failure generate their events. Inbound Application capacity/delivery events
- * remain deferred with inbound Application ownership.
+ * failure generate their events. Inbound Application availability is reported by
+ * application_message_pending rather than a separate delivery event.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[out] event Destination for one event; must not be NULL.
@@ -543,7 +550,9 @@ HIL_Transport_Status_T HIL_TRANSPORT_Read_Event( HIL_Transport_Context_T* contex
  * handles it. Event pending is a boolean derived from the validated private
  * FIFO; the snapshot never exposes its count or capacity. The snapshot does not
  * expose output type, private profile state, sequences, retry counts, borrowed
- * workspace pointers, or mutable handles.
+ * workspace pointers, or mutable handles. Private pending-state metadata is
+ * validated before it is copied into the snapshot; invariant failure returns
+ * INTERNAL_ERROR rather than exposing inconsistent boolean state.
  *
  * @param[in] context Initialized single-owner context.
  * @param[out] status Snapshot destination; must not be NULL.

@@ -17,9 +17,10 @@ initialization, link observation, establishment preparation, automatic
 abandonment, and explicit reset are coordinated by the private session module;
 link changes and abandonment produce real events. Handshake frame processing,
 transactional arbitrary-byte receive dispatch, ACK and RESET generation, and
-outbound Application-message submission/delivery are implemented. Inbound
-Application-message ownership, duplicate handling, and public Application reads
-remain intentionally deferred unless stated otherwise below.
+bidirectional one-message-at-a-time Application delivery are implemented. This
+includes outbound submission/completion, inbound expected-message ownership,
+duplicate re-ACK without redelivery, unread-message backpressure, and public
+complete-message reads.
 
 Transport is HIL-RIG-specific but communication-medium-agnostic. It maps opaque,
 complete Application messages to opaque encoded output and received raw bytes
@@ -346,7 +347,7 @@ silently discard an unreported suffix.
 
 The receive coordinator processes a pending oversized-body diagnostic and any
 already completed parser body before accepting new bytes. A decoded body is a
-transaction: retryable event, reliable-output, or control-output exhaustion
+transaction: retryable event, unread-message, reliable-output, or control-output exhaustion
 returns `CAPACITY_EXHAUSTED` while leaving the body unchanged. A later call,
 including one with zero input bytes, retries semantic processing without asking
 the caller to resend bytes already accepted into parser scratch. `Process()`
@@ -379,14 +380,35 @@ RESET using the failed session identity after old control ownership is cleared.
 session. An accepted peer RESET abandons the session but is never answered with
 another RESET.
 
-The decoder exposes payload only as a synchronous view into codec scratch. The
-receive path does not copy a structurally valid inbound Application payload into
-`received_message` yet. Until inbound Application delivery is implemented, that
-single dispatcher branch consumes the frame and publishes `PROTOCOL_ERROR`; it
-never sets `received_message_pending`, while outbound Application submission and
-ACK completion remain fully operational. `HIL_TRANSPORT_Read_Application_Data()`
-remains the intentional `NOT_IMPLEMENTED` public stub for this deferred inbound
-path.
+The decoder exposes Application payload only as a synchronous view into codec
+scratch. For an expected same-session APPLICATION frame, the Application owner
+first verifies that no unread message is already owned, then copies the payload
+into the currently unowned `received_message` region before ACK encoding reuses
+codec scratch. It publishes the ACK through the independent control-output slot
+before committing receive sequence and `received_message_pending`. Therefore no
+ACK can escape for a message that was not retained, and any fallible capacity
+check can leave the parser body unchanged for retry.
+
+A repeat of the last accepted Application sequence is re-ACKed without
+copying or exposing the payload again. Duplicate classification also checks the
+last accepted reliable frame category and acknowledgement metadata, so a sequence
+collision with a handshake frame is not mistaken for duplicate Application data.
+The MVP does not retain the previous payload solely to byte-compare a retry; the
+peer reliability lifecycle already retransmits the original encoded bytes for a
+given sequence. Older/skipped current-session sequences are incompatible with MVP stop-and-wait
+and trigger protocol recovery. An Application frame for the immediately previous
+session identity is treated as stale protocol input and does not tear down the
+newer established session.
+
+The MVP owns exactly one unread complete Application message. If a new expected
+message arrives while that slot is occupied, Transport withholds its ACK, does not
+advance the receive sequence, retains the completed encoded body, and returns
+`CAPACITY_EXHAUSTED`. Reading the existing message frees the slot; a later
+zero-length Receive call or `Process()` retries the retained body.
+`HIL_TRANSPORT_Read_Application_Data()` supports NULL/zero size query, preserves
+message ownership on `BUFFER_TOO_SMALL`, copies the entire opaque payload on OK,
+and then releases the unread slot. No partial payload, framing, session identity,
+or sequence value crosses the public Application boundary.
 
 ## Peek and commit
 
@@ -603,16 +625,19 @@ Link transitions generate `LINK_STATE_CHANGED`, completed handshakes generate
 `SESSION_ESTABLISHED`, receive/protocol rejection generates `PROTOCOL_ERROR`,
 outbound Application completion generates `DELIVERY_CONFIRMED`, and outbound
 Application retry exhaustion generates `DELIVERY_FAILED` before automatic
-abandonment attempts `SESSION_RESET`. Future inbound Application capacity and
-delivery producers will use the same private FIFO without transferring their
-state transitions into the storage module. `HIL_TRANSPORT_Get_Status()` reports
+abandonment attempts `SESSION_RESET`. Inbound Application arrival does not add a
+separate event; availability is exposed through `application_message_pending` and
+the read API. `HIL_TRANSPORT_Get_Status()` reports
 `event_pending` from the
 validated FIFO. `output_pending` is set while either control or reliable
 initial/retry bytes are ready or peeked, and `reliable_delivery_pending` remains
 set in every non-IDLE reliable state, including `EXHAUSTED`. The remaining
 fields expose role, link, high-level session state, local operating mode,
-received-message state, and high-level failure. Handshake phases, parser states,
-event count and capacity, sequence numbers, and retry counts remain private.
+received-message state, and high-level failure. Before exposing
+`application_message_pending`, `Get_Status()` validates the unread-message pending/size
+ownership metadata; corrupt private combinations fail with `INTERNAL_ERROR` rather than
+producing an invalid public snapshot. Handshake phases, parser states, event count and
+capacity, sequence numbers, and retry counts remain private.
 Control ownership never sets
 `reliable_delivery_pending`. Any future extended fragmentation, reassembly,
 window, keepalive or queueing metadata also remains private.

@@ -199,7 +199,8 @@ typedef struct
     uint16_t last_accepted_receive_sequence;
     uint8_t  accepted_receive_sequence_valid;
 
-    /** Semantic identity of the last accepted reliable frame for exact duplicate checks. */
+    /** Semantic identity of the last accepted reliable frame for handshake/Application duplicate
+     * checks. */
     HIL_Transport_Mvp_Frame_Type_T last_accepted_receive_frame_type;
 
     /** Acknowledgement field of the last accepted reliable frame. */

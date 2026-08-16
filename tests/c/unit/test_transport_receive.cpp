@@ -517,19 +517,27 @@ TEST( TransportReceive, DelayedOlderHandshakeTransmissionDoesNotResetEstablished
     EXPECT_EQ( ReadEvent( rig ).type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
 }
 
-TEST( TransportReceive, UnsupportedApplicationIsConsumedWithoutPublishingMessageStorage )
+TEST( TransportReceive, EstablishedExpectedApplicationIsRetainedAndAcknowledged )
 {
     ReceiveHarness rig;
     rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 5u );
+    rig.root.base.session_state               = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    rig.root.session.state                    = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    rig.root.session.handshake_phase          = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
+    rig.root.session.session_identifier       = 77u;
+    rig.root.session.session_identifier_valid = 1u;
     const std::array<std::uint8_t, 3> payload{ 1u, 2u, 3u };
     const HIL_Transport_Mvp_Frame_T   frame{
         HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE, 77u, 10u, 0u, payload.data(), payload.size() };
 
     ReceiveWhole( rig, Encode( frame ) );
-    EXPECT_EQ( rig.root.received_message_pending, 0u );
-    EXPECT_EQ( rig.root.received_message_size, 0u );
+    EXPECT_EQ( rig.root.received_message_pending, 1u );
+    EXPECT_EQ( rig.root.received_message_size, payload.size() );
+    EXPECT_TRUE( std::equal( payload.begin(), payload.end(), rig.received.begin() ) );
     EXPECT_EQ( rig.root.parser.body_ready, 0u );
-    EXPECT_EQ( ReadEvent( rig ).type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
+    EXPECT_EQ( rig.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY );
+    EXPECT_EQ( rig.root.session.last_accepted_receive_sequence, 10u );
+    EXPECT_EQ( rig.root.session.expected_receive_sequence, 11u );
 }
 
 TEST( TransportReceive, CorruptDelimitedFrameReportsLossWithoutAbandoningEstablishedSession )
