@@ -62,8 +62,10 @@ HIL_TRANSPORT_MVP_Session_Clear_Scoped_Work( HIL_Transport_Mvp_Root_T* root )
     root->session.last_valid_receive_ms                          = 0u;
     root->encoded_output_size                                    = 0u;
     root->control_output_size                                    = 0u;
-    root->control_output_state = HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE;
-    root->output_selection     = HIL_TRANSPORT_MVP_OUTPUT_NONE;
+    root->control_output_state              = HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE;
+    root->output_selection                  = HIL_TRANSPORT_MVP_OUTPUT_NONE;
+    root->recovery_reset_pending            = 0u;
+    root->recovery_reset_session_identifier = HIL_TRANSPORT_SESSION_SEED_INVALID;
 
     if ( output_status != HIL_TRANSPORT_STATUS_OK )
     {

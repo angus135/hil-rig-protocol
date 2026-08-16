@@ -1242,6 +1242,27 @@ TEST_F( TransportReliabilityTest, PublicConnectedResetPublishesResetBeforeRestar
     EXPECT_EQ( root_.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
 }
 
+TEST_F( TransportReliabilityTest, PublicConnectedResetDoesNotTransmitUntrustworthySessionIdentity )
+{
+    HIL_Transport_Context_T context = Context();
+    PopulateSessionScopedState();
+    root_.base.link_state                  = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root_.session.link_state               = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root_.session.link_state_observed      = 1u;
+    root_.base.session_state               = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root_.session.state                    = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root_.session.handshake_phase          = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
+    root_.session.session_identifier_valid = 2u;
+
+    ASSERT_EQ( HIL_TRANSPORT_Reset( &context ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( root_.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( root_.session.state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( root_.base.last_failure, HIL_TRANSPORT_FAILURE_LOCAL_RESET );
+    EXPECT_EQ( root_.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE );
+    EXPECT_EQ( root_.recovery_reset_pending, 0u );
+    EXPECT_EQ( root_.recovery_reset_session_identifier, HIL_TRANSPORT_SESSION_SEED_INVALID );
+}
+
 TEST_F( TransportReliabilityTest, PublicResetClearsFaultUsingRetainedLinkObservation )
 {
     HIL_Transport_Context_T context = Context();

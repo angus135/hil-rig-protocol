@@ -55,8 +55,11 @@ HIL_TRANSPORT_MVP_Handshake_Handle_Frame( HIL_Transport_Mvp_Root_T*             
  * Abandon one locally failed active session and notify the peer with RESET.
  *
  * @details Session cleanup always occurs before RESET publication so previous
- * reliable/control ownership cannot block recovery. A SESSION_RESET event may
- * be backpressured, but that never prevents the mandatory RESET attempt. Peer-
+ * reliable/control ownership cannot block recovery. A successfully published
+ * RESET becomes a private recovery barrier and retains the failed session
+ * identity until its control output is committed; later incompatible traffic
+ * must not abandon again and clear it. A SESSION_RESET event may be
+ * backpressured, but that never prevents the mandatory RESET attempt. Peer-
  * initiated RESET and physical-link loss must continue to use Session_Abandon()
  * directly so RESET is not echoed.
  */

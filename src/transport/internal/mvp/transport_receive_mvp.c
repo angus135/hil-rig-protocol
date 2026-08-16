@@ -58,7 +58,7 @@ HIL_TRANSPORT_MVP_Receive_Validate_Root( HIL_Transport_Mvp_Root_T* root )
     {
         return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
     }
-    if ( ( root->receive_protocol_error_pending > 1u )
+    if ( ( root->receive_protocol_error_pending > 1u ) || ( root->recovery_reset_pending > 1u )
          || ( root->base.role < HIL_TRANSPORT_ROLE_HOST )
          || ( root->base.role > HIL_TRANSPORT_ROLE_RIG )
          || ( root->session.role != root->base.role )
@@ -154,6 +154,46 @@ HIL_TRANSPORT_MVP_Receive_Abandon_Incompatible_Session( HIL_Transport_Mvp_Root_T
     HIL_Transport_Status_T recovery_status;
 
     event_status = HIL_TRANSPORT_MVP_Receive_Publish_Protocol_Error( root );
+
+    /*
+     * A locally generated recovery RESET is the synchronization barrier for the
+     * abandoned session. While it remains uncommitted, further incompatible
+     * traffic belongs to a session that is already being discarded. Reject the
+     * frame without abandoning again, because Session_Abandon() would clear
+     * the pending RESET and recreate the original split-brain failure.
+     */
+    if ( root->recovery_reset_pending != 0u )
+    {
+        if ( ( root->recovery_reset_pending != 1u )
+             || ( root->base.session_state != HIL_TRANSPORT_SESSION_STATE_RECOVERING )
+             || ( root->session.state != HIL_TRANSPORT_SESSION_STATE_RECOVERING )
+             || ( root->session.link_state != HIL_TRANSPORT_LINK_STATE_CONNECTED )
+             || ( root->base.link_state != HIL_TRANSPORT_LINK_STATE_CONNECTED )
+             || ( root->control_output_state == HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE )
+             || ( root->recovery_reset_session_identifier == HIL_TRANSPORT_SESSION_SEED_INVALID )
+             || ( root->recovery_reset_session_identifier == HIL_TRANSPORT_SESSION_SEED_RESERVED ) )
+        {
+            return HIL_TRANSPORT_MVP_Receive_Fault( root );
+        }
+        if ( event_status == HIL_TRANSPORT_STATUS_OK )
+        {
+            return HIL_TRANSPORT_MVP_Receive_Outcome( HIL_TRANSPORT_STATUS_OK,
+                                                      HIL_TRANSPORT_MVP_RECEIVE_BODY_CONSUME );
+        }
+        if ( event_status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
+        {
+            /*
+             * The frame is already known to belong to an abandoned session, so
+             * it must not survive past RESET commit and be reinterpreted under
+             * the replacement session. Consume it now and retain only the
+             * diagnostic obligation, matching oversized-body recovery.
+             */
+            root->receive_protocol_error_pending = 1u;
+            return HIL_TRANSPORT_MVP_Receive_Outcome( HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED,
+                                                      HIL_TRANSPORT_MVP_RECEIVE_BODY_CONSUME );
+        }
+        return HIL_TRANSPORT_MVP_Receive_Fault( root );
+    }
 
     /*
      * Locally detected incompatibility uses the common recovery policy: old

@@ -332,11 +332,16 @@ event is retained, Transport records `HIL_TRANSPORT_FAILURE_DELIVERY`, abandons
 the uncertain session, clears submitted/reliable ownership through the session
 coordinator, publishes RESET for the failed identity, and returns `DELIVERY_FAILED`
 on that transition. `Process()` does not start replacement establishment until
-that RESET control output is committed. RESET remains a best-effort, non-reliable
-control item in the MVP: these recovery rules synchronize the peer when RESET is
-delivered, but loss of RESET itself is not repaired by a RESET retransmission or
-keepalive mechanism. A replacement session must establish before another
-Application message is accepted.
+that RESET control output is committed. The locally generated RESET is a
+recovery barrier: once published, Transport retains its failed-session identity
+and does not let later incompatible old-session traffic or a repeated explicit
+Reset silently clear that synchronization signal before commit. A repeated
+explicit Reset may invalidate a caller-owned peek as part of its normal reset
+semantics, but it re-publishes the same RESET for the failed session afterwards.
+RESET remains a best-effort, non-reliable control item in the MVP: these recovery
+rules synchronize the peer when RESET is delivered, but loss of RESET itself is
+not repaired by a RESET retransmission or keepalive mechanism. A replacement
+session must establish before another Application message is accepted.
 
 ## Exact receive consumption
 
@@ -367,8 +372,14 @@ caller-owned suffix.
 Malformed, integrity-invalid, stale-session, or incompatible-sequence input is
 consumed only through the appropriate implementation resynchronization boundary
 and will map to `PROTOCOL_ERROR`. Capacity will map to `CAPACITY_EXHAUSTED`, and
-configured deadline handling is progressed by `Process()`. The reliability
-primitive reports retry exhaustion privately; the implemented owner policy maps outbound
+configured deadline handling is progressed by `Process()`. One deliberate
+exception applies after local recovery has already abandoned the session and
+owns its RESET barrier: an incompatible frame from the discarded session may be
+consumed even when the event FIFO is full, while only its `PROTOCOL_ERROR`
+diagnostic is retained as pending work. This prevents obsolete parser-owned bytes
+from surviving RESET commit and being reinterpreted against the replacement
+session. The reliability primitive reports retry exhaustion privately; the
+implemented owner policy maps outbound
 Application exhaustion to `DELIVERY_FAILED` after retaining its failure event,
 while handshake exhaustion restarts session establishment without an Application
 delivery event. A private invariant failure maps to `INTERNAL_ERROR`. Detailed
@@ -383,8 +394,12 @@ publishes the same diagnostic when capacity permits, abandons through the
 session coordinator regardless of event capacity, and publishes one best-effort
 RESET using the failed session identity after old control ownership is cleared.
 `Process()` waits for that RESET to be committed before starting the replacement
-session. An accepted peer RESET abandons the session but is never answered with
-another RESET. Because the peer has already supplied the synchronization signal,
+session. If further incompatible frames arrive while that local recovery RESET
+is still pending, they are rejected and may publish `PROTOCOL_ERROR`, but they do
+not run session abandonment again or replace/clear the pending RESET. This keeps
+old in-flight traffic from cancelling the peer-synchronization barrier. An
+accepted peer RESET abandons the session but is never answered with another
+RESET. Because the peer has already supplied the synchronization signal,
 the connected endpoint immediately prepares fresh establishment before receive
 continues. A RIG can therefore accept a following replacement INITIATE from the
 same offered byte chunk instead of consuming it as stale while waiting for a
@@ -398,8 +413,12 @@ sequence is also sufficient evidence that the RIG accepted CONFIRM. The HOST
 completes the retained CONFIRM exactly as though its ACK arrived, publishes
 `SESSION_ESTABLISHED`, and then passes the same frame through the ordinary
 Application receive transaction. This exception is deliberately narrow: wrong
-session identities, stale/future sequences, nonzero acknowledgement metadata, or
-invalid Application payloads do not establish the HOST. A peeked initial or retry
+session identities, any current-session sequence other than the exact next
+expected value (including reuse of the sequence previously consumed by
+`RESPONSE`), nonzero acknowledgement metadata, or invalid Application payloads
+do not establish the HOST. Reusing the `RESPONSE` sequence for an Application is
+an incompatible reliable-frame transition rather than a duplicate Application.
+A peeked initial or retry
 CONFIRM remains caller-owned until commit, so such an Application body is retained
 and returns `CAPACITY_EXHAUSTED` rather than invalidating pinned output.
 
@@ -587,8 +606,13 @@ messages, unread received messages, and every queued event. Because the caller
 initiated it, explicit reset does not enqueue `SESSION_RESET`. If the link is
 connected and the previous active session identity is coherent, explicit reset
 publishes one best-effort RESET for that old identity after cleanup; `Process()`
-waits for its commit before starting replacement establishment. FAULT recovery
-does not transmit an identity that cannot be trusted. Reset retains copied
+waits for its commit before starting replacement establishment. If an earlier
+automatic/local recovery already owns a pending RESET, another explicit reset
+preserves that failed-session identity and re-publishes the RESET after cleanup,
+including when the old RESET was READY or already PEEKED. FAULT recovery does
+not transmit an identity that cannot be trusted; boolean validity metadata and
+the active handshake/session relationship must be coherent before an identity is
+copied back onto the wire. Reset retains copied
 configuration, workspace ownership, endpoint role, and latest link observation;
 records `HIL_TRANSPORT_FAILURE_LOCAL_RESET`; and enters `DISCONNECTED` for a
 disconnected link or `RECOVERING` for a connected link. Reset canonicalizes the

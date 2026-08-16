@@ -75,14 +75,60 @@ HIL_TRANSPORT_MVP_Profile_Has_Trustworthy_Active_Session( const HIL_Transport_Mv
            && ( root->base.role == root->session.role )
            && ( root->session.link_state == HIL_TRANSPORT_LINK_STATE_CONNECTED )
            && ( root->base.link_state == root->session.link_state )
-           && ( root->session.link_state_observed != 0u )
+           && ( root->session.link_state_observed == 1u )
            && ( root->session.state >= HIL_TRANSPORT_SESSION_STATE_CONNECTING )
            && ( root->session.state <= HIL_TRANSPORT_SESSION_STATE_ESTABLISHED )
            && ( root->base.session_state == root->session.state )
            && ( root->base.last_failure == root->session.last_failure )
-           && ( root->session.session_identifier_valid != 0u )
+           && ( root->session.session_identifier_valid == 1u )
            && ( root->session.session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID )
-           && ( root->session.session_identifier != HIL_TRANSPORT_SESSION_SEED_RESERVED );
+           && ( root->session.session_identifier != HIL_TRANSPORT_SESSION_SEED_RESERVED )
+           && ( ( ( root->session.state == HIL_TRANSPORT_SESSION_STATE_ESTABLISHED )
+                  && ( root->session.handshake_phase
+                       == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED ) )
+                || ( ( root->session.state == HIL_TRANSPORT_SESSION_STATE_CONNECTING )
+                     && ( root->session.handshake_phase
+                          > HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_INITIATE )
+                     && ( root->session.handshake_phase
+                          < HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED ) ) );
+}
+
+static int HIL_TRANSPORT_MVP_Profile_Has_Trustworthy_Pending_Recovery_Reset(
+    const HIL_Transport_Mvp_Root_T* root )
+{
+    int control_state_is_coherent;
+
+    if ( root == NULL )
+    {
+        return 0;
+    }
+
+    control_state_is_coherent =
+        ( ( root->control_output_state == HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY )
+          && ( root->output_selection == HIL_TRANSPORT_MVP_OUTPUT_NONE ) )
+        || ( ( root->control_output_state == HIL_TRANSPORT_MVP_CONTROL_OUTPUT_PEEKED )
+             && ( root->output_selection == HIL_TRANSPORT_MVP_OUTPUT_CONTROL ) );
+
+    return ( root->recovery_reset_pending == 1u )
+           && ( root->recovery_reset_session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID )
+           && ( root->recovery_reset_session_identifier != HIL_TRANSPORT_SESSION_SEED_RESERVED )
+           && ( root->session.role >= HIL_TRANSPORT_ROLE_HOST )
+           && ( root->session.role <= HIL_TRANSPORT_ROLE_RIG )
+           && ( root->base.role == root->session.role )
+           && ( root->session.link_state == HIL_TRANSPORT_LINK_STATE_CONNECTED )
+           && ( root->base.link_state == root->session.link_state )
+           && ( root->session.link_state_observed == 1u )
+           && ( root->session.state == HIL_TRANSPORT_SESSION_STATE_RECOVERING )
+           && ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_RECOVERING )
+           && ( root->base.last_failure == root->session.last_failure )
+           && ( root->session.session_identifier_valid == 0u )
+           && ( root->session.session_identifier == HIL_TRANSPORT_SESSION_SEED_INVALID )
+           && ( root->session.handshake_phase == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE )
+           && ( root->session.reliable_state == HIL_TRANSPORT_MVP_RELIABLE_IDLE )
+           && ( root->session.retained_reliable_frame_type == HIL_TRANSPORT_MVP_FRAME_INVALID )
+           && ( root->control_output_size > 0u )
+           && ( root->control_output_size <= HIL_TRANSPORT_MVP_CONTROL_OUTPUT_CAPACITY )
+           && control_state_is_coherent;
 }
 
 static HIL_Transport_Status_T
@@ -305,11 +351,17 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* con
     }
 
     /*
-     * Capture the old identity only from coherent non-FAULT state. Explicit
-     * Reset is also the repair path for private corruption, so untrustworthy
-     * metadata must never be copied onto the wire.
+     * Preserve an already pending local recovery RESET across another explicit
+     * Reset. Otherwise capture the old identity only from coherent non-FAULT
+     * active state. Explicit Reset is also the repair path for private
+     * corruption, so untrustworthy metadata must never be copied onto the wire.
      */
-    if ( HIL_TRANSPORT_MVP_Profile_Has_Trustworthy_Active_Session( root ) )
+    if ( HIL_TRANSPORT_MVP_Profile_Has_Trustworthy_Pending_Recovery_Reset( root ) )
+    {
+        reset_session_identifier = root->recovery_reset_session_identifier;
+        notify_peer              = 1u;
+    }
+    else if ( HIL_TRANSPORT_MVP_Profile_Has_Trustworthy_Active_Session( root ) )
     {
         reset_session_identifier = root->session.session_identifier;
         notify_peer              = 1u;
@@ -330,6 +382,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_PROFILE_Reset( HIL_Transport_Context_T* con
     {
         return HIL_TRANSPORT_MVP_Session_Enter_Fault( root );
     }
+    root->recovery_reset_pending            = 1u;
+    root->recovery_reset_session_identifier = reset_session_identifier;
     return HIL_TRANSPORT_STATUS_OK;
 }
 

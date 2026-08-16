@@ -586,6 +586,8 @@ TEST( TransportApplication, RigRetryExhaustionPublishesResetBeforeWaitingForNewI
                HIL_TRANSPORT_STATUS_DELIVERY_FAILED );
     EXPECT_EQ( harness.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
     EXPECT_EQ( harness.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_READY );
+    EXPECT_EQ( harness.root.recovery_reset_pending, 1u );
+    EXPECT_EQ( harness.root.recovery_reset_session_identifier, SessionIdentifier );
     EXPECT_EQ( harness.root.submitted_message_pending, 0u );
 
     std::array<std::uint8_t, ApplicationCapacity> decoded_payload{};
@@ -596,6 +598,8 @@ TEST( TransportApplication, RigRetryExhaustionPublishesResetBeforeWaitingForNewI
     EXPECT_EQ( reset.sequence, 0u );
     EXPECT_EQ( reset.acknowledgement_sequence, 0u );
     ASSERT_EQ( HIL_TRANSPORT_Commit_Output( &harness.context, 111u ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( harness.root.recovery_reset_pending, 0u );
+    EXPECT_EQ( harness.root.recovery_reset_session_identifier, HIL_TRANSPORT_SESSION_SEED_INVALID );
 
     ASSERT_EQ( HIL_TRANSPORT_Process( &harness.context, 112u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
                HIL_TRANSPORT_STATUS_OK );
