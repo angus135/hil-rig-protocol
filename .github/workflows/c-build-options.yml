@@ -72,7 +72,8 @@ jobs:
           sudo apt-get install -y \
             build-essential \
             cmake \
-            ninja-build
+            ninja-build \
+            gcovr
 
       - name: Configure CMake (${{ matrix.name }})
         run: |
@@ -90,3 +91,37 @@ jobs:
         if: ${{ matrix.run_tests }}
         run: |
           ctest --test-dir build --output-on-failure
+
+      - name: Reset coverage counters
+        if: ${{ matrix.name == 'coverage' }}
+        run: |
+          find build -name '*.gcda' -delete
+
+      - name: Run integration tests for coverage
+        if: ${{ matrix.name == 'coverage' }}
+        run: |
+          ctest --test-dir build --output-on-failure -L integration
+
+      - name: Produce integration coverage reports
+        if: ${{ matrix.name == 'coverage' }}
+        run: |
+          mkdir -p build/coverage
+          gcovr --root . --filter 'src/' --xml-pretty \
+            --output build/coverage/coverage.xml build
+          gcovr --root . --filter 'src/' --html-details \
+            --output build/coverage/coverage.html build
+          gcovr --root . --filter 'src/' --txt \
+            --output build/coverage/coverage.txt --print-summary build
+          cat build/coverage/coverage.txt
+
+      - name: Upload integration coverage report
+        if: ${{ matrix.name == 'coverage' && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-coverage
+          path: |
+            build/coverage/coverage.xml
+            build/coverage/coverage.html
+            build/coverage/coverage.*.html
+            build/coverage/coverage.txt
+          if-no-files-found: error
