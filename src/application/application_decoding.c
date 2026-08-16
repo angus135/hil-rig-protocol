@@ -28,6 +28,7 @@
 
 #include <string.h>
 
+
 HIL_Application_Status_T HIL_APPLICATION_Byte_Span_decode( HIL_Application_Byte_Span_T* data,
                                                            const uint8_t*               payload )
 {
