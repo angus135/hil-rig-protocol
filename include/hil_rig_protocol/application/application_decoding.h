@@ -110,9 +110,8 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
  */
 HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T                    test_id,
-    HIL_Application_Variable_Instruction_Data_T* data, uint32_t max_payload_size,
-    const uint8_t* payload );
+    const HIL_Application_Test_Id_T test_id, HIL_Application_Variable_Instruction_Data_T* data,
+    uint32_t max_payload_size, const uint8_t* payload );
 
 /**
  * @brief decode execution control data.
