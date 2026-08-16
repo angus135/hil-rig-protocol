@@ -387,8 +387,9 @@ HIL_Transport_Status_T HIL_TRANSPORT_Submit_Application_Data( HIL_Transport_Cont
  * identity is rejected as stale without abandoning a replacement session, and an
  * unbound RIG waiting for INITIATE rejects other frame types without starting a
  * second recovery cycle. After a locally generated recovery RESET has been
- * committed, Receive_Bytes() may enter replacement establishment before consuming
- * new input, so callers do not need an intervening Process() call. A valid peer
+ * committed, Receive_Bytes() may enter replacement establishment before processing
+ * a new frame, including between complete frames within the same supplied byte
+ * chunk, so callers do not need an intervening Process() call. A valid peer
  * RESET likewise prepares fresh establishment before receive continues, so a RIG
  * may accept the replacement INITIATE from the same offered byte chunk. While a
  * HOST is waiting

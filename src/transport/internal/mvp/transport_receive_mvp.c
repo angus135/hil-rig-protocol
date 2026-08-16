@@ -152,6 +152,39 @@ HIL_TRANSPORT_MVP_Receive_Process_Pending_Error( HIL_Transport_Mvp_Root_T* root 
     return status;
 }
 
+static HIL_Transport_Status_T
+HIL_TRANSPORT_MVP_Receive_Try_Advance_Recovery( HIL_Transport_Mvp_Root_T* root )
+{
+    if ( root == NULL )
+    {
+        return HIL_TRANSPORT_STATUS_INVALID_ARGUMENT;
+    }
+
+    if ( ( root->session.state != HIL_TRANSPORT_SESSION_STATE_RECOVERING )
+         || ( root->base.session_state != HIL_TRANSPORT_SESSION_STATE_RECOVERING ) )
+    {
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    /*
+     * Recovery may cross into replacement establishment only after the local
+     * RESET barrier and all receive/output ownership from the abandoned session
+     * have been resolved. A partial body, active discard, or deferred diagnostic
+     * is ordinary pending work and leaves the endpoint in RECOVERING.
+     */
+    if ( ( root->recovery_reset_pending != 0u )
+         || ( root->control_output_state != HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE )
+         || ( root->control_output_size != 0u )
+         || ( root->output_selection != HIL_TRANSPORT_MVP_OUTPUT_NONE )
+         || ( root->receive_protocol_error_pending != 0u ) || ( root->parser.body_ready != 0u )
+         || ( root->parser.accumulated_size != 0u ) || ( root->parser.discarding != 0u ) )
+    {
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+
+    return HIL_TRANSPORT_MVP_Session_Begin_Establishment( root );
+}
+
 static HIL_Transport_Mvp_Receive_Body_Outcome_T
 HIL_TRANSPORT_MVP_Receive_Reject_Retained_Body( HIL_Transport_Mvp_Root_T* root )
 {
@@ -583,22 +616,13 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Receive_Bytes( HIL_Transport_Mvp_Root_T
      * Once a locally generated recovery RESET has been committed, newly
      * supplied bytes must be interpreted in the replacement establishment
      * state even if the caller has not made an intervening Process() call.
-     * This keeps Commit -> Receive and Commit -> Process -> Receive equivalent.
+     * Reconsider the same boundary between complete bodies below so arbitrary
+     * byte-stream chunking cannot make a following replacement frame stale.
      */
-    if ( ( root->session.state == HIL_TRANSPORT_SESSION_STATE_RECOVERING )
-         && ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_RECOVERING )
-         && ( root->recovery_reset_pending == 0u )
-         && ( root->control_output_state == HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE )
-         && ( root->control_output_size == 0u )
-         && ( root->output_selection == HIL_TRANSPORT_MVP_OUTPUT_NONE )
-         && ( root->receive_protocol_error_pending == 0u ) && ( root->parser.body_ready == 0u )
-         && ( root->parser.accumulated_size == 0u ) && ( root->parser.discarding == 0u ) )
+    status = HIL_TRANSPORT_MVP_Receive_Try_Advance_Recovery( root );
+    if ( status != HIL_TRANSPORT_STATUS_OK )
     {
-        status = HIL_TRANSPORT_MVP_Session_Begin_Establishment( root );
-        if ( status != HIL_TRANSPORT_STATUS_OK )
-        {
-            return status;
-        }
+        return status;
     }
 
     while ( *bytes_consumed < data_size )
@@ -623,10 +647,20 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Receive_Bytes( HIL_Transport_Mvp_Root_T
                 {
                     return status;
                 }
+                status = HIL_TRANSPORT_MVP_Receive_Try_Advance_Recovery( root );
+                if ( status != HIL_TRANSPORT_STATUS_OK )
+                {
+                    return status;
+                }
                 break;
             case HIL_TRANSPORT_PARSER_RESULT_DISCARDED_BODY:
                 root->receive_protocol_error_pending = 1u;
                 status = HIL_TRANSPORT_MVP_Receive_Process_Pending_Error( root );
+                if ( status != HIL_TRANSPORT_STATUS_OK )
+                {
+                    return status;
+                }
+                status = HIL_TRANSPORT_MVP_Receive_Try_Advance_Recovery( root );
                 if ( status != HIL_TRANSPORT_STATUS_OK )
                 {
                     return status;
