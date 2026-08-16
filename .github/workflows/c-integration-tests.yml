@@ -44,4 +44,4 @@ jobs:
         run: |
           ctest --test-dir build \
             --output-on-failure \
-            -R '^hil_rig_protocol_integration_tests$'
+            -L integration

@@ -37,10 +37,44 @@ set(HIL_RIG_PROTOCOL_INTEGRATION_SUPPORT_SOURCES
 set(HIL_RIG_PROTOCOL_INTEGRATION_TEST_SOURCES
     integration/test_transport_facade.cpp
     integration/pipeline/test_transport_pipeline.cpp
-    integration/reliability/test_transport_handshake_duplicates.cpp
+    integration/pipeline/test_transport_session.cpp
+    integration/pipeline/test_transport_application.cpp
+    integration/pipeline/test_transport_public_ownership.cpp
     integration/support/test_transport_harness.cpp
+    integration/reliability/test_transport_handshake_corruption.cpp
+    integration/reliability/test_transport_handshake_duplicates.cpp
+    integration/reliability/test_transport_handshake_exhaustion.cpp
+    integration/reliability/test_transport_reliability.cpp
+    integration/reliability/test_transport_retry_timing.cpp
+    integration/stream/test_transport_stream.cpp
+    integration/malformed_frames/test_transport_malformed_frames.cpp
+    integration/capacity/test_transport_capacity.cpp
+    integration/lifecycle/test_transport_link_lifecycle.cpp
+    integration/lifecycle/test_transport_reset.cpp
+    integration/recovery/test_transport_stale_traffic.cpp
     integration/recovery/test_transport_recovery.cpp
 )
+
+# Keep the scenario list explicit, while making it impossible for a newly added
+# integration test source to remain silently uncompiled.
+file(GLOB_RECURSE HIL_RIG_PROTOCOL_DISCOVERED_INTEGRATION_TEST_SOURCES
+    CONFIGURE_DEPENDS
+    RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
+    "integration/test_*.cpp"
+)
+set(HIL_RIG_PROTOCOL_INTENTIONALLY_EXCLUDED_INTEGRATION_TEST_SOURCES)
+set(HIL_RIG_PROTOCOL_REGISTERED_INTEGRATION_TEST_SOURCES
+    ${HIL_RIG_PROTOCOL_INTEGRATION_TEST_SOURCES}
+    ${HIL_RIG_PROTOCOL_INTENTIONALLY_EXCLUDED_INTEGRATION_TEST_SOURCES}
+)
+foreach(integration_test_source IN LISTS HIL_RIG_PROTOCOL_DISCOVERED_INTEGRATION_TEST_SOURCES)
+    if(NOT integration_test_source IN_LIST HIL_RIG_PROTOCOL_REGISTERED_INTEGRATION_TEST_SOURCES)
+        message(FATAL_ERROR
+            "Unregistered integration test source: ${integration_test_source}. "
+            "Add it to HIL_RIG_PROTOCOL_INTEGRATION_TEST_SOURCES or the intentional exclusion list."
+        )
+    endif()
+endforeach()
 
 add_executable(hil_rig_protocol_unit_tests
     ${HIL_RIG_PROTOCOL_UNIT_TEST_SOURCES}
@@ -104,19 +138,22 @@ if(COMMAND hil_rig_protocol_apply_coverage)
     hil_rig_protocol_apply_coverage(hil_rig_protocol_c_api_compile_test)
 endif()
 
-add_test(
-    NAME hil_rig_protocol_unit_tests
-    COMMAND hil_rig_protocol_unit_tests
+include(GoogleTest)
+
+gtest_discover_tests(hil_rig_protocol_unit_tests
+    TEST_PREFIX "unit::"
+    PROPERTIES LABELS "unit"
 )
 
-add_test(
-    NAME hil_rig_protocol_integration_tests
-    COMMAND hil_rig_protocol_integration_tests
+gtest_discover_tests(hil_rig_protocol_integration_tests
+    TEST_PREFIX "integration::"
+    PROPERTIES LABELS "integration"
 )
 
 add_test(
     NAME hil_rig_protocol_c_api_compile_test
     COMMAND hil_rig_protocol_c_api_compile_test
 )
+set_tests_properties(hil_rig_protocol_c_api_compile_test PROPERTIES LABELS "c-api")
 
 add_subdirectory(application)
