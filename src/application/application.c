@@ -465,7 +465,6 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_Context_T* context,
-                                                         HIL_Application_Context_T* new_context,
                                                          const uint8_t*             encoded_message,
                                                          size_t encoded_message_size,
                                                          HIL_Application_Message_T* out_message,
@@ -503,14 +502,14 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
     //     out_buffer_size
     //     - HIL_APPLICATION_HEADER_SIZE_BYTES;  // calculate the maximum allow-able payload size
     // size_t payload_size = 0;
-    HIL_Application_Status_T tracker = HIL_APPLICATION_Header_decoding( context, new_context, encoded_message )
+    HIL_Application_Status_T tracker = HIL_APPLICATION_Header_decoding( context, out_message, encoded_message )
     if ( tracker != HIL_APPLICATION_STATUS_OK )
     {
         return tracker;
     };
     uint8_t* payload =
         &( out_buffer[HIL_APPLICATION_HEADER_SIZE_BYTES] );  // create pointer for the payload
-    switch ( new_context )
+    switch ( out_message->type )
     {
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
             return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
