@@ -274,7 +274,7 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
 HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_Context_T* context,
                                                          const uint8_t* encoded_message,
                                                          size_t         encoded_message_size,
-                                                         HIL_Application_Message_T* out_message);
+                                                         HIL_Application_Message_T* out_message );
 
 /**
  * @brief Structurally validate one typed tagged message.

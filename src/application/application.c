@@ -497,8 +497,8 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
 
-    HIL_Application_Status_T tracker = HIL_APPLICATION_Header_decoding(
-        context, out_message, encoded_message );
+    HIL_Application_Status_T tracker =
+        HIL_APPLICATION_Header_decoding( context, out_message, encoded_message );
     if ( tracker != HIL_APPLICATION_STATUS_OK )
     {
         return tracker;
@@ -523,7 +523,7 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
             tracker = HIL_APPLICATION_System_Info_Response_decode(
                 context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.system_info_response ), payload);
+                &( out_message->body.system_info_response ), payload );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -533,7 +533,7 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
             tracker = HIL_APPLICATION_Test_Configuration_decode(
                 context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.test_configuration ),  payload);
+                &( out_message->body.test_configuration ), payload );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -543,7 +543,7 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
             tracker = HIL_APPLICATION_Test_Instructions_decode(
                 context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.test_instruction ),  payload);
+                &( out_message->body.test_instruction ), payload );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -553,7 +553,7 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
             tracker = HIL_APPLICATION_Variable_Instruction_Data_decode(
                 context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.variable_instruction_data ), payload);
+                &( out_message->body.variable_instruction_data ), payload );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -583,7 +583,7 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
             tracker = HIL_APPLICATION_Test_Result_decode(
                 context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.test_result ), payload);
+                &( out_message->body.test_result ), payload );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -593,7 +593,7 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
             tracker = HIL_APPLICATION_Variable_Result_Data_decode(
                 context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.variable_result_data ), payload);
+                &( out_message->body.variable_result_data ), payload );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -601,9 +601,9 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
-            tracker = HIL_APPLICATION_Response_decode(
-                context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.response ), payload );
+            tracker = HIL_APPLICATION_Response_decode( context, &( out_message->subtype ),
+                                                       out_message->test_id,
+                                                       &( out_message->body.response ), payload );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
