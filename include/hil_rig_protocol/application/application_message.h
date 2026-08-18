@@ -13,6 +13,8 @@
 #include <stdint.h>
 
 #include "hil_rig_protocol/application/application_control.h"
+#include "hil_rig_protocol/application/application_types.h"
+#include "hil_rig_protocol/application/application_status.h"
 #include "hil_rig_protocol/application/application_error.h"
 #include "hil_rig_protocol/application/application_instruction.h"
 #include "hil_rig_protocol/application/application_response.h"
@@ -151,6 +153,10 @@ typedef struct
 HIL_Application_Status_T HIL_APPLICATION_Header_Encoding( const HIL_Application_Message_T* message,
                                                           const HIL_Application_Context_T* context,
                                                           uint8_t*                         dest );
+
+HIL_Application_Status_T
+HIL_APPLICATION_Header_decoding( const HIL_Application_Context_T* old_context,
+                                 HIL_Application_Message_T* new_message, uint8_t* encoded_message );
 
 #ifdef __cplusplus
 }

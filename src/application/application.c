@@ -17,6 +17,8 @@
 #include "hil_rig_protocol/application/application.h"
 #include "hil_rig_protocol/application/application_size.h"
 #include "hil_rig_protocol/application/application_encoding.h"
+#include "hil_rig_protocol/application/application_decoding.h"
+#include "hil_rig_protocol/application/application_message.h"
 #include "hil_rig_protocol/application/application_control.h"
 #include "hil_rig_protocol/application/application_error.h"
 #include "hil_rig_protocol/application/application_instruction.h"
@@ -302,7 +304,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
             tracker = HIL_APPLICATION_System_Info_Request_encode(
                 context, &( message->subtype ), message->test_id,
-                &( message->body.system_info_request ), max_payload_size, payload, payload_size );
+                &( message->body.system_info_request ), max_payload_size, payload, &payload_size );
             memcpy( payload_size_pointer, &payload_size,
                     HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
@@ -314,7 +316,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
             tracker = HIL_APPLICATION_System_Info_Response_encode(
                 context, &( message->subtype ), message->test_id,
-                &( message->body.system_info_response ), max_payload_size, payload, payload_size );
+                &( message->body.system_info_response ), max_payload_size, payload, &payload_size );
             memcpy( payload_size_pointer, &payload_size,
                     HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
@@ -326,7 +328,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
             tracker = HIL_APPLICATION_Test_Configuration_encode(
                 context, &( message->subtype ), message->test_id,
-                &( message->body.test_configuration ), max_payload_size, payload, payload_size );
+                &( message->body.test_configuration ), max_payload_size, payload, &payload_size );
             memcpy( payload_size_pointer, &payload_size,
                     HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
@@ -338,7 +340,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
             tracker = HIL_APPLICATION_Test_Instructions_encode(
                 context, &( message->subtype ), message->test_id,
-                &( message->body.test_instruction ), max_payload_size, payload, payload_size );
+                &( message->body.test_instruction ), max_payload_size, payload, &payload_size );
             memcpy( payload_size_pointer, &payload_size,
                     HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
@@ -351,7 +353,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
             tracker = HIL_APPLICATION_Variable_Instruction_Data_encode(
                 context, &( message->subtype ), message->test_id,
                 &( message->body.variable_instruction_data ), max_payload_size, payload,
-                payload_size );
+                &payload_size );
             memcpy( payload_size_pointer, &payload_size,
                     HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
@@ -363,7 +365,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
             tracker = HIL_APPLICATION_Execution_Control_encode(
                 context, &( message->subtype ), message->test_id,
-                &( message->body.execution_control ), max_payload_size, payload, payload_size );
+                &( message->body.execution_control ), max_payload_size, payload, &payload_size );
             memcpy( payload_size_pointer, &payload_size,
                     HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
@@ -375,7 +377,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
             tracker = HIL_APPLICATION_Global_Control_encode(
                 context, &( message->subtype ), message->test_id, &( message->body.global_control ),
-                max_payload_size, payload, payload_size );
+                max_payload_size, payload, &payload_size );
             memcpy( payload_size_pointer, &payload_size,
                     HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
@@ -387,7 +389,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
             tracker = HIL_APPLICATION_Test_Result_encode(
                 context, &( message->subtype ), message->test_id, &( message->body.test_result ),
-                max_payload_size, payload, payload_size );
+                max_payload_size, payload, &payload_size );
             memcpy( payload_size_pointer, &payload_size,
                     HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
@@ -399,7 +401,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
             tracker = HIL_APPLICATION_Variable_Result_Data_encode(
                 context, &( message->subtype ), message->test_id,
-                &( message->body.variable_result_data ), max_payload_size, payload, payload_size );
+                &( message->body.variable_result_data ), max_payload_size, payload, &payload_size );
             memcpy( payload_size_pointer, &payload_size,
                     HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
@@ -411,7 +413,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
             tracker = HIL_APPLICATION_Response_encode(
                 context, &( message->subtype ), message->test_id, &( message->body.response ),
-                max_payload_size, payload, payload_size );
+                max_payload_size, payload, &payload_size );
             memcpy( payload_size_pointer, &payload_size,
                     HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
@@ -465,10 +467,9 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_Context_T* context,
-                                                         const uint8_t*             encoded_message,
-                                                         size_t encoded_message_size,
-                                                         HIL_Application_Message_T* out_message,
-                                                         size_t decode_storage_size )
+                                                         const uint8_t* encoded_message,
+                                                         size_t         encoded_message_size,
+                                                         HIL_Application_Message_T* out_message )
 {
     /*
      * TODO: Validate context, complete input, output, and decode-storage
@@ -491,24 +492,18 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
      */
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;  // Not implemented yet
 
-
-
     if ( encoded_message == NULL || out_message == NULL || context == NULL )
     {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
 
-    // size_t max_payload_size =
-    //     out_buffer_size
-    //     - HIL_APPLICATION_HEADER_SIZE_BYTES;  // calculate the maximum allow-able payload size
-    // size_t payload_size = 0;
-    HIL_Application_Status_T tracker = HIL_APPLICATION_Header_decoding( context, out_message, encoded_message )
-    if ( tracker != HIL_APPLICATION_STATUS_OK )
+    HIL_Application_Status_T tracker = HIL_APPLICATION_Header_decoding(
+        context, out_message, encoded_message ) if ( tracker != HIL_APPLICATION_STATUS_OK )
     {
         return tracker;
     };
-    uint8_t* payload =
-        &( out_buffer[HIL_APPLICATION_HEADER_SIZE_BYTES] );  // create pointer for the payload
+    const uint8_t* payload =
+        &( encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES] );  // create pointer for the payload
     switch ( out_message->type )
     {
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
@@ -516,8 +511,8 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
 
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
             tracker = HIL_APPLICATION_System_Info_Request_decode(
-                context, &( message->subtype ), message->test_id,
-                &( message->body.system_info_request ), max_payload_size, payload, payload_size );
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.system_info_request ), max_payload_size, payload );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -526,8 +521,9 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
 
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
             tracker = HIL_APPLICATION_System_Info_Response_decode(
-                context, &( message->subtype ), message->test_id,
-                &( message->body.system_info_response ), max_payload_size, payload, payload_size );
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.system_info_response ), max_payload_size, payload,
+                payload_size );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -536,8 +532,9 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
             tracker = HIL_APPLICATION_Test_Configuration_decode(
-                context, &( message->subtype ), message->test_id,
-                &( message->body.test_configuration ), max_payload_size, payload, payload_size );
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.test_configuration ), max_payload_size, payload,
+                payload_size );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -546,8 +543,8 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
             tracker = HIL_APPLICATION_Test_Instructions_decode(
-                context, &( message->subtype ), message->test_id,
-                &( message->body.test_instruction ), max_payload_size, payload, payload_size );
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.test_instruction ), max_payload_size, payload, payload_size );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -556,8 +553,8 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
             tracker = HIL_APPLICATION_Variable_Instruction_Data_decode(
-                context, &( message->subtype ), message->test_id,
-                &( message->body.variable_instruction_data ), max_payload_size, payload,
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.variable_instruction_data ), max_payload_size, payload,
                 payload_size );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
@@ -567,8 +564,8 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
 
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
             tracker = HIL_APPLICATION_Execution_Control_decode(
-                context, &( message->subtype ), message->test_id,
-                &( message->body.execution_control ), max_payload_size, payload, payload_size );
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.execution_control ), max_payload_size, payload, payload_size );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -577,8 +574,8 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
 
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
             tracker = HIL_APPLICATION_Global_Control_decode(
-                context, &( message->subtype ), message->test_id, &( message->body.global_control ),
-                max_payload_size, payload, payload_size );
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.global_control ), max_payload_size, payload, payload_size );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -587,8 +584,8 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
             tracker = HIL_APPLICATION_Test_Result_decode(
-                context, &( message->subtype ), message->test_id, &( message->body.test_result ),
-                max_payload_size, payload, payload_size );
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.test_result ), max_payload_size, payload, payload_size );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -597,8 +594,9 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
             tracker = HIL_APPLICATION_Variable_Result_Data_decode(
-                context, &( message->subtype ), message->test_id,
-                &( message->body.variable_result_data ), max_payload_size, payload, payload_size );
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.variable_result_data ), max_payload_size, payload,
+                payload_size );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -607,8 +605,8 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
 
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
             tracker = HIL_APPLICATION_Response_decode(
-                context, &( message->subtype ), message->test_id, &( message->body.response ),
-                max_payload_size, payload, payload_size );
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.response ), max_payload_size, payload, payload_size );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;

@@ -8,6 +8,7 @@
 #include "hil_rig_protocol/application/application_system_info.h"
 #include "hil_rig_protocol/application/application_test_config.h"
 #include "hil_rig_protocol/application/application_types.h"
+#include "hil_rig_protocol/application/application_message.h"
 
 #include <string.h>
 
@@ -48,18 +49,17 @@ HIL_Application_Status_T HIL_APPLICATION_Header_Encoding( const HIL_Application_
         }
     }
     // Message Type
-    memcpy( &( dest[sizeof( message->test_id )] ), &( context->type ), sizeof( context->type ) );
+    memcpy( &( dest[sizeof( message->test_id )] ), &( message->type ), sizeof( message->type ) );
     // Message sub-Type
-    memcpy( &( dest[sizeof( message->test_id ) + sizeof( context->type )] ), &( context->subtype ),
-            sizeof( context->subtype ) );
+    memcpy( &( dest[sizeof( message->test_id ) + sizeof( message->type )] ), &( message->subtype ),
+            sizeof( message->subtype ) );
     // We don't know the size of the payload yet so leave it blank but store the pointer
     return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T
 HIL_APPLICATION_Header_decoding( const HIL_Application_Context_T* old_context,
-                                const HIL_Application_Message_T* new_message,
-                           uint8_t* encoded_message )
+                                 HIL_Application_Message_T* new_message, uint8_t* encoded_message )
 {
     // Test ID
 
@@ -73,11 +73,11 @@ HIL_APPLICATION_Header_decoding( const HIL_Application_Context_T* old_context,
         new_message->has_test_id = 0;
     }
     // Message Type
-    memcpy( &( new_message->type ), encoded_message[sizeof( new_message->test_id )],
+    memcpy( &( new_message->type ), &( encoded_message[sizeof( new_message->test_id )] ),
             sizeof( new_message->type ) );
     // Message sub-Type
-    memcpy( &( new_message->sub_type ),
-            encoded_message[sizeof( message->test_id ) + sizeof( new_message->type )],
+    memcpy( &( new_message->subtype ),
+            &( encoded_message[sizeof( new_message->test_id ) + sizeof( new_message->type )] ),
             sizeof( new_message->subtype ) );
     // We don't know the size of the payload yet so leave it blank but store the pointer
     return HIL_APPLICATION_STATUS_OK;

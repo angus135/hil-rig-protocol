@@ -38,7 +38,7 @@ HIL_Application_Status_T HIL_APPLICATION_Byte_Span_decode( HIL_Application_Byte_
     |    size {4}   |    span {X}   |
     |_______________|_______________|
     */
-    memcpy( data->size, payload, sizeof( data->size ) );
+    memcpy( &( data->size ), payload, sizeof( data->size ) );
     memcpy( &( data->data ), &( payload[sizeof( data->size )] ), data->size );
     return HIL_APPLICATION_STATUS_OK;
 }
