@@ -53,16 +53,6 @@ extern "C"
 {
 #endif
 
-#define HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE 255U  // Largest allowable # of bytes (bytespan size = uint8_t)
-#define HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE // Byte Span Limit
-// CAN {2}, I2C {2}, SPI {2}, UART {2} = . 
-#define HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK 8U // variable_data_count = uint8_t
-// DIO {20}, AIO {12}, PWMIO {4} + HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK =
-#define HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT 24U
-// Test Instruction
-#define HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE 2139U // as calculated by HIL_APPLICATION_Test_Instructions_encode
-#define HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT 1000000U // Arbitrarily selected
-
 /**
  * @brief Populate safe, policy-disabled Application configuration values.
  *
