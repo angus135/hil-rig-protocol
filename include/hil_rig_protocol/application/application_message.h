@@ -27,6 +27,8 @@ extern "C"
 {
 #endif
 
+#define HIL_APPLICATION_VALID_TICK_PERIODS_NS {10000000, 1000000, 100000, 10000}    // 100 Hz 1kHz 10kHz 100kHz 
+
 #define HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE 255U  // Largest allowable # of bytes (bytespan size = uint8_t)
 #define HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE // Byte Span Limit
 // CAN {2}, I2C {2}, SPI {2}, UART {2} = . 
