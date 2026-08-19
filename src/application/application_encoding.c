@@ -389,7 +389,8 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
     */
 
     // variable data count validation
-    if (data->variable_data_count>HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK){
+    if ( data->variable_data_count > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
+    {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
 

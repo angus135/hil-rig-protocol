@@ -25,8 +25,8 @@ extern "C"
  *
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Byte_Span_validate( const HIL_Application_Byte_Span_T* data,
-                                                           uint8_t* payload );
+HIL_Application_Status_T
+HIL_APPLICATION_Byte_Span_validate( const HIL_Application_Byte_Span_T* data, uint8_t* payload );
 
 /**
  * @brief validate a system information request.
@@ -40,8 +40,9 @@ HIL_Application_Status_T HIL_APPLICATION_Byte_Span_validate( const HIL_Applicati
  *
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_validate(
-    const HIL_Application_Context_T* context, const HIL_Application_System_Info_Request_T* data);
+HIL_Application_Status_T
+HIL_APPLICATION_System_Info_Request_validate( const HIL_Application_Context_T*             context,
+                                              const HIL_Application_System_Info_Request_T* data );
 
 /**
  * @brief validate a system information response.
@@ -55,8 +56,9 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_validate(
  *
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_validate(
-    const HIL_Application_Context_T* context, const HIL_Application_System_Info_Response_T* data );
+HIL_Application_Status_T
+HIL_APPLICATION_System_Info_Response_validate( const HIL_Application_Context_T* context,
+                                               const HIL_Application_System_Info_Response_T* data );
 
 /**
  * @brief validate a test configuration.
@@ -70,8 +72,9 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_validate(
  *
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_validate(
-    const HIL_Application_Context_T* context, const HIL_Application_Test_Configuration_T* data );
+HIL_Application_Status_T
+HIL_APPLICATION_Test_Configuration_validate( const HIL_Application_Context_T*            context,
+                                             const HIL_Application_Test_Configuration_T* data );
 
 /**
  * @brief validate test instruction data.
@@ -85,8 +88,9 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_validate(
  *
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_validate(
-    const HIL_Application_Context_T* context, const HIL_Application_Test_Instruction_T* data );
+HIL_Application_Status_T
+HIL_APPLICATION_Test_Instructions_validate( const HIL_Application_Context_T*          context,
+                                            const HIL_Application_Test_Instruction_T* data );
 
 /**
  * @brief validate variable instruction data.
@@ -101,7 +105,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_validate(
  * @return Application status.
  */
 HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_validate(
-    const HIL_Application_Context_T* context,
+    const HIL_Application_Context_T*                   context,
     const HIL_Application_Variable_Instruction_Data_T* data );
 
 /**
@@ -116,8 +120,9 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_validate(
  *
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Execution_Control_validate(
-    const HIL_Application_Context_T* context, const HIL_Application_Execution_Control_T* data );
+HIL_Application_Status_T
+HIL_APPLICATION_Execution_Control_validate( const HIL_Application_Context_T*           context,
+                                            const HIL_Application_Execution_Control_T* data );
 
 /**
  * @brief validate global control data.
@@ -131,8 +136,9 @@ HIL_Application_Status_T HIL_APPLICATION_Execution_Control_validate(
  *
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Global_Control_validate(
-    const HIL_Application_Context_T* context, const HIL_Application_Global_Control_T* data );
+HIL_Application_Status_T
+HIL_APPLICATION_Global_Control_validate( const HIL_Application_Context_T*        context,
+                                         const HIL_Application_Global_Control_T* data );
 
 /**
  * @brief validate test result data.
@@ -146,8 +152,9 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_validate(
  *
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Test_Result_validate(
-    const HIL_Application_Context_T* context, const HIL_Application_Test_Result_T* data );
+HIL_Application_Status_T
+HIL_APPLICATION_Test_Result_validate( const HIL_Application_Context_T*     context,
+                                      const HIL_Application_Test_Result_T* data );
 
 /**
  * @brief validate variable result data.
@@ -161,8 +168,9 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_validate(
  *
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_validate(
-    const HIL_Application_Context_T* context, const HIL_Application_Variable_Result_Data_T* data );
+HIL_Application_Status_T
+HIL_APPLICATION_Variable_Result_Data_validate( const HIL_Application_Context_T* context,
+                                               const HIL_Application_Variable_Result_Data_T* data );
 
 /**
  * @brief validate variable result data.
@@ -176,8 +184,9 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_validate(
  *
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Response_validate(
-    const HIL_Application_Context_T* context, const HIL_Application_Response_T* data );
+HIL_Application_Status_T
+HIL_APPLICATION_Response_validate( const HIL_Application_Context_T*  context,
+                                   const HIL_Application_Response_T* data );
 
 #ifdef __cplusplus
 }

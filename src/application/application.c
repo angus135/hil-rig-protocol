@@ -28,6 +28,7 @@
 #include "hil_rig_protocol/application/application_system_info.h"
 #include "hil_rig_protocol/application/application_test_config.h"
 #include "hil_rig_protocol/application/application_types.h"
+#include "hil_rig_protocol/application/application_validation.h"
 
 #include <string.h>
 
@@ -43,7 +44,8 @@ HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_
      * extents are protocol constants and must not become configurable limits.
      */
 
-    if (config == NULL) {
+    if ( config == NULL )
+    {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
     /**
@@ -58,7 +60,8 @@ HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_
     /** Maximum peripheral configuration records in one typed configuration. */
     config->max_peripheral_config_count = HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT;
     /** Maximum variable-data declarations in one typed tick body. */
-    config->max_variable_transfers_per_tick = HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK;
+    config->max_variable_transfers_per_tick =
+        HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK;
     /**
      * Largest expected_tick_count value accepted structurally.
      *
@@ -88,7 +91,8 @@ HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      c
      * max_encoded_message_size; this codec has no Transport dependency. On
      * failure leave context uninitialized and publish no partial configuration.
      */
-    if (config == NULL || context == NULL) {
+    if ( config == NULL || context == NULL )
+    {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
 
@@ -110,14 +114,15 @@ HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      c
     {
         return HIL_APPLICATION_STATUS_INVALID_COUNT;
     }
-    if ( config->max_variable_transfers_per_tick > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
+    if ( config->max_variable_transfers_per_tick
+         > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
     {
         return HIL_APPLICATION_STATUS_INVALID_COUNT;
     }
 
     // assign config
-    context->config = *config;
-    context->initialized=1;
+    context->config      = *config;
+    context->initialized = 1;
 
     return HIL_APPLICATION_STATUS_OK;
 }
@@ -638,7 +643,8 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
      */
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 
-    if (context == NULL || message == NULL)
+    HIL_Application_Status_T tracker;
+    if ( context == NULL || message == NULL )
     {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
@@ -648,9 +654,8 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
             return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
 
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
-            tracker = HIL_APPLICATION_System_Info_Request_decode(
-                context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.system_info_request ), payload );
+            tracker = HIL_APPLICATION_System_Info_Request_validate(
+                context, &( message->body.system_info_request ) );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -658,9 +663,8 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
-            tracker = HIL_APPLICATION_System_Info_Response_decode(
-                context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.system_info_response ), payload );
+            tracker = HIL_APPLICATION_System_Info_Response_validate(
+                context, &( message->body.system_info_response ) );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -668,9 +672,8 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
-            tracker = HIL_APPLICATION_Test_Configuration_decode(
-                context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.test_configuration ), payload );
+            tracker = HIL_APPLICATION_Test_Configuration_validate(
+                context, &( message->body.test_configuration ) );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -678,9 +681,8 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
-            tracker = HIL_APPLICATION_Test_Instructions_decode(
-                context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.test_instruction ), payload );
+            tracker = HIL_APPLICATION_Test_Instructions_validate(
+                context, &( message->body.test_instruction ) );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -688,9 +690,8 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
-            tracker = HIL_APPLICATION_Variable_Instruction_Data_decode(
-                context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.variable_instruction_data ), payload );
+            tracker = HIL_APPLICATION_Variable_Instruction_Data_validate(
+                context, &( message->body.variable_instruction_data ) );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -698,9 +699,8 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
-            tracker = HIL_APPLICATION_Execution_Control_decode(
-                context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.execution_control ), payload );
+            tracker = HIL_APPLICATION_Execution_Control_validate(
+                context, &( message->body.execution_control ) );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -708,9 +708,8 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
-            tracker = HIL_APPLICATION_Global_Control_decode(
-                context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.global_control ), payload );
+            tracker = HIL_APPLICATION_Global_Control_validate( context,
+                                                               &( message->body.global_control ) );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -718,9 +717,8 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
-            tracker = HIL_APPLICATION_Test_Result_decode(
-                context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.test_result ), payload );
+            tracker =
+                HIL_APPLICATION_Test_Result_validate( context, &( message->body.test_result ) );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -728,9 +726,8 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
-            tracker = HIL_APPLICATION_Variable_Result_Data_decode(
-                context, &( out_message->subtype ), out_message->test_id,
-                &( out_message->body.variable_result_data ), payload );
+            tracker = HIL_APPLICATION_Variable_Result_Data_validate(
+                context, &( message->body.variable_result_data ) );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -738,9 +735,7 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
-            tracker = HIL_APPLICATION_Response_decode( context, &( out_message->subtype ),
-                                                       out_message->test_id,
-                                                       &( out_message->body.response ), payload );
+            tracker = HIL_APPLICATION_Response_validate( context, &( message->body.response ) );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -781,7 +776,7 @@ HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
      * Application transaction here. Do not mutate context, consume or retain
      * input, or perform integration-semantic, hardware, or Transport behavior.
      */
-    if ( required_decode_storage == NULL || context == NULL || encoded_message == NULL)
+    if ( required_decode_storage == NULL || context == NULL || encoded_message == NULL )
     {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
