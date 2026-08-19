@@ -168,92 +168,98 @@ HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Con
      * retain context/message, or publish encoded_size before all validation and
      * arithmetic succeeds.
      */
+    ( void )context;
+    ( void )message;
+    ( void )encoded_size;
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;  // Size functions are not implemented. size is
                                                     // calculated and checked in the encode/decode
                                                     // functions
-    size_t size = 0;
-    if ( encoded_size == NULL || context == NULL || message == NULL )
-    {
-        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
-    }
-    switch ( message->type )
-    {
-        case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
-            return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
-            break;
+    // size_t size = 0;
+    // if ( encoded_size == NULL || context == NULL || message == NULL )
+    // {
+    //     return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    // }
+    // switch ( message->type )
+    // {
+    //     case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
+    //         return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
+    //         break;
 
-        case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
-            HIL_APPLICATION_System_Info_Request_size(
-                context, &( message->subtype ), message->test_id,
-                &( message->body.system_info_request ), &size );
-            break;
+    //     case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
+    //         HIL_APPLICATION_System_Info_Request_size(
+    //             context, &( message->subtype ), message->test_id,
+    //             &( message->body.system_info_request ), &size );
+    //         break;
 
-        case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
-            HIL_APPLICATION_System_Info_Response_size(
-                context, &( message->subtype ), message->test_id,
-                &( message->body.system_info_response ), &size );
-            break;
+    //     case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
+    //         HIL_APPLICATION_System_Info_Response_size(
+    //             context, &( message->subtype ), message->test_id,
+    //             &( message->body.system_info_response ), &size );
+    //         break;
 
-        case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
-            HIL_APPLICATION_Test_Configuration_size( context, &( message->subtype ),
-                                                     message->test_id,
-                                                     &( message->body.test_configuration ), &size );
-            ;
-            break;
+    //     case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
+    //         HIL_APPLICATION_Test_Configuration_size( context, &( message->subtype ),
+    //                                                  message->test_id,
+    //                                                  &( message->body.test_configuration ), &size
+    //                                                  );
+    //         ;
+    //         break;
 
-        case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
-            HIL_APPLICATION_Test_Instructions_size( context, &( message->subtype ),
-                                                    message->test_id,
-                                                    &( message->body.test_instruction ), &size );
-            break;
+    //     case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
+    //         HIL_APPLICATION_Test_Instructions_size( context, &( message->subtype ),
+    //                                                 message->test_id,
+    //                                                 &( message->body.test_instruction ), &size );
+    //         break;
 
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
-            HIL_APPLICATION_Variable_Instruction_Data_size(
-                context, &( message->subtype ), message->test_id,
-                &( message->body.variable_instruction_data ), &size );
-            break;
+    //     case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
+    //         HIL_APPLICATION_Variable_Instruction_Data_size(
+    //             context, &( message->subtype ), message->test_id,
+    //             &( message->body.variable_instruction_data ), &size );
+    //         break;
 
-        case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
-            HIL_APPLICATION_Execution_Control_size( context, &( message->subtype ),
-                                                    message->test_id,
-                                                    &( message->body.execution_control ), &size );
-            break;
+    //     case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
+    //         HIL_APPLICATION_Execution_Control_size( context, &( message->subtype ),
+    //                                                 message->test_id,
+    //                                                 &( message->body.execution_control ), &size
+    //                                                 );
+    //         break;
 
-        case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
-            HIL_APPLICATION_Global_Control_size( context, &( message->subtype ), message->test_id,
-                                                 &( message->body.global_control ), &size );
-            break;
+    //     case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
+    //         HIL_APPLICATION_Global_Control_size( context, &( message->subtype ),
+    //         message->test_id,
+    //                                              &( message->body.global_control ), &size );
+    //         break;
 
-        case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
-            HIL_APPLICATION_Test_Result_size( context, &( message->subtype ), message->test_id,
-                                              &( message->body.test_result ), &size );
-            break;
+    //     case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
+    //         HIL_APPLICATION_Test_Result_size( context, &( message->subtype ), message->test_id,
+    //                                           &( message->body.test_result ), &size );
+    //         break;
 
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
-            HIL_APPLICATION_Variable_Result_Data_size(
-                context, &( message->subtype ), message->test_id,
-                &( message->body.variable_result_data ), &size );
-            break;
+    //     case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
+    //         HIL_APPLICATION_Variable_Result_Data_size(
+    //             context, &( message->subtype ), message->test_id,
+    //             &( message->body.variable_result_data ), &size );
+    //         break;
 
-        case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
-            HIL_APPLICATION_Response_size( context, &( message->subtype ), message->test_id,
-                                           &( message->body.response ), &size );
-            break;
+    //     case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
+    //         HIL_APPLICATION_Response_size( context, &( message->subtype ), message->test_id,
+    //                                        &( message->body.response ), &size );
+    //         break;
 
-        case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
-            return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
-            break;
+    //     case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
+    //         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    //         break;
 
-        case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
-            return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-            break;
+    //     case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
+    //         return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    //         break;
 
-        default:
-            return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
-            break;
-    }
-    *encoded_size = size + HIL_APPLICATION_HEADER_SIZE_BYTES;
-    return HIL_APPLICATION_STATUS_OK;
+    //     default:
+    //         return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
+    //         break;
+    // }
+    // *encoded_size = size + HIL_APPLICATION_HEADER_SIZE_BYTES;
+    // return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_Context_T* context,
@@ -284,8 +290,8 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
     size_t max_payload_size =
         out_buffer_size
         - HIL_APPLICATION_HEADER_SIZE_BYTES;  // calculate the maximum allow-able payload size
-    size_t  payload_size = 0;
-    size_t* payload_size_pointer =
+    size_t   payload_size = 0;
+    uint8_t* payload_size_pointer =
         &( out_buffer[sizeof( message->test_id ) + sizeof( message->type )
                       + sizeof( message->subtype )] );
     HIL_Application_Status_T tracker =
@@ -457,7 +463,7 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
      */
     if ( required_storage_size != NULL )
     {
-        *required_storage_size = 0u;
+        *required_storage_size = 0U;
     }
     ( void )context;
     ( void )encoded_message;
@@ -686,7 +692,7 @@ HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
      */
     if ( required_decode_storage != NULL )
     {
-        *required_decode_storage = 0u;
+        *required_decode_storage = 0U;
     }
     ( void )context;
     ( void )encoded_message;
