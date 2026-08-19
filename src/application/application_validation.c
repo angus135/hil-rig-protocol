@@ -158,7 +158,21 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_validate(
         if (context->initialized == 0){
             return HIL_APPLICATION_STATUS_UNINITIALIZED;
         }
-        return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+        if (data->tick_number > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT) {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+        if (data->variable_data_count > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK) {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+        for (uint8_t i=0; i<data->variable_data_count;i++){
+            if (data->variable_data[i].channel.peripheral == HIL_APPLICATION_PERIPHERAL_INVALID){
+                return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+            }
+            if (data->variable_data[i].channel.channel > HIL_APPLICATION_UART_CHANNEL_COUNT){
+                return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+            }
+        }
+        return HIL_APPLICATION_STATUS_OK;
     }
 
 /**
@@ -179,6 +193,7 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_validate(
         if (context->initialized == 0){
             return HIL_APPLICATION_STATUS_UNINITIALIZED;
         }
+        (void)data;
         return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
     }
 
@@ -199,7 +214,10 @@ HIL_Application_Status_T HIL_APPLICATION_Execution_Control_validate(
         if (context->initialized == 0){
             return HIL_APPLICATION_STATUS_UNINITIALIZED;
         }
-        return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+        if (data->command == HIL_APPLICATION_CONTROL_INVALID){
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+        return HIL_APPLICATION_STATUS_OK;
     }
 
 /**
@@ -219,7 +237,10 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_validate(
         if (context->initialized == 0){
             return HIL_APPLICATION_STATUS_UNINITIALIZED;
         }
-        return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+        if (data->command == HIL_APPLICATION_GLOBAL_CONTROL_INVALID){
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+        return HIL_APPLICATION_STATUS_OK;
     }
 
 /**
@@ -239,7 +260,21 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_validate(
         if (context->initialized == 0){
             return HIL_APPLICATION_STATUS_UNINITIALIZED;
         }
-        return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+        if (data->tick_number > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT) {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+        if (data->variable_data_count > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK) {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+        for (uint8_t i=0; i<data->variable_data_count;i++){
+            if (data->variable_data[i].channel.peripheral == HIL_APPLICATION_PERIPHERAL_INVALID){
+                return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+            }
+            if (data->variable_data[i].channel.channel > HIL_APPLICATION_UART_CHANNEL_COUNT){
+                return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+            }
+        }
+        return HIL_APPLICATION_STATUS_OK;
     }
 
 /**
@@ -259,6 +294,7 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_validate(
         if (context->initialized == 0){
             return HIL_APPLICATION_STATUS_UNINITIALIZED;
         }
+        (void) data;
         return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
     }
 
@@ -278,6 +314,21 @@ HIL_Application_Status_T HIL_APPLICATION_Response_validate(
     const HIL_Application_Context_T* context, const HIL_Application_Response_T* data ){
         if (context->initialized == 0){
             return HIL_APPLICATION_STATUS_UNINITIALIZED;
+        }
+        if (data->tick_number > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT) {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+        if (data->scope == HIL_APPLICATION_RESPONSE_SCOPE_INVALID) {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+        if (data->outcome == HIL_APPLICATION_RESPONSE_OUTCOME_INVALID) {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+        if (data->control_command == HIL_APPLICATION_CONTROL_INVALID) {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+        if (data->global_control_command == HIL_APPLICATION_GLOBAL_CONTROL_INVALID) {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
         }
         return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
     }
