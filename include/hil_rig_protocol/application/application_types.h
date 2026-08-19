@@ -105,7 +105,7 @@ typedef struct
     const uint8_t* data;
 
     /** Number of readable bytes at data. */
-    uint32_t size;
+    uint8_t size;
 } HIL_Application_Byte_Span_T;
 
 /**

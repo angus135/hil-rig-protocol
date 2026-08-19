@@ -32,10 +32,10 @@ HIL_Application_Status_T HIL_APPLICATION_Byte_Span_encode( const HIL_Application
                                                            uint8_t* payload )
 {
     /**
-    Payload = 4 + X Bytes:
+    Payload = 1 + X Bytes:
     ________________________________
     |               |               |
-    |    size {4}   |    span {X}   |
+    |    size {1}   |    span {X}   |
     |_______________|_______________|
     */
     memcpy( payload, &( data->size ), sizeof( data->size ) );
@@ -113,7 +113,7 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
     memcpy( &( payload[running_total] ), &( data->firmware_version_patch ),
             sizeof( data->firmware_version_patch ) );
     running_total += sizeof( data->firmware_version_patch );
-    HIL_APPLICATION_Byte_Span_encode( &( data->firmware_git_hash ), &( payload[running_total] ) );
+    HIL_APPLICATION_Byte_Span_encode( &( data->diagnostic_data ), &( payload[running_total] ) );
     running_total += data->diagnostic_data.size;
     HIL_APPLICATION_Byte_Span_encode( &( data->firmware_git_hash ), &( payload[running_total] ) );
     running_total += data->firmware_git_hash.size;
