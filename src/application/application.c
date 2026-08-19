@@ -470,7 +470,6 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
      * execute no reset/control, generate no Response, and perform no Transport
      * or hardware behavior.
      */
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;  // Not implemented yet
 
     if ( encoded_message == NULL || out_message == NULL || context == NULL )
     {
@@ -637,8 +636,126 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
      * firmware electrical/hardware/execution-manager policy, execute
      * recovery/control, mutate anything, or retain a pointer.
      */
-    ( void )context;
-    ( void )message;
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+
+    if (context == NULL || message == NULL)
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    switch ( message->type )
+    {
+        case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
+            return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
+            tracker = HIL_APPLICATION_System_Info_Request_decode(
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.system_info_request ), payload );
+            if ( tracker != HIL_APPLICATION_STATUS_OK )
+            {
+                return tracker;
+            };
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
+            tracker = HIL_APPLICATION_System_Info_Response_decode(
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.system_info_response ), payload );
+            if ( tracker != HIL_APPLICATION_STATUS_OK )
+            {
+                return tracker;
+            };
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
+            tracker = HIL_APPLICATION_Test_Configuration_decode(
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.test_configuration ), payload );
+            if ( tracker != HIL_APPLICATION_STATUS_OK )
+            {
+                return tracker;
+            };
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
+            tracker = HIL_APPLICATION_Test_Instructions_decode(
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.test_instruction ), payload );
+            if ( tracker != HIL_APPLICATION_STATUS_OK )
+            {
+                return tracker;
+            };
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
+            tracker = HIL_APPLICATION_Variable_Instruction_Data_decode(
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.variable_instruction_data ), payload );
+            if ( tracker != HIL_APPLICATION_STATUS_OK )
+            {
+                return tracker;
+            };
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
+            tracker = HIL_APPLICATION_Execution_Control_decode(
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.execution_control ), payload );
+            if ( tracker != HIL_APPLICATION_STATUS_OK )
+            {
+                return tracker;
+            };
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
+            tracker = HIL_APPLICATION_Global_Control_decode(
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.global_control ), payload );
+            if ( tracker != HIL_APPLICATION_STATUS_OK )
+            {
+                return tracker;
+            };
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
+            tracker = HIL_APPLICATION_Test_Result_decode(
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.test_result ), payload );
+            if ( tracker != HIL_APPLICATION_STATUS_OK )
+            {
+                return tracker;
+            };
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
+            tracker = HIL_APPLICATION_Variable_Result_Data_decode(
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.variable_result_data ), payload );
+            if ( tracker != HIL_APPLICATION_STATUS_OK )
+            {
+                return tracker;
+            };
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
+            tracker = HIL_APPLICATION_Response_decode( context, &( out_message->subtype ),
+                                                       out_message->test_id,
+                                                       &( out_message->body.response ), payload );
+            if ( tracker != HIL_APPLICATION_STATUS_OK )
+            {
+                return tracker;
+            };
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
+            return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
+            return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+
+        default:
+            return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
+    }
 
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
@@ -664,9 +781,9 @@ HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
      * Application transaction here. Do not mutate context, consume or retain
      * input, or perform integration-semantic, hardware, or Transport behavior.
      */
-    if ( required_decode_storage != NULL )
+    if ( required_decode_storage == NULL || context == NULL || encoded_message == NULL)
     {
-        *required_decode_storage = 0U;
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
     ( void )context;
     ( void )encoded_message;

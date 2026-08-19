@@ -69,6 +69,11 @@ extern "C"
 
 /** Number of physical HIL-RIG PWM-input channels in every result. */
 #define HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT ( 2u )
+
+#define HIL_APPLICATION_CAN_CHANNEL_COUNT ( 2u )
+#define HIL_APPLICATION_UART_CHANNEL_COUNT ( 2u )
+#define HIL_APPLICATION_SPI_CHANNEL_COUNT ( 2u )
+#define HIL_APPLICATION_I2C_CHANNEL_COUNT ( 2u )
 /** @} */
 
 /**

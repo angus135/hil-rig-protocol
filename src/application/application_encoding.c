@@ -387,6 +387,12 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
     |         size {4}        |          span {U}          |
     |_________________________|____________________________|
     */
+
+    // variable data count validation
+    if (data->variable_data_count>HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK){
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+
     // size calculation
     uint32_t payload_size = sizeof( data->tick_number ) + sizeof( data->variable_data_count );
     for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
