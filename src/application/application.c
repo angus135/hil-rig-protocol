@@ -88,10 +88,38 @@ HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      c
      * max_encoded_message_size; this codec has no Transport dependency. On
      * failure leave context uninitialized and publish no partial configuration.
      */
-    ( void )context;
-    ( void )config;
+    if (config == NULL || context == NULL) {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
 
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    // validate config
+    if ( config->max_expected_tick_count > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    if ( config->max_encoded_message_size < HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+    /** Largest byte span in one variable instruction/result/error field. */
+    if ( config->max_variable_data_size > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_COUNT;
+    }
+    if ( config->max_peripheral_config_count > HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_COUNT;
+    }
+    if ( config->max_variable_transfers_per_tick > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_COUNT;
+    }
+
+    // assign config
+    context->config = *config;
+    context->initialized=1;
+
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Context_T* context,
