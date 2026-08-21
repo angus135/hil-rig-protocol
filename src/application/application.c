@@ -266,6 +266,10 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
     {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
+    if ( out_buffer_size < HIL_APPLICATION_HEADER_SIZE_BYTES )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
     size_t max_payload_size =
         out_buffer_size
         - HIL_APPLICATION_HEADER_SIZE_BYTES;  // calculate the maximum allow-able payload size
@@ -417,7 +421,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
             return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
     }
 
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T
@@ -604,7 +608,7 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
             return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
     }
 
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T
@@ -641,7 +645,6 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
      * firmware electrical/hardware/execution-manager policy, execute
      * recovery/control, mutate anything, or retain a pointer.
      */
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 
     HIL_Application_Status_T tracker;
     if ( context == NULL || message == NULL )
@@ -752,7 +755,7 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
             return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
     }
 
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(

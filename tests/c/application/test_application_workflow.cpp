@@ -2,6 +2,10 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <algorithm>
+#include <cstring>
+#include <type_traits>
+
 #include <gtest/gtest.h>
 
 #include "hil_rig_protocol/application/application.h"
@@ -21,6 +25,401 @@ HIL_Application_Test_Id_T ExampleTestId( std::uint8_t discriminator )
     test_id.bytes[15] = static_cast<std::uint8_t>( discriminator ^ 0xa5u );
     return test_id;
 }
+
+HIL_Application_Context_T MakeContext()
+{
+    HIL_Application_Context_T context{};
+    HIL_Application_Config_T  config{};
+
+    EXPECT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+
+    EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_OK );
+
+    return context;
+}
+
+void ExpectByteSpanEqual( const HIL_Application_Byte_Span_T& expected,
+                          const HIL_Application_Byte_Span_T& actual )
+{
+    ASSERT_EQ( expected.size, actual.size );
+
+    if ( expected.size == 0u )
+    {
+        return;
+    }
+
+    ASSERT_NE( expected.data, nullptr );
+    ASSERT_NE( actual.data, nullptr );
+
+    EXPECT_EQ( std::memcmp( expected.data, actual.data, expected.size ), 0 );
+}
+
+void ExpectChannelEqual( const HIL_Application_Channel_Id_T& expected,
+                         const HIL_Application_Channel_Id_T& actual )
+{
+    EXPECT_EQ( expected.peripheral, actual.peripheral );
+    EXPECT_EQ( expected.channel, actual.channel );
+}
+
+void ExpectDataDeclarationsEqual( const HIL_Application_Data_Declaration_T* expected,
+                                  std::size_t                               expected_count,
+                                  const HIL_Application_Data_Declaration_T* actual,
+                                  std::size_t                               actual_count )
+{
+    ASSERT_EQ( expected_count, actual_count );
+
+    for ( std::size_t i = 0u; i < expected_count; ++i )
+    {
+        ExpectChannelEqual( expected[i].channel, actual[i].channel );
+        ExpectByteSpanEqual( expected[i].data, actual[i].data );
+    }
+}
+
+void ExpectTestIdEqual( const HIL_Application_Test_Id_T& expected,
+                        const HIL_Application_Test_Id_T& actual )
+{
+    EXPECT_EQ( std::memcmp( expected.bytes, actual.bytes, HIL_APPLICATION_TEST_ID_SIZE ), 0 );
+}
+
+/*
+ * Compare the semantic contents of two Application messages.
+ *
+ * We deliberately do not use memcmp(&expected, &actual, sizeof(...))
+ * because the message contains pointers to variable data.
+ */
+void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
+                          const HIL_Application_Message_T& actual )
+{
+    EXPECT_EQ( expected.type, actual.type );
+    EXPECT_EQ( expected.subtype, actual.subtype );
+    EXPECT_EQ( expected.has_test_id, actual.has_test_id );
+
+    if ( expected.has_test_id != 0u )
+    {
+        ExpectTestIdEqual( expected.test_id, actual.test_id );
+    }
+
+    switch ( expected.type )
+    {
+        case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
+            EXPECT_EQ( expected.body.system_info_request.query,
+                       actual.body.system_info_request.query );
+            EXPECT_EQ( expected.body.system_info_request.request_firmware_git_hash,
+                       actual.body.system_info_request.request_firmware_git_hash );
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
+            EXPECT_EQ( expected.body.system_info_response.application_protocol_major,
+                       actual.body.system_info_response.application_protocol_major );
+            EXPECT_EQ( expected.body.system_info_response.application_protocol_minor,
+                       actual.body.system_info_response.application_protocol_minor );
+            EXPECT_EQ( expected.body.system_info_response.firmware_version_major,
+                       actual.body.system_info_response.firmware_version_major );
+            EXPECT_EQ( expected.body.system_info_response.firmware_version_minor,
+                       actual.body.system_info_response.firmware_version_minor );
+            ExpectByteSpanEqual( expected.body.system_info_response.firmware_git_hash,
+                                 actual.body.system_info_response.firmware_git_hash );
+            ExpectByteSpanEqual( expected.body.system_info_response.diagnostic_data,
+                                 actual.body.system_info_response.diagnostic_data );
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
+            EXPECT_EQ( expected.body.test_configuration.tick_duration.nanoseconds,
+                       actual.body.test_configuration.tick_duration.nanoseconds );
+            EXPECT_EQ( expected.body.test_configuration.expected_tick_count,
+                       actual.body.test_configuration.expected_tick_count );
+            EXPECT_EQ( expected.body.test_configuration.flags,
+                       actual.body.test_configuration.flags );
+            EXPECT_EQ( expected.body.test_configuration.peripheral_count,
+                       actual.body.test_configuration.peripheral_count );
+
+            for ( std::size_t i = 0u; i < expected.body.test_configuration.peripheral_count; ++i )
+            {
+                EXPECT_EQ( expected.body.test_configuration.peripherals[i].type,
+                           actual.body.test_configuration.peripherals[i].type );
+
+                EXPECT_EQ(
+                    std::memcmp( &expected.body.test_configuration.peripherals[i].value,
+                                 &actual.body.test_configuration.peripherals[i].value,
+                                 sizeof( expected.body.test_configuration.peripherals[i].value ) ),
+                    0 );
+            }
+
+            ExpectByteSpanEqual( expected.body.test_configuration.extension_data,
+                                 actual.body.test_configuration.extension_data );
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
+            EXPECT_EQ( expected.body.test_instruction.tick_number,
+                       actual.body.test_instruction.tick_number );
+
+            EXPECT_EQ( std::memcmp( expected.body.test_instruction.digital_outputs,
+                                    actual.body.test_instruction.digital_outputs,
+                                    sizeof( expected.body.test_instruction.digital_outputs ) ),
+                       0 );
+
+            EXPECT_EQ( std::memcmp( expected.body.test_instruction.analog_outputs,
+                                    actual.body.test_instruction.analog_outputs,
+                                    sizeof( expected.body.test_instruction.analog_outputs ) ),
+                       0 );
+
+            EXPECT_EQ( std::memcmp( expected.body.test_instruction.pwm_outputs,
+                                    actual.body.test_instruction.pwm_outputs,
+                                    sizeof( expected.body.test_instruction.pwm_outputs ) ),
+                       0 );
+
+            ExpectDataDeclarationsEqual( expected.body.test_instruction.variable_data,
+                                         expected.body.test_instruction.variable_data_count,
+                                         actual.body.test_instruction.variable_data,
+                                         actual.body.test_instruction.variable_data_count );
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
+            EXPECT_EQ( expected.body.variable_instruction_data.tick_number,
+                       actual.body.variable_instruction_data.tick_number );
+
+            ExpectChannelEqual( expected.body.variable_instruction_data.channel,
+                                actual.body.variable_instruction_data.channel );
+
+            ExpectByteSpanEqual( expected.body.variable_instruction_data.data,
+                                 actual.body.variable_instruction_data.data );
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
+            EXPECT_EQ( expected.body.execution_control.command,
+                       actual.body.execution_control.command );
+            EXPECT_EQ( expected.body.execution_control.flags, actual.body.execution_control.flags );
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
+            EXPECT_EQ( expected.body.global_control.command, actual.body.global_control.command );
+            EXPECT_EQ( expected.body.global_control.flags, actual.body.global_control.flags );
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
+            EXPECT_EQ( expected.body.test_result.tick_number, actual.body.test_result.tick_number );
+
+            EXPECT_EQ( std::memcmp( expected.body.test_result.digital_inputs,
+                                    actual.body.test_result.digital_inputs,
+                                    sizeof( expected.body.test_result.digital_inputs ) ),
+                       0 );
+
+            EXPECT_EQ( std::memcmp( expected.body.test_result.analog_inputs,
+                                    actual.body.test_result.analog_inputs,
+                                    sizeof( expected.body.test_result.analog_inputs ) ),
+                       0 );
+
+            EXPECT_EQ( std::memcmp( expected.body.test_result.pwm_inputs,
+                                    actual.body.test_result.pwm_inputs,
+                                    sizeof( expected.body.test_result.pwm_inputs ) ),
+                       0 );
+
+            EXPECT_EQ( expected.body.test_result.condition, actual.body.test_result.condition );
+
+            ExpectDataDeclarationsEqual( expected.body.test_result.variable_data,
+                                         expected.body.test_result.variable_data_count,
+                                         actual.body.test_result.variable_data,
+                                         actual.body.test_result.variable_data_count );
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
+            EXPECT_EQ( expected.body.variable_result_data.tick_number,
+                       actual.body.variable_result_data.tick_number );
+
+            ExpectChannelEqual( expected.body.variable_result_data.channel,
+                                actual.body.variable_result_data.channel );
+
+            ExpectByteSpanEqual( expected.body.variable_result_data.data,
+                                 actual.body.variable_result_data.data );
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
+            EXPECT_EQ( expected.body.response.scope, actual.body.response.scope );
+            EXPECT_EQ( expected.body.response.outcome, actual.body.response.outcome );
+            EXPECT_EQ( expected.body.response.reason, actual.body.response.reason );
+            EXPECT_EQ( expected.body.response.tick_number, actual.body.response.tick_number );
+            EXPECT_EQ( expected.body.response.control_command,
+                       actual.body.response.control_command );
+            EXPECT_EQ( expected.body.response.global_control_command,
+                       actual.body.response.global_control_command );
+            break;
+
+        case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
+            EXPECT_EQ( expected.body.error.category, actual.body.error.category );
+            EXPECT_EQ( expected.body.error.recoverable, actual.body.error.recoverable );
+            EXPECT_EQ( expected.body.error.has_tick_number, actual.body.error.has_tick_number );
+            EXPECT_EQ( expected.body.error.tick_number, actual.body.error.tick_number );
+
+            ExpectByteSpanEqual( expected.body.error.diagnostic_data,
+                                 actual.body.error.diagnostic_data );
+            break;
+
+        default:
+            break;
+    }
+}
+
+/*
+ * This is the existing representative message set from
+ * application_test_api.cpp, reproduced here so the behavioural
+ * tests can actually exercise every codec family.
+ */
+std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
+{
+    const HIL_Application_Test_Id_T test_id = ExampleTestId( 0x11u );  // CHANGED
+
+    static const std::array<std::uint8_t, 8u> git_hash{ 'd', 'e', 'a', 'd', 'b', 'e', 'e', 'f' };
+
+    static const std::array<std::uint8_t, 3u> diagnostic{ 1u, 2u, 3u };
+
+    static const std::array<std::uint8_t, 5u> variable_bytes{ 9u, 8u, 7u, 6u, 5u };
+
+    static const std::array<HIL_Application_Peripheral_Config_T, 3u> peripherals{
+        [] {
+            HIL_Application_Peripheral_Config_T peripheral{};
+            peripheral.type                             = HIL_APPLICATION_PERIPHERAL_CONFIG_DIGITAL;
+            peripheral.value.digital.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
+            peripheral.value.digital.channel.channel    = 2u;
+            peripheral.value.digital.output_millivolts  = 3300u;
+            peripheral.value.digital.initial_output_high = 0u;
+            return peripheral;
+        }(),
+
+        [] {
+            HIL_Application_Peripheral_Config_T peripheral{};
+            peripheral.type                            = HIL_APPLICATION_PERIPHERAL_CONFIG_ANALOG;
+            peripheral.value.analog.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT;
+            peripheral.value.analog.channel.channel    = 0u;
+            peripheral.value.analog.minimum_microvolts = -1000000;
+            peripheral.value.analog.maximum_microvolts = 1000000;
+            return peripheral;
+        }(),
+
+        [] {
+            HIL_Application_Peripheral_Config_T peripheral{};
+            peripheral.type = HIL_APPLICATION_PERIPHERAL_CONFIG_COMMUNICATION;
+            peripheral.value.communication.channel.peripheral  = HIL_APPLICATION_PERIPHERAL_UART;
+            peripheral.value.communication.channel.channel     = 0u;
+            peripheral.value.communication.bit_rate            = 115200u;
+            peripheral.value.communication.flags               = 0u;
+            peripheral.value.communication.capture_limit_bytes = variable_bytes.size();
+            return peripheral;
+        }() };
+    static const std::array<HIL_Application_Data_Declaration_T, 1u> instruction_data{
+        HIL_Application_Data_Declaration_T{
+            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },
+            HIL_Application_Byte_Span_T{ variable_bytes.data(), variable_bytes.size() } } };
+
+    static const std::array<HIL_Application_Data_Declaration_T, 1u> result_data{
+        HIL_Application_Data_Declaration_T{
+            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },
+            HIL_Application_Byte_Span_T{ variable_bytes.data(), variable_bytes.size() } } };
+
+    std::array<HIL_Application_Message_T, 10u> messages{};
+
+    messages[0].type                           = HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST;
+    messages[0].subtype                        = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
+    messages[0].has_test_id                    = 0u;
+    messages[0].body.system_info_request.query = HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC;
+    messages[0].body.system_info_request.request_firmware_git_hash = 1u;
+
+    messages[1].type        = HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE;
+    messages[1].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
+    messages[1].has_test_id = 0u;
+    messages[1].body.system_info_response.application_protocol_major =
+        HIL_APPLICATION_PROTOCOL_VERSION_MAJOR;
+    messages[1].body.system_info_response.application_protocol_minor =
+        HIL_APPLICATION_PROTOCOL_VERSION_MINOR;
+    messages[1].body.system_info_response.firmware_version_major = 1u;
+    messages[1].body.system_info_response.firmware_git_hash =
+        HIL_Application_Byte_Span_T{ git_hash.data(), git_hash.size() };
+    messages[1].body.system_info_response.diagnostic_data =
+        HIL_Application_Byte_Span_T{ diagnostic.data(), diagnostic.size() };
+
+    messages[2].type        = HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION;
+    messages[2].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    messages[2].has_test_id = 1u;
+    messages[2].test_id     = test_id;
+    messages[2].body.test_configuration.tick_duration.nanoseconds = 1000000u;
+    messages[2].body.test_configuration.expected_tick_count       = 100u;
+    messages[2].body.test_configuration.flags                     = 0u;
+    messages[2].body.test_configuration.peripherals               = peripherals.data();
+    messages[2].body.test_configuration.peripheral_count          = peripherals.size();
+    messages[2].body.test_configuration.extension_data = HIL_Application_Byte_Span_T{ nullptr, 0u };
+
+    messages[3].type                              = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
+    messages[3].subtype                           = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    messages[3].has_test_id                       = 1u;
+    messages[3].test_id                           = test_id;
+    messages[3].body.test_instruction.tick_number = 0u;
+    messages[3].body.test_instruction.digital_outputs[2].high             = 1u;
+    messages[3].body.test_instruction.analog_outputs[1].microvolts        = 1250000;
+    messages[3].body.test_instruction.pwm_outputs[1].period_nanoseconds   = 1000000u;
+    messages[3].body.test_instruction.pwm_outputs[1].duty_cycle_permyriad = 5000u;
+    messages[3].body.test_instruction.variable_data                       = instruction_data.data();
+    messages[3].body.test_instruction.variable_data_count                 = instruction_data.size();
+
+    messages[4].type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA;
+    messages[4].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    messages[4].has_test_id = 1u;
+    messages[4].test_id     = test_id;
+    messages[4].body.variable_instruction_data.tick_number = 0u;
+    messages[4].body.variable_instruction_data.channel =
+        HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u };
+    messages[4].body.variable_instruction_data.data =
+        HIL_Application_Byte_Span_T{ variable_bytes.data(), variable_bytes.size() };
+
+    messages[5].type                           = HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL;
+    messages[5].subtype                        = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    messages[5].has_test_id                    = 1u;
+    messages[5].test_id                        = test_id;
+    messages[5].body.execution_control.command = HIL_APPLICATION_CONTROL_START;
+    messages[5].body.execution_control.flags   = 0u;
+
+    messages[6].type                        = HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL;
+    messages[6].subtype                     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    messages[6].has_test_id                 = 0u;
+    messages[6].body.global_control.command = HIL_APPLICATION_GLOBAL_CONTROL_RESET_APPLICATION;
+    messages[6].body.global_control.flags   = 0u;
+
+    messages[7].type                                    = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
+    messages[7].subtype                                 = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    messages[7].has_test_id                             = 1u;
+    messages[7].test_id                                 = test_id;
+    messages[7].body.test_result.tick_number            = 0u;
+    messages[7].body.test_result.digital_inputs[4].high = 1u;
+    messages[7].body.test_result.analog_inputs[1].microvolts        = 1210000;
+    messages[7].body.test_result.pwm_inputs[1].period_nanoseconds   = 1000100u;
+    messages[7].body.test_result.pwm_inputs[1].duty_cycle_permyriad = 4990u;
+    messages[7].body.test_result.variable_data                      = result_data.data();
+    messages[7].body.test_result.variable_data_count                = result_data.size();
+    messages[7].body.test_result.condition = HIL_APPLICATION_RESULT_CONDITION_OK;
+
+    messages[8].type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA;
+    messages[8].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    messages[8].has_test_id = 1u;
+    messages[8].test_id     = test_id;
+    messages[8].body.variable_result_data.tick_number = 0u;
+    messages[8].body.variable_result_data.channel =
+        HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u };
+    messages[8].body.variable_result_data.data =
+        HIL_Application_Byte_Span_T{ variable_bytes.data(), variable_bytes.size() };
+
+    messages[9].type                                 = HIL_APPLICATION_MESSAGE_TYPE_RESPONSE;
+    messages[9].subtype                              = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    messages[9].has_test_id                          = 1u;
+    messages[9].test_id                              = test_id;
+    messages[9].body.response.scope                  = HIL_APPLICATION_RESPONSE_SCOPE_TICK;
+    messages[9].body.response.outcome                = HIL_APPLICATION_RESPONSE_OUTCOME_ACCEPTED;
+    messages[9].body.response.reason                 = HIL_APPLICATION_RESPONSE_REASON_NONE;
+    messages[9].body.response.tick_number            = 0u;
+    messages[9].body.response.control_command        = HIL_APPLICATION_CONTROL_INVALID;
+    messages[9].body.response.global_control_command = HIL_APPLICATION_GLOBAL_CONTROL_INVALID;
+
+    return messages;
+}
+
+}  // namespace
 
 HIL_Application_Message_T
 TestResponse( const HIL_Application_Test_Id_T& test_id, HIL_Application_Response_Scope_T scope,
@@ -81,8 +480,8 @@ void CompileCodecFacadeUsage()
                                                       encoded_size, &required_decode_storage );
     ( void )HIL_APPLICATION_Decode_Storage_Size( &context, encoded_message.data(), encoded_size,
                                                  &required_decode_storage );
-    ( void )HIL_APPLICATION_Decode_Message(
-        &context, encoded_message.data(), encoded_size, &decoded );
+    ( void )HIL_APPLICATION_Decode_Message( &context, encoded_message.data(), encoded_size,
+                                            &decoded );
 
     /* Context remains codec-only; endpoint transaction data is never supplied. */
 }
@@ -117,10 +516,10 @@ void CompileUploadConformanceScenarios()
     const std::array<HIL_Application_Data_Declaration_T, 2u> declarations{
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },
-            HIL_Application_Byte_Span_T{uart_bytes.data(), uart_bytes.size()} },
+            HIL_Application_Byte_Span_T{ uart_bytes.data(), uart_bytes.size() } },
         HIL_Application_Data_Declaration_T{
-            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_SPI, 1u }, 
-            HIL_Application_Byte_Span_T{spi_bytes.data(), spi_bytes.size() }},
+            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_SPI, 1u },
+            HIL_Application_Byte_Span_T{ spi_bytes.data(), spi_bytes.size() } },
     };
 
     HIL_Application_Message_T fixed_tick{};
@@ -258,11 +657,11 @@ void CompileSuccessfulResultConformanceScenario()
 
     const std::array<HIL_Application_Data_Declaration_T, 2u> result_declarations{
         HIL_Application_Data_Declaration_T{
-            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_CAN, 0u }, 
-            HIL_Application_Byte_Span_T{can_bytes.data(), can_bytes.size() }},
+            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_CAN, 0u },
+            HIL_Application_Byte_Span_T{ can_bytes.data(), can_bytes.size() } },
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 1u },
-            HIL_Application_Byte_Span_T{uart_bytes.data(), uart_bytes.size() }},
+            HIL_Application_Byte_Span_T{ uart_bytes.data(), uart_bytes.size() } },
     };
 
     HIL_Application_Message_T fixed_result_0{};
@@ -323,7 +722,7 @@ void CompilePartialVariableResultScenario()
     const std::array<std::uint8_t, 2u>       valid_can_bytes{ 0x11u, 0x22u };
     const HIL_Application_Data_Declaration_T valid_can_declaration{
         HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_CAN, 0u },
-        HIL_Application_Byte_Span_T{valid_can_bytes.data(), valid_can_bytes.size()},
+        HIL_Application_Byte_Span_T{ valid_can_bytes.data(), valid_can_bytes.size() },
     };
 
     HIL_Application_Message_T partial_result{};
@@ -524,14 +923,13 @@ void CompileRecoveryConformanceScenarios()
     ( void )in_flight_rejected;
     ( void )restarted_configuration;
 }
-}  // namespace
 
 TEST( ApplicationFacadeApiDesign, IntentionalStubsRemainExplicit )
 {
     HIL_Application_Context_T context{};
     HIL_Application_Config_T  config{};
-    EXPECT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
-    EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
+    EXPECT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_OK );
 }
 
 TEST( ApplicationFacadeApiDesign, DocumentedTransactionScenariosCompile )
@@ -551,4 +949,401 @@ TEST( ApplicationFacadeApiDesign, DocumentedTransactionScenariosCompile )
     {
         EXPECT_NE( scenario, nullptr );
     }
+}
+
+TEST( ApplicationDefaultConfig, RejectsNullPointer )
+{
+    EXPECT_EQ( HIL_APPLICATION_Default_Config( nullptr ), HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+}
+
+TEST( ApplicationDefaultConfig, ProducesProtocolMaximumConfiguration )
+{
+    HIL_Application_Config_T config{};
+
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+
+    EXPECT_EQ( config.max_encoded_message_size, HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE );
+
+    EXPECT_EQ( config.max_variable_data_size, HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE );
+
+    EXPECT_EQ( config.max_peripheral_config_count, HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT );
+
+    EXPECT_EQ( config.max_variable_transfers_per_tick,
+               HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK );
+
+    EXPECT_EQ( config.max_expected_tick_count, HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT );
+}
+
+TEST( ApplicationInit, RejectsNullContext )
+{
+    HIL_Application_Config_T config{};
+
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+
+    EXPECT_EQ( HIL_APPLICATION_Init( nullptr, &config ), HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+}
+
+TEST( ApplicationInit, RejectsNullConfig )
+{
+    HIL_Application_Context_T context{};
+
+    EXPECT_EQ( HIL_APPLICATION_Init( &context, nullptr ), HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+}
+
+TEST( ApplicationInit, AcceptsDefaultConfiguration )
+{
+    HIL_Application_Config_T  config{};
+    HIL_Application_Context_T context{};
+
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+
+    ASSERT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_OK );
+
+    EXPECT_EQ( context.initialized, 1u );
+
+    EXPECT_EQ( context.config.max_encoded_message_size, config.max_encoded_message_size );
+
+    EXPECT_EQ( context.config.max_variable_data_size, config.max_variable_data_size );
+
+    EXPECT_EQ( context.config.max_peripheral_config_count, config.max_peripheral_config_count );
+
+    EXPECT_EQ( context.config.max_variable_transfers_per_tick,
+               config.max_variable_transfers_per_tick );
+
+    EXPECT_EQ( context.config.max_expected_tick_count, config.max_expected_tick_count );
+}
+
+TEST( ApplicationInit, RejectsExcessiveExpectedTickCount )
+{
+    HIL_Application_Config_T  config{};
+    HIL_Application_Context_T context{};
+
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+
+    config.max_expected_tick_count = HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT + 1u;
+
+    EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_INVALID_LENGTH );
+}
+
+TEST( ApplicationInit, RejectsInsufficientEncodedMessageSize )
+{
+    HIL_Application_Config_T  config{};
+    HIL_Application_Context_T context{};
+
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+
+    config.max_encoded_message_size = HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE - 1u;
+
+    EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL );
+}
+
+TEST( ApplicationInit, RejectsExcessiveVariableDataSize )
+{
+    HIL_Application_Config_T  config{};
+    HIL_Application_Context_T context{};
+
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+
+    config.max_variable_data_size = HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE + 1u;
+
+    EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_INVALID_COUNT );
+}
+
+TEST( ApplicationInit, RejectsExcessivePeripheralCount )
+{
+    HIL_Application_Config_T  config{};
+    HIL_Application_Context_T context{};
+
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+
+    config.max_peripheral_config_count = HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT + 1u;
+
+    EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_INVALID_COUNT );
+}
+
+TEST( ApplicationInit, RejectsExcessiveVariableTransfersPerTick )
+{
+    HIL_Application_Config_T  config{};
+    HIL_Application_Context_T context{};
+
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+
+    config.max_variable_transfers_per_tick =
+        HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK + 1u;
+
+    EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_INVALID_COUNT );
+}
+
+TEST( ApplicationEncode, RejectsNullArguments )
+{
+    HIL_Application_Context_T context = MakeContext();
+    HIL_Application_Message_T message{};
+
+    std::array<std::uint8_t, 256u> buffer{};
+    std::size_t                    output_size = 0u;
+
+    EXPECT_EQ( HIL_APPLICATION_Encode_Message( nullptr, &message, buffer.data(), buffer.size(),
+                                               &output_size ),
+               HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+
+    EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, nullptr, buffer.data(), buffer.size(),
+                                               &output_size ),
+               HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+
+    EXPECT_EQ(
+        HIL_APPLICATION_Encode_Message( &context, &message, nullptr, buffer.size(), &output_size ),
+        HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+
+    EXPECT_EQ(
+        HIL_APPLICATION_Encode_Message( &context, &message, buffer.data(), buffer.size(), nullptr ),
+        HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+}
+
+TEST( ApplicationEncode, RejectsBufferSmallerThanHeader )
+{
+    HIL_Application_Context_T context = MakeContext();
+
+    HIL_Application_Message_T message{};
+    message.type                           = HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL;
+    message.subtype                        = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    message.has_test_id                    = 1u;
+    message.test_id                        = ExampleTestId( 0x11u );
+    message.body.execution_control.command = HIL_APPLICATION_CONTROL_START;
+
+    std::array<std::uint8_t, HIL_APPLICATION_HEADER_SIZE_BYTES - 1u> buffer{};
+
+    std::size_t output_size = 0u;
+
+    EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, buffer.data(), buffer.size(),
+                                               &output_size ),
+               HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL );
+}
+
+TEST( ApplicationEncodeDecode, EverySupportedCodecRoundTrips )
+{
+    HIL_Application_Context_T context = MakeContext();
+
+    const auto messages = ConstructCodecMessages();
+
+    for ( const auto& original : messages )
+    {
+        SCOPED_TRACE( static_cast<int>( original.type ) );
+
+        std::array<std::uint8_t, 4096u> encoded{};
+        std::size_t                     encoded_size = 0u;
+
+        ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &original, encoded.data(),
+                                                   encoded.size(), &encoded_size ),
+                   HIL_APPLICATION_STATUS_OK );
+
+        ASSERT_GT( encoded_size, 0u );
+        ASSERT_LE( encoded_size, encoded.size() );
+
+        HIL_Application_Message_T decoded{};
+
+        ASSERT_EQ(
+            HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded ),
+            HIL_APPLICATION_STATUS_OK );
+
+        ExpectMessagesEqual( original, decoded );
+    }
+}
+
+TEST( ApplicationEncodeDecode, TestConfigurationRoundTrips )
+{
+    const auto  messages = ConstructCodecMessages();
+    const auto& original = messages[2];
+
+    HIL_Application_Context_T context = MakeContext();
+
+    std::array<std::uint8_t, 4096u> encoded{};
+    std::size_t                     encoded_size = 0u;
+
+    ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &original, encoded.data(), encoded.size(),
+                                               &encoded_size ),
+               HIL_APPLICATION_STATUS_OK );
+
+    HIL_Application_Message_T decoded{};
+
+    ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded ),
+               HIL_APPLICATION_STATUS_OK );
+
+    ExpectMessagesEqual( original, decoded );
+
+    EXPECT_EQ( decoded.body.test_configuration.peripheral_count, 3u );
+}
+
+TEST( ApplicationEncodeDecode, VariableInstructionDataRoundTrips )
+{
+    const auto  messages = ConstructCodecMessages();
+    const auto& original = messages[4];
+
+    HIL_Application_Context_T context = MakeContext();
+
+    std::array<std::uint8_t, 4096u> encoded{};
+    std::size_t                     encoded_size = 0u;
+
+    ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &original, encoded.data(), encoded.size(),
+                                               &encoded_size ),
+               HIL_APPLICATION_STATUS_OK );
+
+    HIL_Application_Message_T decoded{};
+
+    ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded ),
+               HIL_APPLICATION_STATUS_OK );
+
+    ExpectMessagesEqual( original, decoded );
+}
+
+TEST( ApplicationEncodeDecode, TestInstructionWithFixedAndVariableDataRoundTrips )
+{
+    const auto  messages = ConstructCodecMessages();
+    const auto& original = messages[3];
+
+    HIL_Application_Context_T context = MakeContext();
+
+    std::array<std::uint8_t, 4096u> encoded{};
+    std::size_t                     encoded_size = 0u;
+
+    ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &original, encoded.data(), encoded.size(),
+                                               &encoded_size ),
+               HIL_APPLICATION_STATUS_OK );
+
+    HIL_Application_Message_T decoded{};
+
+    ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded ),
+               HIL_APPLICATION_STATUS_OK );
+
+    ExpectMessagesEqual( original, decoded );
+}
+
+TEST( ApplicationEncodeDecode, TestResultWithFixedAndVariableDataRoundTrips )
+{
+    const auto  messages = ConstructCodecMessages();
+    const auto& original = messages[7];
+
+    HIL_Application_Context_T context = MakeContext();
+
+    std::array<std::uint8_t, 4096u> encoded{};
+    std::size_t                     encoded_size = 0u;
+
+    ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &original, encoded.data(), encoded.size(),
+                                               &encoded_size ),
+               HIL_APPLICATION_STATUS_OK );
+
+    HIL_Application_Message_T decoded{};
+
+    ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded ),
+               HIL_APPLICATION_STATUS_OK );
+
+    ExpectMessagesEqual( original, decoded );
+}
+
+TEST( ApplicationDecode, RejectsNullArguments )
+{
+    HIL_Application_Context_T context = MakeContext();
+
+    std::array<std::uint8_t, 64u> encoded{};
+    HIL_Application_Message_T     message{};
+
+    EXPECT_EQ( HIL_APPLICATION_Decode_Message( nullptr, encoded.data(), encoded.size(), &message ),
+               HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+
+    EXPECT_EQ( HIL_APPLICATION_Decode_Message( &context, nullptr, encoded.size(), &message ),
+               HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+
+    EXPECT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded.size(), nullptr ),
+               HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+}
+
+TEST( ApplicationEncode, RejectsInvalidMessageType )
+{
+    HIL_Application_Context_T context = MakeContext();
+
+    HIL_Application_Message_T message{};
+    message.type = HIL_APPLICATION_MESSAGE_TYPE_INVALID;
+
+    std::array<std::uint8_t, 256u> buffer{};
+    std::size_t                    output_size = 0u;
+
+    EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, buffer.data(), buffer.size(),
+                                               &output_size ),
+               HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE );
+}
+
+TEST( ApplicationEncode, RejectsReservedMessageType )
+{
+    HIL_Application_Context_T context = MakeContext();
+
+    HIL_Application_Message_T message{};
+    message.type = HIL_APPLICATION_MESSAGE_TYPE_RESERVED;
+
+    std::array<std::uint8_t, 256u> buffer{};
+    std::size_t                    output_size = 0u;
+
+    EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, buffer.data(), buffer.size(),
+                                               &output_size ),
+               HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
+}
+
+TEST( ApplicationEncode, ErrorMessageReturnsInternalError )
+{
+    HIL_Application_Context_T context = MakeContext();
+
+    HIL_Application_Message_T message{};
+    message.type = HIL_APPLICATION_MESSAGE_TYPE_ERROR;
+
+    std::array<std::uint8_t, 256u> buffer{};
+    std::size_t                    output_size = 0u;
+
+    EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, buffer.data(), buffer.size(),
+                                               &output_size ),
+               HIL_APPLICATION_STATUS_INTERNAL_ERROR );
+}
+
+TEST( ApplicationDecode, InvalidHeaderIsRejected )
+{
+    HIL_Application_Context_T context = MakeContext();
+
+    /*
+     * Deliberately provide an undersized message. The header decoder
+     * should reject it rather than attempting to dispatch the body.
+     */
+    std::array<std::uint8_t, HIL_APPLICATION_HEADER_SIZE_BYTES - 1u> encoded{};
+
+    HIL_Application_Message_T decoded{};
+
+    EXPECT_NE( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded.size(), &decoded ),
+               HIL_APPLICATION_STATUS_OK );
+}
+
+TEST( ApplicationValidate, RejectsNullArguments )
+{
+    HIL_Application_Context_T context = MakeContext();
+    HIL_Application_Message_T message{};
+
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( nullptr, &message ),
+               HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, nullptr ),
+               HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+}
+
+TEST( ApplicationValidateEncoded, RejectsNullArguments )
+{
+    HIL_Application_Context_T     context = MakeContext();
+    std::array<std::uint8_t, 64u> encoded{};
+    std::size_t                   required_storage = 0u;
+
+    EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message( nullptr, encoded.data(), encoded.size(),
+                                                         &required_storage ),
+               HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+
+    EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &context, nullptr, encoded.size(),
+                                                         &required_storage ),
+               HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+
+    EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &context, encoded.data(), encoded.size(),
+                                                         nullptr ),
+               HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
 }
