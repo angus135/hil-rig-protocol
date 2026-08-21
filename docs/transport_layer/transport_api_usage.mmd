@@ -23,11 +23,13 @@ subgraph Runtime["Caller-driven service loop"]
     K["HIL_TRANSPORT_Process<br/>monotonic time + local Transport mode"]
     L["HIL_TRANSPORT_Peek_Output"]
     M{"Complete output available?"}
-    N["Offer opaque bytes to external I/O"]
-    O{"External I/O accepted all bytes?"}
+    N["Retain complete peeked item + total length<br/>set caller-owned write offset to zero"]
+    Na["Offer only remaining suffix<br/>item + write offset"]
+    O{"All bytes accepted?"}
+    Ob["Advance caller-owned offset<br/>keep same Transport item pinned"]
     P["HIL_TRANSPORT_Commit_Output"]
     Q["Drain complete Application messages<br/>frees the sole unread-message slot"]
-    R["Drain high-level events and status<br/>restores bounded event capacity"]
+    R["HIL_TRANSPORT_Read_Event<br/>successful reads restore event FIFO capacity<br/>HIL_TRANSPORT_Get_Status is observational only"]
 end
 
 Caller --> A --> B --> C --> D --> Da --> Db --> E
@@ -40,8 +42,8 @@ I -- No --> K
 Ja -- Yes --> K
 Ja -- No --> Jb --> K
 K --> L --> M
-M -- Yes --> N --> O
+M -- Yes --> N --> Na --> O
 O -- Yes --> P --> L
-O -- No, busy --> Q
+O -- No / partial --> Ob --> Na
 M -- No --> Q
 Q --> R --> E

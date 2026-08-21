@@ -97,7 +97,7 @@ typedef struct
  * @details data may be NULL only when size is zero. Message validation and
  * encoding borrow the bytes only for the duration of the call and never retain
  * the pointer. Successful decoding points spans into caller-owned decode
- * storage, never into the encoded Transport-reassembled input.
+ * storage, never into the encoded complete-message input.
  */
 typedef struct
 {
@@ -261,7 +261,8 @@ typedef struct
  * matching variable instruction/result message. A duplicate variable message
  * for the same declaration is invalid. Endpoint integration tracks that
  * cross-message relationship; the stateless codec does not. Multi-part
- * Application transfers are deferred; Transport fragmentation is transparent.
+ * Application transfers are deferred. Each complete encoded message uses one
+ * MVP Transport frame.
  */
 typedef struct
 {

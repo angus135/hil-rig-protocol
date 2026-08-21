@@ -66,8 +66,8 @@ typedef struct
  * @brief Complete variable instruction-data body for one tick/channel.
  *
  * @details This aliases the common correlation/data representation to make the
- * message family explicit. data contains one complete Application value even
- * when Transport later fragments its encoded message.
+ * message family explicit. data contains one complete Application value. Its
+ * encoded message is carried in one MVP Transport frame.
  */
 typedef HIL_Application_Peripheral_Data_T HIL_Application_Variable_Instruction_Data_T;
 

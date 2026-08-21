@@ -69,4 +69,10 @@ The harness never drains Application messages or events automatically because un
 
 ## Application tests and golden vectors
 
-`tests/c/application/` contains Application-layer tests. `tests/golden_vectors/` is the language-neutral location for stable wire-format fixtures that may later be shared by C, firmware, and Python validation.
+`tests/c/application/` contains public-type and intentional-stub tests; it does
+not test an operational codec. `tests/golden_vectors/` is the intended
+language-neutral location for stable wire fixtures, but the fixture set is not
+implemented. Existing Transport unit and integration tests cover core behaviour
+and several complex recovery cases. The complete public two-endpoint
+fault-injection matrix and consumer-style `add_subdirectory` validation remain
+unfinished.

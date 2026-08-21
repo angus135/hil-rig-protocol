@@ -5,8 +5,9 @@
  * @details Firmware and host integrations use this header to exchange opaque,
  * complete Application messages over a caller-owned byte-stream link. The
  * selected private Transport profile decides how sessions, framing, integrity,
- * reliability, and any future fragmentation work. Callers never construct
- * frames, calculate integrity fields, schedule acknowledgements, or manipulate
+ * and reliability work. The MVP places one complete Application message in one
+ * frame; fragmentation and reassembly are outside the MVP. Callers never
+ * construct frames, calculate integrity fields, schedule acknowledgements, or manipulate
  * parser/session state.
  *
  * The library performs no USB, UART, serial, DMA, RTOS, callback, clock, or
@@ -58,7 +59,7 @@ extern "C"
  *
  * @details HIL_TRANSPORT_Init() copies this structure, so it need not outlive
  * initialization. These limits describe the stable integration boundary, not
- * internal queue depths, fragment sizes, or a final wire representation.
+ * internal queue depths, buffer partitions, or a final wire representation.
  *
  * Both capacity limits must be nonzero. The selected profile may additionally
  * reject a valid pair as UNSUPPORTED_CONFIGURATION when their relationship
@@ -253,8 +254,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_Init( HIL_Transport_Context_T*       contex
  * @brief Abandon all session-scoped Transport work while retaining setup.
  *
  * @details Reset clears session negotiation, sequence and ACK state,
- * retransmission ownership, timers, partial input, any future partial
- * reassembly, pinned/uncommitted output, submitted messages, unread received
+ * retransmission ownership, timers, partial parser input, pinned/uncommitted
+ * output, submitted messages, unread received
  * messages, and every queued event. It does not enqueue SESSION_RESET for this
  * explicit caller-initiated action. It retains copied configuration, workspace
  * ownership, endpoint role, and the latest caller-reported link observation.
@@ -279,6 +280,14 @@ HIL_Transport_Status_T HIL_TRANSPORT_Init( HIL_Transport_Context_T*       contex
  * clears ownership where possible, remains in FAULT with INTERNAL recorded,
  * and returns INTERNAL_ERROR; arbitrary memory corruption is not guaranteed to
  * be recoverable.
+ *
+ * RESET is best-effort: it is not acknowledged or retransmitted, and committing
+ * its output proves only external-interface acceptance. Loss can leave peers in
+ * different session states; automatic in-band convergence is not guaranteed for
+ * every loss or simultaneous-recovery ordering. Hard recovery stops old bytes,
+ * reports DISCONNECTED, re-establishes the physical connection, reports
+ * CONNECTED, and resumes normal servicing. Link cycling does not repair FAULT;
+ * this function is its defined repair operation.
  *
  * @param[in,out] context Initialized single-owner context.
  * @return OK, INVALID_ARGUMENT, or INTERNAL_ERROR.
@@ -331,10 +340,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_Notify_Link_State( HIL_Transport_Context_T*
  * every payload byte is copied into the retained caller workspace before return;
  * the input pointer is never borrowed beyond the call. The selected profile owns
  * the copy until delivery, failure, reset, or disconnection; reset and
- * disconnection abandon any accepted message. The caller never fragments
- * messages. An MVP may support only messages
+ * disconnection abandon any accepted message. The caller supplies exactly one
+ * complete message per submission. The MVP supports only messages
  * that fit one frame; that limitation is rejected during initialization rather
- * than exposed as fragment metadata here.
+ * rather than exposing fragmentation metadata here.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[in] payload Complete message bytes; NULL is valid only when payload_len
@@ -501,12 +510,17 @@ HIL_Transport_Status_T HIL_TRANSPORT_Peek_Output( HIL_Transport_Context_T* conte
  * @brief Confirm that external I/O accepted the complete last-peeked item.
  *
  * @details Call only after the caller's USB/serial implementation accepted all
- * bytes as one transmission. Transport routes commit to the lifecycle that
+ * bytes in the last-peeked item. For partial external writes, retain the complete
+ * peeked copy and a caller-owned offset, retry only its remaining suffix, and do
+ * not commit until every byte has been accepted. A partial write is not a
+ * Transport commit. Transport routes commit to the lifecycle that
  * produced the pinned item. Control commit releases its slot immediately and
  * deliberately ignores now_ms. Reliable acknowledgement timing starts at
  * now_ms, not when bytes were peeked; reliable bytes remain retained until a
- * matching acknowledgement, later owner-directed recovery, or reset. The
- * initial reliable commit does not count as a retransmission; each committed
+ * matching acknowledgement, later owner-directed recovery, or reset. Committing
+ * RESET proves only that the external interface accepted its bytes; RESET is
+ * neither acknowledged nor retransmitted, and commit does not prove peer receipt.
+ * The initial reliable commit does not count as a retransmission; each committed
  * retry increments the private count exactly once. Commit never performs
  * hardware I/O, reconstruction, CRC, or COBS work. If either session-state
  * mirror is FAULT, commit returns INTERNAL_ERROR without changing output
@@ -543,16 +557,20 @@ HIL_Transport_Status_T HIL_TRANSPORT_Read_Application_Data( HIL_Transport_Contex
 /**
  * @brief Retrieve and consume the oldest high-level Transport event.
  *
- * @details The MVP retains a private bounded FIFO whose depth is not part of the
- * public contract. This operation copies one fully initialized oldest event and
+ * @details The selected profile retains a fixed, bounded FIFO whose exact depth
+ * is private. This operation copies one initialized oldest event and
  * consumes exactly that event only after the complete copy succeeds. NOT_READY,
  * INVALID_ARGUMENT, and INTERNAL_ERROR leave event unchanged. Events do not
  * instruct callers to construct ACK, recovery, or handshake frames; such output
  * remains an internal Transport responsibility. Event storage and reading are
  * implemented. Link changes, handshake establishment, receive/protocol errors,
  * automatic session abandonment, and outbound Application delivery success or
- * failure generate their events. Inbound Application availability is reported by
- * application_message_pending rather than a separate delivery event.
+ * failure generate their events. Event draining is required service work: unread
+ * entries are never overwritten, and bounded protocol transitions may return
+ * CAPACITY_EXHAUSTED until an event can be retained. After a successful read, the
+ * caller resumes its normal Process()/Receive_Bytes() retry flow. Inbound
+ * Application availability is reported by application_message_pending rather
+ * than a separate delivery event.
  *
  * @param[in,out] context Initialized single-owner context.
  * @param[out] event Destination for one event; must not be NULL.
@@ -574,8 +592,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_Read_Event( HIL_Transport_Context_T* contex
  * expose output type, private profile state, sequences, retry counts, borrowed
  * workspace pointers, or mutable handles. Core role/link/session/failure mirrors,
  * operating-mode metadata, and private pending-state metadata are validated before
- * they are copied into the snapshot; invariant failure returns INTERNAL_ERROR rather
- * than exposing invalid enums, booleans, or inconsistent state.
+ * they are copied into the snapshot. With valid metadata this operation is
+ * observational. Validation failure can place the context in FAULT and return
+ * INTERNAL_ERROR rather than exposing invalid state; HIL_TRANSPORT_Reset() is
+ * then required.
  *
  * @param[in] context Initialized single-owner context.
  * @param[out] status Snapshot destination; must not be NULL.

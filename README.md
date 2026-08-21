@@ -28,10 +28,9 @@ typed firmware/Python data
     -> caller-owned USB/UART/serial I/O
 ```
 
-Reception follows the reverse path. Transport must return one complete
-reassembled Application message before the Application codec decodes it.
-Transport fragmentation, when supported by a future profile, remains invisible
-to Application.
+Reception follows the reverse path. The MVP returns one complete Application
+message before a future Application codec decodes it. It places each message in
+one Transport frame; fragmentation and reassembly are outside the MVP.
 
 The layer boundary is deliberate:
 
@@ -49,6 +48,16 @@ The layer boundary is deliberate:
   be at least Application's maximum encoded-message size.
 
 ## Current status
+
+The MVP Transport implementation includes framing, COBS, CRC, reliable and
+control output, output arbitration, bounded events, link/session recovery, the
+handshake, transactional receive, and bidirectional complete-message delivery.
+Integration and consumer readiness remain partial. Existing unit and integration
+tests cover core
+behaviour and several complex recovery cases, but the complete public
+two-endpoint fault-injection matrix, language-neutral golden vectors, a concrete
+runnable consumer example, and consumer-style `add_subdirectory` validation are
+not finished.
 
 Application encoding, decoding, and structural validation are intentional
 `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` stubs, and the common Application wire
@@ -73,8 +82,8 @@ time, while reliable commit starts ACK timing and retains the encoded bytes.
 lifecycle tests use opaque sentinel bytes; handshake tests additionally decode
 the real INITIATE, RESPONSE, CONFIRM, ACK, and RESET output they coordinate.
 
-The MVP also embeds private storage for four complete high-level Transport
-events. Private modules can publish complete event values into this bounded
+The MVP also embeds private storage for a bounded FIFO of complete high-level
+Transport events. Private modules can publish complete event values into this
 FIFO without retaining caller pointers. `Read_Event()` returns the oldest event
 and consumes exactly that event only after a successful complete copy;
 `NOT_READY` and other errors preserve the destination. A full FIFO returns
@@ -86,7 +95,8 @@ exactly one `SESSION_ESTABLISHED` per endpoint; automatic session abandonment
 preserves older events and attempts to append `SESSION_RESET`.
 
 The semantic MVP session handshake is implemented through a private coordinator:
-host INITIATE, rig RESPONSE, host CONFIRM, and rig ACK establish both endpoints.
+three reliable negotiation frames (`INITIATE`, `RESPONSE`, and `CONFIRM`) plus a
+final ACK acknowledging `CONFIRM`. The clean exchange is four wire transmissions.
 It reuses the codec and output lifecycles, supports exact duplicate recovery and
 timed retries, and abandons exhausted attempts through the existing session
 recovery path. `HIL_TRANSPORT_Process()` validates and records all three MVP
@@ -116,15 +126,22 @@ ACK publication succeeds. A repeat of the last accepted Application sequence is 
 without exposing the payload twice. A new expected frame is retained
 transactionally when the unread-message slot or control-output slot is occupied,
 and `HIL_TRANSPORT_Read_Application_Data()` supports size query, undersized retry,
-and consume-on-success reads of complete opaque messages. Fragmentation,
-reassembly, receive queues, and reorder windows remain unimplemented.
+and consume-on-success reads of complete opaque messages. Fragmentation and
+reassembly are outside the MVP; receive queues and reorder windows are unsupported.
 
 The default MVP Transport profile is designed for one complete Application
 message per frame and one outstanding reliable transmission. The private event
-FIFO does not imply message or output queueing. Extended fragmentation,
-reassembly, flow control, keepalives, and message queueing remain future design
-only. Public headers, documentation, unit tests, and public two-endpoint integration tests define
-the integration contracts.
+FIFO does not imply message or output queueing. Possible extended-profile
+fragmentation, reassembly, flow control, keepalives, and message queueing remain
+future design only. Public headers, documentation, unit tests, and public
+two-endpoint integration tests define the integration contracts.
+
+`DELIVERY_CONFIRMED` means the peer Transport accepted a message, not that its
+Application layer decoded or processed it. Unread received messages can be
+discarded by reset, abandonment, or link loss. Application Responses and Test
+IDs provide higher-level transaction semantics; after delivery failure or
+session loss, firmware or host software decides whether and how to restart an
+upload, execution request, or result transaction.
 
 ## Build and test
 
