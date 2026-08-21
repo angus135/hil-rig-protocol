@@ -722,7 +722,7 @@ TEST( TransportHandshake, RejectsWrongRoleIdentitySequenceAcknowledgementAndDupl
     frame = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 11u, 3u, 10u );
     ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host.root, &frame, &result ),
                HIL_TRANSPORT_STATUS_OK );
-    EXPECT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE );
+    EXPECT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE );
     frame = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 12u, 3u, 99u );
     ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host.root, &frame, &result ),
                HIL_TRANSPORT_STATUS_OK );
@@ -739,6 +739,75 @@ TEST( TransportHandshake, RejectsWrongRoleIdentitySequenceAcknowledgementAndDupl
     ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host.root, &frame, &result ),
                HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE );
+}
+
+TEST( TransportHandshake, DifferentSessionIdentifiersAreIncompatibleInSemanticHandlers )
+{
+    constexpr std::uint64_t current_session = 100u;
+    constexpr std::uint64_t other_session   = 99u;
+
+    Harness host_response;
+    host_response.Initialize( HIL_TRANSPORT_ROLE_HOST, current_session, 10u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Process( &host_response.root, 0u ),
+               HIL_TRANSPORT_STATUS_OK );
+    HIL_Transport_Mvp_Frame_T published{};
+    ASSERT_TRUE( PeekDecodeCommit( host_response, 1u, &published ) );
+    host_response.root.recently_abandoned_session_identifier       = other_session;
+    host_response.root.recently_abandoned_session_identifier_valid = 1u;
+    const auto other_response =
+        EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, other_session, 500u, 10u );
+    HIL_Transport_Mvp_Handshake_Frame_Result_T frame_result;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host_response.root, &other_response,
+                                                         &frame_result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( frame_result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE );
+
+    Harness rig;
+    rig.Initialize( HIL_TRANSPORT_ROLE_RIG, HIL_TRANSPORT_SESSION_SEED_INVALID, 500u );
+    const auto initiate = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_INITIATE, current_session, 10u, 0u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &initiate, &frame_result ),
+               HIL_TRANSPORT_STATUS_OK );
+    rig.root.recently_abandoned_session_identifier       = other_session;
+    rig.root.recently_abandoned_session_identifier_valid = 1u;
+    const auto other_initiate =
+        EmptyFrame( HIL_TRANSPORT_MVP_FRAME_INITIATE, other_session, 10u, 0u );
+    ASSERT_EQ(
+        HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &other_initiate, &frame_result ),
+        HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( frame_result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE );
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Process( &rig.root, 0u ), HIL_TRANSPORT_STATUS_OK );
+    ASSERT_TRUE( PeekDecodeCommit( rig, 1u, &published ) );
+    const auto other_confirm =
+        EmptyFrame( HIL_TRANSPORT_MVP_FRAME_CONFIRM, other_session, 11u, 500u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &rig.root, &other_confirm, &frame_result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( frame_result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE );
+
+    Harness host_proof;
+    host_proof.Initialize( HIL_TRANSPORT_ROLE_HOST, current_session, 10u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Process( &host_proof.root, 0u ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_TRUE( PeekDecodeCommit( host_proof, 1u, &published ) );
+    const auto response =
+        EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, current_session, 500u, 10u );
+    ASSERT_EQ(
+        HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host_proof.root, &response, &frame_result ),
+        HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Process( &host_proof.root, 2u ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_TRUE( PeekDecodeCommit( host_proof, 3u, &published ) );
+    host_proof.root.recently_abandoned_session_identifier       = other_session;
+    host_proof.root.recently_abandoned_session_identifier_valid = 1u;
+    const std::uint8_t              payload                     = 1u;
+    const HIL_Transport_Mvp_Frame_T other_application{
+        HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE, other_session, 501u, 0u, &payload, 1u,
+    };
+    HIL_Transport_Mvp_Handshake_Application_Proof_Result_T proof_result;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Try_Complete_Host_From_Application(
+                   &host_proof.root, &other_application, &proof_result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( proof_result, HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_INCOMPATIBLE );
 }
 
 TEST( TransportHandshake, RejectsInvalidReservedInitiateAndStaleAckWithoutMutation )

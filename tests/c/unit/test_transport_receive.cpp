@@ -463,7 +463,9 @@ TEST( TransportReceive, StaleResetDoesNotAbandonNewerSession )
     auto context = host.Context();
     ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
                HIL_TRANSPORT_STATUS_OK );
-    const auto stale_reset = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESET, 76u, 0u, 0u ) );
+    host.root.recently_abandoned_session_identifier       = 42u;
+    host.root.recently_abandoned_session_identifier_valid = 1u;
+    const auto stale_reset = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESET, 42u, 0u, 0u ) );
 
     std::size_t consumed = 0u;
     EXPECT_EQ(
@@ -475,15 +477,17 @@ TEST( TransportReceive, StaleResetDoesNotAbandonNewerSession )
     EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
 }
 
-TEST( TransportReceive, DelayedResponseFromPreviousSessionDoesNotResetNewAttempt )
+TEST( TransportReceive, RecordedAbandonedResponseDoesNotResetNewAttempt )
 {
     ReceiveHarness host;
     host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
     auto context = host.Context();
     ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
                HIL_TRANSPORT_STATUS_OK );
+    host.root.recently_abandoned_session_identifier       = 42u;
+    host.root.recently_abandoned_session_identifier_valid = 1u;
     const auto delayed_response =
-        Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 76u, 500u, 10u ) );
+        Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 42u, 500u, 10u ) );
 
     std::size_t consumed = 0u;
     EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, delayed_response.data(),

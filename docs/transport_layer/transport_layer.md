@@ -336,7 +336,7 @@ coordinator, publishes RESET for the failed identity, and returns `DELIVERY_FAIL
 on that transition. `Process()` does not start replacement establishment until
 that RESET control output is committed. The locally generated RESET is a
 recovery barrier: once published, Transport retains its failed-session identity
-and does not let later incompatible old-session traffic or a repeated explicit
+and does not let later incompatible traffic or a repeated explicit
 Reset silently clear that synchronization signal before commit. A repeated
 explicit Reset may invalidate a caller-owned peek as part of its normal reset
 semantics, but it re-publishes the same RESET for the failed session afterwards.
@@ -344,9 +344,11 @@ RESET remains a best-effort, non-reliable control item in the MVP: these recover
 rules synchronize the peer when RESET is delivered, but loss of RESET itself is
 not repaired by a RESET retransmission or keepalive mechanism. The most recently
 adopted session identity is retained while the physical link remains connected
-so delayed traffic from that abandoned session can be rejected without tearing
-down its replacement. Only one abandoned identity is retained. A replacement
-session must establish before another Application message is accepted.
+so delayed traffic carrying that exact abandoned identity can be rejected without
+tearing down its replacement. Only one abandoned identity is retained. Identities
+are not ordered for receive classification: numeric adjacency does not imply that
+an identity was abandoned. A replacement session must establish before another
+Application message is accepted.
 
 ## Exact receive consumption
 
@@ -404,17 +406,24 @@ profile boundary.
 Ordinary malformed COBS and CRC-invalid bodies publish `PROTOCOL_ERROR` with
 status `NOT_READY`, failure `PROTOCOL`, and zero required capacity, then preserve
 the current session as if the frame were lost. Stale decoded traffic is rejected
-without abandoning a newer session. Frames carrying the one recently abandoned
-session identity are classified before frame-specific handshake/Application
-semantics, consumed as obsolete traffic, and never allowed to invalidate a
-replacement handshake. If the event FIFO is full, the stale body is still
+without abandoning a newer session. Before dispatch by frame type, the receive
+coordinator classifies cross-session traffic as stale only when its identity
+exactly matches the explicitly recorded recently abandoned identity and differs
+from the current identity. Frame-specific handshake and Application handlers
+therefore treat every other different valid identity as incompatible. No
+abandoned identity is inferred by decrementing the current identity or by any
+other numeric-distance rule. Explicitly recorded stale traffic is consumed as
+obsolete and never allowed to invalidate a replacement handshake. If the event
+FIFO is full, the stale body is still
 consumed and only its `PROTOCOL_ERROR` publication remains pending. While an
 unbound RIG is waiting for a fresh INITIATE, other valid frame types are likewise
 reported/rejected without starting another recovery cycle because there is no
-current session to abandon. Current-session semantic incompatibility publishes
-the same diagnostic when capacity permits, abandons through the session
+current session to abandon. A different valid identity that is neither current
+nor the recorded abandoned identity is incompatible. It publishes the same
+diagnostic when capacity permits, abandons the current session through the session
 coordinator regardless of event capacity, and publishes one best-effort RESET
-using the failed session identity after old control ownership is cleared.
+using the actual failed current-session identity after old control ownership is
+cleared.
 `Process()` waits for that RESET to be committed before starting the replacement
 session. If further incompatible frames arrive while that local recovery RESET
 is still pending, they are rejected and may publish `PROTOCOL_ERROR`, but they do
@@ -434,8 +443,11 @@ unconsumed INITIATE suffix remains caller-owned and is valid when retried.
 The MVP deliberately does not make RESET reliable. RESET is not acknowledged or
 retransmitted, there is no peer-liveness/keepalive timer, and automatic
 convergence is not guaranteed for every simultaneous two-sided recovery ordering.
-Only the most recently abandoned session identity is remembered. These are
-accepted MVP limits rather than reasons to expand the wire protocol.
+Only the most recently abandoned session identity is remembered. Traffic from
+still older identities is conservatively incompatible and can cause an
+unnecessary recovery, but it is never delivered as current-session Application
+data. These are accepted MVP limits rather than reasons to expand the wire
+protocol.
 
 If peers fail to converge after recovery, the supported hard-recovery path is to
 stop forwarding old link bytes, notify Transport of `DISCONNECTED`, restart or
@@ -476,10 +488,11 @@ last accepted reliable frame category and acknowledgement metadata, so a sequenc
 collision with a handshake frame is not mistaken for duplicate Application data.
 The MVP does not retain the previous payload solely to byte-compare a retry; the
 peer reliability lifecycle already retransmits the original encoded bytes for a
-given sequence. Older/skipped current-session sequences are incompatible with MVP stop-and-wait
-and trigger protocol recovery. An Application frame for the immediately previous
-session identity is treated as stale protocol input and does not tear down the
-newer established session.
+given sequence. Older/skipped current-session sequences are incompatible with MVP
+stop-and-wait and trigger protocol recovery. An Application frame carrying the
+explicitly recorded recently abandoned identity is stale protocol input and does
+not tear down the newer established session. Numeric adjacency to the current
+identity has no stale-session meaning.
 
 The MVP owns exactly one unread complete Application message. If a new expected
 message arrives while that slot is occupied, Transport withholds its ACK, does not
@@ -613,9 +626,12 @@ private link-observed flag distinguishes the initialized DISCONNECTED value from
 a real caller observation and is retained across abandonment and reset. The
 first DISCONNECTED observation is silent. The first CONNECTED observation
 publishes `LINK_STATE_CHANGED`, enters `CONNECTING`, and prepares a fresh
-handshake without encoding or publishing a frame. A host assigns the current
-identity cursor to the attempt and advances it immediately; after using
-`UINT64_MAX - 1`, the cursor wraps to 1. A rig keeps an invalid active identity
+handshake without encoding or publishing a frame. A host currently assigns its
+deterministic identity cursor to the attempt and advances it immediately; after
+using `UINT64_MAX - 1`, the cursor wraps to 1. This deterministic generation
+strategy is a host implementation detail, not an interoperability rule or receive
+classification rule; the protocol requires only a fresh, valid identity. A rig
+keeps an invalid active identity
 and waits for a later validated INITIATE. Starting another attempt while already
 CONNECTING or ESTABLISHED returns `NOT_READY` through the private seam and does
 not consume another identity.

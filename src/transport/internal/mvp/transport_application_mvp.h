@@ -36,7 +36,7 @@ typedef enum
     /** The last accepted Application sequence was re-ACKed without redelivery. */
     HIL_TRANSPORT_MVP_APPLICATION_FRAME_DUPLICATE,
 
-    /** Traffic belongs to the immediately previous session and must not reset the current one. */
+    /** Obsolete disposition; cross-session stale traffic is filtered before this handler. */
     HIL_TRANSPORT_MVP_APPLICATION_FRAME_STALE,
 
     /** Current-session sequence/session semantics are incompatible with stop-and-wait state. */
