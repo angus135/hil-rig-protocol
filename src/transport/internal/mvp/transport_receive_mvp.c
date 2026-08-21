@@ -230,6 +230,11 @@ static int
 HIL_TRANSPORT_MVP_Receive_Frame_Is_Recently_Abandoned( const HIL_Transport_Mvp_Root_T*  root,
                                                        const HIL_Transport_Mvp_Frame_T* frame )
 {
+    /*
+     * This pre-dispatch check is the sole cross-session stale classifier. Only
+     * the explicitly recorded abandoned identity is stale; frame-specific
+     * handlers treat every other different valid identity as incompatible.
+     */
     return ( root->recently_abandoned_session_identifier_valid != 0u )
            && ( frame->session_identifier == root->recently_abandoned_session_identifier )
            && ( ( root->session.session_identifier_valid == 0u )

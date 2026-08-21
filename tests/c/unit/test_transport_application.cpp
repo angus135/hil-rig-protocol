@@ -88,6 +88,18 @@ struct Harness
             root.session.handshake_phase = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE;
         }
     }
+
+    void SetActiveSessionIdentifier( std::uint64_t session_identifier )
+    {
+        root.session.session_identifier           = session_identifier;
+        root.session.next_host_session_identifier = session_identifier + 1u;
+    }
+
+    void SetRecentlyAbandonedSessionIdentifier( std::uint64_t session_identifier )
+    {
+        root.recently_abandoned_session_identifier       = session_identifier;
+        root.recently_abandoned_session_identifier_valid = 1u;
+    }
 };
 
 std::array<std::uint8_t, EncodedCapacity> EncodeAck( std::uint64_t session_identifier,
@@ -894,17 +906,34 @@ TEST( TransportApplication, ReceiveSequenceWrapDeliversEachMessageOnce )
     EXPECT_EQ( output[0], second[0] );
 }
 
-TEST( TransportApplication, PreviousSessionApplicationIsRejectedWithoutResettingEstablishedSession )
+TEST( TransportApplication,
+      ExplicitlyRecordedNonAdjacentSessionApplicationDoesNotResetEstablishedSession )
 {
     Harness harness;
     harness.InitializeEstablished();
+    harness.SetActiveSessionIdentifier( 100u );
+    harness.SetRecentlyAbandonedSessionIdentifier( 42u );
     const std::array<std::uint8_t, 1u> payload{ 3u };
+    const std::array<std::uint8_t, 2u> submitted{ 8u, 9u };
 
-    ASSERT_EQ(
-        FeedApplication( harness, SessionIdentifier - 1u, 5u, payload.data(), payload.size() ),
-        HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( HIL_TRANSPORT_Submit_Application_Data( &harness.context, submitted.data(),
+                                                      submitted.size() ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto reliable_before = harness.root.session;
+    const auto encoded_before  = harness.encoded;
+
+    ASSERT_EQ( FeedApplication( harness, 42u, 5u, payload.data(), payload.size() ),
+               HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( harness.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
     EXPECT_EQ( harness.root.received_message_pending, 0u );
+    EXPECT_EQ( harness.root.received_message_size, 0u );
+    EXPECT_EQ( harness.root.submitted_message_pending, 1u );
+    EXPECT_EQ( harness.root.submitted_message_size, submitted.size() );
+    EXPECT_EQ( harness.root.session.reliable_state, reliable_before.reliable_state );
+    EXPECT_EQ( harness.root.session.retained_transmit_sequence,
+               reliable_before.retained_transmit_sequence );
+    EXPECT_EQ( harness.encoded, encoded_before );
+    EXPECT_EQ( harness.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE );
     HIL_Transport_Event_T event{};
     ASSERT_EQ( HIL_TRANSPORT_Read_Event( &harness.context, &event ), HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( event.type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
@@ -914,39 +943,87 @@ TEST( TransportApplication, PreviousSessionApplicationIsRejectedWithoutResetting
 
 TEST( TransportApplication, UnrelatedSessionApplicationTriggersMandatoryRecovery )
 {
-    Harness harness;
-    harness.InitializeEstablished();
-    const std::array<std::uint8_t, 2u> payload{ 3u, 4u };
-
-    ASSERT_EQ(
-        FeedApplication( harness, SessionIdentifier + 10u, 5u, payload.data(), payload.size() ),
-        HIL_TRANSPORT_STATUS_OK );
-
-    EXPECT_EQ( harness.root.received_message_pending, 0u );
-    EXPECT_EQ( harness.root.received_message_size, 0u );
-    EXPECT_EQ( harness.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
-    EXPECT_EQ( harness.root.session.state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
-    EXPECT_EQ( harness.root.parser.body_ready, 0u );
-    EXPECT_EQ( harness.root.parser.accumulated_size, 0u );
-
-    bool                  protocol_error = false;
-    bool                  session_reset  = false;
-    HIL_Transport_Event_T event{};
-    while ( HIL_TRANSPORT_Read_Event( &harness.context, &event ) == HIL_TRANSPORT_STATUS_OK )
+    constexpr std::array<std::uint64_t, 2u> unrelated_identifiers{ 99u, 110u };
+    for ( const auto unrelated_identifier : unrelated_identifiers )
     {
-        protocol_error = protocol_error || event.type == HIL_TRANSPORT_EVENT_PROTOCOL_ERROR;
-        session_reset  = session_reset || event.type == HIL_TRANSPORT_EVENT_SESSION_RESET;
-    }
-    EXPECT_TRUE( protocol_error );
-    EXPECT_TRUE( session_reset );
+        SCOPED_TRACE( unrelated_identifier );
+        Harness harness;
+        harness.InitializeEstablished();
+        harness.SetActiveSessionIdentifier( 100u );
+        harness.SetRecentlyAbandonedSessionIdentifier( 42u );
+        const std::array<std::uint8_t, 2u> payload{ 3u, 4u };
 
-    std::array<std::uint8_t, ApplicationCapacity> decoded{};
-    std::size_t                                   decoded_size = 0u;
-    const auto reset = PeekDecodeOutput( harness, &decoded, &decoded_size );
-    EXPECT_EQ( reset.type, HIL_TRANSPORT_MVP_FRAME_RESET );
-    EXPECT_EQ( reset.session_identifier, SessionIdentifier );
-    EXPECT_EQ( reset.sequence, 0u );
-    EXPECT_EQ( reset.acknowledgement_sequence, 0u );
+        ASSERT_EQ(
+            FeedApplication( harness, unrelated_identifier, 5u, payload.data(), payload.size() ),
+            HIL_TRANSPORT_STATUS_OK );
+
+        EXPECT_EQ( harness.root.received_message_pending, 0u );
+        EXPECT_EQ( harness.root.received_message_size, 0u );
+        EXPECT_EQ( harness.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+        EXPECT_EQ( harness.root.session.state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+        EXPECT_EQ( harness.root.recently_abandoned_session_identifier_valid, 1u );
+        EXPECT_EQ( harness.root.recently_abandoned_session_identifier, 100u );
+        EXPECT_EQ( harness.root.parser.body_ready, 0u );
+        EXPECT_EQ( harness.root.parser.accumulated_size, 0u );
+
+        bool                  protocol_error = false;
+        bool                  session_reset  = false;
+        HIL_Transport_Event_T event{};
+        while ( HIL_TRANSPORT_Read_Event( &harness.context, &event ) == HIL_TRANSPORT_STATUS_OK )
+        {
+            protocol_error = protocol_error || event.type == HIL_TRANSPORT_EVENT_PROTOCOL_ERROR;
+            session_reset  = session_reset || event.type == HIL_TRANSPORT_EVENT_SESSION_RESET;
+        }
+        EXPECT_TRUE( protocol_error );
+        EXPECT_TRUE( session_reset );
+
+        std::array<std::uint8_t, ApplicationCapacity> decoded{};
+        std::size_t                                   decoded_size = 0u;
+        const auto reset = PeekDecodeOutput( harness, &decoded, &decoded_size );
+        EXPECT_EQ( reset.type, HIL_TRANSPORT_MVP_FRAME_RESET );
+        EXPECT_EQ( reset.session_identifier, 100u );
+        EXPECT_EQ( reset.sequence, 0u );
+        EXPECT_EQ( reset.acknowledgement_sequence, 0u );
+
+        ASSERT_EQ(
+            HIL_TRANSPORT_Process( &harness.context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+            HIL_TRANSPORT_STATUS_OK );
+        EXPECT_EQ( harness.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+        ASSERT_EQ( HIL_TRANSPORT_Commit_Output( &harness.context, 2u ), HIL_TRANSPORT_STATUS_OK );
+        ASSERT_EQ(
+            HIL_TRANSPORT_Process( &harness.context, 3u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+            HIL_TRANSPORT_STATUS_OK );
+        EXPECT_EQ( harness.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+        EXPECT_EQ( harness.root.session.session_identifier, 101u );
+    }
+}
+
+TEST( TransportApplication, WrapBoundarySessionIsStaleOnlyWhenExplicitlyRecorded )
+{
+    constexpr std::uint64_t            candidate = HIL_TRANSPORT_SESSION_SEED_RESERVED - 1u;
+    const std::array<std::uint8_t, 1u> payload{ 3u };
+
+    Harness unrelated;
+    unrelated.InitializeEstablished();
+    unrelated.SetActiveSessionIdentifier( 1u );
+    ASSERT_EQ( FeedApplication( unrelated, candidate, 5u, payload.data(), payload.size() ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( unrelated.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( unrelated.root.received_message_pending, 0u );
+
+    Harness stale;
+    stale.InitializeEstablished();
+    stale.SetActiveSessionIdentifier( 1u );
+    stale.SetRecentlyAbandonedSessionIdentifier( candidate );
+    ASSERT_EQ( FeedApplication( stale, candidate, 5u, payload.data(), payload.size() ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( stale.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+    EXPECT_EQ( stale.root.received_message_pending, 0u );
+    EXPECT_EQ( stale.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE );
+    HIL_Transport_Event_T event{};
+    ASSERT_EQ( HIL_TRANSPORT_Read_Event( &stale.context, &event ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( event.type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
+    EXPECT_EQ( HIL_TRANSPORT_Read_Event( &stale.context, &event ), HIL_TRANSPORT_STATUS_NOT_READY );
 }
 
 TEST( TransportApplication, IncompatibleApplicationSequenceAbandonsSession )

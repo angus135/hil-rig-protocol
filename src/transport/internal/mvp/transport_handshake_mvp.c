@@ -51,17 +51,6 @@ static int HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Valid( uint64_t ses
 }
 
 static int
-HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Previous( uint64_t current_session_identifier,
-                                                            uint64_t candidate_session_identifier )
-{
-    const uint64_t previous_session_identifier = current_session_identifier == 1u
-                                                     ? HIL_TRANSPORT_SESSION_SEED_RESERVED - 1u
-                                                     : current_session_identifier - 1u;
-
-    return candidate_session_identifier == previous_session_identifier;
-}
-
-static int
 HIL_TRANSPORT_MVP_Handshake_Frame_Has_Empty_Payload( const HIL_Transport_Mvp_Frame_T* frame )
 {
     return frame->payload_size == 0u;
@@ -267,10 +256,7 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Host_Response(
 
     if ( frame->session_identifier != root->session.session_identifier )
     {
-        *result = HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Previous(
-                      root->session.session_identifier, frame->session_identifier )
-                      ? HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE
-                      : HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
         return HIL_TRANSPORT_STATUS_OK;
     }
     status = HIL_TRANSPORT_MVP_Session_Classify_Sequence( &root->session, frame->sequence,
@@ -433,10 +419,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Try_Complete_Host_From_Applic
 
     if ( frame->session_identifier != root->session.session_identifier )
     {
-        *result = HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Previous(
-                      root->session.session_identifier, frame->session_identifier )
-                      ? HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_STALE
-                      : HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_INCOMPATIBLE;
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_INCOMPATIBLE;
         return HIL_TRANSPORT_STATUS_OK;
     }
     if ( ( frame->payload == NULL ) || ( frame->payload_size == 0u )
@@ -520,10 +503,7 @@ static HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Handle_Rig_Initiate(
     if ( ( root->session.session_identifier_valid != 0u )
          && ( frame->session_identifier != root->session.session_identifier ) )
     {
-        *result = HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Previous(
-                      root->session.session_identifier, frame->session_identifier )
-                      ? HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE
-                      : HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
         return HIL_TRANSPORT_STATUS_OK;
     }
     status = HIL_TRANSPORT_MVP_Session_Classify_Sequence( &root->session, frame->sequence,
@@ -598,10 +578,7 @@ HIL_TRANSPORT_MVP_Handshake_Handle_Rig_Confirm( HIL_Transport_Mvp_Root_T*       
 
     if ( frame->session_identifier != root->session.session_identifier )
     {
-        *result = HIL_TRANSPORT_MVP_Handshake_Session_Identifier_Is_Previous(
-                      root->session.session_identifier, frame->session_identifier )
-                      ? HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE
-                      : HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
         return HIL_TRANSPORT_STATUS_OK;
     }
     status = HIL_TRANSPORT_MVP_Session_Classify_Sequence( &root->session, frame->sequence,

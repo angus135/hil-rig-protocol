@@ -59,16 +59,6 @@ static int HIL_TRANSPORT_MVP_Application_Received_Message_Metadata_Is_Valid(
     return root->received_message_size != 0u;
 }
 
-static int HIL_TRANSPORT_MVP_Application_Session_Identifier_Is_Previous(
-    uint64_t current_session_identifier, uint64_t candidate_session_identifier )
-{
-    const uint64_t previous_session_identifier = current_session_identifier == 1u
-                                                     ? HIL_TRANSPORT_SESSION_SEED_RESERVED - 1u
-                                                     : current_session_identifier - 1u;
-
-    return candidate_session_identifier == previous_session_identifier;
-}
-
 static HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Application_Publish_Acknowledgement( HIL_Transport_Mvp_Root_T* root,
                                                        uint16_t                  sequence )
@@ -294,11 +284,6 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Application_Handle_Received_Frame(
     }
     if ( frame->session_identifier != root->session.session_identifier )
     {
-        if ( HIL_TRANSPORT_MVP_Application_Session_Identifier_Is_Previous(
-                 root->session.session_identifier, frame->session_identifier ) )
-        {
-            *result = HIL_TRANSPORT_MVP_APPLICATION_FRAME_STALE;
-        }
         return HIL_TRANSPORT_STATUS_OK;
     }
 
