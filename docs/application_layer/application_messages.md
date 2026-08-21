@@ -8,6 +8,12 @@ This is the message-level companion to
 byte order, compatibility behavior, and all codec algorithms remain TODO. Every
 current `.c` function is an intentional `NOT_IMPLEMENTED` stub.
 
+Transport can already carry each complete opaque encoded Application message,
+but the Application encode/decode codec, exact wire layouts, and validation
+behaviour are not implemented. No Python binding or completed Python codec
+exists. End-to-end IDC readiness therefore still depends on this separate codec
+and on firmware/host endpoint integration.
+
 The structures below are C API representations, not packed wire layouts.
 `size_t`, enum representation, padding, unions, and pointers must never be
 copied directly onto the wire.
@@ -28,7 +34,11 @@ There is no Application sequence number. Transport supplies reliable ordered
 delivery. Application correlation uses Test ID when applicable, Response scope,
 tick number, peripheral/channel, and the relevant control command. A Transport
 ACK confirms byte/frame delivery; an Application Response separately confirms a
-semantic outcome. Initial instruction upload uses stop-and-wait at tick
+semantic outcome. Likewise, Transport `DELIVERY_CONFIRMED` means peer Transport
+accepted the message; it does not prove peer Application decoding or processing.
+An unread received message may be discarded by reset, session abandonment, or
+link loss. Application request/response correlation and Test IDs own the
+higher-level transaction semantics. Initial instruction upload uses stop-and-wait at tick
 granularity rather than an Application sequence field. More generally, Python
 serializes response-requiring operations so identical requests and Responses
 cannot become ambiguous; the codec stores no request identity or outstanding
@@ -38,12 +48,14 @@ The eventual common wire envelope must identify the Application protocol
 version. Its complete layout, fields, widths, byte order, and serialization
 remain undefined in this PR.
 
-### Compiled-in codec version
+### Reserved codec version
 
-The MVP library defines `HIL_APPLICATION_PROTOCOL_VERSION_MAJOR == 1` and
-`HIL_APPLICATION_PROTOCOL_VERSION_MINOR == 0`. Encoding always produces this
-compiled-in version, and decoding accepts only this version. An incompatible
-version produces `HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE`.
+The public constants `HIL_APPLICATION_PROTOCOL_VERSION_MAJOR == 1` and
+`HIL_APPLICATION_PROTOCOL_VERSION_MINOR == 0` reserve Application version 1.0.
+A future codec will encode and validate this version. The current
+`NOT_IMPLEMENTED` encoder and decoder do not perform version handling. The
+future decoder will report an incompatible version as
+`HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE`.
 
 Callers cannot select or negotiate another version through codec configuration,
 context, typed messages, or individual calls. System Information version fields
@@ -163,7 +175,7 @@ UART/SPI/I2C/CAN Application messages correlated by Test ID, tick, peripheral,
 and channel. It is not one monolithic package, and a complete tick is not folded
 into one large Application message.
 
-Transport may transparently fragment each complete Application message. The
+The MVP Transport carries each complete Application message in one frame. The
 Application codec's `max_variable_data_size` and `max_encoded_message_size`
 bound individual messages. Integration must configure Transport's maximum
 Application-message size to at least the Application Layer's maximum encoded
@@ -339,8 +351,8 @@ the one outstanding tick. Tick `ACCEPTED` allows the host to submit tick T + 1;
 before that Response, no later tick may be submitted. This stop-and-wait rule is
 an initial Application transaction rule, not Transport state or firmware
 execution-manager state. A Transport ACK remains only a delivery confirmation,
-and Transport may fragment and reliably deliver each complete Application
-message independently. Future pipelining requires a versioned capability.
+and Transport reliably delivers each complete Application message independently
+in one MVP frame. Future pipelining requires a versioned capability.
 
 Tick acceptance does not require a completed NAND write: retention may be NAND,
 RAM, or an accepted storage-manager queue.
@@ -481,7 +493,8 @@ accepted for delivery. Whether retained results wait for a Transport delivery
 acknowledgement is firmware/Transport policy. Application defines no simultaneous
 endpoint state change, per-result Response, Application-level stop-and-wait
 acknowledgement, result-finalization message, or result-summary message.
-Transport owns acknowledgement, retransmission, and fragmentation.
+Transport owns acknowledgement and retransmission. Fragmentation/reassembly is
+outside the Transport MVP.
 
 Transport/session loss, reset, or inability to communicate is the exception:
 the complete set cannot be guaranteed and integration reports recovery is
@@ -568,7 +581,7 @@ recovery and internal state transitions.
 
 Future typed and encoded codec validation checks:
 
-- the encoded envelope uses the compiled-in Application protocol version;
+- the encoded envelope uses the reserved Application protocol version;
 - valid supported type and correct subtype;
 - exact type/scope-specific test-ID presence;
 - selected union member;
@@ -804,9 +817,9 @@ abandoned START.
 ### Incompatible Application version
 
 ```text
-Library compiled-in Application version is 1.0
+Public constants reserve Application version 1.0
 Received envelope identifies an incompatible Application version
-Codec reports HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE
+Future codec reports HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE
 Python does not submit Test Configuration or START
 Python reports protocol mismatch/recovery required
 ```
@@ -825,6 +838,10 @@ may be rejected, and no later tick was submitted
 Transport reconnects
 Python restarts with Test Configuration and a fresh Test ID B
 ```
+
+Transport cannot automatically restart an upload, execution request, or result
+transaction. After Transport delivery failure or session loss, host or firmware
+integration decides whether and how to restart the higher-level operation.
 
 ## Decisions still TODO
 

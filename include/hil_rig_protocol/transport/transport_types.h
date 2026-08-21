@@ -4,7 +4,7 @@
  *
  * @details The declarations in this file describe only integration contracts.
  * They deliberately omit frame fields, parser state, handshake phases,
- * retransmission state, queues, and fragmentation/reassembly bookkeeping. Such
+ * retransmission state, queues, and profile-specific buffer bookkeeping. Such
  * details belong to the selected private Transport profile and may change
  * without changing callers.
  *
@@ -24,7 +24,7 @@
  * @details This compile-time expression is usable with C11 `_Alignas` and C++
  * `alignas`. It is based on `max_align_t`, so it is sufficient for every MVP
  * private object placed directly in caller storage. Required_Storage_Size()
- * reports byte capacity assuming this alignment. A future Init() returns
+ * reports byte capacity assuming this alignment. Init() returns
  * INVALID_ARGUMENT for a non-NULL workspace that does not satisfy it.
  */
 #if defined( __cplusplus )
@@ -83,7 +83,7 @@ typedef enum
     /** Reliable byte delivery failed under the configured policy. */
     HIL_TRANSPORT_STATUS_DELIVERY_FAILED,
 
-    /** A configured high-level Transport deadline expired. */
+    /** Reserved for a configured deadline; the MVP never returns this value. */
     HIL_TRANSPORT_STATUS_TIMEOUT,
 
     /** No item is available or the operation must be retried later. */
@@ -177,7 +177,7 @@ typedef enum
     /** The caller reported that the physical link disconnected. */
     HIL_TRANSPORT_FAILURE_LINK_LOST,
 
-    /** A configured peer-liveness deadline expired. */
+    /** Reserved for peer-liveness expiry; unsupported by the MVP. */
     HIL_TRANSPORT_FAILURE_CONNECTION_TIMEOUT,
 
     /** Reliable delivery exhausted retries and forced normal session recovery. */
@@ -186,7 +186,7 @@ typedef enum
     /** Received Transport input was malformed or incompatible with the session. */
     HIL_TRANSPORT_FAILURE_PROTOCOL,
 
-    /** Caller workspace could not retain required incoming or outgoing work. */
+    /** Reserved failure classification; capacity is primarily an operation status. */
     HIL_TRANSPORT_FAILURE_CAPACITY,
 
     /** The owning caller explicitly reset the Transport context. */
@@ -217,7 +217,7 @@ typedef enum
     /** Received data was rejected without exposing private frame diagnostics. */
     HIL_TRANSPORT_EVENT_PROTOCOL_ERROR,
 
-    /** Caller-owned capacity prevented retaining incoming or outgoing work. */
+    /** Public reserved value; an already-full FIFO cannot promise this event. */
     HIL_TRANSPORT_EVENT_CAPACITY_EXHAUSTED,
 
     /** The external link state changed. */
@@ -227,12 +227,13 @@ typedef enum
 /**
  * @brief One queued high-level Transport event.
  *
- * @details Sequence numbers, frame categories, handshake steps, fragment
+ * @details Sequence numbers, frame categories, handshake steps, internal buffer
  * offsets, and queue slots are intentionally absent. Events report protocol
  * delivery rather than Application acceptance. A private producer constructs
  * every complete value before publication; fields not relevant to that event
  * are set to their zero/none values. The selected profile's retention depth is
- * private and is not encoded in this structure.
+ * private and is not encoded in this structure. Events report Transport
+ * outcomes, not Application decoding, acceptance, or processing.
  */
 typedef struct
 {

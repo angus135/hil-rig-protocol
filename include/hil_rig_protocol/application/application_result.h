@@ -87,7 +87,7 @@ typedef enum
  * result in declaration order. It completes all declarations before sending
  * the fixed result for tick T + 1. Fixed results are sent in increasing order
  * from tick 0 through N - 1, and variable data never precedes its declaring
- * fixed result. Transport fragmentation remains invisible.
+ * fixed result. Each encoded Application message uses one MVP Transport frame.
  *
  * For a test with N ticks, host integration considers result transfer complete
  * only after decoding every fixed result for ticks 0 through N - 1 and every

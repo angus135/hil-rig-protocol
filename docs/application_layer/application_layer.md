@@ -16,21 +16,20 @@ Application message:
 typed firmware/Python-facing data
     -> HIL_APPLICATION_Encode_Message
     -> one complete Application message
-    -> Transport
-    -> possibly several Transport frames
+    -> one MVP Transport frame
 ```
 
 Reception is the reverse:
 
 ```text
-Transport
-    -> one complete reassembled Application message
+one MVP Transport frame
+    -> one complete Application message
     -> HIL_APPLICATION_Decode_Message
     -> typed firmware/Python-facing data
 ```
 
-Transport fragmentation is invisible to the codec. The codec never receives a
-partial Transport frame or combines Transport fragments.
+The Transport MVP carries one complete Application message in one frame and has
+no fragmentation/reassembly. The codec never receives a partial Transport frame.
 
 ## Ownership model
 
@@ -95,13 +94,14 @@ Firmware and bindings include:
 The declarations specify future behavior. Current stubs return
 `NOT_IMPLEMENTED` and defensively clear documented output lengths/structures.
 
-## Single compiled-in protocol version
+## Reserved protocol version
 
-The MVP codec supports exactly the version named by
+The public constants
 `HIL_APPLICATION_PROTOCOL_VERSION_MAJOR` and
-`HIL_APPLICATION_PROTOCOL_VERSION_MINOR`, initially 1.0. Encoding always
-produces the library's compiled-in version, and decoding accepts only that exact
-version. An incompatible version produces
+`HIL_APPLICATION_PROTOCOL_VERSION_MINOR` reserve Application version 1.0. A
+future codec will encode that version and validate it while decoding; the
+current `NOT_IMPLEMENTED` encoder and decoder do not perform version handling.
+That future decoder will report an incompatible version as
 `HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE`.
 
 Callers cannot select or negotiate an encoding version through
@@ -226,7 +226,7 @@ retains no pointer. The caller submits those complete bytes to Transport. On
 `BUFFER_TOO_SMALL`, `output_size` reports required bytes and partial output is
 not a message. Sizing and encoding never mutate the context.
 
-Transport supplies one complete reassembled Application message for decoding.
+Transport supplies one complete Application message from one MVP frame for decoding.
 Future decoding copies every variable array/span into caller-owned
 `decode_storage`. Pointers in the decoded message point only into that region,
 not the encoded input. The Transport receive item can therefore be released
@@ -273,7 +273,7 @@ no Application Response merely because Transport rejected it.
 
 The future codec checks:
 
-- the eventual envelope's Application version equals the compiled-in version;
+- the eventual envelope's Application version equals the reserved version;
 - message type/subtype and exact test-ID presence;
 - exact complete encoded length;
 - required fields and enum values;
@@ -402,9 +402,9 @@ acceptance starts upload; Complete Test acceptance completes upload; START is a
 separate request whose success is never predicted by the codec or host.
 
 Only one tick may await semantic acceptance. Its fixed message and associated
-variable messages collectively form that outstanding tick. Transport ACKs and
-fragmentation remain independent: a Transport ACK confirms reliable frame/byte
-delivery, while Tick `ACCEPTED` confirms semantic acceptance and retention of
+variable messages collectively form that outstanding tick. Transport delivery
+and Application semantic acceptance remain independent: a Transport ACK confirms
+reliable frame/byte delivery, while Tick `ACCEPTED` confirms acceptance and retention of
 the complete tick. Stop-and-wait is an initial Application transaction rule,
 not Transport state or firmware execution-manager state. Versioned capability
 negotiation may permit future pipelining.
@@ -468,8 +468,9 @@ Firmware sends fixed Test Results in increasing order from tick 0 through
 Data message in the order its declarations appear, and completes those messages
 before sending the fixed result for tick T+1. Variable data never precedes the
 fixed result that declares it. Result messages have no Application Response or
-Application-level stop-and-wait acknowledgement. Transport acknowledgement,
-retransmission, and fragmentation remain Transport responsibilities.
+Application-level stop-and-wait acknowledgement. Transport acknowledgement and
+retransmission remain Transport responsibilities. Fragmentation/reassembly
+is outside the Transport MVP.
 
 If execution stops or fails before all ticks execute, firmware still produces
 the remaining fixed results. Each tick without valid execution/capture data uses
@@ -543,7 +544,7 @@ reconnect Transport.
 
 The intended firmware boundary is:
 
-1. Transport returns one complete reassembled Application message.
+1. Transport returns one complete Application message from one MVP frame.
 2. Firmware calls the shared Application decoder and structural validator.
 3. A future firmware Application handler examines the decoded message.
 4. That handler tracks transaction data such as active Test ID, expected tick,

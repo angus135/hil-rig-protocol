@@ -12,11 +12,13 @@ extended wire representation still requires explicit decisions about additional
 fields, version compatibility, control delivery classes, and crossed-session
 behavior; this document does not override the implemented MVP format.
 
-## MVP-private three-message handshake choice
+## MVP-private establishment choice
 
 The compiled MVP retains an explicit private phase model independent of public
 operating mode and every Application lifecycle. The wire frame types and current
-MVP handshake progression are implemented privately and are not public API:
+MVP establishment progression is implemented privately and is not public API.
+It uses three reliable negotiation frames plus a final ACK, for four wire
+transmissions in the clean exchange:
 
 1. host sends reliable `INITIATE` carrying a fresh caller-seeded Transport
    session identity and host initial sequence information;

@@ -19,8 +19,8 @@ end
 
 subgraph TransportBoundary["Transport Handoff"]
     I["Submit one complete encoded<br/>Application message to Transport"]
-    Wire["Transport fragmentation, framing, and reliable delivery<br/>over the USB CDC integration"]
-    J["Receive one complete reassembled<br/>Application message from Transport"]
+    Wire["One complete Application message becomes<br/>one reliable MVP Transport frame<br/>over caller-owned USB CDC I/O"]
+    J["Receive one complete Application message<br/>from that MVP Transport frame"]
 end
 
 subgraph Inbound["Decode One Inbound Message"]

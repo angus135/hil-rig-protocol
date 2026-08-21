@@ -5,7 +5,7 @@
  * @details This umbrella header defines the stateless shared message-codec
  * boundary used by firmware and Python bindings. The future implementation
  * converts typed data to one complete Application message and reverses that
- * conversion after Transport has reassembled one complete message.
+ * conversion after the MVP Transport returns one complete message from one frame.
  *
  * The surrounding Application protocol specification defines message
  * direction, correlation, exchange order, Response meaning, transaction
@@ -15,16 +15,17 @@
  * direction-neutral: endpoint integration, not encoding or decoding, enforces
  * whether Python or firmware may send a structurally valid message family.
  *
- * The initial codec has one version named by
+ * The public constants
  * HIL_APPLICATION_PROTOCOL_VERSION_MAJOR and
- * HIL_APPLICATION_PROTOCOL_VERSION_MINOR. Encoding always produces that
- * compiled-in version and decoding accepts only it. Callers cannot select or
- * negotiate another encoding version through config, context, messages, or
- * per-call arguments. The eventual common envelope must identify the version,
- * but its complete wire layout remains undefined.
+ * HIL_APPLICATION_PROTOCOL_VERSION_MINOR reserve Application version 1.0. A
+ * future codec will encode and validate that version. The current
+ * NOT_IMPLEMENTED encoder and decoder perform no version handling. Callers
+ * cannot select or negotiate another encoding version through config, context,
+ * messages, or per-call arguments. The eventual common envelope must identify
+ * the version, but its complete wire layout remains undefined.
  *
  * Application never performs COBS framing, CRC, Transport sequencing,
- * acknowledgements, retransmission, fragmentation/reassembly, advertised-window
+ * acknowledgements, retransmission, Transport framing, advertised-window
  * management, communication I/O, RTOS work, hardware access, test execution,
  * hardware scheduling, or Python UI behavior. It has no Transport-header
  * dependency. A Transport ACK confirms delivery only; semantic acceptance uses
@@ -116,7 +117,7 @@ HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      c
  * fixed tick array, and adds explicit future envelope/body fields using checked
  * arithmetic. It does not mutate context or message and retains no pointer.
  *
- * A future envelope includes the compiled-in Application protocol version.
+ * A future envelope includes the reserved Application protocol version.
  * Exact fields, widths, byte order, and layout remain TODO; callers cannot
  * select an alternate version.
  *
@@ -143,10 +144,10 @@ HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Con
  * @details The future implementation validates the tagged message, calculates
  * size with checked arithmetic, explicitly serializes approved fixed-width
  * fields, serializes all fixed tick-array elements in deterministic channel
- * order, writes the compiled-in Application protocol version into the future
+ * order, writes the reserved Application protocol version into the future
  * envelope, copies every variable array/span, rejects inconsistent
  * declarations, and publishes output_size only after complete success. It never
- * performs a Global Control operation, Transport framing/fragmentation, or
+ * performs a Global Control operation, Transport framing, or
  * pointer retention. No API parameter selects another encoding version.
  *
  * On OK output_size is the bytes copied. On BUFFER_TOO_SMALL it is the required
@@ -178,7 +179,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
  * @brief Calculate variable storage required to decode one complete message.
  *
  * @details The future implementation validates the complete encoded envelope
- * and body without publishing typed output, accepts only the compiled-in
+ * and body without publishing typed output, accepts only the reserved
  * Application protocol version, rejects missing/trailing bytes, and totals
  * storage required for every decoded array and byte span using checked
  * arithmetic. The reported value is the required usable byte capacity assuming
@@ -186,7 +187,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
  * mutates context or input.
  *
  * @param[in] context Successfully initialized context.
- * @param[in] encoded_message Complete reassembled Application bytes; NULL only
+ * @param[in] encoded_message One complete Application message; NULL only
  *            when encoded_message_size is zero.
  * @param[in] encoded_message_size Exact complete-message byte count.
  * @param[out] required_storage_size Required decode bytes on OK; zero on error.
@@ -207,9 +208,9 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
 /**
  * @brief Decode one complete Application message into typed caller storage.
  *
- * @details Transport must supply exactly one complete reassembled Application
- * message. The future implementation validates envelope/type/subtype/test-ID
- * presence, compiled-in Application protocol version, and exact length;
+ * @details The MVP Transport supplies exactly one complete Application message
+ * from one frame. The future implementation validates envelope/type/subtype/test-ID
+ * presence, reserved Application protocol version, and exact length;
  * calculates/reserves caller decode storage; copies variable arrays and byte
  * spans; decodes fixed tick arrays directly into the typed output; decodes the
  * selected union body; rejects trailing or missing bytes; and publishes
@@ -236,7 +237,7 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
  * modules; or creates a Response.
  *
  * @param[in] context Successfully initialized context.
- * @param[in] encoded_message Complete reassembled bytes, borrowed for this call.
+ * @param[in] encoded_message Complete Application bytes, borrowed for this call.
  * @param[in] encoded_message_size Exact complete-message bytes.
  * @param[out] decode_storage Caller workspace for variable arrays/spans; NULL
  *             only when decode_storage_capacity is zero. A non-NULL pointer
@@ -303,7 +304,7 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
  * @brief Structurally validate one complete encoded Application message.
  *
  * @details Future validation safely parses without publishing typed output,
- * accepts only the compiled-in Application protocol version, checks exact
+ * accepts only the reserved Application protocol version, checks exact
  * encoded length and all internal declarations, rejects trailing or missing
  * bytes, and reports decode storage required for valid content. It does not
  * mutate context, consume Transport data, enforce sender/transaction policy, or

@@ -10,7 +10,7 @@ header contracts.
 The MVP wire codec, CRC, COBS framing, bounded stream parser, workspace sizing,
 initialization, private one-item reliable and control-output lifecycles, and
 public arbitration between those lifecycles are implemented. A separate private
-four-entry event FIFO, public consume-on-success event reads, event pending
+bounded event FIFO, public consume-on-success event reads, event pending
 status, and explicit event reset are also implemented. Public peek, commit,
 status, and reset operate across the implemented private lifecycles. Session
 initialization, link observation, establishment preparation, automatic
@@ -48,7 +48,7 @@ allocates heap memory.
 A non-NULL workspace must be aligned to
 `HIL_TRANSPORT_WORKSPACE_ALIGNMENT`, which is based on `max_align_t` and is
 sufficient for the MVP private root. `Required_Storage_Size` reports capacity
-assuming this alignment; future `Init` rejects a misaligned workspace as
+assuming this alignment; `Init` rejects a misaligned workspace as
 `INVALID_ARGUMENT`. C11 and C++ allocation examples are:
 
 ```c
@@ -113,6 +113,13 @@ later adopts a valid host-proposed identity. A non-invalid rig seed is
 `INVALID_ARGUMENT`. A new or reconnected session cannot continue the previous
 session's sequences or ACK state. Session identity is independent of every
 Application test identifier.
+
+A session identifier must be valid and fresh, but freshness does not
+normatively mean numeric adjacency. The host MVP advances its cursor
+deterministically, but a peer must not infer an abandoned identity as
+`current_session_identifier - 1`. Stale traffic carries the actual recorded
+recently abandoned identity. Any unrelated identity is incompatible and follows
+the recovery path below.
 
 Session initialization validates before mutating its destination. It records the
 role, deterministic initial DISCONNECTED states, an unobserved link, an inactive
@@ -188,7 +195,12 @@ including zero and `0xFFFF`, is representable; deciding whether it is currently
 expected belongs to session logic rather than structural decoding. Similarly,
 the codec does not decide whether a nonzero session ID belongs to the current
 session. An Application payload is limited by
-`max_application_message_size`; control frames have exactly zero payload bytes.
+`max_application_message_size`. This bound applies to each individual encoded
+Application message, not to an entire test tick plus all related UART, SPI, I2C,
+or other variable data. The MVP puts one complete Application message in one
+Transport frame; fragmentation and reassembly are outside the MVP. The current
+default is 512 bytes, but a configured Transport bound is not an Application
+protocol size guarantee. Control frames have exactly zero payload bytes.
 
 After the first accepted peer reliable sequence establishes a baseline, the
 next value is expected and the exact last value is a duplicate. Other values in
@@ -240,7 +252,8 @@ malformed body is consumed as one complete delimited item, so a following valid
 frame can be parsed independently.
 
 One MVP `APPLICATION` frame always carries exactly one complete opaque
-Application message. Fragmentation, reassembly, session acceptance, duplicate
+Application message. Application-message fragmentation and reassembly are not
+implemented by the MVP; session acceptance, duplicate
 classification, acknowledgement scheduling, retransmission, and recovery are
 outside the codec.
 
@@ -287,10 +300,10 @@ with otherwise valid arguments, that readiness check occurs before the configure
 message-size limit, so an oversized pre-establishment submission still returns
 `NOT_READY`. On success Transport copies every byte before returning and owns the
 copy until delivery, failure, reset, or disconnection. The caller never constructs
-frames or future extended fragments.
+frames.
 
 `HIL_TRANSPORT_Read_Application_Data()` exposes only one complete received
-Application message. No parser state, frame category, session sequence, fragment
+Application message. No parser state, frame category, session sequence, internal
 offset, or partial message is returned. On OK, `message_size` is bytes copied and
 the item is consumed. On `BUFFER_TOO_SMALL`, it is required bytes and the item is
 unchanged. On `NOT_READY`, it is zero. NULL with zero capacity is a size query.
@@ -443,22 +456,33 @@ unconsumed INITIATE suffix remains caller-owned and is valid when retried.
 
 ### MVP recovery limits and hard recovery
 
-The MVP deliberately does not make RESET reliable. RESET is not acknowledged or
-retransmitted, there is no peer-liveness/keepalive timer, and automatic
-convergence is not guaranteed for every simultaneous two-sided recovery ordering.
+The MVP deliberately does not make RESET reliable. A locally generated recovery
+RESET remains a synchronization barrier until the caller commits its output.
+That commit confirms only external-interface acceptance, not peer receipt.
+RESET is not acknowledged or retransmitted, there is no keepalive or
+peer-liveness timer, and after commit Transport may begin replacement
+establishment according to its role. If delivered, RESET tells the peer to
+abandon the identified session. If lost, some recovery schedules can leave the
+endpoints holding different session state; automatic in-band convergence is not
+guaranteed for every RESET-loss or simultaneous-recovery ordering.
 Only the most recently abandoned session identity is remembered. Traffic from
 still older identities is conservatively incompatible and can cause an
 unnecessary recovery, but it is never delivered as current-session Application
 data. These are accepted MVP limits rather than reasons to expand the wire
 protocol.
 
-If peers fail to converge after recovery, the supported hard-recovery path is to
-stop forwarding old link bytes, notify Transport of `DISCONNECTED`, restart or
-re-establish the underlying link, notify `CONNECTED`, and resume the normal
-Process/receive/peek/commit loop. Physical disconnect clears active recovery and
-stale-session history, so a subsequent connection starts a fresh protocol
-universe. A peer restart that does not produce a physical link-state transition
-may therefore require retransmission or this explicit link restart.
+If peers fail to converge after recovery, the supported hard-recovery procedure is:
+
+1. Stop forwarding old bytes.
+2. Notify Transport that the physical link is `DISCONNECTED`.
+3. Restart or re-establish the underlying connection.
+4. Notify Transport that the physical link is `CONNECTED`.
+5. Resume the normal Process/receive/peek/commit service loop and allow a fresh handshake.
+
+Physical disconnect/reconnect clears the active protocol context needed for a
+fresh session. It does not repair a genuine `FAULT`/`INTERNAL_ERROR`, which is an
+internal invariant failure; `HIL_TRANSPORT_Reset()` is the defined repair for
+`FAULT`.
 
 
 While a HOST is specifically waiting for the final ACK of its committed CONFIRM,
@@ -504,7 +528,8 @@ advance the receive sequence, retains the completed encoded body, and returns
 zero-length Receive call or `Process()` retries the retained body.
 `HIL_TRANSPORT_Read_Application_Data()` supports NULL/zero size query, preserves
 message ownership on `BUFFER_TOO_SMALL`, copies the entire opaque payload on OK,
-and then releases the unread slot. No partial payload, framing, session identity,
+and then releases the unread slot. Received-message draining is required normal
+service work, just like event draining. No partial payload, framing, session identity,
 or sequence value crosses the public Application boundary.
 
 ## Peek and commit
@@ -547,6 +572,14 @@ starts at commit rather than publication or peek. Initial reliable commit leaves
 the committed retransmission count at zero; retransmission commit increases it
 exactly once. Reliable ownership and exact encoded bytes continue after commit
 until matching acknowledgement, owner-directed recovery, or reset.
+
+For a partial external write, the caller retains the complete peeked bytes and
+total length, maintains its own write offset, and retries only the remaining
+suffix of that same Transport-owned item. It does not call
+`HIL_TRANSPORT_Commit_Output()` until every byte has been accepted. The current
+API matches commit to the internally pinned selection (there is no public token
+argument). A partial external write is not a Transport commit. Full commit
+confirms only external-interface acceptance; it does not prove peer receipt.
 
 The reliable lifecycle is:
 
@@ -697,8 +730,8 @@ corrupted private lifecycle metadata. With size zero and state `IDLE`, stale
 bytes are inaccessible, and avoiding buffer `memset` work is useful on an MCU.
 The same regions can then receive newly encoded items.
 
-The event lifecycle is a separate fixed four-entry FIFO embedded in the MVP
-root. Its private read index and count define ownership; the public API exposes
+The event lifecycle is a separate fixed, bounded FIFO. Its exact retention depth,
+private read index, and count are implementation details; the public API exposes
 only an `event_pending` boolean, so callers cannot depend on the depth. Private
 producers publish complete `HIL_Transport_Event_T` values, which are copied in
 full and may include repeated identical occurrences. Publication into a full
@@ -717,7 +750,10 @@ observation does not retry either event. Result precedence is
 Event draining is therefore part of normal Transport servicing rather than only
 diagnostic consumption. Some semantic transitions, including Application
 delivery confirmation and the `DELIVERY_FAILED` event that precedes automatic
-Application recovery, are intentionally transactional with event capacity. If
+Application recovery, are intentionally transactional with event capacity.
+Session establishment likewise waits until `SESSION_ESTABLISHED` can be
+retained. Received frames and pending diagnostics may remain Transport-owned
+until capacity becomes available. If
 the FIFO is allowed to remain full, receive or `Process()` may return
 `CAPACITY_EXHAUSTED` and retain protocol work until the caller consumes an event.
 After recovery RESET commit, any deferred receive diagnostic is serviced before
@@ -728,13 +764,20 @@ handling. Mandatory physical/session cleanup and
 RESET publication still proceed where documented even if the corresponding
 best-effort `SESSION_RESET` event cannot be retained.
 
+After draining an event, the caller continues the normal `Process()` or
+`Receive_Bytes()` retry flow. `HIL_TRANSPORT_EVENT_CAPACITY_EXHAUSTED` is a
+public future-facing value, but the implementation cannot guarantee enqueueing
+an event to describe an already-full FIFO; capacity exhaustion is primarily
+reported by the operation return status. Events report Transport outcomes, not
+whether the Application codec decoded, accepted, or processed a message.
+
 `HIL_TRANSPORT_Read_Event()` validates the queue, copies the oldest complete
 event, and consumes exactly that event on success. FIFO order is preserved
 through wraparound. `NOT_READY`, invalid arguments, and internal errors leave
 the destination unchanged. Reading the final event returns the empty queue to a
 canonical read index of zero. Explicit reset releases all event ownership by
 zeroing the read index and count, including when repairing corrupt metadata; it
-does not clear the four event structures because their stale bytes are then
+does not clear the event storage because its stale bytes are then
 inaccessible.
 
 A private invariant failure returns `INTERNAL_ERROR`, enters public and private
@@ -762,15 +805,16 @@ initial/retry bytes are ready or peeked, and `reliable_delivery_pending` remains
 set in every non-IDLE reliable state, including `EXHAUSTED`. The remaining
 fields expose role, link, high-level session state, local operating mode,
 received-message state, and high-level failure. Before exposing the snapshot,
-`Get_Status()` validates the public/private role,
+`Get_Status()` is observational while metadata is valid. It validates the public/private role,
 link, session-state, and failure mirrors, the operating-mode enum/validity flag,
 and the unread-message pending/size ownership metadata. Corrupt combinations
-fail with `INTERNAL_ERROR` rather than producing invalid public enums, booleans,
+fail with `INTERNAL_ERROR`, enter `FAULT`, and require explicit Reset rather
+than producing invalid public enums, booleans,
 or inconsistent state. Handshake phases, parser states, event count and capacity,
 sequence numbers, and retry counts remain private.
 Control ownership never sets
-`reliable_delivery_pending`. Any future extended fragmentation, reassembly,
-window, keepalive or queueing metadata also remains private.
+`reliable_delivery_pending`. Possible extended-profile fragmentation,
+reassembly, window, keepalive, or queueing metadata would also remain private.
 
 ## Public and private headers
 
@@ -808,9 +852,10 @@ INITIATE/RESPONSE/CONFIRM session choice, sequence/ACK state and implemented
 one-item stop-and-wait byte-retention model. Handshake and Application reliable
 work share the public `retransmit_timeout_ms` and `max_retries`; owner policy
 handles exhaustion and session recovery above the common retained-byte lifecycle.
-The MVP has no fragment, reassembly, advertised-window, keepalive,
-flow-policy or multi-message queue types. Those concepts and their uncompiled
-frame codec live only under `internal/extended`.
+The MVP has no Application-message fragmentation, reassembly,
+advertised-window, keepalive, flow-policy, or multi-message queue types. Possible
+versions of those concepts and their uncompiled frame codec live only under
+`internal/extended`.
 
 The private MVP handshake completes asymmetrically: the rig enters ESTABLISHED
 after a valid CONFIRM and makes its ACK available, while the host normally enters
