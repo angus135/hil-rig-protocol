@@ -82,8 +82,7 @@ void CompileCodecFacadeUsage()
     ( void )HIL_APPLICATION_Decode_Storage_Size( &context, encoded_message.data(), encoded_size,
                                                  &required_decode_storage );
     ( void )HIL_APPLICATION_Decode_Message(
-        &context, encoded_message.data(), encoded_size, decode_storage.bytes.data(),
-        decode_storage.bytes.size(), &decoded, &required_decode_storage );
+        &context, encoded_message.data(), encoded_size, &decoded );
 
     /* Context remains codec-only; endpoint transaction data is never supplied. */
 }
@@ -118,9 +117,10 @@ void CompileUploadConformanceScenarios()
     const std::array<HIL_Application_Data_Declaration_T, 2u> declarations{
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },
-            uart_bytes.size() },
+            HIL_Application_Byte_Span_T{uart_bytes.data(), uart_bytes.size()} },
         HIL_Application_Data_Declaration_T{
-            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_SPI, 1u }, spi_bytes.size() },
+            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_SPI, 1u }, 
+            HIL_Application_Byte_Span_T{spi_bytes.data(), spi_bytes.size() }},
     };
 
     HIL_Application_Message_T fixed_tick{};
@@ -258,10 +258,11 @@ void CompileSuccessfulResultConformanceScenario()
 
     const std::array<HIL_Application_Data_Declaration_T, 2u> result_declarations{
         HIL_Application_Data_Declaration_T{
-            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_CAN, 0u }, can_bytes.size() },
+            HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_CAN, 0u }, 
+            HIL_Application_Byte_Span_T{can_bytes.data(), can_bytes.size() }},
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 1u },
-            uart_bytes.size() },
+            HIL_Application_Byte_Span_T{uart_bytes.data(), uart_bytes.size() }},
     };
 
     HIL_Application_Message_T fixed_result_0{};
@@ -322,7 +323,7 @@ void CompilePartialVariableResultScenario()
     const std::array<std::uint8_t, 2u>       valid_can_bytes{ 0x11u, 0x22u };
     const HIL_Application_Data_Declaration_T valid_can_declaration{
         HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_CAN, 0u },
-        valid_can_bytes.size(),
+        HIL_Application_Byte_Span_T{valid_can_bytes.data(), valid_can_bytes.size()},
     };
 
     HIL_Application_Message_T partial_result{};
