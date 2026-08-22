@@ -185,9 +185,13 @@ typedef struct
     HIL_Transport_Mvp_Handshake_Phase_T handshake_phase;
     uint64_t                            session_identifier;
     uint8_t                             session_identifier_valid;
-    uint64_t                            next_host_session_identifier;
-    uint16_t                            initial_reliable_sequence;
-    uint16_t                            next_transmit_sequence;
+    /** CONFIRM sequence that established the current host session. */
+    uint16_t completed_confirm_sequence;
+    /** Nonzero when completed_confirm_sequence belongs to the current established host session. */
+    uint8_t  completed_confirm_sequence_valid;
+    uint64_t next_host_session_identifier;
+    uint16_t initial_reliable_sequence;
+    uint16_t next_transmit_sequence;
     /** Next peer sequence after a baseline exists; ignored before first acceptance. */
     uint16_t expected_receive_sequence;
     /** Sequence owned by the active reliable item; valid outside IDLE. */

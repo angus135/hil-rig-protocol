@@ -81,6 +81,7 @@ HIL_TRANSPORT_MVP_Receive_Validate_Root( HIL_Transport_Mvp_Root_T* root )
     }
     if ( ( root->receive_protocol_error_pending > 1u ) || ( root->recovery_reset_pending > 1u )
          || !HIL_TRANSPORT_MVP_Receive_Recently_Abandoned_Metadata_Is_Valid( root )
+         || !HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( root )
          || ( root->base.role < HIL_TRANSPORT_ROLE_HOST )
          || ( root->base.role > HIL_TRANSPORT_ROLE_RIG )
          || ( root->session.role != root->base.role )
@@ -414,16 +415,19 @@ HIL_TRANSPORT_MVP_Receive_Dispatch_Acknowledgement( HIL_Transport_Mvp_Root_T*   
     }
 
     /*
-     * Once a session is established, a current-session ACK belongs only to the
-     * outbound Application stop-and-wait lifecycle. With no Application delivery
-     * active, it is stale/unexpected protocol input. Do not route it through the
-     * role-specific handshake handler: a rig has no valid established-state
-     * handshake ACK transition and would otherwise classify the duplicate as
-     * incompatible and abandon an otherwise healthy session.
+     * Once a session is established, the sole handshake exception is an exact
+     * current-session repeat of the ACK that completed the host's CONFIRM. The
+     * handshake layer recognizes that immutable completion marker without event
+     * capacity or lifecycle mutation. Every other ACK remains stale/unexpected.
      */
     if ( ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_ESTABLISHED )
          && ( root->session.state == HIL_TRANSPORT_SESSION_STATE_ESTABLISHED ) )
     {
+        if ( HIL_TRANSPORT_MVP_Handshake_Is_Duplicate_Final_Host_Acknowledgement( root, frame ) )
+        {
+            return HIL_TRANSPORT_MVP_Receive_Outcome( HIL_TRANSPORT_STATUS_OK,
+                                                      HIL_TRANSPORT_MVP_RECEIVE_BODY_CONSUME );
+        }
         return HIL_TRANSPORT_MVP_Receive_Reject_Retained_Body( root );
     }
 

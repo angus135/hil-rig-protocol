@@ -15,11 +15,7 @@
 static HIL_Transport_Status_T
 HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( HIL_Transport_Mvp_Root_T* root )
 {
-    root->base.session_state   = HIL_TRANSPORT_SESSION_STATE_FAULT;
-    root->base.last_failure    = HIL_TRANSPORT_FAILURE_INTERNAL;
-    root->session.state        = HIL_TRANSPORT_SESSION_STATE_FAULT;
-    root->session.last_failure = HIL_TRANSPORT_FAILURE_INTERNAL;
-    return HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    return HIL_TRANSPORT_MVP_Session_Enter_Fault( root );
 }
 
 static HIL_Transport_Status_T
@@ -37,7 +33,8 @@ HIL_TRANSPORT_MVP_Handshake_Validate_Root( HIL_Transport_Mvp_Root_T* root )
          || ( root->base.last_failure != root->session.last_failure )
          || ( root->session.handshake_phase < HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE )
          || ( root->session.handshake_phase > HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED )
-         || ( root->session.session_identifier_valid > 1u ) )
+         || ( root->session.session_identifier_valid > 1u )
+         || !HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( root ) )
     {
         return HIL_TRANSPORT_MVP_Handshake_Record_Invariant_Failure( root );
     }
@@ -170,6 +167,30 @@ static void HIL_TRANSPORT_MVP_Handshake_Set_Established( HIL_Transport_Mvp_Root_
     root->session.handshake_phase = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
     root->base.last_failure       = HIL_TRANSPORT_FAILURE_NONE;
     root->session.last_failure    = HIL_TRANSPORT_FAILURE_NONE;
+}
+
+static void HIL_TRANSPORT_MVP_Handshake_Set_Host_Established( HIL_Transport_Mvp_Root_T* root,
+                                                              uint16_t completed_confirm_sequence )
+{
+    HIL_TRANSPORT_MVP_Handshake_Set_Established( root );
+    root->session.completed_confirm_sequence       = completed_confirm_sequence;
+    root->session.completed_confirm_sequence_valid = 1u;
+}
+
+int HIL_TRANSPORT_MVP_Handshake_Is_Duplicate_Final_Host_Acknowledgement(
+    const HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame )
+{
+    return ( root != NULL ) && ( frame != NULL ) && ( frame->type == HIL_TRANSPORT_MVP_FRAME_ACK )
+           && HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( root )
+           && ( root->base.role == HIL_TRANSPORT_ROLE_HOST )
+           && ( root->session.role == HIL_TRANSPORT_ROLE_HOST )
+           && ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_ESTABLISHED )
+           && ( root->session.state == HIL_TRANSPORT_SESSION_STATE_ESTABLISHED )
+           && ( root->session.handshake_phase == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED )
+           && ( root->session.completed_confirm_sequence_valid == 1u )
+           && ( root->session.session_identifier_valid == 1u )
+           && ( frame->session_identifier == root->session.session_identifier )
+           && ( frame->acknowledgement_sequence == root->session.completed_confirm_sequence );
 }
 
 typedef enum
@@ -343,6 +364,7 @@ HIL_TRANSPORT_MVP_Handshake_Handle_Host_Ack( HIL_Transport_Mvp_Root_T*          
 {
     HIL_Transport_Status_T                   status;
     HIL_Transport_Mvp_Handshake_Ack_Result_T acknowledgement_result;
+    uint16_t                                 completed_confirm_sequence;
 
     if ( frame->session_identifier != root->session.session_identifier )
     {
@@ -375,14 +397,15 @@ HIL_TRANSPORT_MVP_Handshake_Handle_Host_Ack( HIL_Transport_Mvp_Root_T*          
     {
         return status;
     }
-    status = HIL_TRANSPORT_MVP_Handshake_Complete_Acknowledgement(
+    completed_confirm_sequence = root->session.retained_transmit_sequence;
+    status                     = HIL_TRANSPORT_MVP_Handshake_Complete_Acknowledgement(
         root, frame->acknowledgement_sequence, HIL_TRANSPORT_MVP_FRAME_CONFIRM );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
         return status;
     }
 
-    HIL_TRANSPORT_MVP_Handshake_Set_Established( root );
+    HIL_TRANSPORT_MVP_Handshake_Set_Host_Established( root, completed_confirm_sequence );
     status = HIL_TRANSPORT_MVP_Handshake_Publish_Established_Event( root );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
@@ -398,6 +421,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Try_Complete_Host_From_Applic
 {
     HIL_Transport_Mvp_Rx_Sequence_Result_T sequence_result;
     HIL_Transport_Status_T                 status;
+    uint16_t                               completed_confirm_sequence;
 
     if ( result == NULL )
     {
@@ -474,14 +498,15 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Try_Complete_Host_From_Applic
     {
         return status;
     }
-    status = HIL_TRANSPORT_MVP_Handshake_Complete_Acknowledgement(
+    completed_confirm_sequence = root->session.retained_transmit_sequence;
+    status                     = HIL_TRANSPORT_MVP_Handshake_Complete_Acknowledgement(
         root, root->session.retained_transmit_sequence, HIL_TRANSPORT_MVP_FRAME_CONFIRM );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {
         return status;
     }
 
-    HIL_TRANSPORT_MVP_Handshake_Set_Established( root );
+    HIL_TRANSPORT_MVP_Handshake_Set_Host_Established( root, completed_confirm_sequence );
     status = HIL_TRANSPORT_MVP_Handshake_Publish_Established_Event( root );
     if ( status != HIL_TRANSPORT_STATUS_OK )
     {

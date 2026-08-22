@@ -331,11 +331,13 @@ retained until that pinned retry is committed.
 
 Stale, duplicate, or otherwise unexpected ACKs do not alter reliable or
 submitted-message ownership and are reported through the existing
-`PROTOCOL_ERROR` path. In particular, once the session is `ESTABLISHED` and no
-outbound Application delivery is active, an ACK is treated as stale/unexpected
-for both HOST and RIG roles and is not routed back through handshake dispatch. A
-duplicate Application ACK therefore cannot reset an established rig session.
-This rule applies to ACKs carrying the current session identity; cross-session
+`PROTOCOL_ERROR` path. There is one narrow handshake exception after the session
+is `ESTABLISHED` and no outbound Application delivery is active: a HOST silently
+consumes an exact current-session ACK for the CONFIRM sequence that established
+that session. Repeated copies remain idempotent and require no event capacity.
+Every other ACK is treated as stale/unexpected for both HOST and RIG roles and
+is not routed back through ordinary handshake transitions. A duplicate
+Application ACK therefore cannot reset an established rig session. Cross-session
 ACKs are first classified by the receive coordinator as described below.
 
 The reliability primitive itself still ends at `EXHAUSTED`, retaining the frame

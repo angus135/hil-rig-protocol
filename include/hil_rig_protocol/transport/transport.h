@@ -381,10 +381,12 @@ HIL_Transport_Status_T HIL_TRANSPORT_Submit_Application_Data( HIL_Transport_Cont
  * blocked, only the later unconsumed suffix remains caller-owned.
  *
  * Receive accepts no bytes while the reported link is DISCONNECTED and returns
- * NOT_READY. During an established session, an ACK completes only the active
- * outbound Application delivery that it exactly matches. Stale, duplicate, or
- * otherwise unexpected established-session ACKs are reported as PROTOCOL_ERROR
- * without abandoning the session and are not reinterpreted as handshake input.
+ * NOT_READY. During an established session, an ACK first completes the active
+ * outbound Application delivery that it exactly matches. With no such delivery,
+ * a HOST silently consumes an exact current-session repeat of the final ACK for
+ * the CONFIRM that established it. All other stale, duplicate, or unexpected
+ * established-session ACKs are reported as PROTOCOL_ERROR without abandoning
+ * the session and are not reinterpreted as handshake input.
  * An expected same-session Application frame is accepted only when the sole
  * unread-message slot and required ACK control output can both commit. Its payload
  * is copied before ACK encoding reuses decode scratch, then receive sequence and
