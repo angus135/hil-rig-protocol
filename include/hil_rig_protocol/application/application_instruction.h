@@ -59,7 +59,7 @@ typedef struct
     /** Unique, nonzero UART/SPI/I2C/CAN transfers for this tick. */
     const HIL_Application_Data_Declaration_T* variable_data;
     /** Number of declarations at variable_data. */
-    size_t variable_data_count;
+    uint8_t variable_data_count;
 } HIL_Application_Test_Instruction_T;
 
 /**

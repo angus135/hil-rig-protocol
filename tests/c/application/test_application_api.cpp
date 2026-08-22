@@ -98,12 +98,12 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
     static const std::array<HIL_Application_Data_Declaration_T, 1u> instruction_data{
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },
-            variable_bytes.size() } };
+            HIL_Application_Byte_Span_T{ variable_bytes.data(), variable_bytes.size() } } };
 
     static const std::array<HIL_Application_Data_Declaration_T, 1u> result_data{
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },
-            variable_bytes.size() } };
+            HIL_Application_Byte_Span_T{ variable_bytes.data(), variable_bytes.size() } } };
 
     std::array<HIL_Application_Message_T, 11u> messages{};
 
