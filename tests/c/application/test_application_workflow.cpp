@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cstring>
 #include <type_traits>
+#include <iostream>
+#include <iomanip>
 
 #include <gtest/gtest.h>
 
@@ -36,6 +38,309 @@ HIL_Application_Context_T MakeContext()
     EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_OK );
 
     return context;
+}
+
+void PrintByteSpan( const HIL_Application_Byte_Span_T& data )
+{
+    std::cout << "    size: " << data.size << "\n";
+
+    if ( data.data == nullptr || data.size == 0u )
+    {
+        std::cout << "    data: <empty>\n";
+        return;
+    }
+
+    std::cout << "    data: ";
+
+    for ( std::size_t i = 0u; i < data.size; ++i )
+    {
+        std::cout << std::hex << std::setw( 2 ) << std::setfill( '0' )
+                  << static_cast<unsigned>( data.data[i] ) << " ";
+    }
+
+    std::cout << std::dec << "\n";
+}
+
+void PrintTestId( const HIL_Application_Test_Id_T& test_id )
+{
+    std::cout << "  Test ID: ";
+
+    for ( std::size_t i = 0u; i < HIL_APPLICATION_TEST_ID_SIZE; ++i )
+    {
+        std::cout << std::hex << std::setw( 2 ) << std::setfill( '0' )
+                  << static_cast<unsigned>( test_id.bytes[i] ) << " ";
+    }
+
+    std::cout << std::dec << "\n";
+}
+
+void PrintChannel( const HIL_Application_Channel_Id_T& channel )
+{
+    std::cout << "    peripheral: " << static_cast<unsigned>( channel.peripheral ) << "\n";
+
+    std::cout << "    channel: " << static_cast<unsigned>( channel.channel ) << "\n";
+}
+
+void PrintMessage( const HIL_Application_Message_T& message )
+{
+    std::cout << "\n========================================\n";
+    std::cout << "HIL Application Message\n";
+    std::cout << "========================================\n";
+
+    std::cout << "Type: " << static_cast<unsigned>( message.type ) << "\n";
+
+    std::cout << "Subtype: " << static_cast<unsigned>( message.subtype ) << "\n";
+
+    std::cout << "Has Test ID: " << static_cast<unsigned>( message.has_test_id ) << "\n";
+
+    if ( message.has_test_id )
+    {
+        PrintTestId( message.test_id );
+    }
+
+    std::cout << "\nPayload:\n";
+
+    switch ( message.type )
+    {
+        case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST: {
+            const auto& data = message.body.system_info_request;
+
+            std::cout << "  System Info Request\n";
+            std::cout << "    query: " << static_cast<unsigned>( data.query ) << "\n";
+
+            std::cout << "    request_firmware_git_hash: "
+                      << static_cast<unsigned>( data.request_firmware_git_hash ) << "\n";
+            break;
+        }
+
+        case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE: {
+            const auto& data = message.body.system_info_response;
+
+            std::cout << "  System Info Response\n";
+
+            std::cout << "    application_protocol_major: "
+                      << static_cast<unsigned>( data.application_protocol_major ) << "\n";
+
+            std::cout << "    application_protocol_minor: "
+                      << static_cast<unsigned>( data.application_protocol_minor ) << "\n";
+
+            std::cout << "    firmware_version_major: "
+                      << static_cast<unsigned>( data.firmware_version_major ) << "\n";
+
+            std::cout << "    firmware_version_minor: "
+                      << static_cast<unsigned>( data.firmware_version_minor ) << "\n";
+
+            std::cout << "    firmware_git_hash:\n";
+            PrintByteSpan( data.firmware_git_hash );
+
+            std::cout << "    diagnostic_data:\n";
+            PrintByteSpan( data.diagnostic_data );
+
+            break;
+        }
+
+        case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION: {
+            const auto& data = message.body.test_configuration;
+
+            std::cout << "  Test Configuration\n";
+
+            std::cout << "    tick_duration.nanoseconds: " << data.tick_duration.nanoseconds
+                      << "\n";
+
+            std::cout << "    expected_tick_count: " << data.expected_tick_count << "\n";
+
+            std::cout << "    flags: " << data.flags << "\n";
+
+            std::cout << "    peripheral_count: " << data.peripheral_count << "\n";
+
+            for ( std::size_t i = 0u; i < data.peripheral_count; ++i )
+            {
+                std::cout << "    peripheral[" << i << "]\n";
+
+                std::cout << "      type: " << static_cast<unsigned>( data.peripherals[i].type )
+                          << "\n";
+            }
+
+            std::cout << "    extension_data:\n";
+            PrintByteSpan( data.extension_data );
+
+            break;
+        }
+
+        case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION: {
+            const auto& data = message.body.test_instruction;
+
+            std::cout << "  Test Instruction\n";
+
+            std::cout << "    tick_number: " << data.tick_number << "\n";
+
+            std::cout << "    variable_data_count: " << data.variable_data_count << "\n";
+
+            for ( std::size_t i = 0u; i < data.variable_data_count; ++i )
+            {
+                std::cout << "    variable_data[" << i << "]\n";
+
+                PrintChannel( data.variable_data[i].channel );
+
+                std::cout << "      data:\n";
+                PrintByteSpan( data.variable_data[i].data );
+            }
+
+            break;
+        }
+
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA: {
+            const auto& data = message.body.variable_instruction_data;
+
+            std::cout << "  Variable Instruction Data\n";
+
+            std::cout << "    tick_number: " << data.tick_number << "\n";
+
+            std::cout << "    channel:\n";
+            PrintChannel( data.channel );
+
+            std::cout << "    data:\n";
+            PrintByteSpan( data.data );
+
+            break;
+        }
+
+        case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL: {
+            const auto& data = message.body.execution_control;
+
+            std::cout << "  Execution Control\n";
+
+            std::cout << "    command: " << static_cast<unsigned>( data.command ) << "\n";
+
+            std::cout << "    flags: " << data.flags << "\n";
+
+            break;
+        }
+
+        case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL: {
+            const auto& data = message.body.global_control;
+
+            std::cout << "  Global Control\n";
+
+            std::cout << "    command: " << static_cast<unsigned>( data.command ) << "\n";
+
+            std::cout << "    flags: " << data.flags << "\n";
+
+            break;
+        }
+
+        case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT: {
+            const auto& data = message.body.test_result;
+
+            std::cout << "  Test Result\n";
+
+            std::cout << "    tick_number: " << data.tick_number << "\n";
+
+            std::cout << "    condition: " << static_cast<unsigned>( data.condition ) << "\n";
+
+            std::cout << "    variable_data_count: " << data.variable_data_count << "\n";
+
+            for ( std::size_t i = 0u; i < data.variable_data_count; ++i )
+            {
+                std::cout << "    variable_data[" << i << "]\n";
+
+                PrintChannel( data.variable_data[i].channel );
+
+                std::cout << "      data:\n";
+                PrintByteSpan( data.variable_data[i].data );
+            }
+
+            break;
+        }
+
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA: {
+            const auto& data = message.body.variable_result_data;
+
+            std::cout << "  Variable Result Data\n";
+
+            std::cout << "    tick_number: " << data.tick_number << "\n";
+
+            std::cout << "    channel:\n";
+            PrintChannel( data.channel );
+
+            std::cout << "    data:\n";
+            PrintByteSpan( data.data );
+
+            break;
+        }
+
+        case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE: {
+            const auto& data = message.body.response;
+
+            std::cout << "  Response\n";
+
+            std::cout << "    scope: " << static_cast<unsigned>( data.scope ) << "\n";
+
+            std::cout << "    outcome: " << static_cast<unsigned>( data.outcome ) << "\n";
+
+            std::cout << "    reason: " << static_cast<unsigned>( data.reason ) << "\n";
+
+            std::cout << "    tick_number: " << data.tick_number << "\n";
+
+            std::cout << "    control_command: " << static_cast<unsigned>( data.control_command )
+                      << "\n";
+
+            std::cout << "    global_control_command: "
+                      << static_cast<unsigned>( data.global_control_command ) << "\n";
+
+            break;
+        }
+
+        case HIL_APPLICATION_MESSAGE_TYPE_ERROR: {
+            const auto& data = message.body.error;
+
+            std::cout << "  Error\n";
+
+            std::cout << "    category: " << static_cast<unsigned>( data.category ) << "\n";
+
+            std::cout << "    recoverable: " << static_cast<unsigned>( data.recoverable ) << "\n";
+
+            std::cout << "    has_tick_number: " << static_cast<unsigned>( data.has_tick_number )
+                      << "\n";
+
+            std::cout << "    tick_number: " << data.tick_number << "\n";
+
+            std::cout << "    diagnostic_data:\n";
+            PrintByteSpan( data.diagnostic_data );
+
+            break;
+        }
+
+        default: {
+            std::cout << "  Unknown/Unsupported Message Type\n";
+            break;
+        }
+    }
+
+    std::cout << "========================================\n";
+}
+
+void printEncodedArr( std::array<std::uint8_t, 4096u> encoded, std::size_t encoded_size )
+{
+    std::cout << "Encoded message (" << encoded_size << " bytes):\n";
+    for ( std::size_t i = 0; i < encoded_size; ++i )
+    {
+        std::cout << "  [" << i << "] = 0x" << std::hex << std::setw( 2 ) << std::setfill( '0' )
+                  << static_cast<unsigned>( encoded[i] ) << std::dec << "\n";
+    }
+}
+
+template <typename T> void ExpectUint32Encoded( T expected, const std::uint8_t* encoded )
+{
+    const std::uint32_t value = static_cast<std::uint32_t>( expected );
+
+    EXPECT_EQ( encoded[0], static_cast<std::uint8_t>( value & 0xFFu ) );
+
+    EXPECT_EQ( encoded[1], static_cast<std::uint8_t>( ( value >> 8u ) & 0xFFu ) );
+
+    EXPECT_EQ( encoded[2], static_cast<std::uint8_t>( ( value >> 16u ) & 0xFFu ) );
+
+    EXPECT_EQ( encoded[3], static_cast<std::uint8_t>( ( value >> 24u ) & 0xFFu ) );
 }
 
 void ExpectByteSpanEqual( const HIL_Application_Byte_Span_T& expected,

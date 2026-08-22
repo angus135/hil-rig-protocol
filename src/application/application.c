@@ -421,6 +421,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
             return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
     }
 
+    *output_size = payload_size + HIL_APPLICATION_HEADER_SIZE_BYTES;
     return HIL_APPLICATION_STATUS_OK;
 }
 
@@ -499,9 +500,9 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message( const HIL_Application_C
             return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
 
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
-            // tracker = HIL_APPLICATION_System_Info_Request_decode(
-            //     context, &( out_message->subtype ), out_message->test_id,
-            //     &( out_message->body.system_info_request ), payload );
+            tracker = HIL_APPLICATION_System_Info_Request_decode(
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.system_info_request ), payload );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
