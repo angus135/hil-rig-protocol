@@ -142,6 +142,18 @@ void FillEvents( ReceiveHarness& endpoint )
     }
 }
 
+void FillCapacityEvents( ReceiveHarness& endpoint, std::size_t count )
+{
+    const HIL_Transport_Event_T event{ HIL_TRANSPORT_EVENT_CAPACITY_EXHAUSTED,
+                                       HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED,
+                                       HIL_TRANSPORT_FAILURE_CAPACITY, 0u };
+    for ( std::size_t index = 0u; index < count; ++index )
+    {
+        ASSERT_EQ( HIL_TRANSPORT_MVP_Events_Publish( &endpoint.root, &event ),
+                   HIL_TRANSPORT_STATUS_OK );
+    }
+}
+
 HIL_Transport_Event_T ReadEvent( ReceiveHarness& endpoint )
 {
     HIL_Transport_Event_T event{};
@@ -725,7 +737,7 @@ TEST( TransportReceive, FullEventsCannotPreventMandatoryIncompatibilityRecovery 
     ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
                HIL_TRANSPORT_STATUS_OK );
     ( void )PeekAndCommit( host, 2u );
-    FillEvents( host );
+    FillCapacityEvents( host, HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY );
     auto incompatible = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESET, 99u, 0u, 0u ) );
 
     std::size_t consumed = 0u;
@@ -737,11 +749,101 @@ TEST( TransportReceive, FullEventsCannotPreventMandatoryIncompatibilityRecovery 
     EXPECT_EQ( host.root.parser.body_ready, 0u );
     EXPECT_EQ( host.root.parser.accumulated_size, 0u );
     EXPECT_EQ( host.root.event_count, HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY );
+    EXPECT_EQ( host.root.receive_protocol_error_pending, 1u );
     EXPECT_EQ( host.root.recovery_reset_pending, 1u );
     EXPECT_EQ( host.root.recovery_reset_session_identifier, 77u );
-    const auto reset = DecodeTransmission( PeekAndCommit( host, 3u ) );
+    EXPECT_EQ( host.root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE );
+    EXPECT_EQ( host.root.encoded_output_size, 0u );
+    EXPECT_EQ( host.root.recently_abandoned_session_identifier, 77u );
+    EXPECT_EQ( host.root.recently_abandoned_session_identifier_valid, 1u );
+
+    std::array<std::uint8_t, EncodedCapacity> reset_output{};
+    std::size_t                               reset_size = 0u;
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Output_Peek_Output( &host.root, reset_output.data(),
+                                                     reset_output.size(), &reset_size ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto reset = DecodeTransmission(
+        std::vector<std::uint8_t>( reset_output.begin(), reset_output.begin() + reset_size ) );
     EXPECT_EQ( reset.type, HIL_TRANSPORT_MVP_FRAME_RESET );
     EXPECT_EQ( reset.session_identifier, 77u );
+
+    const auto reset_before_retry = host.root.control_output;
+    consumed                      = incompatible.size();
+    EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, nullptr, 0u, &consumed ),
+               HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
+    EXPECT_EQ( consumed, 0u );
+    EXPECT_EQ( HIL_TRANSPORT_Process( &context, 3u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
+    EXPECT_EQ( host.root.receive_protocol_error_pending, 1u );
+    EXPECT_EQ( host.root.recovery_reset_pending, 1u );
+    EXPECT_EQ( host.root.recently_abandoned_session_identifier, 77u );
+    EXPECT_EQ( host.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_PEEKED );
+    EXPECT_EQ( host.root.control_output, reset_before_retry );
+    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+
+    EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_CAPACITY_EXHAUSTED );
+    EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, nullptr, 0u, &consumed ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( consumed, 0u );
+    EXPECT_EQ( host.root.receive_protocol_error_pending, 0u );
+    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( host.root.event_count, HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY );
+    for ( std::size_t index = 1u; index < HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY; ++index )
+    {
+        EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_CAPACITY_EXHAUSTED );
+    }
+    EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
+    HIL_Transport_Event_T event{};
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Read( &host.root, &event ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Output_Commit_Output( &host.root, 4u ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host.root.recovery_reset_pending, 0u );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 5u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host.root.session.handshake_phase,
+               HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_RESPONSE );
+    EXPECT_EQ( host.root.session.session_identifier, 78u );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Read( &host.root, &event ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+}
+
+TEST( TransportReceive, OneEventSlotPublishesIncompatibilityDiagnosticWithoutDeferringIt )
+{
+    ReceiveHarness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
+    auto context = host.Context();
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ( void )PeekAndCommit( host, 2u );
+    FillCapacityEvents( host, HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY - 1u );
+    const auto incompatible = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESET, 99u, 0u, 0u ) );
+
+    std::size_t consumed = 0u;
+    EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, incompatible.data(), incompatible.size(),
+                                            &consumed ),
+               HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED );
+    EXPECT_EQ( consumed, incompatible.size() );
+    EXPECT_EQ( host.root.receive_protocol_error_pending, 0u );
+    EXPECT_EQ( host.root.recovery_reset_pending, 1u );
+    EXPECT_EQ( host.root.event_count, HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY );
+
+    for ( std::size_t index = 0u; index < HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY - 1u; ++index )
+    {
+        EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_CAPACITY_EXHAUSTED );
+    }
+    EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
+    HIL_Transport_Event_T event{};
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Read( &host.root, &event ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+
+    EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, nullptr, 0u, &consumed ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host.root.receive_protocol_error_pending, 0u );
+    EXPECT_EQ( HIL_TRANSPORT_Process( &context, 3u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Read( &host.root, &event ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
 }
 
 TEST( TransportReceive, StaleResetDoesNotAbandonNewerSession )

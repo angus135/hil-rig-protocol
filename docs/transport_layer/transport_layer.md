@@ -397,9 +397,11 @@ unread-message, reliable-output, or control-output exhaustion returns
 one with zero input bytes, retries semantic processing without asking the caller
 to resend bytes already accepted into parser scratch. `Process()` also progresses
 this pending receive work before handshake publication or retry expiry, and leaves
-reliability timing unchanged while local capacity blocks it. A completed oversized
-discard has no body to retain, so a one-bit pending diagnostic blocks later input
-until its `PROTOCOL_ERROR` event can be published. When that publication is
+reliability timing unchanged while local capacity blocks it. A receive-side
+rejection that has already consumed its body, including a completed oversized
+discard or an incompatible-session frame entering local recovery, has no body to
+retain, so a one-bit pending diagnostic blocks later input until its
+`PROTOCOL_ERROR` event can be published. When that publication is
 backpressured, receive stops before consuming the following frame and the remaining
 suffix stays caller-owned for retry.
 
@@ -437,16 +439,22 @@ consumed and only its `PROTOCOL_ERROR` publication remains pending. While an
 unbound RIG is waiting for a fresh INITIATE, other valid frame types are likewise
 reported/rejected without starting another recovery cycle because there is no
 current session to abandon. A different valid identity that is neither current
-nor the recorded abandoned identity is incompatible. It publishes the same
-diagnostic when capacity permits, abandons the current session through the session
-coordinator regardless of event capacity, and publishes one best-effort RESET
-using the actual failed current-session identity after old control ownership is
-cleared.
-`Process()` waits for that RESET to be committed before starting the replacement
-session. If further incompatible frames arrive while that local recovery RESET
-is still pending, they are rejected and may publish `PROTOCOL_ERROR`, but they do
-not run session abandonment again or replace/clear the pending RESET. This keeps
-old in-flight traffic from cancelling the peer-synchronization barrier. An
+nor the recorded abandoned identity is incompatible. Its complete frame is
+consumed, and it publishes the same diagnostic when capacity permits. If the
+event FIFO is full, that `PROTOCOL_ERROR` remains pending and zero-length
+`Receive_Bytes()` and `Process()` remain capacity-exhausted until exactly one copy
+can be retained. The current session is abandoned regardless of event capacity,
+releasing its reliable and session ownership. The resulting `SESSION_RESET`
+event is best-effort: if its one publication attempt is blocked, it is dropped
+and is not deferred or manufactured later. Independently, Transport publishes
+the mandatory wire RESET using the actual failed current-session identity after
+old control ownership is cleared and retains it as an output barrier.
+Replacement establishment waits for both the deferred receive diagnostic and
+wire RESET commit. If further incompatible frames arrive while that local
+recovery RESET is still pending, they are rejected and may publish
+`PROTOCOL_ERROR`, but they do not run session abandonment again or replace/clear
+the pending RESET. This keeps old in-flight traffic from cancelling the
+peer-synchronization barrier. An
 accepted peer RESET abandons the session but is never answered with another
 RESET. Because the peer has already supplied the synchronization signal,
 the connected endpoint immediately prepares fresh establishment before receive
