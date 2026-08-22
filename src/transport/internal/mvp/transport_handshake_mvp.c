@@ -344,9 +344,13 @@ HIL_TRANSPORT_MVP_Handshake_Handle_Host_Ack( HIL_Transport_Mvp_Root_T*          
     HIL_Transport_Status_T                   status;
     HIL_Transport_Mvp_Handshake_Ack_Result_T acknowledgement_result;
 
-    if ( ( root->session.handshake_phase
-           != HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK )
-         || ( frame->session_identifier != root->session.session_identifier ) )
+    if ( frame->session_identifier != root->session.session_identifier )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( root->session.handshake_phase
+         != HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK )
     {
         *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE;
         return HIL_TRANSPORT_STATUS_OK;
@@ -682,10 +686,14 @@ HIL_TRANSPORT_MVP_Handshake_Handle_Reset( HIL_Transport_Mvp_Root_T*             
         *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
         return HIL_TRANSPORT_STATUS_OK;
     }
-    if ( ( root->session.session_identifier_valid == 0u )
-         || ( frame->session_identifier != root->session.session_identifier ) )
+    if ( root->session.session_identifier_valid == 0u )
     {
         *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_STALE;
+        return HIL_TRANSPORT_STATUS_OK;
+    }
+    if ( frame->session_identifier != root->session.session_identifier )
+    {
+        *result = HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE;
         return HIL_TRANSPORT_STATUS_OK;
     }
 

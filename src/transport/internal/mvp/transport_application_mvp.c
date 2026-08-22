@@ -204,6 +204,7 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Application_Handle_Acknowledgement(
     }
     if ( frame->session_identifier != root->session.session_identifier )
     {
+        *result = HIL_TRANSPORT_MVP_APPLICATION_ACK_INCOMPATIBLE;
         return HIL_TRANSPORT_STATUS_OK;
     }
 
