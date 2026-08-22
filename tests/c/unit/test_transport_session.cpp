@@ -45,6 +45,8 @@ TEST( TransportSessionInit, InitializesHostCompletely )
     EXPECT_EQ( session.link_state_observed, 0u );
     EXPECT_EQ( session.state, HIL_TRANSPORT_SESSION_STATE_DISCONNECTED );
     EXPECT_EQ( session.handshake_phase, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE );
+    EXPECT_EQ( session.completed_confirm_sequence, 0u );
+    EXPECT_EQ( session.completed_confirm_sequence_valid, 0u );
     EXPECT_EQ( session.next_host_session_identifier, 7u );
     EXPECT_EQ( session.initial_reliable_sequence, UINT16_MAX );
     EXPECT_EQ( session.next_transmit_sequence, UINT16_MAX );
@@ -174,6 +176,44 @@ struct RootFixture : testing::Test
         root.control_output_state    = HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE;
     }
 };
+
+TEST_F( RootFixture, CompletedConfirmMetadataIsCanonicalAndHostEstablishedOnly )
+{
+    EXPECT_TRUE( HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( &root ) );
+
+    root.session.completed_confirm_sequence = 9u;
+    EXPECT_FALSE( HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( &root ) );
+    root.session.completed_confirm_sequence_valid = 2u;
+    EXPECT_FALSE( HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( &root ) );
+    root.session.completed_confirm_sequence_valid = 1u;
+    EXPECT_FALSE( HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( &root ) );
+
+    root.base.session_state               = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root.session.state                    = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+    root.session.handshake_phase          = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
+    root.session.session_identifier       = 5u;
+    root.session.session_identifier_valid = 1u;
+    EXPECT_TRUE( HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( &root ) );
+
+    root.base.role    = HIL_TRANSPORT_ROLE_RIG;
+    root.session.role = HIL_TRANSPORT_ROLE_RIG;
+    EXPECT_FALSE( HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( &root ) );
+}
+
+TEST_F( RootFixture, BeginningEstablishmentRejectsAndClearsCompletedConfirmMarker )
+{
+    root.session.link_state_observed              = 1u;
+    root.session.link_state                       = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.base.link_state                          = HIL_TRANSPORT_LINK_STATE_CONNECTED;
+    root.session.completed_confirm_sequence       = 9u;
+    root.session.completed_confirm_sequence_valid = 0u;
+
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &root ),
+               HIL_TRANSPORT_STATUS_INTERNAL_ERROR );
+    EXPECT_EQ( root.base.session_state, HIL_TRANSPORT_SESSION_STATE_FAULT );
+    EXPECT_EQ( root.session.completed_confirm_sequence, 0u );
+    EXPECT_EQ( root.session.completed_confirm_sequence_valid, 0u );
+}
 
 TEST_F( RootFixture, FirstDisconnectedIsSilentAndIdempotent )
 {

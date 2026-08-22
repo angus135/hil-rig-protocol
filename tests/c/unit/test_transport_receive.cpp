@@ -2,6 +2,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -169,6 +170,18 @@ void AdvanceHostToWaitingForConfirmAck( ReceiveHarness& host )
     ( void )PeekAndCommit( host, 4u );
     ASSERT_EQ( host.root.session.handshake_phase,
                HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK );
+}
+
+std::vector<std::uint8_t> CompleteHostHandshake( ReceiveHarness& host )
+{
+    AdvanceHostToWaitingForConfirmAck( host );
+    const auto final_ack =
+        Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_ACK, host.root.session.session_identifier, 0u,
+                            host.root.session.retained_transmit_sequence ) );
+    ReceiveWhole( host, final_ack );
+    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+    EXPECT_EQ( host.root.session.handshake_phase, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED );
+    return final_ack;
 }
 
 TEST( TransportReceive, PublicApiCompletesHandshakeAcrossArbitraryChunkBoundaries )
@@ -358,6 +371,126 @@ TEST( TransportReceive, FinalAckWaitsTransactionallyForEventCapacity )
     EXPECT_EQ( host.root.parser.body_ready, 0u );
     EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
     EXPECT_EQ( host.root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE );
+}
+
+TEST( TransportReceive, ExactDuplicateFinalHostAckIsRepeatedlyConsumedWithoutEventsOrMutation )
+{
+    ReceiveHarness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
+    const auto final_ack = CompleteHostHandshake( host );
+    ASSERT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_SESSION_ESTABLISHED );
+    ASSERT_EQ( host.root.session.completed_confirm_sequence_valid, 1u );
+    ASSERT_EQ( host.root.session.completed_confirm_sequence, 11u );
+
+    const auto session_before            = host.root.session;
+    const auto encoded_before            = host.encoded;
+    const auto submitted_message_size    = host.root.submitted_message_size;
+    const auto submitted_message_pending = host.root.submitted_message_pending;
+    const auto received_message_size     = host.root.received_message_size;
+    const auto received_message_pending  = host.root.received_message_pending;
+    const auto control_output_size       = host.root.control_output_size;
+    const auto control_output_state      = host.root.control_output_state;
+    const auto output_selection          = host.root.output_selection;
+
+    ReceiveWhole( host, final_ack );
+    ReceiveWhole( host, final_ack );
+
+    EXPECT_EQ( 0, std::memcmp( &host.root.session, &session_before, sizeof( session_before ) ) );
+    EXPECT_EQ( host.encoded, encoded_before );
+    EXPECT_EQ( host.root.submitted_message_size, submitted_message_size );
+    EXPECT_EQ( host.root.submitted_message_pending, submitted_message_pending );
+    EXPECT_EQ( host.root.received_message_size, received_message_size );
+    EXPECT_EQ( host.root.received_message_pending, received_message_pending );
+    EXPECT_EQ( host.root.control_output_size, control_output_size );
+    EXPECT_EQ( host.root.control_output_state, control_output_state );
+    EXPECT_EQ( host.root.output_selection, output_selection );
+    EXPECT_EQ( host.root.parser.body_ready, 0u );
+    HIL_Transport_Event_T event{};
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Read( &host.root, &event ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+}
+
+TEST( TransportReceive, WrongFinalHostAckSequenceStillPublishesProtocolError )
+{
+    ReceiveHarness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
+    ( void )CompleteHostHandshake( host );
+    ASSERT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_SESSION_ESTABLISHED );
+
+    ReceiveWhole( host, Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_ACK, 77u, 0u, 12u ) ) );
+
+    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+    EXPECT_EQ( host.root.session.completed_confirm_sequence_valid, 1u );
+    EXPECT_EQ( host.root.session.completed_confirm_sequence, 11u );
+    EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
+    HIL_Transport_Event_T event{};
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Read( &host.root, &event ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+}
+
+TEST( TransportReceive, DuplicateFinalHostAckIsConsumedWhileEventQueueIsFull )
+{
+    ReceiveHarness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
+    const auto final_ack = CompleteHostHandshake( host );
+    ASSERT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_SESSION_ESTABLISHED );
+    FillEvents( host );
+    const auto  session_before = host.root.session;
+    auto        context        = host.Context();
+    std::size_t consumed       = 0u;
+
+    EXPECT_EQ(
+        HIL_TRANSPORT_Receive_Bytes( &context, final_ack.data(), final_ack.size(), &consumed ),
+        HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( consumed, final_ack.size() );
+    EXPECT_EQ( host.root.event_count, HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY );
+    EXPECT_EQ( 0, std::memcmp( &host.root.session, &session_before, sizeof( session_before ) ) );
+    EXPECT_EQ( host.root.parser.body_ready, 0u );
+}
+
+TEST( TransportReceive, ResetAndReplacementEstablishmentClearCompletedConfirmMarker )
+{
+    ReceiveHarness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
+    ( void )CompleteHostHandshake( host );
+    ASSERT_EQ( host.root.session.completed_confirm_sequence_valid, 1u );
+
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Explicit_Reset( &host.root ), HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host.root.session.completed_confirm_sequence, 0u );
+    EXPECT_EQ( host.root.session.completed_confirm_sequence_valid, 0u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Session_Begin_Establishment( &host.root ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host.root.session.session_identifier, 78u );
+    EXPECT_EQ( host.root.session.completed_confirm_sequence, 0u );
+    EXPECT_EQ( host.root.session.completed_confirm_sequence_valid, 0u );
+}
+
+TEST( TransportReceive, ActiveApplicationAckTakesPriorityOverCompletedConfirmMarker )
+{
+    ReceiveHarness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
+    ( void )CompleteHostHandshake( host );
+    ASSERT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_SESSION_ESTABLISHED );
+    const std::array<std::uint8_t, 2u> payload{ 0x31u, 0x32u };
+    auto                               context = host.Context();
+    ASSERT_EQ( HIL_TRANSPORT_Submit_Application_Data( &context, payload.data(), payload.size() ),
+               HIL_TRANSPORT_STATUS_OK );
+    ( void )PeekAndCommit( host, 20u );
+    ASSERT_EQ( host.root.session.retained_reliable_frame_type,
+               HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE );
+    const auto application_sequence = host.root.session.retained_transmit_sequence;
+
+    ReceiveWhole(
+        host, Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_ACK, 77u, 0u, application_sequence ) ) );
+
+    EXPECT_EQ( host.root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE );
+    EXPECT_EQ( host.root.submitted_message_pending, 0u );
+    EXPECT_EQ( host.root.session.completed_confirm_sequence, 11u );
+    EXPECT_EQ( host.root.session.completed_confirm_sequence_valid, 1u );
+    EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_DELIVERY_CONFIRMED );
+    HIL_Transport_Event_T event{};
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Read( &host.root, &event ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
 }
 
 TEST( TransportReceive, UnrelatedFinalHandshakeAckTriggersRecoveryForCurrentSession )
@@ -852,11 +985,21 @@ TEST( TransportReceive, ApplicationCanCompleteHostHandshakeWhenFinalAckWasLost )
     EXPECT_EQ( host.root.session.handshake_phase, HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED );
     EXPECT_EQ( host.root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE );
     EXPECT_EQ( host.root.session.next_transmit_sequence, 12u );
+    EXPECT_EQ( host.root.session.completed_confirm_sequence, confirm.sequence );
+    EXPECT_EQ( host.root.session.completed_confirm_sequence_valid, 1u );
     EXPECT_EQ( host.root.session.expected_receive_sequence, 502u );
     ASSERT_EQ( host.root.received_message_pending, 1u );
     ASSERT_EQ( host.root.received_message_size, payload.size() );
     EXPECT_TRUE( std::equal( payload.begin(), payload.end(), host.received.begin() ) );
     EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_SESSION_ESTABLISHED );
+
+    ReceiveWhole( host,
+                  Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_ACK, 77u, 0u, confirm.sequence ) ) );
+    HIL_Transport_Event_T event{};
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Read( &host.root, &event ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+    EXPECT_EQ( host.root.session.completed_confirm_sequence_valid, 1u );
 
     const auto ack = DecodeTransmission( PeekAndCommit( host, 5u ) );
     EXPECT_EQ( ack.type, HIL_TRANSPORT_MVP_FRAME_ACK );

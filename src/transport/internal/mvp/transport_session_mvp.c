@@ -38,6 +38,30 @@ static int HIL_TRANSPORT_MVP_Session_Identifier_Is_Valid( uint64_t session_ident
            && ( session_identifier != HIL_TRANSPORT_SESSION_SEED_RESERVED );
 }
 
+int HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid(
+    const HIL_Transport_Mvp_Root_T* root )
+{
+    if ( root == NULL )
+    {
+        return 0;
+    }
+    if ( root->session.completed_confirm_sequence_valid > 1u )
+    {
+        return 0;
+    }
+    if ( root->session.completed_confirm_sequence_valid == 0u )
+    {
+        return root->session.completed_confirm_sequence == 0u;
+    }
+    return ( root->base.role == HIL_TRANSPORT_ROLE_HOST )
+           && ( root->session.role == HIL_TRANSPORT_ROLE_HOST )
+           && ( root->base.session_state == HIL_TRANSPORT_SESSION_STATE_ESTABLISHED )
+           && ( root->session.state == HIL_TRANSPORT_SESSION_STATE_ESTABLISHED )
+           && ( root->session.handshake_phase == HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED )
+           && ( root->session.session_identifier_valid == 1u )
+           && HIL_TRANSPORT_MVP_Session_Identifier_Is_Valid( root->session.session_identifier );
+}
+
 static void HIL_TRANSPORT_MVP_Session_Clear_Recently_Abandoned( HIL_Transport_Mvp_Root_T* root )
 {
     root->recently_abandoned_session_identifier       = HIL_TRANSPORT_SESSION_SEED_INVALID;
@@ -74,6 +98,8 @@ HIL_TRANSPORT_MVP_Session_Clear_Scoped_Work( HIL_Transport_Mvp_Root_T* root )
     root->receive_protocol_error_pending           = 0u;
     root->session.session_identifier               = HIL_TRANSPORT_SESSION_SEED_INVALID;
     root->session.session_identifier_valid         = 0u;
+    root->session.completed_confirm_sequence       = 0u;
+    root->session.completed_confirm_sequence_valid = 0u;
     root->session.handshake_phase                  = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE;
     root->session.next_transmit_sequence           = root->session.initial_reliable_sequence;
     root->session.expected_receive_sequence        = root->session.initial_reliable_sequence;
@@ -217,7 +243,8 @@ HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root )
          || ( session->state > HIL_TRANSPORT_SESSION_STATE_FAULT )
          || ( root->base.session_state != session->state )
          || ( root->base.last_failure != session->last_failure )
-         || !HIL_TRANSPORT_MVP_Session_Recently_Abandoned_Metadata_Is_Valid( root ) )
+         || !HIL_TRANSPORT_MVP_Session_Recently_Abandoned_Metadata_Is_Valid( root )
+         || !HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( root ) )
     {
         return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
     }
@@ -235,6 +262,8 @@ HIL_TRANSPORT_MVP_Session_Begin_Establishment( HIL_Transport_Mvp_Root_T* root )
     if ( ( session->handshake_phase != HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_INACTIVE )
          || ( session->session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID )
          || ( session->session_identifier_valid != 0u )
+         || ( session->completed_confirm_sequence != 0u )
+         || ( session->completed_confirm_sequence_valid != 0u )
          || ( session->reliable_state != HIL_TRANSPORT_MVP_RELIABLE_IDLE )
          || ( session->retained_reliable_frame_type != HIL_TRANSPORT_MVP_FRAME_INVALID )
          || ( session->retained_transmit_sequence != 0u )
@@ -322,7 +351,8 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Abandon( HIL_Transport_Mvp_Root
          || ( root->session.state < HIL_TRANSPORT_SESSION_STATE_DISCONNECTED )
          || ( root->session.state > HIL_TRANSPORT_SESSION_STATE_FAULT )
          || ( root->session.link_state < HIL_TRANSPORT_LINK_STATE_DISCONNECTED )
-         || ( root->session.link_state > HIL_TRANSPORT_LINK_STATE_CONNECTED ) )
+         || ( root->session.link_state > HIL_TRANSPORT_LINK_STATE_CONNECTED )
+         || !HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( root ) )
     {
         return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
     }
@@ -488,7 +518,8 @@ HIL_TRANSPORT_MVP_Session_Notify_Link_State( HIL_Transport_Mvp_Root_T*  root,
          || ( root->base.session_state < HIL_TRANSPORT_SESSION_STATE_DISCONNECTED )
          || ( root->base.session_state > HIL_TRANSPORT_SESSION_STATE_FAULT )
          || ( root->base.session_state != root->session.state )
-         || ( root->base.last_failure != root->session.last_failure ) )
+         || ( root->base.last_failure != root->session.last_failure )
+         || !HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( root ) )
     {
         return HIL_TRANSPORT_MVP_Session_Record_Invariant_Failure( root );
     }

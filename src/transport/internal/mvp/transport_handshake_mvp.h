@@ -79,6 +79,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Try_Complete_Host_From_Applic
     HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame,
     HIL_Transport_Mvp_Handshake_Application_Proof_Result_T* result );
 
+/** Return nonzero only for an exact duplicate of the final ACK for the current host session. */
+int HIL_TRANSPORT_MVP_Handshake_Is_Duplicate_Final_Host_Acknowledgement(
+    const HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame );
+
 /** Encode and publish one best-effort, non-reliable RESET control frame. */
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Handshake_Publish_Reset( HIL_Transport_Mvp_Root_T* root,
                                                                   uint64_t session_identifier );

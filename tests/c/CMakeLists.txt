@@ -37,6 +37,7 @@ set(HIL_RIG_PROTOCOL_INTEGRATION_SUPPORT_SOURCES
 set(HIL_RIG_PROTOCOL_INTEGRATION_TEST_SOURCES
     integration/test_transport_facade.cpp
     integration/pipeline/test_transport_pipeline.cpp
+    integration/reliability/test_transport_handshake_duplicates.cpp
     integration/support/test_transport_harness.cpp
     integration/recovery/test_transport_recovery.cpp
 )

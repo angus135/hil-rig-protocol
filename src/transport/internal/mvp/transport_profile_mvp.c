@@ -80,6 +80,7 @@ HIL_TRANSPORT_MVP_Profile_Has_Trustworthy_Active_Session( const HIL_Transport_Mv
            && ( root->session.state <= HIL_TRANSPORT_SESSION_STATE_ESTABLISHED )
            && ( root->base.session_state == root->session.state )
            && ( root->base.last_failure == root->session.last_failure )
+           && HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( root )
            && ( root->session.session_identifier_valid == 1u )
            && ( root->session.session_identifier != HIL_TRANSPORT_SESSION_SEED_INVALID )
            && ( root->session.session_identifier != HIL_TRANSPORT_SESSION_SEED_RESERVED )
@@ -148,7 +149,8 @@ HIL_TRANSPORT_MVP_Profile_Validate_Status_Metadata( HIL_Transport_Mvp_Root_T* ro
          || ( root->base.operating_mode_valid > 1u )
          || ( root->base.last_failure < HIL_TRANSPORT_FAILURE_NONE )
          || ( root->base.last_failure > HIL_TRANSPORT_FAILURE_INTERNAL )
-         || ( root->session.last_failure != root->base.last_failure ) )
+         || ( root->session.last_failure != root->base.last_failure )
+         || !HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid( root ) )
     {
         return HIL_TRANSPORT_MVP_Session_Enter_Fault( root );
     }

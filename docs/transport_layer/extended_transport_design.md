@@ -35,7 +35,9 @@ the high-level CONNECTING state. Candidate duplicate handling is idempotent:
 - duplicate same-session INITIATE causes the HIL-RIG to resend RESPONSE;
 - duplicate RESPONSE causes the host to resend CONFIRM;
 - duplicate CONFIRM for an established HIL-RIG is re-ACKed without repeating
-  the state transition; and
+  the state transition;
+- an exact current-session repeat of the final CONFIRM ACK is consumed by an
+  established host without repeating its state transition or event; and
 - an incompatible identity triggers the session reset/restart policy.
 
 Handshake retransmission uses the same global `retransmit_timeout_ms` and

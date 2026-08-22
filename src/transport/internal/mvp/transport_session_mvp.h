@@ -73,6 +73,10 @@ HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Explicit_Reset( HIL_Transport_M
  */
 HIL_Transport_Status_T HIL_TRANSPORT_MVP_Session_Enter_Fault( HIL_Transport_Mvp_Root_T* root );
 
+/** Validate the canonical, session-scoped completed-CONFIRM marker. */
+int HIL_TRANSPORT_MVP_Session_Completed_Confirm_Metadata_Is_Valid(
+    const HIL_Transport_Mvp_Root_T* root );
+
 /**
  * @brief Observe one caller-owned physical-link state.
  *
