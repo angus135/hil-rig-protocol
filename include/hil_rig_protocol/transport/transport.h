@@ -378,7 +378,13 @@ HIL_Transport_Status_T HIL_TRANSPORT_Submit_Application_Data( HIL_Transport_Cont
  * acceptance, the already accepted body remains retained and a later call,
  * including a zero-byte call, retries it without caller resubmission. An
  * oversized body is discarded through its delimiter; if its error event is
- * blocked, only the later unconsumed suffix remains caller-owned.
+ * blocked, only the later unconsumed suffix remains caller-owned. An incompatible
+ * session frame is likewise fully consumed and mandatory local recovery begins
+ * immediately even when the event FIFO is full. Its receive-side PROTOCOL_ERROR
+ * remains deferred until one event slot is available, while the SESSION_RESET
+ * event is best-effort and is never recreated. The mandatory wire RESET remains
+ * pending until committed, and replacement establishment waits for both that
+ * output barrier and the deferred diagnostic.
  *
  * Receive accepts no bytes while the reported link is DISCONNECTED and returns
  * NOT_READY. During an established session, an ACK first completes the active

@@ -299,7 +299,7 @@ typedef struct
     size_t   received_message_size;
     uint8_t  received_message_pending;
 
-    /** Oversized body was discarded but its protocol-error event is not retained yet. */
+    /** Receive-side protocol diagnostic detected but not yet retained in the event FIFO. */
     uint8_t receive_protocol_error_pending;
 
     HIL_Transport_Event_T event_queue[HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY];

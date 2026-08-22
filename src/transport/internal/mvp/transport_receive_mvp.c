@@ -331,6 +331,10 @@ HIL_TRANSPORT_MVP_Receive_Abandon_Incompatible_Session( HIL_Transport_Mvp_Root_T
     {
         return HIL_TRANSPORT_MVP_Receive_Fault( root );
     }
+    if ( event_status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
+    {
+        root->receive_protocol_error_pending = 1u;
+    }
     if ( ( event_status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED )
          || ( recovery_status == HIL_TRANSPORT_STATUS_CAPACITY_EXHAUSTED ) )
     {
