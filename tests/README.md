@@ -70,9 +70,9 @@ The harness never drains Application messages or events automatically because un
 ## Application tests and golden vectors
 
 `tests/c/application/` contains public-type and intentional-stub tests; it does
-not test an operational codec. `tests/golden_vectors/` is the intended
-language-neutral location for stable wire fixtures, but the fixture set is not
-implemented. Existing Transport unit and integration tests cover core behaviour
-and several complex recovery cases. The complete public two-endpoint
-fault-injection matrix and consumer-style `add_subdirectory` validation remain
-unfinished.
+not test an operational codec. `tests/golden_vectors/` documents the canonical
+MVP Transport fixtures exercised through the public facade by
+`integration/wire/test_transport_golden_vectors.cpp`. Existing Transport unit
+and integration tests cover core behaviour and several complex recovery cases.
+Application-codec fixtures and consumer-style `add_subdirectory` validation
+remain unfinished.

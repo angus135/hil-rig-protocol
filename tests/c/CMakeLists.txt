@@ -49,6 +49,9 @@ set(HIL_RIG_PROTOCOL_INTEGRATION_TEST_SOURCES
     integration/stream/test_transport_stream.cpp
     integration/malformed_frames/test_transport_malformed_frames.cpp
     integration/capacity/test_transport_capacity.cpp
+    integration/capacity/test_transport_handshake_capacity.cpp
+    integration/configuration/test_transport_reduced_configuration.cpp
+    integration/wire/test_transport_golden_vectors.cpp
     integration/lifecycle/test_transport_link_lifecycle.cpp
     integration/lifecycle/test_transport_reset.cpp
     integration/recovery/test_transport_stale_traffic.cpp
