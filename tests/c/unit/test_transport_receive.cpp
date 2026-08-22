@@ -65,6 +65,21 @@ struct ReceiveHarness
         return HIL_Transport_Context_T{ &root, sizeof( root ),
                                         HIL_TRANSPORT_INTERNAL_INITIALIZATION_COOKIE };
     }
+
+    void SetEstablished( std::uint64_t session_identifier = 77u )
+    {
+        root.base.session_state               = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+        root.session.state                    = HIL_TRANSPORT_SESSION_STATE_ESTABLISHED;
+        root.session.handshake_phase          = HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_ESTABLISHED;
+        root.session.session_identifier       = session_identifier;
+        root.session.session_identifier_valid = 1u;
+    }
+
+    void SetRecentlyAbandoned( std::uint64_t session_identifier )
+    {
+        root.recently_abandoned_session_identifier       = session_identifier;
+        root.recently_abandoned_session_identifier_valid = 1u;
+    }
 };
 
 HIL_Transport_Mvp_Frame_T EmptyFrame( HIL_Transport_Mvp_Frame_Type_T type,
@@ -140,6 +155,20 @@ void ReceiveWhole( ReceiveHarness& endpoint, const std::vector<std::uint8_t>& by
     ASSERT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, bytes.data(), bytes.size(), &consumed ),
                HIL_TRANSPORT_STATUS_OK );
     ASSERT_EQ( consumed, bytes.size() );
+}
+
+void AdvanceHostToWaitingForConfirmAck( ReceiveHarness& host )
+{
+    auto context = host.Context();
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ( void )PeekAndCommit( host, 2u );
+    ReceiveWhole( host, Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 77u, 500u, 10u ) ) );
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 3u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    ( void )PeekAndCommit( host, 4u );
+    ASSERT_EQ( host.root.session.handshake_phase,
+               HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK );
 }
 
 TEST( TransportReceive, PublicApiCompletesHandshakeAcrossArbitraryChunkBoundaries )
@@ -331,6 +360,57 @@ TEST( TransportReceive, FinalAckWaitsTransactionallyForEventCapacity )
     EXPECT_EQ( host.root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE );
 }
 
+TEST( TransportReceive, UnrelatedFinalHandshakeAckTriggersRecoveryForCurrentSession )
+{
+    ReceiveHarness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
+    AdvanceHostToWaitingForConfirmAck( host );
+    host.SetRecentlyAbandoned( 42u );
+    const auto unrelated_ack = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_ACK, 99u, 0u, 11u ) );
+
+    auto        context  = host.Context();
+    std::size_t consumed = 0u;
+    ASSERT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, unrelated_ack.data(), unrelated_ack.size(),
+                                            &consumed ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( consumed, unrelated_ack.size() );
+    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( host.root.session.state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( host.root.parser.body_ready, 0u );
+    EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
+    EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_SESSION_RESET );
+
+    const auto reset = DecodeTransmission( PeekAndCommit( host, 5u ) );
+    EXPECT_EQ( reset.type, HIL_TRANSPORT_MVP_FRAME_RESET );
+    EXPECT_EQ( reset.session_identifier, 77u );
+}
+
+TEST( TransportReceive, RecordedAbandonedFinalHandshakeAckPreservesCurrentAttempt )
+{
+    ReceiveHarness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
+    AdvanceHostToWaitingForConfirmAck( host );
+    host.SetRecentlyAbandoned( 42u );
+    const auto session_before  = host.root.session;
+    const auto reliable_before = host.encoded;
+    const auto stale_ack       = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_ACK, 42u, 0u, 11u ) );
+
+    ReceiveWhole( host, stale_ack );
+    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
+    EXPECT_EQ( host.root.session.handshake_phase,
+               HIL_TRANSPORT_MVP_HANDSHAKE_PHASE_WAITING_FOR_CONFIRM_ACK );
+    EXPECT_EQ( host.root.session.reliable_state, session_before.reliable_state );
+    EXPECT_EQ( host.root.session.retained_transmit_sequence,
+               session_before.retained_transmit_sequence );
+    EXPECT_EQ( host.encoded, reliable_before );
+    EXPECT_EQ( host.root.recovery_reset_pending, 0u );
+    EXPECT_EQ( host.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE );
+    EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
+    HIL_Transport_Event_T event{};
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Read( &host.root, &event ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
+}
+
 TEST( TransportReceive, ConfirmWaitsTransactionallyForOccupiedControlOutput )
 {
     ReceiveHarness rig;
@@ -433,6 +513,77 @@ TEST( TransportReceive, IncompatibilityAbandonsBodyPublishesResetAndWaitsForItsC
     EXPECT_EQ( host.root.session.session_identifier, 78u );
 }
 
+TEST( TransportReceive, UnrelatedResetWhileConnectingTriggersRecoveryForCurrentSession )
+{
+    ReceiveHarness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
+    auto context = host.Context();
+    ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
+               HIL_TRANSPORT_STATUS_OK );
+    host.SetRecentlyAbandoned( 42u );
+    const auto unrelated_reset = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESET, 99u, 0u, 0u ) );
+
+    std::size_t consumed = 0u;
+    ASSERT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, unrelated_reset.data(),
+                                            unrelated_reset.size(), &consumed ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( consumed, unrelated_reset.size() );
+    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( host.root.session.state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( host.root.parser.body_ready, 0u );
+    EXPECT_EQ( host.root.parser.accumulated_size, 0u );
+    EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
+    EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_SESSION_RESET );
+
+    const auto reset = DecodeTransmission( PeekAndCommit( host, 2u ) );
+    EXPECT_EQ( reset.type, HIL_TRANSPORT_MVP_FRAME_RESET );
+    EXPECT_EQ( reset.session_identifier, 77u );
+}
+
+TEST( TransportReceive, UnrelatedResetWhileEstablishedClearsApplicationOwnershipForRecovery )
+{
+    ReceiveHarness host;
+    host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
+    host.SetEstablished();
+    host.SetRecentlyAbandoned( 42u );
+    auto                               context = host.Context();
+    const std::array<std::uint8_t, 2u> received_payload{ 1u, 2u };
+    const HIL_Transport_Mvp_Frame_T    received_application{
+        HIL_TRANSPORT_MVP_FRAME_APPLICATION_MESSAGE,
+        77u,
+        10u,
+        0u,
+        received_payload.data(),
+        received_payload.size(),
+    };
+    ReceiveWhole( host, Encode( received_application ) );
+    const std::array<std::uint8_t, 2u> submitted_payload{ 3u, 4u };
+    ASSERT_EQ( HIL_TRANSPORT_Submit_Application_Data( &context, submitted_payload.data(),
+                                                      submitted_payload.size() ),
+               HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( host.root.received_message_pending, 1u );
+    ASSERT_EQ( host.root.submitted_message_pending, 1u );
+
+    const auto unrelated_reset = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESET, 99u, 0u, 0u ) );
+    std::size_t consumed       = 0u;
+    ASSERT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, unrelated_reset.data(),
+                                            unrelated_reset.size(), &consumed ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( consumed, unrelated_reset.size() );
+    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( host.root.received_message_pending, 0u );
+    EXPECT_EQ( host.root.received_message_size, 0u );
+    EXPECT_EQ( host.root.submitted_message_pending, 0u );
+    EXPECT_EQ( host.root.submitted_message_size, 0u );
+    EXPECT_EQ( host.root.session.reliable_state, HIL_TRANSPORT_MVP_RELIABLE_IDLE );
+    EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
+    EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_SESSION_RESET );
+
+    const auto reset = DecodeTransmission( PeekAndCommit( host, 1u ) );
+    EXPECT_EQ( reset.type, HIL_TRANSPORT_MVP_FRAME_RESET );
+    EXPECT_EQ( reset.session_identifier, 77u );
+}
+
 TEST( TransportReceive, FullEventsCannotPreventMandatoryIncompatibilityRecovery )
 {
     ReceiveHarness host;
@@ -442,7 +593,7 @@ TEST( TransportReceive, FullEventsCannotPreventMandatoryIncompatibilityRecovery 
                HIL_TRANSPORT_STATUS_OK );
     ( void )PeekAndCommit( host, 2u );
     FillEvents( host );
-    auto incompatible = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESPONSE, 77u, 500u, 999u ) );
+    auto incompatible = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESET, 99u, 0u, 0u ) );
 
     std::size_t consumed = 0u;
     EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, incompatible.data(), incompatible.size(),
@@ -451,9 +602,13 @@ TEST( TransportReceive, FullEventsCannotPreventMandatoryIncompatibilityRecovery 
     EXPECT_EQ( consumed, incompatible.size() );
     EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
     EXPECT_EQ( host.root.parser.body_ready, 0u );
+    EXPECT_EQ( host.root.parser.accumulated_size, 0u );
     EXPECT_EQ( host.root.event_count, HIL_TRANSPORT_MVP_EVENT_QUEUE_CAPACITY );
-    EXPECT_EQ( DecodeTransmission( PeekAndCommit( host, 3u ) ).type,
-               HIL_TRANSPORT_MVP_FRAME_RESET );
+    EXPECT_EQ( host.root.recovery_reset_pending, 1u );
+    EXPECT_EQ( host.root.recovery_reset_session_identifier, 77u );
+    const auto reset = DecodeTransmission( PeekAndCommit( host, 3u ) );
+    EXPECT_EQ( reset.type, HIL_TRANSPORT_MVP_FRAME_RESET );
+    EXPECT_EQ( reset.session_identifier, 77u );
 }
 
 TEST( TransportReceive, StaleResetDoesNotAbandonNewerSession )
@@ -463,9 +618,10 @@ TEST( TransportReceive, StaleResetDoesNotAbandonNewerSession )
     auto context = host.Context();
     ASSERT_EQ( HIL_TRANSPORT_Process( &context, 1u, HIL_TRANSPORT_OPERATING_MODE_NORMAL ),
                HIL_TRANSPORT_STATUS_OK );
-    host.root.recently_abandoned_session_identifier       = 42u;
-    host.root.recently_abandoned_session_identifier_valid = 1u;
-    const auto stale_reset = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESET, 42u, 0u, 0u ) );
+    host.SetRecentlyAbandoned( 42u );
+    const auto session_before  = host.root.session;
+    const auto reliable_before = host.encoded;
+    const auto stale_reset     = Encode( EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESET, 42u, 0u, 0u ) );
 
     std::size_t consumed = 0u;
     EXPECT_EQ(
@@ -474,7 +630,15 @@ TEST( TransportReceive, StaleResetDoesNotAbandonNewerSession )
     EXPECT_EQ( consumed, stale_reset.size() );
     EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
     EXPECT_EQ( host.root.session.session_identifier, 77u );
+    EXPECT_EQ( host.root.session.handshake_phase, session_before.handshake_phase );
+    EXPECT_EQ( host.root.session.reliable_state, session_before.reliable_state );
+    EXPECT_EQ( host.encoded, reliable_before );
+    EXPECT_EQ( host.root.recovery_reset_pending, 0u );
+    EXPECT_EQ( host.root.control_output_state, HIL_TRANSPORT_MVP_CONTROL_OUTPUT_IDLE );
     EXPECT_EQ( ReadEvent( host ).type, HIL_TRANSPORT_EVENT_PROTOCOL_ERROR );
+    HIL_Transport_Event_T event{};
+    EXPECT_EQ( HIL_TRANSPORT_MVP_Events_Read( &host.root, &event ),
+               HIL_TRANSPORT_STATUS_NOT_READY );
 }
 
 TEST( TransportReceive, RecordedAbandonedResponseDoesNotResetNewAttempt )
@@ -861,7 +1025,7 @@ TEST( TransportReceive, PinnedConfirmRetryDefersApplicationProofUntilCommit )
     EXPECT_EQ( host.root.received_message_pending, 1u );
 }
 
-TEST( TransportReceive, ProcessesMultipleDelimitedBodiesFromOneOfferedChunk )
+TEST( TransportReceive, MultipleUnrelatedFramesPreserveFirstRecoveryReset )
 {
     ReceiveHarness host;
     host.Initialize( HIL_TRANSPORT_ROLE_HOST, 77u, 10u );
@@ -876,8 +1040,17 @@ TEST( TransportReceive, ProcessesMultipleDelimitedBodiesFromOneOfferedChunk )
     EXPECT_EQ( HIL_TRANSPORT_Receive_Bytes( &context, first.data(), first.size(), &consumed ),
                HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( consumed, first.size() );
-    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_CONNECTING );
-    EXPECT_EQ( host.root.event_count, 2u );
+    EXPECT_EQ( host.root.base.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( host.root.session.state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( host.root.parser.body_ready, 0u );
+    EXPECT_EQ( host.root.parser.accumulated_size, 0u );
+    EXPECT_EQ( host.root.event_count, 3u );
+    EXPECT_EQ( host.root.recovery_reset_pending, 1u );
+    EXPECT_EQ( host.root.recovery_reset_session_identifier, 77u );
+
+    const auto reset = DecodeTransmission( PeekAndCommit( host, 2u ) );
+    EXPECT_EQ( reset.type, HIL_TRANSPORT_MVP_FRAME_RESET );
+    EXPECT_EQ( reset.session_identifier, 77u );
 }
 
 TEST( TransportReceive, ValidatesArgumentsDisconnectedPolicyAndPendingFlagInvariant )

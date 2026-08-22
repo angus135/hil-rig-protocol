@@ -209,6 +209,33 @@ void EstablishPublicPair( TransportPairHarness& pair )
     ASSERT_EQ( rig_status.snapshot.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
 }
 
+/**
+ * @brief Deliver an already pending rig RESET and complete the replacement handshake.
+ */
+void DeliverRigResetAndEstablishReplacement( TransportPairHarness& pair,
+                                             const std::uint32_t   first_now_ms )
+{
+    auto& host = pair.Host();
+    auto& rig  = pair.Rig();
+
+    TransferOneOutput( pair, TransportTestDirection::RigToHost, first_now_ms );
+    ASSERT_EQ( rig.Process( first_now_ms + 1u ), HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( host.Process( first_now_ms + 2u ), HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( pair, TransportTestDirection::HostToRig, first_now_ms + 3u );
+    ASSERT_EQ( rig.Process( first_now_ms + 4u ), HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( pair, TransportTestDirection::RigToHost, first_now_ms + 5u );
+    ASSERT_EQ( host.Process( first_now_ms + 6u ), HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( pair, TransportTestDirection::HostToRig, first_now_ms + 7u );
+    TransferOneOutput( pair, TransportTestDirection::RigToHost, first_now_ms + 8u );
+
+    const auto host_status = host.GetStatus();
+    const auto rig_status  = rig.GetStatus();
+    ASSERT_EQ( host_status.status, HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( rig_status.status, HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( host_status.snapshot.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+    ASSERT_EQ( rig_status.snapshot.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+}
+
 }  // namespace
 
 TEST( TransportFacadeRecovery, RigDeliveryExhaustionResetsPeerAndReestablishes )
@@ -293,6 +320,70 @@ TEST( TransportFacadeRecovery, RigExplicitResetNotifiesHostAndReestablishes )
     ASSERT_EQ( GetStatus( rig, &rig_status ), HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( host_status.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
     EXPECT_EQ( rig_status.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+}
+
+TEST( TransportFacadeRecovery, UnrecordedOlderSessionTrafficRecoversAndThenDeliversApplication )
+{
+    TransportPairHarness pair{};
+    const auto           initialization =
+        pair.InitializeConnected( TransportTestEndpointConfig::Host( UINT64_C( 0xD223 ), 10u ),
+                                  TransportTestEndpointConfig::Rig( 500u ) );
+    AssertPairInitialized( initialization );
+    auto& host = pair.Host();
+    auto& rig  = pair.Rig();
+    EstablishPublicPair( pair );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    const std::array<std::uint8_t, 3u> old_payload{ 0x31u, 0x32u, 0x33u };
+    ASSERT_EQ( host.SubmitApplication( old_payload.data(), old_payload.size() ),
+               HIL_TRANSPORT_STATUS_OK );
+    const auto delayed_old_application =
+        TakeOneOutput( pair, TransportTestDirection::HostToRig, 20u );
+    ASSERT_FALSE( delayed_old_application.empty() );
+
+    /* Replace the session twice so the delayed frame is older than the one retained marker. */
+    ASSERT_EQ( rig.Reset(), HIL_TRANSPORT_STATUS_OK );
+    DeliverRigResetAndEstablishReplacement( pair, 21u );
+    DrainEvents( host );
+    DrainEvents( rig );
+    ASSERT_EQ( rig.Reset(), HIL_TRANSPORT_STATUS_OK );
+    DeliverRigResetAndEstablishReplacement( pair, 40u );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    DeliverBytes( pair, rig, delayed_old_application.data(), delayed_old_application.size() );
+
+    auto rig_status = rig.GetStatus();
+    ASSERT_EQ( rig_status.status, HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( rig_status.snapshot.session_state, HIL_TRANSPORT_SESSION_STATE_RECOVERING );
+    EXPECT_EQ( rig_status.snapshot.output_pending, 1u );
+    EXPECT_EQ( rig_status.snapshot.application_message_pending, 0u );
+
+    DeliverRigResetAndEstablishReplacement( pair, 60u );
+    DrainEvents( host );
+    DrainEvents( rig );
+
+    const std::array<std::uint8_t, 4u> replacement_payload{ 0x41u, 0x42u, 0x43u, 0x44u };
+    ASSERT_EQ( host.SubmitApplication( replacement_payload.data(), replacement_payload.size() ),
+               HIL_TRANSPORT_STATUS_OK );
+    TransferOneOutput( pair, TransportTestDirection::HostToRig, 80u );
+
+    const auto received = rig.ReadApplication();
+    ASSERT_EQ( received.status, HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( received.bytes.size(), replacement_payload.size() );
+    EXPECT_TRUE( std::equal( replacement_payload.begin(), replacement_payload.end(),
+                             received.bytes.begin() ) );
+
+    TransferOneOutput( pair, TransportTestDirection::RigToHost, 81u );
+    const auto host_status = host.GetStatus();
+    rig_status             = rig.GetStatus();
+    ASSERT_EQ( host_status.status, HIL_TRANSPORT_STATUS_OK );
+    ASSERT_EQ( rig_status.status, HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( host_status.snapshot.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+    EXPECT_EQ( rig_status.snapshot.session_state, HIL_TRANSPORT_SESSION_STATE_ESTABLISHED );
+    EXPECT_EQ( host_status.snapshot.reliable_delivery_pending, 0u );
+    EXPECT_EQ( rig_status.snapshot.application_message_pending, 0u );
 }
 
 TEST( TransportFacadeRecovery, InFlightPeerTrafficCannotClearPendingRecoveryReset )

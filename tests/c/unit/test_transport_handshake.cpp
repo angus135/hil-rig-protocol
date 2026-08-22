@@ -808,6 +808,19 @@ TEST( TransportHandshake, DifferentSessionIdentifiersAreIncompatibleInSemanticHa
                    &host_proof.root, &other_application, &proof_result ),
                HIL_TRANSPORT_STATUS_OK );
     EXPECT_EQ( proof_result, HIL_TRANSPORT_MVP_HANDSHAKE_APPLICATION_PROOF_INCOMPATIBLE );
+
+    const auto other_ack =
+        EmptyFrame( HIL_TRANSPORT_MVP_FRAME_ACK, other_session, 0u, published.sequence );
+    ASSERT_EQ(
+        HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host_proof.root, &other_ack, &frame_result ),
+        HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( frame_result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE );
+
+    const auto other_reset = EmptyFrame( HIL_TRANSPORT_MVP_FRAME_RESET, other_session, 0u, 0u );
+    ASSERT_EQ( HIL_TRANSPORT_MVP_Handshake_Handle_Frame( &host_response.root, &other_reset,
+                                                         &frame_result ),
+               HIL_TRANSPORT_STATUS_OK );
+    EXPECT_EQ( frame_result, HIL_TRANSPORT_MVP_HANDSHAKE_FRAME_INCOMPATIBLE );
 }
 
 TEST( TransportHandshake, RejectsInvalidReservedInitiateAndStaleAckWithoutMutation )

@@ -24,7 +24,10 @@ typedef enum
     HIL_TRANSPORT_MVP_APPLICATION_ACK_STALE = 0,
 
     /** The exact ACK completed the active Application delivery. */
-    HIL_TRANSPORT_MVP_APPLICATION_ACK_ACCEPTED
+    HIL_TRANSPORT_MVP_APPLICATION_ACK_ACCEPTED,
+
+    /** The ACK carries a different session identity than the active delivery. */
+    HIL_TRANSPORT_MVP_APPLICATION_ACK_INCOMPATIBLE
 } HIL_Transport_Mvp_Application_Ack_Result_T;
 
 /** Result of semantically handling one decoded inbound Application frame. */

@@ -322,6 +322,8 @@ submitted-message ownership and are reported through the existing
 outbound Application delivery is active, an ACK is treated as stale/unexpected
 for both HOST and RIG roles and is not routed back through handshake dispatch. A
 duplicate Application ACK therefore cannot reset an established rig session.
+This rule applies to ACKs carrying the current session identity; cross-session
+ACKs are first classified by the receive coordinator as described below.
 
 The reliability primitive itself still ends at `EXHAUSTED`, retaining the frame
 type, sequence, encoded bytes, and ownership while exposing no reliable output.
@@ -409,12 +411,13 @@ the current session as if the frame were lost. Stale decoded traffic is rejected
 without abandoning a newer session. Before dispatch by frame type, the receive
 coordinator classifies cross-session traffic as stale only when its identity
 exactly matches the explicitly recorded recently abandoned identity and differs
-from the current identity. Frame-specific handshake and Application handlers
-therefore treat every other different valid identity as incompatible. No
-abandoned identity is inferred by decrementing the current identity or by any
-other numeric-distance rule. Explicitly recorded stale traffic is consumed as
-obsolete and never allowed to invalidate a replacement handshake. If the event
-FIFO is full, the stale body is still
+from the current identity. The coordinator routes every other different valid
+identity directly to incompatibility recovery before frame-type dispatch;
+defensive identity checks in frame-specific handlers use the same incompatible
+treatment. No abandoned identity is inferred by decrementing the current
+identity or by any other numeric-distance rule. Explicitly recorded stale
+traffic is consumed as obsolete and never allowed to invalidate a replacement
+handshake. If the event FIFO is full, the stale body is still
 consumed and only its `PROTOCOL_ERROR` publication remains pending. While an
 unbound RIG is waiting for a fresh INITIATE, other valid frame types are likewise
 reported/rejected without starting another recovery cycle because there is no

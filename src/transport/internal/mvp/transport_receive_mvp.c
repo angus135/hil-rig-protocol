@@ -252,6 +252,13 @@ static int HIL_TRANSPORT_MVP_Receive_Rig_Is_Waiting_Unbound_For_Initiate(
            && ( root->session.session_identifier == HIL_TRANSPORT_SESSION_SEED_INVALID );
 }
 
+static int HIL_TRANSPORT_MVP_Receive_Frame_Has_Incompatible_Session_Identifier(
+    const HIL_Transport_Mvp_Root_T* root, const HIL_Transport_Mvp_Frame_T* frame )
+{
+    return ( root->session.session_identifier_valid != 0u )
+           && ( frame->session_identifier != root->session.session_identifier );
+}
+
 static HIL_Transport_Mvp_Receive_Body_Outcome_T
 HIL_TRANSPORT_MVP_Receive_Abandon_Incompatible_Session( HIL_Transport_Mvp_Root_T* root )
 {
@@ -395,13 +402,21 @@ HIL_TRANSPORT_MVP_Receive_Dispatch_Acknowledgement( HIL_Transport_Mvp_Root_T*   
             return HIL_TRANSPORT_MVP_Receive_Outcome( HIL_TRANSPORT_STATUS_OK,
                                                       HIL_TRANSPORT_MVP_RECEIVE_BODY_CONSUME );
         }
-        return HIL_TRANSPORT_MVP_Receive_Reject_Retained_Body( root );
+        if ( application_result == HIL_TRANSPORT_MVP_APPLICATION_ACK_STALE )
+        {
+            return HIL_TRANSPORT_MVP_Receive_Reject_Retained_Body( root );
+        }
+        if ( application_result == HIL_TRANSPORT_MVP_APPLICATION_ACK_INCOMPATIBLE )
+        {
+            return HIL_TRANSPORT_MVP_Receive_Abandon_Incompatible_Session( root );
+        }
+        return HIL_TRANSPORT_MVP_Receive_Fault( root );
     }
 
     /*
-     * Once a session is established, ACK belongs only to the outbound
-     * Application stop-and-wait lifecycle. With no Application delivery active,
-     * an ACK is stale/unexpected protocol input. Do not route it through the
+     * Once a session is established, a current-session ACK belongs only to the
+     * outbound Application stop-and-wait lifecycle. With no Application delivery
+     * active, it is stale/unexpected protocol input. Do not route it through the
      * role-specific handshake handler: a rig has no valid established-state
      * handshake ACK transition and would otherwise classify the duplicate as
      * incompatible and abandon an otherwise healthy session.
@@ -434,6 +449,17 @@ HIL_TRANSPORT_MVP_Receive_Dispatch_Frame( HIL_Transport_Mvp_Root_T*        root,
          && ( frame->type != HIL_TRANSPORT_MVP_FRAME_INITIATE ) )
     {
         return HIL_TRANSPORT_MVP_Receive_Reject_Obsolete_Body( root );
+    }
+
+    /*
+     * Decoding has already rejected invalid/reserved identities. With the sole
+     * stale marker and unbound-rig exception handled above, every other identity
+     * mismatch against a valid current session requires recovery before semantic
+     * dispatch. Current-session frames retain their frame-specific rules.
+     */
+    if ( HIL_TRANSPORT_MVP_Receive_Frame_Has_Incompatible_Session_Identifier( root, frame ) )
+    {
+        return HIL_TRANSPORT_MVP_Receive_Abandon_Incompatible_Session( root );
     }
 
     switch ( frame->type )
