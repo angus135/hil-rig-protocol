@@ -43,7 +43,8 @@ HIL_Application_Status_T HIL_APPLICATION_Byte_Span_decode( const HIL_Application
 HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_System_Info_Request_T* data,
-    const uint8_t* payload );
+    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
+    size_t* used_decoded_size );
 
 /**
  * @brief decode a system information response.
@@ -60,7 +61,8 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_decode(
 HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_System_Info_Response_T* data,
-    const uint8_t* payload );
+    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
+    size_t* used_decoded_size );
 
 /**
  * @brief decode a test configuration.
@@ -77,7 +79,8 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
 HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Test_Configuration_T* data,
-    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size );
+    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
+    size_t* used_decoded_size );
 
 /**
  * @brief decode test instruction data.
@@ -94,7 +97,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
 HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Test_Instruction_T* data,
-    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size );
+    const uint8_t* payload, uint8_t* decoded_data, size_t* used_decoded_size );
 
 /**
  * @brief decode variable instruction data.
@@ -111,7 +114,8 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
 HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Variable_Instruction_Data_T* data,
-    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size );
+    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
+    size_t* used_decoded_size );
 
 /**
  * @brief decode execution control data.
@@ -128,7 +132,8 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_decode(
 HIL_Application_Status_T HIL_APPLICATION_Execution_Control_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Execution_Control_T* data,
-    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size );
+    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
+    size_t* used_decoded_size );
 
 /**
  * @brief decode global control data.
@@ -145,7 +150,8 @@ HIL_Application_Status_T HIL_APPLICATION_Execution_Control_decode(
 HIL_Application_Status_T HIL_APPLICATION_Global_Control_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Global_Control_T* data,
-    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size );
+    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
+    size_t* used_decoded_size );
 
 /**
  * @brief decode test result data.
@@ -162,7 +168,8 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_decode(
 HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Test_Result_T* data,
-    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size );
+    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
+    size_t* used_decoded_size );
 
 /**
  * @brief decode variable result data.
@@ -179,7 +186,8 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
 HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Variable_Result_Data_T* data,
-    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size );
+    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
+    size_t* used_decoded_size );
 
 /**
  * @brief decode a response.
@@ -196,7 +204,8 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_decode(
 HIL_Application_Status_T HIL_APPLICATION_Response_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Response_T* data,
-    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size );
+    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
+    size_t* used_decoded_size );
 
 #ifdef __cplusplus
 }

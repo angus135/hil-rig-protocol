@@ -301,16 +301,16 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     size_t max_payload_size, uint8_t* payload, size_t* used_size )
 {
     /**
-    Payload = 16 Bytes + X + Y
+    Payload = 16 Bytes + X + Y peripheral count {4}
     _______________________________________________________
     |                         |                            |
     |    tick duration {4}    |  expected tick count {4}   |
     |_________________________|____________________________|
     |                         |                            |
-    |        flags {4}        |      *peripherals {Y}      |
+    |        flags {4}        |    peripheral count {4}    |
     |_________________________|____________________________|
     |                         |                            |
-    |   peripheral count {4}  |     extension data {X}     |
+    |     *peripherals {Y}    |     extension data {X}     |
     |_________________________|____________________________|
 
     *Peripgerals expanded:
@@ -321,8 +321,9 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
 
 
     */
-    uint32_t payload_size =
-        sizeof( data->tick_duration ) + sizeof( data->expected_tick_count ) + sizeof( data->flags );
+    uint32_t payload_size = sizeof( data->tick_duration ) + sizeof( data->expected_tick_count )
+                            + sizeof( data->flags ) + sizeof( data->peripheral_count )
+                            + sizeof( data->peripherals ) * data->peripheral_count;
     if ( max_payload_size < payload_size )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
@@ -334,6 +335,9 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     running_total += sizeof( data->expected_tick_count );
     memcpy( &( payload[running_total] ), &( data->flags ), sizeof( data->flags ) );
     running_total += sizeof( data->flags );
+    memcpy( &( payload[running_total] ), &( data->peripheral_count ),
+            sizeof( data->peripheral_count ) );
+    running_total += sizeof( data->peripheral_count );
     uint32_t var_size = 0;
     for ( uint32_t i = 0; i < data->peripheral_count; i++ )
     {
@@ -343,16 +347,12 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
         running_total += var_size;
         var_size = 0;
     }
-    payload_size = running_total + sizeof( data->peripheral_count ) + sizeof( data->flags )
-                   + data->extension_data.size;
+    payload_size = running_total + sizeof( data->flags ) + data->extension_data.size;
     if ( max_payload_size < payload_size )
     {
         *used_size = running_total;
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    memcpy( &( payload[running_total] ), &( data->peripheral_count ),
-            sizeof( data->peripheral_count ) );
-    running_total += sizeof( data->peripheral_count );
     memcpy( &( payload[running_total] ), &( data->flags ), sizeof( data->flags ) );
     running_total += sizeof( data->flags );
     HIL_APPLICATION_Byte_Span_encode( &( data->extension_data ), &( payload[running_total] ) );
