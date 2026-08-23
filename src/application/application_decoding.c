@@ -32,10 +32,10 @@ HIL_Application_Status_T HIL_APPLICATION_Byte_Span_decode( HIL_Application_Byte_
                                                            const uint8_t*               payload )
 {
     /**
-    Payload = 4 + X Bytes:
+    Payload = 1 + X Bytes:
     ________________________________
     |               |               |
-    |    size {4}   |    span {X}   |
+    |    size {1}   |    span {X}   |
     |_______________|_______________|
     */
     memcpy( &( data->size ), payload, sizeof( data->size ) );
@@ -46,7 +46,7 @@ HIL_Application_Status_T HIL_APPLICATION_Byte_Span_decode( HIL_Application_Byte_
 HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_System_Info_Request_T* data,
-    const uint8_t* payload )
+    const uint8_t* payload, uint8_t * decoded_data, size_t max_decoded_data_size )
 {
     /**
     Payload = 5 Bytes:
@@ -65,7 +65,7 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_decode(
 HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_System_Info_Response_T* data,
-    const uint8_t* payload )
+    const uint8_t* payload, uint8_t * decoded_data, size_t max_decoded_data_size )
 {
     /**
     Payload = 10 Bytes (fixed) + X + Y
@@ -77,10 +77,10 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     |    version major {2}    |     version minor {2}      |
     |_________________________|____________________________|
     |                         |                            |
-    |    version patch {2}    |        git hash {X}        |
+    |    version patch {2}    |    diagnostic data {X}     |
     |_________________________|____________________________|
     |                         |
-    |   diagnostic data {Y}   |
+    |       git hash {Y}      |
     |_________________________|
     */
     memcpy( &( data->application_protocol_major ), payload,
@@ -98,7 +98,7 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     memcpy( &( data->firmware_version_patch ), &( payload[running_total] ),
             sizeof( data->firmware_version_patch ) );
     running_total += sizeof( data->firmware_version_patch );
-    HIL_APPLICATION_Byte_Span_decode( &( data->firmware_git_hash ), &( payload[running_total] ) );
+    HIL_APPLICATION_Byte_Span_decode( &( data->diagnostic_data ), &( payload[running_total] ) );
     running_total += data->diagnostic_data.size;
     HIL_APPLICATION_Byte_Span_decode( &( data->firmware_git_hash ), &( payload[running_total] ) );
     running_total += data->firmware_git_hash.size;
@@ -243,7 +243,7 @@ HIL_APPLICATION_Peripheral_Config_decode( HIL_Application_Peripheral_Config_T* d
 HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Test_Configuration_T* data,
-    const uint8_t* payload )
+    const uint8_t* payload, uint8_t * decoded_data, size_t max_decoded_data_size )
 {
     /**
     Payload = 16 Bytes + X + Y
@@ -294,7 +294,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
 HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Test_Instruction_T* data,
-    const uint8_t* payload )
+    const uint8_t* payload, uint8_t * decoded_data, size_t max_decoded_data_size )
 {
     /**
     _______________________________________________________
@@ -366,7 +366,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
 HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Variable_Instruction_Data_T* data,
-    const uint8_t* payload )
+    const uint8_t* payload, uint8_t * decoded_data, size_t max_decoded_data_size )
 {
     ( void )context;
     ( void )sub_type;
@@ -379,7 +379,7 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_decode(
 HIL_Application_Status_T HIL_APPLICATION_Execution_Control_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Execution_Control_T* data,
-    const uint8_t* payload )
+    const uint8_t* payload, uint8_t * decoded_data, size_t max_decoded_data_size )
 {
     /**
     _______________________________________________________
@@ -398,7 +398,7 @@ HIL_Application_Status_T HIL_APPLICATION_Execution_Control_decode(
 HIL_Application_Status_T HIL_APPLICATION_Global_Control_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Global_Control_T* data,
-    const uint8_t* payload )
+    const uint8_t* payload, uint8_t * decoded_data, size_t max_decoded_data_size )
 {
     /**
     _______________________________________________________
@@ -418,7 +418,7 @@ HIL_Application_Status_T
 HIL_APPLICATION_Test_Result_decode( const HIL_Application_Context_T*         context,
                                     const HIL_Application_Message_Subtype_T* sub_type,
                                     const HIL_Application_Test_Id_T          test_id,
-                                    HIL_Application_Test_Result_T* data, const uint8_t* payload )
+                                    HIL_Application_Test_Result_T* data, const uint8_t* payload, uint8_t * decoded_data, size_t max_decoded_data_size )
 {
     /**
     _______________________________________________________
@@ -499,7 +499,7 @@ HIL_APPLICATION_Test_Result_decode( const HIL_Application_Context_T*         con
 HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Variable_Result_Data_T* data,
-    const uint8_t* payload )
+    const uint8_t* payload, uint8_t * decoded_data, size_t max_decoded_data_size )
 {
     ( void )context;
     ( void )sub_type;
@@ -513,7 +513,7 @@ HIL_Application_Status_T
 HIL_APPLICATION_Response_decode( const HIL_Application_Context_T*         context,
                                  const HIL_Application_Message_Subtype_T* sub_type,
                                  const HIL_Application_Test_Id_T          test_id,
-                                 HIL_Application_Response_T* data, const uint8_t* payload )
+                                 HIL_Application_Response_T* data, const uint8_t* payload, uint8_t * decoded_data, size_t max_decoded_data_size )
 {
     /**
     _______________________________________________________

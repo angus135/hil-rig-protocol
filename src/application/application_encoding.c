@@ -83,10 +83,10 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
     |    version major {2}    |     version minor {2}      |
     |_________________________|____________________________|
     |                         |                            |
-    |    version patch {2}    |        git hash {X}        |
+    |    version patch {2}    |    diagnostic data {X}     |
     |_________________________|____________________________|
     |                         |
-    |   diagnostic data {Y}   |
+    |       git hash {Y}      |
     |_________________________|
     */
     uint32_t payload_size =

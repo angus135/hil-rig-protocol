@@ -42,7 +42,7 @@ HIL_Application_Context_T MakeContext()
 
 void PrintByteSpan( const HIL_Application_Byte_Span_T& data )
 {
-    std::cout << "    size: " << data.size << "\n";
+    std::cout << "    size: " << static_cast<unsigned>( data.size ) << "\n";
 
     if ( data.data == nullptr || data.size == 0u )
     {
@@ -346,17 +346,33 @@ template <typename T> void ExpectUint32Encoded( T expected, const std::uint8_t* 
 void ExpectByteSpanEqual( const HIL_Application_Byte_Span_T& expected,
                           const HIL_Application_Byte_Span_T& actual )
 {
-    ASSERT_EQ( expected.size, actual.size );
+    std::cout << "\n--- Byte Span Comparison ---\n";
 
-    if ( expected.size == 0u )
-    {
-        return;
-    }
+    std::cout << "Expected:\n";
+    std::cout << "  data pointer: " << static_cast<const void*>( expected.data ) << "\n";
+    std::cout << "  size: " << static_cast<unsigned>( expected.size ) << "\n";
+
+    std::cout << "Actual:\n";
+    std::cout << "  data pointer: " << static_cast<const void*>( actual.data ) << "\n";
+    std::cout << "  size: " << static_cast<unsigned>( actual.size ) << "\n";
 
     ASSERT_NE( expected.data, nullptr );
     ASSERT_NE( actual.data, nullptr );
 
-    EXPECT_EQ( std::memcmp( expected.data, actual.data, expected.size ), 0 );
+    ASSERT_EQ( expected.size, actual.size );
+
+    ASSERT_EQ( std::memcmp( expected.data, actual.data, expected.size ), 0 );
+    // ASSERT_EQ( expected.size, actual.size );
+
+    // if ( expected.size == 0u )
+    // {
+    //     return;
+    // }
+
+    // ASSERT_NE( expected.data, nullptr );
+    // ASSERT_NE( actual.data, nullptr );
+
+    // EXPECT_EQ( std::memcmp( expected.data, actual.data, expected.size ), 0 );
 }
 
 void ExpectChannelEqual( const HIL_Application_Channel_Id_T& expected,
@@ -407,6 +423,8 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
     switch ( expected.type )
     {
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
+            std::cout << "info request"
+                      << "\n";
             EXPECT_EQ( expected.body.system_info_request.query,
                        actual.body.system_info_request.query );
             EXPECT_EQ( expected.body.system_info_request.request_firmware_git_hash,
@@ -414,6 +432,8 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
+            std::cout << "info response"
+                      << "\n";
             EXPECT_EQ( expected.body.system_info_response.application_protocol_major,
                        actual.body.system_info_response.application_protocol_major );
             EXPECT_EQ( expected.body.system_info_response.application_protocol_minor,
@@ -429,6 +449,8 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
+            std::cout << "test config"
+                      << "\n";
             EXPECT_EQ( expected.body.test_configuration.tick_duration.nanoseconds,
                        actual.body.test_configuration.tick_duration.nanoseconds );
             EXPECT_EQ( expected.body.test_configuration.expected_tick_count,
@@ -455,6 +477,8 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
+            std::cout << "test instruction"
+                      << "\n";
             EXPECT_EQ( expected.body.test_instruction.tick_number,
                        actual.body.test_instruction.tick_number );
 
@@ -480,6 +504,8 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
+            std::cout << "variable inst"
+                      << "\n";
             EXPECT_EQ( expected.body.variable_instruction_data.tick_number,
                        actual.body.variable_instruction_data.tick_number );
 
@@ -491,17 +517,23 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
+            std::cout << "ex control"
+                      << "\n";
             EXPECT_EQ( expected.body.execution_control.command,
                        actual.body.execution_control.command );
             EXPECT_EQ( expected.body.execution_control.flags, actual.body.execution_control.flags );
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
+            std::cout << "global control"
+                      << "\n";
             EXPECT_EQ( expected.body.global_control.command, actual.body.global_control.command );
             EXPECT_EQ( expected.body.global_control.flags, actual.body.global_control.flags );
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
+            std::cout << "test result"
+                      << "\n";
             EXPECT_EQ( expected.body.test_result.tick_number, actual.body.test_result.tick_number );
 
             EXPECT_EQ( std::memcmp( expected.body.test_result.digital_inputs,
@@ -528,6 +560,8 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
+            std::cout << "variable result"
+                      << "\n";
             EXPECT_EQ( expected.body.variable_result_data.tick_number,
                        actual.body.variable_result_data.tick_number );
 
@@ -539,6 +573,8 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
+            std::cout << "response"
+                      << "\n";
             EXPECT_EQ( expected.body.response.scope, actual.body.response.scope );
             EXPECT_EQ( expected.body.response.outcome, actual.body.response.outcome );
             EXPECT_EQ( expected.body.response.reason, actual.body.response.reason );
@@ -550,6 +586,8 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
+            std::cout << "error"
+                      << "\n";
             EXPECT_EQ( expected.body.error.category, actual.body.error.category );
             EXPECT_EQ( expected.body.error.recoverable, actual.body.error.recoverable );
             EXPECT_EQ( expected.body.error.has_tick_number, actual.body.error.has_tick_number );
@@ -613,12 +651,14 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
     static const std::array<HIL_Application_Data_Declaration_T, 1u> instruction_data{
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },
-            HIL_Application_Byte_Span_T{ variable_bytes.data(), variable_bytes.size() } } };
+            HIL_Application_Byte_Span_T{ variable_bytes.data(),
+                                         ( uint8_t )variable_bytes.size() } } };
 
     static const std::array<HIL_Application_Data_Declaration_T, 1u> result_data{
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },
-            HIL_Application_Byte_Span_T{ variable_bytes.data(), variable_bytes.size() } } };
+            HIL_Application_Byte_Span_T{ variable_bytes.data(),
+                                         ( uint8_t )variable_bytes.size() } } };
 
     std::array<HIL_Application_Message_T, 10u> messages{};
 
@@ -637,9 +677,9 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
         HIL_APPLICATION_PROTOCOL_VERSION_MINOR;
     messages[1].body.system_info_response.firmware_version_major = 1u;
     messages[1].body.system_info_response.firmware_git_hash =
-        HIL_Application_Byte_Span_T{ git_hash.data(), git_hash.size() };
+        HIL_Application_Byte_Span_T{ git_hash.data(), ( uint8_t )git_hash.size() };
     messages[1].body.system_info_response.diagnostic_data =
-        HIL_Application_Byte_Span_T{ diagnostic.data(), diagnostic.size() };
+        HIL_Application_Byte_Span_T{ diagnostic.data(), ( uint8_t )diagnostic.size() };
 
     messages[2].type        = HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION;
     messages[2].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
@@ -672,7 +712,7 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
     messages[4].body.variable_instruction_data.channel =
         HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u };
     messages[4].body.variable_instruction_data.data =
-        HIL_Application_Byte_Span_T{ variable_bytes.data(), variable_bytes.size() };
+        HIL_Application_Byte_Span_T{ variable_bytes.data(), ( uint8_t )variable_bytes.size() };
 
     messages[5].type                           = HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL;
     messages[5].subtype                        = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
@@ -708,7 +748,7 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
     messages[8].body.variable_result_data.channel =
         HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u };
     messages[8].body.variable_result_data.data =
-        HIL_Application_Byte_Span_T{ variable_bytes.data(), variable_bytes.size() };
+        HIL_Application_Byte_Span_T{ variable_bytes.data(), ( uint8_t )variable_bytes.size() };
 
     messages[9].type                                 = HIL_APPLICATION_MESSAGE_TYPE_RESPONSE;
     messages[9].subtype                              = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
@@ -821,10 +861,10 @@ void CompileUploadConformanceScenarios()
     const std::array<HIL_Application_Data_Declaration_T, 2u> declarations{
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },
-            HIL_Application_Byte_Span_T{ uart_bytes.data(), uart_bytes.size() } },
+            HIL_Application_Byte_Span_T{ uart_bytes.data(), ( uint8_t )uart_bytes.size() } },
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_SPI, 1u },
-            HIL_Application_Byte_Span_T{ spi_bytes.data(), spi_bytes.size() } },
+            HIL_Application_Byte_Span_T{ spi_bytes.data(), ( uint8_t )spi_bytes.size() } },
     };
 
     HIL_Application_Message_T fixed_tick{};
@@ -844,7 +884,7 @@ void CompileUploadConformanceScenarios()
     variable_tick.body.variable_instruction_data.tick_number = 0u;
     variable_tick.body.variable_instruction_data.channel     = declarations[0].channel;
     variable_tick.body.variable_instruction_data.data =
-        HIL_Application_Byte_Span_T{ uart_bytes.data(), uart_bytes.size() };
+        HIL_Application_Byte_Span_T{ uart_bytes.data(), ( uint8_t )uart_bytes.size() };
 
     HIL_Application_Message_T second_variable_tick{};
     second_variable_tick.type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA;
@@ -854,7 +894,7 @@ void CompileUploadConformanceScenarios()
     second_variable_tick.body.variable_instruction_data.tick_number = 0u;
     second_variable_tick.body.variable_instruction_data.channel     = declarations[1].channel;
     second_variable_tick.body.variable_instruction_data.data =
-        HIL_Application_Byte_Span_T{ spi_bytes.data(), spi_bytes.size() };
+        HIL_Application_Byte_Span_T{ spi_bytes.data(), ( uint8_t )spi_bytes.size() };
 
     /* Tick ACCEPTED represents the complete fixed-plus-variable acceptance. */
     const HIL_Application_Message_T tick_accepted = TestResponse(
@@ -963,10 +1003,10 @@ void CompileSuccessfulResultConformanceScenario()
     const std::array<HIL_Application_Data_Declaration_T, 2u> result_declarations{
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_CAN, 0u },
-            HIL_Application_Byte_Span_T{ can_bytes.data(), can_bytes.size() } },
+            HIL_Application_Byte_Span_T{ can_bytes.data(), ( uint8_t )can_bytes.size() } },
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 1u },
-            HIL_Application_Byte_Span_T{ uart_bytes.data(), uart_bytes.size() } },
+            HIL_Application_Byte_Span_T{ uart_bytes.data(), ( uint8_t )uart_bytes.size() } },
     };
 
     HIL_Application_Message_T fixed_result_0{};
@@ -989,7 +1029,7 @@ void CompileSuccessfulResultConformanceScenario()
     variable_result_0.body.variable_result_data.tick_number = 0u;
     variable_result_0.body.variable_result_data.channel     = result_declarations[0].channel;
     variable_result_0.body.variable_result_data.data =
-        HIL_Application_Byte_Span_T{ can_bytes.data(), can_bytes.size() };
+        HIL_Application_Byte_Span_T{ can_bytes.data(), ( uint8_t )can_bytes.size() };
 
     HIL_Application_Message_T variable_result_1{};
     variable_result_1.type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA;
@@ -999,7 +1039,7 @@ void CompileSuccessfulResultConformanceScenario()
     variable_result_1.body.variable_result_data.tick_number = 0u;
     variable_result_1.body.variable_result_data.channel     = result_declarations[1].channel;
     variable_result_1.body.variable_result_data.data =
-        HIL_Application_Byte_Span_T{ uart_bytes.data(), uart_bytes.size() };
+        HIL_Application_Byte_Span_T{ uart_bytes.data(), ( uint8_t )uart_bytes.size() };
 
     HIL_Application_Message_T fixed_result_1                    = fixed_result_0;
     fixed_result_1.body.test_result.tick_number                 = 1u;
@@ -1027,7 +1067,7 @@ void CompilePartialVariableResultScenario()
     const std::array<std::uint8_t, 2u>       valid_can_bytes{ 0x11u, 0x22u };
     const HIL_Application_Data_Declaration_T valid_can_declaration{
         HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_CAN, 0u },
-        HIL_Application_Byte_Span_T{ valid_can_bytes.data(), valid_can_bytes.size() },
+        HIL_Application_Byte_Span_T{ valid_can_bytes.data(), ( uint8_t )valid_can_bytes.size() },
     };
 
     HIL_Application_Message_T partial_result{};
@@ -1050,7 +1090,7 @@ void CompilePartialVariableResultScenario()
     valid_variable_result.body.variable_result_data.tick_number = 0u;
     valid_variable_result.body.variable_result_data.channel     = valid_can_declaration.channel;
     valid_variable_result.body.variable_result_data.data =
-        HIL_Application_Byte_Span_T{ valid_can_bytes.data(), valid_can_bytes.size() };
+        HIL_Application_Byte_Span_T{ valid_can_bytes.data(), ( uint8_t )valid_can_bytes.size() };
 
     /* All configured fixed captures remain valid; only failed variable data is omitted. */
     const std::array<HIL_Application_Message_T, 2u> ordered_partial_result{
@@ -1432,6 +1472,12 @@ TEST( ApplicationEncodeDecode, EverySupportedCodecRoundTrips )
 
     for ( const auto& original : messages )
     {
+        std::cout << "\n\n===== STARTING MESSAGE TYPE "
+                  << " =====\n";
+
+        PrintMessage( original );
+
+        std::cout << "===== PRINT COMPLETE =====\n";
         SCOPED_TRACE( static_cast<int>( original.type ) );
 
         std::array<std::uint8_t, 4096u> encoded{};
