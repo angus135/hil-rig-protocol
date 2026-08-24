@@ -129,6 +129,9 @@ void PrintMessage( const HIL_Application_Message_T& message )
 
             std::cout << "    firmware_version_minor: "
                       << static_cast<unsigned>( data.firmware_version_minor ) << "\n";
+            
+            std::cout << "    firmware_version_patch: "
+                      << static_cast<unsigned>( data.firmware_version_patch ) << "\n";
 
             std::cout << "    firmware_git_hash:\n";
             PrintByteSpan( data.firmware_git_hash );
@@ -423,7 +426,7 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
     switch ( expected.type )
     {
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
-            std::cout << "info request"
+            std::cout << "testing info request..."
                       << "\n";
             EXPECT_EQ( expected.body.system_info_request.query,
                        actual.body.system_info_request.query );
@@ -432,7 +435,7 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
-            std::cout << "info response"
+            std::cout << "testing info response..."
                       << "\n";
             EXPECT_EQ( expected.body.system_info_response.application_protocol_major,
                        actual.body.system_info_response.application_protocol_major );
@@ -449,7 +452,7 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
-            std::cout << "test config"
+            std::cout << "testing test config..."
                       << "\n";
             EXPECT_EQ( expected.body.test_configuration.tick_duration.nanoseconds,
                        actual.body.test_configuration.tick_duration.nanoseconds );
@@ -477,7 +480,7 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
-            std::cout << "test instruction"
+            std::cout << "testing test instruction..."
                       << "\n";
             EXPECT_EQ( expected.body.test_instruction.tick_number,
                        actual.body.test_instruction.tick_number );
@@ -504,7 +507,7 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
-            std::cout << "variable inst"
+            std::cout << "testing variable inst..."
                       << "\n";
             EXPECT_EQ( expected.body.variable_instruction_data.tick_number,
                        actual.body.variable_instruction_data.tick_number );
@@ -517,7 +520,7 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
-            std::cout << "ex control"
+            std::cout << "testing ex control..."
                       << "\n";
             EXPECT_EQ( expected.body.execution_control.command,
                        actual.body.execution_control.command );
@@ -525,14 +528,14 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
-            std::cout << "global control"
+            std::cout << "testing global control..."
                       << "\n";
             EXPECT_EQ( expected.body.global_control.command, actual.body.global_control.command );
             EXPECT_EQ( expected.body.global_control.flags, actual.body.global_control.flags );
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
-            std::cout << "test result"
+            std::cout << "testing test result..."
                       << "\n";
             EXPECT_EQ( expected.body.test_result.tick_number, actual.body.test_result.tick_number );
 
@@ -560,7 +563,7 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
-            std::cout << "variable result"
+            std::cout << "testing variable result..."
                       << "\n";
             EXPECT_EQ( expected.body.variable_result_data.tick_number,
                        actual.body.variable_result_data.tick_number );
@@ -573,7 +576,7 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
-            std::cout << "response"
+            std::cout << "testing response..."
                       << "\n";
             EXPECT_EQ( expected.body.response.scope, actual.body.response.scope );
             EXPECT_EQ( expected.body.response.outcome, actual.body.response.outcome );
@@ -586,7 +589,7 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
-            std::cout << "error"
+            std::cout << "testing error..."
                       << "\n";
             EXPECT_EQ( expected.body.error.category, actual.body.error.category );
             EXPECT_EQ( expected.body.error.recoverable, actual.body.error.recoverable );
@@ -794,7 +797,7 @@ void CompileCodecFacadeUsage()
     std::array<std::uint8_t, 2048u>                       encoded_message{};
     std::array<std::uint8_t, 2048u>                       decode_storage{};
     std::array<HIL_Application_Peripheral_Config_T, 255u> decoded_peripherals{};
-    std::array<HIL_Application_Data_Declaration_T, 255u> decoded_variable{};
+    std::array<HIL_Application_Data_Declaration_T, 255u>  decoded_variable{};
     std::size_t                                           used_variable_size{};
     std::size_t                                           used_decoded_size{};
     std::size_t                                           encoded_size            = 0u;
@@ -832,7 +835,8 @@ void CompileCodecFacadeUsage()
     ( void )HIL_APPLICATION_Decode_Message( &context, encoded_message.data(), encoded_size,
                                             &decoded, decode_storage.data(), decode_storage.size(),
                                             &used_decoded_size, decoded_peripherals.data(),
-                                            decoded_peripherals.size(), decoded_variable.data(), decoded_variable.size(), &used_variable_size );
+                                            decoded_peripherals.size(), decoded_variable.data(),
+                                            decoded_variable.size(), &used_variable_size );
 
     /* Context remains codec-only; endpoint transaction data is never supplied. */
 }
@@ -1478,13 +1482,6 @@ TEST( ApplicationEncodeDecode, EverySupportedCodecRoundTrips )
 
     for ( const auto& original : messages )
     {
-        std::cout << "\n\n===== STARTING MESSAGE TYPE "
-                  << " =====\n";
-
-        PrintMessage( original );
-
-        std::cout << "===== PRINT COMPLETE =====\n";
-        SCOPED_TRACE( static_cast<int>( original.type ) );
 
         std::array<std::uint8_t, 4096u>                       encoded{};
         std::size_t                                           encoded_size = 0u;
@@ -1499,15 +1496,22 @@ TEST( ApplicationEncodeDecode, EverySupportedCodecRoundTrips )
         ASSERT_GT( encoded_size, 0u );
         ASSERT_LE( encoded_size, encoded.size() );
 
-        HIL_Application_Message_T decoded{};
+        HIL_Application_Message_T                            decoded{};
         std::array<HIL_Application_Data_Declaration_T, 255u> decoded_variable{};
-        std::size_t                                           used_variable_size{};
+        std::size_t                                          used_variable_size{};
 
-        ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded,
-                                                   decode_storage.data(), decode_storage.size(),
-                                                   &used_decoded_size, decoded_peripherals.data(),
-                                                   decoded_peripherals.size(), decoded_variable.data(), decoded_variable.size(), &used_variable_size ),
+        ASSERT_EQ( HIL_APPLICATION_Decode_Message(
+                       &context, encoded.data(), encoded_size, &decoded, decode_storage.data(),
+                       decode_storage.size(), &used_decoded_size, decoded_peripherals.data(),
+                       decoded_peripherals.size(), decoded_variable.data(), decoded_variable.size(),
+                       &used_variable_size ),
                    HIL_APPLICATION_STATUS_OK );
+
+        if (original.type == 2){
+            PrintMessage(original);
+            PrintMessage(decoded);
+            printEncodedArr(encoded, 90);
+        }
 
         ExpectMessagesEqual( original, decoded );
     }
@@ -1531,13 +1535,14 @@ TEST( ApplicationEncodeDecode, TestConfigurationRoundTrips )
     std::array<std::uint8_t, 2048u>                       decode_storage{};
     std::array<HIL_Application_Peripheral_Config_T, 255u> decoded_peripherals{};
     std::size_t                                           used_decoded_size{};
-    std::array<HIL_Application_Data_Declaration_T, 255u> decoded_variable{};
+    std::array<HIL_Application_Data_Declaration_T, 255u>  decoded_variable{};
     std::size_t                                           used_variable_size{};
 
     ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded,
                                                decode_storage.data(), decode_storage.size(),
                                                &used_decoded_size, decoded_peripherals.data(),
-                                               decoded_peripherals.size(), decoded_variable.data(), decoded_variable.size(), &used_variable_size ),
+                                               decoded_peripherals.size(), decoded_variable.data(),
+                                               decoded_variable.size(), &used_variable_size ),
                HIL_APPLICATION_STATUS_OK );
 
     ExpectMessagesEqual( original, decoded );
@@ -1563,13 +1568,14 @@ TEST( ApplicationEncodeDecode, VariableInstructionDataRoundTrips )
     std::array<std::uint8_t, 2048u>                       decode_storage{};
     std::array<HIL_Application_Peripheral_Config_T, 255u> decoded_peripherals{};
     std::size_t                                           used_decoded_size{};
-    std::array<HIL_Application_Data_Declaration_T, 255u> decoded_variable{};
+    std::array<HIL_Application_Data_Declaration_T, 255u>  decoded_variable{};
     std::size_t                                           used_variable_size{};
 
     ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded,
                                                decode_storage.data(), decode_storage.size(),
                                                &used_decoded_size, decoded_peripherals.data(),
-                                               decoded_peripherals.size(), decoded_variable.data(), decoded_variable.size(), &used_variable_size ),
+                                               decoded_peripherals.size(), decoded_variable.data(),
+                                               decoded_variable.size(), &used_variable_size ),
                HIL_APPLICATION_STATUS_OK );
 
     ExpectMessagesEqual( original, decoded );
@@ -1593,13 +1599,14 @@ TEST( ApplicationEncodeDecode, TestInstructionWithFixedAndVariableDataRoundTrips
     std::array<std::uint8_t, 2048u>                       decode_storage{};
     std::array<HIL_Application_Peripheral_Config_T, 255u> decoded_peripherals{};
     std::size_t                                           used_decoded_size{};
-    std::array<HIL_Application_Data_Declaration_T, 255u> decoded_variable{};
+    std::array<HIL_Application_Data_Declaration_T, 255u>  decoded_variable{};
     std::size_t                                           used_variable_size{};
 
     ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded,
                                                decode_storage.data(), decode_storage.size(),
                                                &used_decoded_size, decoded_peripherals.data(),
-                                               decoded_peripherals.size(), decoded_variable.data(), decoded_variable.size(), &used_variable_size ),
+                                               decoded_peripherals.size(), decoded_variable.data(),
+                                               decoded_variable.size(), &used_variable_size ),
                HIL_APPLICATION_STATUS_OK );
 
     ExpectMessagesEqual( original, decoded );
@@ -1623,13 +1630,14 @@ TEST( ApplicationEncodeDecode, TestResultWithFixedAndVariableDataRoundTrips )
     std::array<std::uint8_t, 2048u>                       decode_storage{};
     std::array<HIL_Application_Peripheral_Config_T, 255u> decoded_peripherals{};
     std::size_t                                           used_decoded_size{};
-    std::array<HIL_Application_Data_Declaration_T, 255u> decoded_variable{};
+    std::array<HIL_Application_Data_Declaration_T, 255u>  decoded_variable{};
     std::size_t                                           used_variable_size{};
 
     ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded,
                                                decode_storage.data(), decode_storage.size(),
                                                &used_decoded_size, decoded_peripherals.data(),
-                                               decoded_peripherals.size(), decoded_variable.data(), decoded_variable.size(), &used_variable_size ),
+                                               decoded_peripherals.size(), decoded_variable.data(),
+                                               decoded_variable.size(), &used_variable_size ),
                HIL_APPLICATION_STATUS_OK );
 
     ExpectMessagesEqual( original, decoded );
@@ -1644,25 +1652,28 @@ TEST( ApplicationDecode, RejectsNullArguments )
     std::array<std::uint8_t, 2048u>                       decode_storage{};
     std::array<HIL_Application_Peripheral_Config_T, 255u> decoded_peripherals{};
     std::size_t                                           used_decoded_size{};
-    std::array<HIL_Application_Data_Declaration_T, 255u> decoded_variable{};
+    std::array<HIL_Application_Data_Declaration_T, 255u>  decoded_variable{};
     std::size_t                                           used_variable_size{};
 
     EXPECT_EQ( HIL_APPLICATION_Decode_Message( nullptr, encoded.data(), encoded.size(), &message,
                                                decode_storage.data(), decode_storage.size(),
                                                &used_decoded_size, decoded_peripherals.data(),
-                                               decoded_peripherals.size(), decoded_variable.data(), decoded_variable.size(), &used_variable_size ),
+                                               decoded_peripherals.size(), decoded_variable.data(),
+                                               decoded_variable.size(), &used_variable_size ),
                HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
 
     EXPECT_EQ( HIL_APPLICATION_Decode_Message( &context, nullptr, encoded.size(), &message,
                                                decode_storage.data(), decode_storage.size(),
                                                &used_decoded_size, decoded_peripherals.data(),
-                                               decoded_peripherals.size(), decoded_variable.data(), decoded_variable.size(), &used_variable_size ),
+                                               decoded_peripherals.size(), decoded_variable.data(),
+                                               decoded_variable.size(), &used_variable_size ),
                HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
 
     EXPECT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded.size(), nullptr,
                                                decode_storage.data(), decode_storage.size(),
                                                &used_decoded_size, decoded_peripherals.data(),
-                                               decoded_peripherals.size(), decoded_variable.data(), decoded_variable.size(), &used_variable_size ),
+                                               decoded_peripherals.size(), decoded_variable.data(),
+                                               decoded_variable.size(), &used_variable_size ),
                HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
 }
 
@@ -1725,13 +1736,14 @@ TEST( ApplicationDecode, InvalidHeaderIsRejected )
     std::array<std::uint8_t, 2048u>                       decode_storage{};
     std::array<HIL_Application_Peripheral_Config_T, 255u> decoded_peripherals{};
     std::size_t                                           used_decoded_size{};
-    std::array<HIL_Application_Data_Declaration_T, 255u> decoded_variable{};
+    std::array<HIL_Application_Data_Declaration_T, 255u>  decoded_variable{};
     std::size_t                                           used_variable_size{};
 
     EXPECT_NE( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded.size(), &decoded,
                                                decode_storage.data(), decode_storage.size(),
                                                &used_decoded_size, decoded_peripherals.data(),
-                                               decoded_peripherals.size(), decoded_variable.data(), decoded_variable.size(), &used_variable_size ),
+                                               decoded_peripherals.size(), decoded_variable.data(),
+                                               decoded_variable.size(), &used_variable_size ),
                HIL_APPLICATION_STATUS_OK );
 }
 
