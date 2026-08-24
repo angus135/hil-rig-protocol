@@ -64,13 +64,13 @@ HIL_APPLICATION_Header_decoding( const HIL_Application_Context_T* old_context,
     // Test ID
 
     memcpy( &( new_message->test_id ), encoded_message, sizeof( new_message->test_id ) );
-    if ( new_message->has_test_id != 0 )
+    new_message->has_test_id = 0;
+    for ( size_t i = 0; i < sizeof( new_message->test_id ); i++ )
     {
-        new_message->has_test_id = 1;
-    }
-    else
-    {
-        new_message->has_test_id = 0;
+        if ( new_message->test_id.bytes[i] != 0 )
+        {
+            new_message->has_test_id = 1;
+        }
     }
     // Message Type
     memcpy( &( new_message->type ), &( encoded_message[sizeof( new_message->test_id )] ),

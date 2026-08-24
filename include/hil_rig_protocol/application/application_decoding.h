@@ -79,7 +79,8 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
 HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Test_Configuration_T* data,
-    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
+    const uint8_t* payload, HIL_Application_Peripheral_Config_T* decoded_peripherals,
+    size_t max_decoded_peripherals_num, uint8_t* decoded_data, size_t max_decoded_data_size,
     size_t* used_decoded_size );
 
 /**
@@ -97,7 +98,9 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
 HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Test_Instruction_T* data,
-    const uint8_t* payload, uint8_t* decoded_data, size_t* used_decoded_size );
+    const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
+    size_t* used_decoded_size, HIL_Application_Data_Declaration_T* decoded_variable_data,
+    size_t max_decoded_variable_data_num, size_t* used_devoded_variable_num );
 
 /**
  * @brief decode variable instruction data.
@@ -169,7 +172,8 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Test_Result_T* data,
     const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
-    size_t* used_decoded_size );
+    size_t* used_decoded_siz, HIL_Application_Data_Declaration_T* decoded_variable_data,
+    size_t max_decoded_variable_data_num, size_t* used_decoded_variable_nume );
 
 /**
  * @brief decode variable result data.
