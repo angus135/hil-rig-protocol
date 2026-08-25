@@ -47,9 +47,9 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Request_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size )
 {
-    ( void ) context;
-    ( void ) sub_type;
-    ( void ) test_id;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
     /**
     Payload = 5 Bytes:
     ________________________________
@@ -75,9 +75,9 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Response_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size )
 {
-    ( void ) context;
-    ( void ) sub_type;
-    ( void ) test_id;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
     /**
     Payload = 10 Bytes (fixed) + X + Y
     _______________________________________________________
@@ -145,8 +145,7 @@ HIL_APPLICATION_Channel_Id_encode( const HIL_Application_Channel_Id_T* data, uin
 
 HIL_Application_Status_T
 HIL_APPLICATION_Peripheral_Config_encode( const HIL_Application_Peripheral_Config_T* data,
-                                          size_t max_payload_size, uint8_t* payload,
-                                          size_t* size )
+                                          size_t max_payload_size, uint8_t* payload, size_t* size )
 {
     /**
     Payload:
@@ -307,9 +306,9 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Configuration_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size )
 {
-    ( void ) context;
-    ( void ) sub_type;
-    ( void ) test_id;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
     /**
     Payload = 16 Bytes + X + Y peripheral count {4}
     _______________________________________________________
@@ -331,9 +330,11 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
 
 
     */
-    size_t payload_size = sizeof( data->tick_duration ) + sizeof( data->expected_tick_count )
-                            + sizeof( data->flags ) + sizeof( data->peripheral_count )
-                            + (sizeof( data->peripherals->value ) + sizeof( data->peripherals->type )) * data->peripheral_count;
+    size_t payload_size =
+        sizeof( data->tick_duration ) + sizeof( data->expected_tick_count ) + sizeof( data->flags )
+        + sizeof( data->peripheral_count )
+        + ( sizeof( data->peripherals->value ) + sizeof( data->peripherals->type ) )
+              * data->peripheral_count;
     if ( max_payload_size < payload_size )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
@@ -377,9 +378,9 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Instruction_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size )
 {
-    ( void ) context;
-    ( void ) sub_type;
-    ( void ) test_id;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
     /**
     _______________________________________________________
     |                         |                            |
@@ -504,9 +505,9 @@ HIL_Application_Status_T HIL_APPLICATION_Execution_Control_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Execution_Control_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size )
 {
-    ( void ) context;
-    ( void ) sub_type;
-    ( void ) test_id;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
     /**
     _______________________________________________________
     |                         |                            |
@@ -532,9 +533,9 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Global_Control_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size )
 {
-    ( void ) context;
-    ( void ) sub_type;
-    ( void ) test_id;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
     /**
     _______________________________________________________
     |                         |                            |
@@ -560,9 +561,9 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Result_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size )
 {
-    ( void ) context;
-    ( void ) sub_type;
-    ( void ) test_id;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
     /**
     _______________________________________________________
     |                         |                            |
@@ -692,9 +693,9 @@ HIL_Application_Status_T HIL_APPLICATION_Response_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Response_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size )
 {
-    ( void ) context;
-    ( void ) sub_type;
-    ( void ) test_id;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
     /**
     _______________________________________________________
     |                         |                            |

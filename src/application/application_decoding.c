@@ -58,11 +58,11 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_decode(
     const uint8_t* payload, uint8_t* decoded_data, const size_t max_decoded_data_size,
     size_t* used_decoded_size )
 {
-    ( void) context;
-    (void) sub_type;
-    (void) test_id;
-    (void) decoded_data;
-    (void) max_decoded_data_size;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )decoded_data;
+    ( void )max_decoded_data_size;
     /**
     Payload = 5 Bytes:
     ________________________________
@@ -85,9 +85,9 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
     size_t* used_decoded_size )
 {
-    ( void) context;
-    (void) sub_type;
-    (void) test_id;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
     /**
     Payload = 10 Bytes (fixed) + X + Y
     _______________________________________________________
@@ -290,9 +290,9 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
     size_t max_decoded_peripherals_num, uint8_t* decoded_data, size_t max_decoded_data_size,
     size_t* used_decoded_size )
 {
-    ( void) context;
-    (void) sub_type;
-    (void) test_id;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
     /**
     Payload = 16 Bytes + X + Y
     _______________________________________________________
@@ -358,9 +358,9 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
     size_t* used_decoded_size, HIL_Application_Data_Declaration_T* decoded_variable_data,
     size_t max_decoded_variable_data_num, size_t* used_devoded_variable_num )
 {
-    ( void) context;
-    (void) sub_type;
-    (void) test_id;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
     /**
     _______________________________________________________
     |                         |                            |
@@ -456,9 +456,9 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_decode(
     ( void )test_id;
     ( void )data;
     ( void )payload;
-    (void) decoded_data;
-    (void) max_decoded_data_size;
-    (void) used_decoded_size;
+    ( void )decoded_data;
+    ( void )max_decoded_data_size;
+    ( void )used_decoded_size;
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
@@ -468,11 +468,11 @@ HIL_Application_Status_T HIL_APPLICATION_Execution_Control_decode(
     const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
     size_t* used_decoded_size )
 {
-    (void) context;
-    (void) sub_type;
-    (void) test_id;
-    (void) decoded_data;
-    (void) max_decoded_data_size;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )decoded_data;
+    ( void )max_decoded_data_size;
     /**
     _______________________________________________________
     |                         |                            |
@@ -494,11 +494,11 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_decode(
     const uint8_t* payload, uint8_t* decoded_data, size_t max_decoded_data_size,
     size_t* used_decoded_size )
 {
-    (void) context;
-    (void) sub_type;
-    (void) test_id;
-    (void) decoded_data;
-    (void) max_decoded_data_size;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )decoded_data;
+    ( void )max_decoded_data_size;
     /**
     _______________________________________________________
     |                         |                            |
@@ -521,9 +521,9 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     size_t* used_decoded_size, HIL_Application_Data_Declaration_T* decoded_variable_data,
     size_t max_decoded_variable_data_num, size_t* used_decoded_variable_num )
 {
-    (void) context;
-    (void) sub_type;
-    (void) test_id;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
     /**
     _______________________________________________________
     |                         |                            |
@@ -612,7 +612,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     memcpy( &( data->problem_detail ), &( payload[running_total] ),
             sizeof( data->problem_detail ) );
     running_total += sizeof( data->problem_detail );
-    *used_decoded_size = decoded_running;
+    *used_decoded_size         = decoded_running;
     *used_decoded_variable_num = data->variable_data_count;
     return HIL_APPLICATION_STATUS_OK;
 }
@@ -628,9 +628,9 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_decode(
     ( void )test_id;
     ( void )data;
     ( void )payload;
-    (void)decoded_data;
-    (void)max_decoded_data_size;
-    (void)used_decoded_size;
+    ( void )decoded_data;
+    ( void )max_decoded_data_size;
+    ( void )used_decoded_size;
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
@@ -643,8 +643,8 @@ HIL_Application_Status_T HIL_APPLICATION_Response_decode(
     ( void )context;
     ( void )sub_type;
     ( void )test_id;
-    (void) decoded_data;
-    (void)max_decoded_data_size;
+    ( void )decoded_data;
+    ( void )max_decoded_data_size;
     /**
     _______________________________________________________
     |                         |                            |
