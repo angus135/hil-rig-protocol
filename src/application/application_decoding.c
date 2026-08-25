@@ -99,7 +99,7 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     */
     memcpy( &( data->application_protocol_major ), payload,
             sizeof( data->application_protocol_major ) );
-    size_t running_total = sizeof( data->application_protocol_major );
+    size_t  running_total = sizeof( data->application_protocol_major );
     uint8_t decoded_total = 0;
     memcpy( &( data->application_protocol_minor ), &( payload[running_total] ),
             sizeof( data->application_protocol_minor ) );
@@ -152,7 +152,7 @@ HIL_Application_Status_T HIL_APPLICATION_Channel_Id_decode( HIL_Application_Chan
     |_________________________|____________________________|
     */
     memcpy( &( data->peripheral ), payload, sizeof( data->peripheral ) );
-    memcpy( &( data->channel ), &( payload[sizeof( data->peripheral )] ), data->channel );
+    memcpy( &( data->channel ), &( payload[sizeof( data->peripheral )] ), sizeof( data->channel ) );
     return HIL_APPLICATION_STATUS_OK;
 }
 

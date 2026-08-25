@@ -114,10 +114,10 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
             sizeof( data->firmware_version_patch ) );
     running_total += sizeof( data->firmware_version_patch );
     HIL_APPLICATION_Byte_Span_encode( &( data->diagnostic_data ), &( payload[running_total] ) );
-    running_total += sizeof(data->diagnostic_data.size);
+    running_total += sizeof( data->diagnostic_data.size );
     running_total += data->diagnostic_data.size;
     HIL_APPLICATION_Byte_Span_encode( &( data->firmware_git_hash ), &( payload[running_total] ) );
-    running_total += sizeof(data->firmware_git_hash.size);
+    running_total += sizeof( data->firmware_git_hash.size );
     running_total += data->firmware_git_hash.size;
     *used_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
@@ -134,7 +134,7 @@ HIL_APPLICATION_Channel_Id_encode( const HIL_Application_Channel_Id_T* data, uin
     |_________________________|____________________________|
     */
     memcpy( payload, &( data->peripheral ), sizeof( data->peripheral ) );
-    memcpy( &( payload[sizeof( data->peripheral )] ), &( data->channel ), data->channel );
+    memcpy( &( payload[sizeof( data->peripheral )] ), &( data->channel ), sizeof( data->channel ) );
     return HIL_APPLICATION_STATUS_OK;
 }
 
@@ -358,7 +358,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     memcpy( &( payload[running_total] ), &( data->flags ), sizeof( data->flags ) );
     running_total += sizeof( data->flags );
     HIL_APPLICATION_Byte_Span_encode( &( data->extension_data ), &( payload[running_total] ) );
-    running_total += sizeof(data->extension_data.size);
+    running_total += sizeof( data->extension_data.size );
     running_total += data->extension_data.size;
     *used_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
@@ -465,7 +465,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
         running_total += sizeof( data->variable_data[i].channel.channel );
         HIL_APPLICATION_Byte_Span_encode( &( data->variable_data[i].data ),
                                           &( payload[running_total] ) );
-        running_total += sizeof(data->variable_data[i].data.size);
+        running_total += sizeof( data->variable_data[i].data.size );
         running_total += data->variable_data[i].data.size;
     }
     *used_size = running_total;
@@ -640,7 +640,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
         running_total += sizeof( data->variable_data[i].channel.channel );
         HIL_APPLICATION_Byte_Span_encode( &( data->variable_data[i].data ),
                                           &( payload[running_total] ) );
-        running_total += sizeof(data->variable_data[i].data.size);                             
+        running_total += sizeof( data->variable_data[i].data.size );
         running_total += data->variable_data[i].data.size;
     }
     // Condition and problem
