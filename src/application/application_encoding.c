@@ -330,7 +330,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     |     *peripherals {Y}    |     extension data {X}     |
     |_________________________|____________________________|
 
-    *Peripgerals expanded:
+    *Peripherals expanded:
     _______________________________________________________
     |                         |                            |
     |         type {1}        |         *value {Z}         |
@@ -339,7 +339,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
 
     */
     size_t payload_size =
-        sizeof( data->tick_duration ) + sizeof( data->expected_tick_count ) + sizeof( data->flags )
+        sizeof( data->tick_duration_us ) + sizeof( data->expected_tick_count ) + sizeof( data->flags )
         + sizeof( data->peripheral_count )
         + ( sizeof( data->peripherals->value ) + sizeof( data->peripherals->type ) )
               * data->peripheral_count;
@@ -347,8 +347,8 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    memcpy( payload, &( data->tick_duration ), sizeof( data->tick_duration ) );
-    size_t running_total = sizeof( data->tick_duration );
+    memcpy( payload, &( data->tick_duration_us ), sizeof( data->tick_duration_us ) );
+    size_t running_total = sizeof( data->tick_duration_us );
     memcpy( &( payload[running_total] ), &( data->expected_tick_count ),
             sizeof( data->expected_tick_count ) );
     running_total += sizeof( data->expected_tick_count );

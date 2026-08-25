@@ -173,7 +173,7 @@ typedef struct
 typedef struct
 {
     /** Unit-explicit duration represented by one instruction tick. */
-    HIL_Application_Tick_Duration_T tick_duration;
+    HIL_Application_Tick_Duration_T tick_duration_us;
     /** Nonzero upload length N, defining valid ticks 0 through N - 1. */
     uint32_t expected_tick_count;
     /** Reserved test-wide option bits; must be zero in the initial protocol. */

@@ -130,7 +130,7 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
     messages[2].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     messages[2].has_test_id = 1u;
     messages[2].test_id     = test_id;
-    messages[2].body.test_configuration.tick_duration.nanoseconds = 1000000u;
+    messages[2].body.test_configuration.tick_duration_us.nanoseconds = 1000000u;
     messages[2].body.test_configuration.expected_tick_count       = 100u;
     messages[2].body.test_configuration.flags                     = 0u;
     messages[2].body.test_configuration.peripherals               = peripherals.data();

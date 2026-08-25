@@ -67,6 +67,7 @@ typedef struct
     uint16_t application_protocol_major;
     /** Diagnostic Application protocol minor version reported by the peer. */
     uint16_t application_protocol_minor;
+    
     uint16_t application_protocol_patch;
     /** Firmware semantic-version major component. */
     uint16_t firmware_version_major;
