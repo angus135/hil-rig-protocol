@@ -95,14 +95,14 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     |   protocol major {2}    |    protocol minor {2}      |
     |_________________________|____________________________|
     |                         |                            |
-    |    version major {2}    |     version minor {2}      |
+    |    protcol patch {2}    |    version major {2}       |
     |_________________________|____________________________|
     |                         |                            |
-    |    version patch {2}    |    diagnostic data {X}     |
+    |    version minor {2}    |     version patch {2}      |
     |_________________________|____________________________|
-    |                         |
-    |       git hash {Y}      |
-    |_________________________|
+    |                         |                            |
+    |   diagnostic data {X}   |        git hash {Y}        |
+    |_________________________|____________________________|
     */
     memcpy( &( data->application_protocol_major ), payload,
             sizeof( data->application_protocol_major ) );
@@ -110,6 +110,9 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     uint8_t decoded_total = 0;
     memcpy( &( data->application_protocol_minor ), &( payload[running_total] ),
             sizeof( data->application_protocol_minor ) );
+    running_total += sizeof( data->application_protocol_minor );
+    memcpy( &( data->application_protocol_patch ), &( payload[running_total] ),
+            sizeof( data->application_protocol_patch ) );
     running_total += sizeof( data->application_protocol_minor );
     memcpy( &( data->firmware_version_major ), &( payload[running_total] ),
             sizeof( data->firmware_version_major ) );

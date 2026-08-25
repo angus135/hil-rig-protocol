@@ -25,6 +25,8 @@
 #include "hil_rig_protocol/application/application_test_config.h"
 #include "hil_rig_protocol/application/application_types.h"
 
+#include "hil_rig_protocol/version.h"
+
 #include <string.h>
 
 HIL_Application_Status_T HIL_APPLICATION_Byte_Span_encode( const HIL_Application_Byte_Span_T* data,
@@ -85,17 +87,17 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
     |   protocol major {2}    |    protocol minor {2}      |
     |_________________________|____________________________|
     |                         |                            |
-    |    version major {2}    |     version minor {2}      |
+    |    protcol patch {2}    |    version major {2}       |
     |_________________________|____________________________|
     |                         |                            |
-    |    version patch {2}    |    diagnostic data {X}     |
+    |    version minor {2}    |     version patch {2}      |
     |_________________________|____________________________|
-    |                         |
-    |       git hash {Y}      |
-    |_________________________|
+    |                         |                            |
+    |   diagnostic data {X}   |        git hash {Y}        |
+    |_________________________|____________________________|
     */
     uint32_t payload_size =
-        sizeof( data->application_protocol_major ) + sizeof( data->application_protocol_minor )
+        sizeof( data->application_protocol_major ) + sizeof( data->application_protocol_minor ) + sizeof( data->application_protocol_patch )
         + sizeof( data->firmware_version_major ) + sizeof( data->firmware_version_minor )
         + sizeof( data->firmware_version_patch ) + data->firmware_git_hash.size
         + data->diagnostic_data.size;
@@ -103,12 +105,18 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    memcpy( payload, &( data->application_protocol_major ),
+    uint16_t protocol_patch = HIL_RIG_PROTOCOL_VERSION_PATCH;
+    uint16_t protocol_major = HIL_RIG_PROTOCOL_VERSION_MAJOR;
+    uint16_t protocol_minor = HIL_RIG_PROTOCOL_VERSION_MINOR;
+    memcpy( payload, &protocol_major,
             sizeof( data->application_protocol_major ) );
     size_t running_total = sizeof( data->application_protocol_major );
-    memcpy( &( payload[running_total] ), &( data->application_protocol_minor ),
+    memcpy( &( payload[running_total] ), &protocol_minor,
             sizeof( data->application_protocol_minor ) );
     running_total += sizeof( data->application_protocol_minor );
+    memcpy( &( payload[running_total] ), &protocol_patch,
+            sizeof( data->application_protocol_patch ) );
+    running_total += sizeof( data->application_protocol_patch );
     memcpy( &( payload[running_total] ), &( data->firmware_version_major ),
             sizeof( data->firmware_version_major ) );
     running_total += sizeof( data->firmware_version_major );
