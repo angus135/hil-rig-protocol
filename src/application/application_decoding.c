@@ -180,14 +180,9 @@ HIL_APPLICATION_Peripheral_Config_decode( HIL_Application_Peripheral_Config_T* d
     Digital :
     _______________________________________________________
     |                         |                            |
-    |       channel {6}       |       output mV {4}        |
+    |       channel {6}       |     voltage_level {4}      |
     |_________________________|____________________________|
-    |                         |                            |
-    |      input mV {4}       |   initial output high {1}  |
-    |_________________________|____________________________|
-    |                         |
-    |     capture en {1}      |
-    |_________________________|
+
     Analog :
     _______________________________________________________
     |                         |                            |
@@ -200,7 +195,7 @@ HIL_APPLICATION_Peripheral_Config_decode( HIL_Application_Peripheral_Config_T* d
     |       channel {6}       |        period nS {4}       |
     |_________________________|____________________________|
     |                         |                            |
-    |initial duty cycle pm {2}|     capture enabled {1}    |
+    |initial duty cycle pm {2}|      voltage_level {4}     |
     |_________________________|____________________________|
     Communication :
     _______________________________________________________
@@ -244,9 +239,9 @@ HIL_APPLICATION_Peripheral_Config_decode( HIL_Application_Peripheral_Config_T* d
             memcpy( &( data->value.pwm.initial_duty_cycle_permyriad ), &( payload[running_total] ),
                     sizeof( data->value.pwm.initial_duty_cycle_permyriad ) );
             running_total += sizeof( data->value.pwm.initial_duty_cycle_permyriad );
-            memcpy( &( data->value.pwm.capture_enabled ), &( payload[running_total] ),
-                    sizeof( data->value.pwm.capture_enabled ) );
-            running_total += sizeof( data->value.pwm.capture_enabled );
+            memcpy( &( data->value.pwm.voltage_level ), &( payload[running_total] ),
+                    sizeof( data->value.pwm.voltage_level ) );
+            running_total += sizeof( data->value.pwm.voltage_level );
             break;
         case HIL_APPLICATION_PERIPHERAL_CONFIG_COMMUNICATION:
             HIL_APPLICATION_Channel_Id_decode( &( data->value.communication.channel ),

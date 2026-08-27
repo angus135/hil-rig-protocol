@@ -107,8 +107,8 @@ typedef struct
     uint32_t period_nanoseconds;
     /** Initial duty cycle in 1/10000 units for PWM output. */
     uint16_t initial_duty_cycle_permyriad;
-    /** Nonzero requests period/duty capture in fixed result messages. */
-    uint8_t capture_enabled;
+    /** Maximum requested/supported voltage. */
+    HIL_Application_Peripheral_Config_Voltage_Level_T voltage_level;
 } HIL_Application_Pwm_Config_T;
 
 /**
