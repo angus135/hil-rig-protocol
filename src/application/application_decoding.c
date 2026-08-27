@@ -191,11 +191,9 @@ HIL_APPLICATION_Peripheral_Config_decode( HIL_Application_Peripheral_Config_T* d
     Analog :
     _______________________________________________________
     |                         |                            |
-    |      channel {6}        |       minimum mV {4}       |
+    |      channel {6}        |     voltage level {4}      |
     |_________________________|____________________________|
-    |                         |
-    |      maximum mV {4}     |
-    |_________________________|
+
     PWM :
     _______________________________________________________
     |                         |                            |
@@ -242,12 +240,9 @@ HIL_APPLICATION_Peripheral_Config_decode( HIL_Application_Peripheral_Config_T* d
             HIL_APPLICATION_Channel_Id_decode( &( data->value.analog.channel ),
                                                &( payload[running_total] ) );
             running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-            memcpy( &( data->value.analog.minimum_microvolts ), &( payload[running_total] ),
-                    sizeof( data->value.analog.minimum_microvolts ) );
-            running_total += sizeof( data->value.analog.minimum_microvolts );
-            memcpy( &( data->value.analog.maximum_microvolts ), &( payload[running_total] ),
-                    sizeof( data->value.analog.maximum_microvolts ) );
-            running_total += sizeof( data->value.analog.maximum_microvolts );
+            memcpy( &( data->value.analog.voltage_level ), &( payload[running_total] ),
+                    sizeof( data->value.analog.voltage_level ) );
+            running_total += sizeof( data->value.analog.voltage_level );
             break;
         case HIL_APPLICATION_PERIPHERAL_CONFIG_PWM:
             HIL_APPLICATION_Channel_Id_decode( &( data->value.pwm.channel ),

@@ -28,6 +28,28 @@ extern "C"
 typedef enum
 {
     /** Invalid sentinel. */
+    HIL_APPLICATION_PERIPHERAL_CONFIG_VOLTAGE_INVALID = 0,
+    /** Peripheral is set to 3v3 voltage level. */
+    HIL_APPLICATION_PERIPHERAL_CONFIG_3V3 = 1,
+    /** Peripheral is set to 5v voltage level. */
+    HIL_APPLICATION_PERIPHERAL_CONFIG_5V = 2,
+    /** Peripheral is set to 12v voltage level. */
+    HIL_APPLICATION_PERIPHERAL_CONFIG_12V = 3,
+    /** Peripheral is set to 24v voltage level. */
+    HIL_APPLICATION_PERIPHERAL_CONFIG_24V = 4,
+    /** Reserved sentinel. */
+    HIL_APPLICATION_PERIPHERAL_CONFIG_VOLTAGE_RESERVED = 255
+} HIL_Application_Peripheral_Config_Voltage_Level_T;
+
+/**
+ * @brief Peripheral configuration record category.
+ *
+ * @warning Values may become wire identifiers and require compatibility review
+ * if changed after publication.
+ */
+typedef enum
+{
+    /** Invalid sentinel. */
     HIL_APPLICATION_PERIPHERAL_CONFIG_INVALID = 0,
     /** Digital input/output electrical configuration. */
     HIL_APPLICATION_PERIPHERAL_CONFIG_DIGITAL = 1,
@@ -77,10 +99,8 @@ typedef struct
 {
     /** Protocol-level ANALOG_INPUT or ANALOG_OUTPUT channel. */
     HIL_Application_Channel_Id_T channel;
-    /** Minimum requested/supported signal in microvolts. */
-    int32_t minimum_microvolts;
-    /** Maximum requested/supported signal in microvolts. */
-    int32_t maximum_microvolts;
+    /** Maximum requested/supported voltage. */
+    HIL_Application_Peripheral_Config_Voltage_Level_T voltage_level;
 } HIL_Application_Analog_Config_T;
 
 /** Protocol-level PWM generation or capture configuration. */

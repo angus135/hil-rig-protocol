@@ -176,11 +176,8 @@ HIL_APPLICATION_Peripheral_Config_encode( const HIL_Application_Peripheral_Confi
     Analog :
     _______________________________________________________
     |                         |                            |
-    |      channel {6}        |       minimum mV {4}       |
+    |      channel {6}        |     voltage level {4}      |
     |_________________________|____________________________|
-    |                         |
-    |      maximum mV {4}     |
-    |_________________________|
     PWM :
     _______________________________________________________
     |                         |                            |
@@ -239,9 +236,7 @@ HIL_APPLICATION_Peripheral_Config_encode( const HIL_Application_Peripheral_Confi
             break;
         case HIL_APPLICATION_PERIPHERAL_CONFIG_ANALOG:
             payload_size += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE
-                            + sizeof( data->value.analog.minimum_microvolts )
-                            + sizeof( data->value.analog.maximum_microvolts )
-                            + sizeof( data->value.analog.maximum_microvolts );
+                            + sizeof( data->value.analog.voltage_level );
             if ( max_payload_size < payload_size )
             {
                 return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
@@ -249,12 +244,9 @@ HIL_APPLICATION_Peripheral_Config_encode( const HIL_Application_Peripheral_Confi
             HIL_APPLICATION_Channel_Id_encode( &( data->value.analog.channel ),
                                                &( payload[running_total] ) );
             running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-            memcpy( &( payload[running_total] ), &( data->value.analog.minimum_microvolts ),
-                    sizeof( data->value.analog.minimum_microvolts ) );
-            running_total += sizeof( data->value.analog.minimum_microvolts );
-            memcpy( &( payload[running_total] ), &( data->value.analog.maximum_microvolts ),
-                    sizeof( data->value.analog.maximum_microvolts ) );
-            running_total += sizeof( data->value.analog.maximum_microvolts );
+            memcpy( &( payload[running_total] ), &( data->value.analog.voltage_level ),
+                    sizeof( data->value.analog.voltage_level ) );
+            running_total += sizeof( data->value.analog.voltage_level );
             break;
         case HIL_APPLICATION_PERIPHERAL_CONFIG_PWM:
             payload_size += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE
