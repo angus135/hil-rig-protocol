@@ -132,6 +132,69 @@ typedef struct
 } HIL_Application_Communication_Config_T;
 
 /**
+ * @brief Protocol-level serial/bus channel configuration.
+ *
+ * @details The flags field reserves family-specific protocol options whose
+ * exact bit assignments remain TODO. It must be zero in the initial protocol
+ * and must not contain MCU register values. A nonzero value is structurally
+ * unsupported.
+ */
+typedef struct
+{
+    // TODO CREATE STRUCT FIELDS
+    /** UART, SPI, I2C, or CAN logical channel. */
+    HIL_Application_Channel_Id_T channel;
+    /** Requested communication rate in bits per second. */
+    uint32_t bit_rate;
+    /** Reserved protocol option bits; must be zero in the initial protocol. */
+    uint32_t flags;
+    /** Maximum captured bytes per tick; zero disables result capture. */
+    size_t capture_limit_bytes;
+} HIL_Application_CAN_Config_T;
+
+/**
+ * @brief Protocol-level serial/bus channel configuration.
+ *
+ * @details The flags field reserves family-specific protocol options whose
+ * exact bit assignments remain TODO. It must be zero in the initial protocol
+ * and must not contain MCU register values. A nonzero value is structurally
+ * unsupported.
+ */
+typedef struct
+{
+    // TODO CREATE STRUCT FIELDS
+    /** UART, SPI, I2C, or CAN logical channel. */
+    HIL_Application_Channel_Id_T channel;
+    /** Requested communication rate in bits per second. */
+    uint32_t bit_rate;
+    /** Reserved protocol option bits; must be zero in the initial protocol. */
+    uint32_t flags;
+    /** Maximum captured bytes per tick; zero disables result capture. */
+    size_t capture_limit_bytes;
+} HIL_Application_I2C_Config_T;
+
+/**
+ * @brief Protocol-level serial/bus channel configuration.
+ *
+ * @details The flags field reserves family-specific protocol options whose
+ * exact bit assignments remain TODO. It must be zero in the initial protocol
+ * and must not contain MCU register values. A nonzero value is structurally
+ * unsupported.
+ */
+typedef struct
+{
+    // TODO CREATE STRUCT FIELDS
+    /** UART, SPI, I2C, or CAN logical channel. */
+    HIL_Application_Channel_Id_T channel;
+    /** Requested communication rate in bits per second. */
+    uint32_t bit_rate;
+    /** Reserved protocol option bits; must be zero in the initial protocol. */
+    uint32_t flags;
+    /** Maximum captured bytes per tick; zero disables result capture. */
+    size_t capture_limit_bytes;
+} HIL_Application_SPI_Config_T;
+
+/**
  * @brief Tagged peripheral configuration record.
  *
  * @details type selects exactly one union member. Within one Test

@@ -393,38 +393,39 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
         running_total += sizeof( data->pwm_outputs[i].duty_cycle_permyriad );
     }
     // variable data
-    memcpy( &( data->variable_data_count ), &( payload[running_total] ),
-            sizeof( data->variable_data_count ) );
-    running_total += sizeof( data->variable_data_count );
-    data->variable_data = decoded_variable_data;
-    if ( data->variable_data_count > max_decoded_variable_data_num )
-    {
-        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
-    }
-    size_t decoded_running = 0;
-    for ( uint8_t i = 0; i < data->variable_data_count; i++ )
-    {
-        memcpy( &( data->variable_data[i].channel.peripheral ), &( payload[running_total] ),
-                sizeof( data->variable_data[i].channel.peripheral ) );
-        running_total += sizeof( data->variable_data[i].channel.peripheral );
-        memcpy( &( data->variable_data[i].channel.channel ), &( payload[running_total] ),
-                sizeof( data->variable_data[i].channel.channel ) );
-        running_total += sizeof( data->variable_data[i].channel.channel );
-        memcpy( &( data->variable_data[i].data.size ), &( payload[running_total] ),
-                sizeof( data->variable_data[i].data.size ) );
-        if ( data->variable_data[i].data.size + decoded_running > max_decoded_data_size )
-        {
-            return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
-        }
-        HIL_APPLICATION_Byte_Span_decode( &( data->variable_data[i].data ),
-                                          &( payload[running_total] ),
-                                          &( decoded_data[decoded_running] ) );
-        running_total += sizeof( data->variable_data[i].data.size );
-        running_total += data->variable_data[i].data.size;
-        decoded_running += data->variable_data[i].data.size;
-        *used_devoded_variable_num = i;
-    }
-    *used_decoded_size = decoded_running;
+    // memcpy( &( data->variable_data_count ), &( payload[running_total] ),
+    //         sizeof( data->variable_data_count ) );
+    // running_total += sizeof( data->variable_data_count );
+    // data->variable_data = decoded_variable_data;
+    // if ( data->variable_data_count > max_decoded_variable_data_num )
+    // {
+    //     return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    // }
+    // size_t decoded_running = 0;
+    // for ( uint8_t i = 0; i < data->variable_data_count; i++ )
+    // {
+    //     memcpy( &( data->variable_data[i].channel.peripheral ), &( payload[running_total] ),
+    //             sizeof( data->variable_data[i].channel.peripheral ) );
+    //     running_total += sizeof( data->variable_data[i].channel.peripheral );
+    //     memcpy( &( data->variable_data[i].channel.channel ), &( payload[running_total] ),
+    //             sizeof( data->variable_data[i].channel.channel ) );
+    //     running_total += sizeof( data->variable_data[i].channel.channel );
+    //     memcpy( &( data->variable_data[i].data.size ), &( payload[running_total] ),
+    //             sizeof( data->variable_data[i].data.size ) );
+    //     if ( data->variable_data[i].data.size + decoded_running > max_decoded_data_size )
+    //     {
+    //         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    //     }
+    //     HIL_APPLICATION_Byte_Span_decode( &( data->variable_data[i].data ),
+    //                                       &( payload[running_total] ),
+    //                                       &( decoded_data[decoded_running] ) );
+    //     running_total += sizeof( data->variable_data[i].data.size );
+    //     running_total += data->variable_data[i].data.size;
+    //     decoded_running += data->variable_data[i].data.size;
+    //     *used_devoded_variable_num = i;
+    // }
+    // *used_decoded_size = decoded_running;
+    *used_decoded_size = 0;
     return HIL_APPLICATION_STATUS_OK;
 }
 

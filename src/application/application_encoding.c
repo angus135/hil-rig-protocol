@@ -385,13 +385,14 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
     */
 
     // variable data count validation
-    if ( data->variable_data_count > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
-    {
-        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    }
+    // if ( data->variable_data_count > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
+    // {
+    //     return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    // }
 
     // size calculation
-    uint32_t payload_size = sizeof( data->tick_number ) + sizeof( data->variable_data_count );
+    // uint32_t payload_size = sizeof( data->tick_number ) + sizeof( data->variable_data_count );
+    uint32_t payload_size = sizeof( data->tick_number );
     for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
     {
         payload_size += sizeof( data->digital_outputs[i].high );
@@ -405,12 +406,12 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
         payload_size += sizeof( data->pwm_outputs[i].period_nanoseconds );
         payload_size += sizeof( data->pwm_outputs[i].duty_cycle_permyriad );
     }
-    for ( uint8_t i = 0; i < data->variable_data_count; i++ )
-    {
-        payload_size += sizeof( data->variable_data->channel.peripheral );
-        payload_size += sizeof( data->variable_data->channel.channel );
-        payload_size += data->variable_data->data.size;
-    }
+    // for ( uint8_t i = 0; i < data->variable_data_count; i++ )
+    // {
+    //     payload_size += sizeof( data->variable_data->channel.peripheral );
+    //     payload_size += sizeof( data->variable_data->channel.channel );
+    //     payload_size += data->variable_data->data.size;
+    // }
     if ( max_payload_size < payload_size )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
@@ -445,23 +446,23 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
         running_total += sizeof( data->pwm_outputs[i].duty_cycle_permyriad );
     }
     // variable data
-    memcpy( &( payload[running_total] ), &( data->variable_data_count ),
-            sizeof( data->variable_data_count ) );
-    running_total += sizeof( data->variable_data_count );
-    for ( uint8_t i = 0; i < data->variable_data_count; i++ )
-    {
-        memcpy( &( payload[running_total] ), &( data->variable_data[i].channel.peripheral ),
-                sizeof( data->variable_data[i].channel.peripheral ) );
-        running_total += sizeof( data->variable_data[i].channel.peripheral );
-        memcpy( &( payload[running_total] ), &( data->variable_data[i].channel.channel ),
-                sizeof( data->variable_data[i].channel.channel ) );
-        running_total += sizeof( data->variable_data[i].channel.channel );
-        HIL_APPLICATION_Byte_Span_encode( &( data->variable_data[i].data ),
-                                          &( payload[running_total] ) );
-        running_total += sizeof( data->variable_data[i].data.size );
-        running_total += data->variable_data[i].data.size;
-    }
-    *used_size = running_total;
+    // memcpy( &( payload[running_total] ), &( data->variable_data_count ),
+    //         sizeof( data->variable_data_count ) );
+    // running_total += sizeof( data->variable_data_count );
+    // for ( uint8_t i = 0; i < data->variable_data_count; i++ )
+    // {
+    //     memcpy( &( payload[running_total] ), &( data->variable_data[i].channel.peripheral ),
+    //             sizeof( data->variable_data[i].channel.peripheral ) );
+    //     running_total += sizeof( data->variable_data[i].channel.peripheral );
+    //     memcpy( &( payload[running_total] ), &( data->variable_data[i].channel.channel ),
+    //             sizeof( data->variable_data[i].channel.channel ) );
+    //     running_total += sizeof( data->variable_data[i].channel.channel );
+    //     HIL_APPLICATION_Byte_Span_encode( &( data->variable_data[i].data ),
+    //                                       &( payload[running_total] ) );
+    //     running_total += sizeof( data->variable_data[i].data.size );
+    //     running_total += data->variable_data[i].data.size;
+    // }
+    *used_size = 0;
     return HIL_APPLICATION_STATUS_OK;
 }
 

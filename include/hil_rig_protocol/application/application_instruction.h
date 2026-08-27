@@ -56,10 +56,10 @@ typedef struct
         analog_outputs[HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT];
     /** Complete PWM-output state; element i is PWM_OUTPUT channel i. */
     HIL_Application_Pwm_Output_Value_T pwm_outputs[HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT];
-    /** Unique, nonzero UART/SPI/I2C/CAN transfers for this tick. */
-    const HIL_Application_Data_Declaration_T* variable_data;
-    /** Number of declarations at variable_data. */
-    uint8_t variable_data_count;
+    // /** Unique, nonzero UART/SPI/I2C/CAN transfers for this tick. */
+    // const HIL_Application_Data_Declaration_T* variable_data;
+    // /** Number of declarations at variable_data. */
+    // uint8_t variable_data_count;
 } HIL_Application_Test_Instruction_T;
 
 /**
