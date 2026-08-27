@@ -222,19 +222,9 @@ HIL_APPLICATION_Peripheral_Config_decode( HIL_Application_Peripheral_Config_T* d
             HIL_APPLICATION_Channel_Id_decode( &( data->value.digital.channel ),
                                                &( payload[running_total] ) );
             running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-            memcpy( &( data->value.digital.output_millivolts ), &( payload[running_total] ),
-                    sizeof( data->value.digital.output_millivolts ) );
-            running_total += sizeof( data->value.digital.output_millivolts );
-            memcpy( &( data->value.digital.input_threshold_millivolts ),
-                    &( payload[running_total] ),
-                    sizeof( data->value.digital.input_threshold_millivolts ) );
-            running_total += sizeof( data->value.digital.input_threshold_millivolts );
-            memcpy( &( data->value.digital.initial_output_high ), &( payload[running_total] ),
-                    sizeof( data->value.digital.initial_output_high ) );
-            running_total += sizeof( data->value.digital.initial_output_high );
-            memcpy( &( data->value.digital.capture_enabled ), &( payload[running_total] ),
-                    sizeof( data->value.digital.capture_enabled ) );
-            running_total += sizeof( data->value.digital.capture_enabled );
+            memcpy( &( data->value.digital.voltage_level ), &( payload[running_total] ),
+                    sizeof( data->value.digital.voltage_level ) );
+            running_total += sizeof( data->value.digital.voltage_level );
             break;
         case HIL_APPLICATION_PERIPHERAL_CONFIG_ANALOG:
             HIL_APPLICATION_Channel_Id_decode( &( data->value.analog.channel ),

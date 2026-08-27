@@ -74,14 +74,9 @@ typedef struct
 {
     /** Protocol-level digital input or output channel. */
     HIL_Application_Channel_Id_T channel;
-    /** Nominal output level in millivolts; zero for input-only channels. */
-    uint32_t output_millivolts;
-    /** Input-high threshold in millivolts; zero for output-only channels. */
-    uint32_t input_threshold_millivolts;
-    /** Initial output state; zero for input channels. */
-    uint8_t initial_output_high;
-    /** Nonzero requests capture of input state for result reporting. */
-    uint8_t capture_enabled;
+    /** Nominal output level */
+    HIL_Application_Peripheral_Config_Voltage_Level_T voltage_level;
+
 } HIL_Application_Digital_Config_T;
 
 /**
