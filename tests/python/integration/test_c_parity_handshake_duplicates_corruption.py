@@ -187,7 +187,8 @@ def test_delayed_response_from_abandoned_attempt_does_not_disrupt_replacement_ha
         assert deliver_bytes(pair, R2H, ack_b)[0] is TransportStatus.OK
         assert pair.host.get_status().session_state is SessionState.ESTABLISHED
         assert pair.rig.get_status().session_state is SessionState.ESTABLISHED
-        drain_events(pair.host); drain_events(pair.rig)
+        drain_events(pair.host)
+        drain_events(pair.rig)
         complete_application(pair, H2R, b"qrs")
 
 
@@ -198,7 +199,9 @@ def test_delayed_confirm_from_previous_session_does_not_disrupt_established_repl
         response_a = _publish_response(pair, initiate_a, 71)
         confirm_a = _publish_confirm(pair, response_a, 72)
         _reset_and_prepare_replacement(pair, 80)
-        pair.establish_clean_session(); drain_events(pair.host); drain_events(pair.rig)
+        pair.establish_clean_session()
+        drain_events(pair.host)
+        drain_events(pair.rig)
         assert deliver_bytes(pair, H2R, confirm_a)[0] is TransportStatus.OK
         assert pair.rig.get_status().session_state is SessionState.ESTABLISHED
         assert not pair.rig.get_status().output_pending
@@ -248,8 +251,9 @@ def test_structurally_malformed_input_does_not_prevent_later_clean_initiate() ->
         _finish_from_initiate(pair, 110)
 
 
-def test_integrity_invalid_initiate_does_not_advance_rig_and_clean_copy_completes_handshake(
-) -> None:
+def test_integrity_invalid_initiate_does_not_advance_rig_and_clean_copy_completes_handshake() -> (
+    None
+):
     with make_pair(host_seed=0xC102030405060708) as pair:
         initialize_connected(pair)
         initiate = _publish_initiate(pair, 100)
@@ -274,12 +278,14 @@ def test_integrity_invalid_response_retains_initiate_until_retry_and_clean_respo
         pair.set_host_time(109)
         assert pair.process_host() is TransportStatus.OK
         assert not pair.host.get_status().output_pending
-        pair.set_host_time(110); assert pair.process_host() is TransportStatus.OK
+        pair.set_host_time(110)
+        assert pair.process_host() is TransportStatus.OK
         assert take_output(pair, H2R, now_ms=110).data == initiate
         confirm = _publish_confirm(pair, response, 111)
         final_ack = _publish_final_ack(pair, confirm, 112)
         assert pair.host.receive_bytes(final_ack).status is TransportStatus.OK
-        _expect_exactly_one_establishment(pair.host); _expect_exactly_one_establishment(pair.rig)
+        _expect_exactly_one_establishment(pair.host)
+        _expect_exactly_one_establishment(pair.rig)
 
 
 def test_integrity_invalid_confirm_does_not_establish_rig_or_publish_final_ack() -> None:
@@ -295,7 +301,8 @@ def test_integrity_invalid_confirm_does_not_establish_rig_or_publish_final_ack()
         _expect_protocol_error_only(pair.rig)
         final_ack = _publish_final_ack(pair, confirm, 103)
         assert pair.host.receive_bytes(final_ack).status is TransportStatus.OK
-        _expect_exactly_one_establishment(pair.host); _expect_exactly_one_establishment(pair.rig)
+        _expect_exactly_one_establishment(pair.host)
+        _expect_exactly_one_establishment(pair.rig)
 
 
 def test_integrity_invalid_final_ack_retains_confirm_until_retry_and_clean_ack() -> None:
@@ -312,10 +319,12 @@ def test_integrity_invalid_final_ack_retains_confirm_until_retry_and_clean_ack()
         pair.set_host_time(111)
         assert pair.process_host() is TransportStatus.OK
         assert not pair.host.get_status().output_pending
-        pair.set_host_time(112); assert pair.process_host() is TransportStatus.OK
+        pair.set_host_time(112)
+        assert pair.process_host() is TransportStatus.OK
         assert take_output(pair, H2R, now_ms=112).data == confirm
         assert pair.host.receive_bytes(final_ack).status is TransportStatus.OK
-        _expect_exactly_one_establishment(pair.host); _expect_exactly_one_establishment(pair.rig)
+        _expect_exactly_one_establishment(pair.host)
+        _expect_exactly_one_establishment(pair.rig)
         assert not pair.host.get_status().output_pending
 
 
@@ -324,7 +333,8 @@ def test_valid_response_with_incompatible_session_fields_triggers_documented_rec
         make_pair(host_seed=0xC102030405060708) as pair,
         make_pair(host_seed=0xC202030405060708) as foreign,
     ):
-        initialize_connected(pair); initialize_connected(foreign)
+        initialize_connected(pair)
+        initialize_connected(foreign)
         response = _publish_response(pair, _publish_initiate(pair, 100), 101)
         foreign_response = _publish_response(foreign, _publish_initiate(foreign, 100), 101)
         assert foreign_response != response
@@ -343,4 +353,5 @@ def test_valid_response_with_incompatible_session_fields_triggers_documented_rec
         assert sum(e.type is EventType.SESSION_RESET for e in drain_events(pair.rig)) == 1
         pair.set_both_times(120)
         pair.establish_clean_session()
-        _expect_exactly_one_establishment(pair.host); _expect_exactly_one_establishment(pair.rig)
+        _expect_exactly_one_establishment(pair.host)
+        _expect_exactly_one_establishment(pair.rig)

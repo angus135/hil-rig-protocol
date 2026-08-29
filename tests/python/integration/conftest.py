@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from hil_rig_protocol import TransportStatus
 
 from .transport_pair_harness import TransportPairHarness, drain_events

@@ -74,8 +74,10 @@ not test an operational codec. `tests/golden_vectors/` documents the canonical
 MVP Transport fixtures exercised through the public facade by
 `integration/wire/test_transport_golden_vectors.cpp`. Existing Transport unit
 and integration tests cover core behaviour and several complex recovery cases.
-Application-codec fixtures and consumer-style `add_subdirectory` validation
-remain unfinished.
+Application-codec fixtures remain unfinished. Direct source compilation of
+`src/version.c` and a parent-project `add_subdirectory()` fixture under
+`tests/consumer/` cover the two C consumer build paths that do not use the
+repository's own top-level build.
 
 ## Python Transport integration tests
 
@@ -100,6 +102,13 @@ Run the complete Python binding suite with:
 ```sh
 python -m pytest tests/python
 ```
+
+Packaging adds self-contained downstream checks under `tests/installed/` and
+the caller-owned servicing example tests under `tests/examples/`. Cibuildwheel
+copies these test sources into an isolated test directory, imports only the
+installed wheel, runs the complete Python suite, establishes a real native
+HOST/RIG pair, transfers opaque Application bytes both ways, and executes the
+example without installing the test harness into the public wheel.
 
 ### Python-specific integration coverage
 

@@ -5,12 +5,10 @@ from __future__ import annotations
 import itertools
 
 import pytest
-
 from hil_rig_protocol import (
     EventType,
     Failure,
     LinkState,
-    OperatingMode,
     SessionState,
     Transport,
     TransportConfig,
@@ -51,19 +49,11 @@ def _hard_reconnect(pair: TransportPairHarness, now_ms: int) -> None:
     _drain_disconnect_events(pair.host)
     _drain_disconnect_events(pair.rig)
     reconnect_pair(pair, now_ms + 1)
-    assert [event.type for event in drain_events(pair.host)] == [
-        EventType.LINK_STATE_CHANGED
-    ]
-    assert [event.type for event in drain_events(pair.rig)] == [
-        EventType.LINK_STATE_CHANGED
-    ]
+    assert [event.type for event in drain_events(pair.host)] == [EventType.LINK_STATE_CHANGED]
+    assert [event.type for event in drain_events(pair.rig)] == [EventType.LINK_STATE_CHANGED]
     pair.establish_clean_session()
-    assert [event.type for event in drain_events(pair.host)] == [
-        EventType.SESSION_ESTABLISHED
-    ]
-    assert [event.type for event in drain_events(pair.rig)] == [
-        EventType.SESSION_ESTABLISHED
-    ]
+    assert [event.type for event in drain_events(pair.host)] == [EventType.SESSION_ESTABLISHED]
+    assert [event.type for event in drain_events(pair.rig)] == [EventType.SESSION_ESTABLISHED]
 
 
 def _find_minimum_encoded_capacity(application_capacity: int) -> int:

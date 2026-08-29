@@ -5,8 +5,8 @@ from __future__ import annotations
 import queue
 import threading
 
+import hil_rig_protocol.transport as transport_module
 import pytest
-
 from hil_rig_protocol import (
     EventType,
     Failure,
@@ -24,9 +24,8 @@ from hil_rig_protocol import (
     TransportOwnershipError,
     TransportSnapshot,
     TransportStatus,
+    _binding,
 )
-from hil_rig_protocol import _binding
-import hil_rig_protocol.transport as transport_module
 
 UINT32_MAX = (1 << 32) - 1
 
@@ -107,19 +106,25 @@ def test_time_boundaries_are_forwarded(
     seen: list[int] = []
 
     if method_name == "notify_link_state":
+
         def fake(handle: object, state: int, value: int) -> int:
             seen.append(value)
             return int(TransportStatus.OK)
+
         args = (extra_args[0], now_ms)
     elif method_name == "process":
+
         def fake(handle: object, value: int, mode: int) -> int:
             seen.append(value)
             return int(TransportStatus.OK)
+
         args = (now_ms, extra_args[0])
     else:
+
         def fake(handle: object, value: int) -> int:
             seen.append(value)
             return int(TransportStatus.NOT_READY)
+
         args = (now_ms,)
 
     monkeypatch.setattr(transport_module, native_name, fake)
@@ -535,9 +540,7 @@ def _fake_application_read(
     return fake
 
 
-def test_read_application_data_none(
-    monkeypatch: pytest.MonkeyPatch, transport: Transport
-) -> None:
+def test_read_application_data_none(monkeypatch: pytest.MonkeyPatch, transport: Transport) -> None:
     monkeypatch.setattr(
         transport_module,
         "_native_read_application_data",
@@ -821,7 +824,9 @@ def _snapshot_fake(
     return fake
 
 
-def test_get_status_converts_snapshot(monkeypatch: pytest.MonkeyPatch, transport: Transport) -> None:
+def test_get_status_converts_snapshot(
+    monkeypatch: pytest.MonkeyPatch, transport: Transport
+) -> None:
     monkeypatch.setattr(transport_module, "_native_get_status", _snapshot_fake())
     assert transport.get_status() == TransportSnapshot(
         role=Role.HOST,
@@ -865,7 +870,9 @@ def test_get_status_rejects_non_boolean_native_flags(
         transport.get_status()
 
 
-@pytest.mark.parametrize("field", ["role", "link_state", "session_state", "operating_mode", "last_failure"])
+@pytest.mark.parametrize(
+    "field", ["role", "link_state", "session_state", "operating_mode", "last_failure"]
+)
 def test_get_status_rejects_unknown_enum_values(
     monkeypatch: pytest.MonkeyPatch, transport: Transport, field: str
 ) -> None:
@@ -908,7 +915,9 @@ def test_non_receive_internal_errors_have_no_consumption(
 
 
 def test_real_native_initial_and_caller_driven_host_flow() -> None:
-    with Transport(Role.HOST, TransportConfig(max_application_message_size=8, session_seed=1)) as transport:
+    with Transport(
+        Role.HOST, TransportConfig(max_application_message_size=8, session_seed=1)
+    ) as transport:
         initial = transport.get_status()
         assert initial.role is Role.HOST
         assert initial.link_state is LinkState.DISCONNECTED

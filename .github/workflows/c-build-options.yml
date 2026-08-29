@@ -74,6 +74,36 @@ jobs:
         run: |
           cmake --build build --target ${{ matrix.build_target }} --verbose
 
+      - name: Validate VERSION and checked-in public header
+        if: ${{ matrix.name == 'library-only' }}
+        run: python3 scripts/check_version.py
+
+      - name: Compile version source directly without generated headers
+        if: ${{ matrix.name == 'library-only' }}
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -Iinclude \
+            src/version.c tests/consumer/direct_source/version_source_smoke.c \
+            -o build/direct-version-source-smoke
+          build/direct-version-source-smoke
+
+      - name: Build parent add_subdirectory consumer
+        if: ${{ matrix.name == 'library-only' }}
+        run: |
+          cmake -S tests/consumer/add_subdirectory \
+            -B build-consumer -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build-consumer --verbose
+          build-consumer/hil_rig_protocol_external_consumer
+
+      - name: Validate installed C library and public version header
+        if: ${{ matrix.name == 'library-only' }}
+        run: |
+          cmake --install build --prefix build/install
+          test -f build/install/include/hil_rig_protocol/version.h
+          cc -std=c11 -Wall -Wextra -Werror \
+            -Ibuild/install/include tests/consumer/direct_source/version_source_smoke.c \
+            build/install/lib/libhil_rig_protocol.a -o build/installed-version-smoke
+          build/installed-version-smoke
+
       - name: Run tests (${{ matrix.name }})
         if: ${{ matrix.run_tests }}
         run: |

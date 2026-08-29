@@ -2,10 +2,15 @@
  * @file version.h
  * @brief Library package version for hil-rig-protocol.
  *
- * @details These values identify the C library release. They are deliberately
- * separate from the transport wire-protocol version declared in
- * transport_types.h: implementation releases may change without changing the
- * wire format, and a future library may support more than one wire version.
+ * @details VERSION in the repository root is the release metadata authority.
+ * This checked-in public header mirrors that value so direct source consumers
+ * do not require a CMake-generated include tree. Repository validation fails if
+ * these macros drift from VERSION.
+ *
+ * These values identify the C library release. They are deliberately separate
+ * from the transport wire-protocol version declared in transport_types.h:
+ * implementation releases may change without changing the wire format, and a
+ * future library may support more than one wire version.
  */
 #ifndef HIL_RIG_PROTOCOL_VERSION_H
 #define HIL_RIG_PROTOCOL_VERSION_H
@@ -29,25 +34,13 @@ extern "C"
 /** Complete dotted library version string. */
 #define HIL_RIG_PROTOCOL_VERSION_STRING "0.1.0"
 
-/**
- * @brief Get the library major version.
- *
- * @return HIL_RIG_PROTOCOL_VERSION_MAJOR.
- */
+/** Get the library major version. */
 uint32_t HIL_RIG_PROTOCOL_Version_Major( void );
 
-/**
- * @brief Get the library minor version.
- *
- * @return HIL_RIG_PROTOCOL_VERSION_MINOR.
- */
+/** Get the library minor version. */
 uint32_t HIL_RIG_PROTOCOL_Version_Minor( void );
 
-/**
- * @brief Get the library patch version.
- *
- * @return HIL_RIG_PROTOCOL_VERSION_PATCH.
- */
+/** Get the library patch version. */
 uint32_t HIL_RIG_PROTOCOL_Version_Patch( void );
 
 /**

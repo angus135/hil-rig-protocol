@@ -1,6 +1,17 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(hil_rig_protocol VERSION 0.1.0 LANGUAGES C)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" HIL_RIG_PROTOCOL_VERSION)
+string(STRIP "${HIL_RIG_PROTOCOL_VERSION}" HIL_RIG_PROTOCOL_VERSION)
+if(NOT HIL_RIG_PROTOCOL_VERSION MATCHES
+    "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+)
+    message(FATAL_ERROR
+        "VERSION must contain exactly one numeric MAJOR.MINOR.PATCH value; "
+        "found '${HIL_RIG_PROTOCOL_VERSION}'"
+    )
+endif()
+
+project(hil_rig_protocol VERSION "${HIL_RIG_PROTOCOL_VERSION}" LANGUAGES C)
 
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     set(HIL_RIG_PROTOCOL_IS_TOP_LEVEL ON)
@@ -15,6 +26,10 @@ option(HIL_RIG_PROTOCOL_BUILD_TESTS
 option(HIL_RIG_PROTOCOL_BUILD_PYTHON
     "Build HIL-RIG protocol Python binding support"
     OFF
+)
+option(HIL_RIG_PROTOCOL_BUILD_EXAMPLES
+    "Build HIL-RIG protocol examples"
+    ${HIL_RIG_PROTOCOL_IS_TOP_LEVEL}
 )
 option(HIL_RIG_PROTOCOL_ENABLE_WARNINGS
     "Enable warnings for HIL-RIG protocol targets"
@@ -46,6 +61,26 @@ add_library(hil_rig_protocol ${HIL_RIG_PROTOCOL_SOURCES})
 add_library(hil_rig_protocol::hil_rig_protocol ALIAS hil_rig_protocol)
 
 add_subdirectory(src/application)
+
+set(HIL_RIG_PROTOCOL_PUBLIC_VERSION_HEADER
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/hil_rig_protocol/version.h"
+)
+file(READ "${HIL_RIG_PROTOCOL_PUBLIC_VERSION_HEADER}" HIL_RIG_PROTOCOL_VERSION_HEADER_TEXT)
+foreach(component MAJOR MINOR PATCH)
+    if(NOT HIL_RIG_PROTOCOL_VERSION_HEADER_TEXT MATCHES
+        "#define[ \t]+HIL_RIG_PROTOCOL_VERSION_${component}[ \t]+${PROJECT_VERSION_${component}}u"
+    )
+        message(FATAL_ERROR
+            "include/hil_rig_protocol/version.h does not match VERSION for ${component}"
+        )
+    endif()
+endforeach()
+if(NOT HIL_RIG_PROTOCOL_VERSION_HEADER_TEXT MATCHES
+    "#define[ \t]+HIL_RIG_PROTOCOL_VERSION_STRING[ \t]+\"${PROJECT_VERSION}\""
+)
+    message(FATAL_ERROR "include/hil_rig_protocol/version.h does not match VERSION string")
+endif()
+unset(HIL_RIG_PROTOCOL_VERSION_HEADER_TEXT)
 
 target_include_directories(hil_rig_protocol
     PUBLIC
@@ -136,12 +171,30 @@ hil_rig_protocol_apply_warnings(hil_rig_protocol)
 hil_rig_protocol_apply_sanitizers(hil_rig_protocol)
 hil_rig_protocol_apply_coverage(hil_rig_protocol)
 
+# Python wheels install only the private extension. Normal C consumers may
+# install the static/shared library and checked-in public headers directly.
+if(HIL_RIG_PROTOCOL_IS_TOP_LEVEL AND NOT HIL_RIG_PROTOCOL_BUILD_PYTHON)
+    include(GNUInstallDirs)
+    install(TARGETS hil_rig_protocol
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/hil_rig_protocol"
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        FILES_MATCHING PATTERN "*.h"
+    )
+endif()
+
 if(HIL_RIG_PROTOCOL_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests/c)
 endif()
 
+if(HIL_RIG_PROTOCOL_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
+
 if(HIL_RIG_PROTOCOL_BUILD_PYTHON)
     add_subdirectory(bindings/python)
 endif()
-

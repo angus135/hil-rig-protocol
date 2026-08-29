@@ -13,6 +13,7 @@ if(NOT TARGET GTest::gtest OR NOT TARGET GTest::gmock OR NOT TARGET GTest::gtest
 endif()
 
 set(HIL_RIG_PROTOCOL_UNIT_TEST_SOURCES
+    unit/test_version.cpp
     unit/test_transport.cpp
     unit/test_transport_application.cpp
     unit/test_transport_control_output.cpp
@@ -93,6 +94,13 @@ target_link_libraries(hil_rig_protocol_unit_tests
 target_include_directories(hil_rig_protocol_unit_tests
     PRIVATE
         ${PROJECT_SOURCE_DIR}/src
+)
+target_compile_definitions(hil_rig_protocol_unit_tests
+    PRIVATE
+        HIL_RIG_PROTOCOL_TEST_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+        HIL_RIG_PROTOCOL_TEST_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+        HIL_RIG_PROTOCOL_TEST_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+        HIL_RIG_PROTOCOL_TEST_VERSION_STRING="${PROJECT_VERSION}"
 )
 
 add_executable(hil_rig_protocol_integration_tests
