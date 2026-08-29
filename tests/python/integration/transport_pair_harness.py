@@ -136,6 +136,7 @@ class _PendingExternalWrite:
 class _DirectionState:
     pending_external_write: _PendingExternalWrite | None
     accepted: deque[TransportTestOutputItem]
+    held: deque[TransportTestOutputItem]
     ready_bytes: bytearray
 
     @classmethod
@@ -143,6 +144,7 @@ class _DirectionState:
         return cls(
             pending_external_write=None,
             accepted=deque(),
+            held=deque(),
             ready_bytes=bytearray(),
         )
 
@@ -159,8 +161,9 @@ class TransportTestLink:
     to the peer using arbitrary receive chunk sizes. Exact unconsumed suffixes
     are retained and zero-byte receive can be invoked explicitly.
 
-    Loss, duplication, corruption, and delayed committed items remain deferred
-    to the later full integration/recovery work.
+    Complete committed items retain stable opaque handles so tests can delay,
+    drop, duplicate, release, or bytewise-corrupt external traffic without
+    decoding Transport frames or depending on protocol-private structure.
     """
 
     def __init__(self) -> None:
@@ -272,6 +275,170 @@ class TransportTestLink:
             committed=True,
         )
 
+
+    def take_next_accepted(
+        self, direction: TransportTestDirection
+    ) -> TransportTestOutputItem | None:
+        """Remove and return the oldest complete committed output item."""
+
+        state = self._states[direction]
+        return state.accepted.popleft() if state.accepted else None
+
+    def take_accepted(
+        self, handle: TransportTestOutputHandle
+    ) -> TransportTestOutputItem | None:
+        """Remove one exact committed item by stable link identity."""
+
+        state = self._states[handle.direction]
+        for index, item in enumerate(state.accepted):
+            if item.handle == handle:
+                del state.accepted[index]
+                return item
+        return None
+
+    def drop_accepted(self, handle: TransportTestOutputHandle) -> bool:
+        """Drop one exact committed output item."""
+
+        return self.take_accepted(handle) is not None
+
+    def drop_next_accepted(self, direction: TransportTestDirection) -> bool:
+        """Drop the oldest committed output item in one direction."""
+
+        return self.take_next_accepted(direction) is not None
+
+    def duplicate_accepted(
+        self, handle: TransportTestOutputHandle
+    ) -> TransportTestOutputHandle | None:
+        """Duplicate one exact committed item while preserving the original."""
+
+        state = self._states[handle.direction]
+        for index, item in enumerate(state.accepted):
+            if item.handle == handle:
+                duplicate_handle = TransportTestOutputHandle(
+                    handle.direction, self._next_ordinal
+                )
+                self._next_ordinal += 1
+                duplicate = TransportTestOutputItem(duplicate_handle, item.data)
+                state.accepted.insert(index + 1, duplicate)
+                return duplicate_handle
+        return None
+
+    def duplicate_next_accepted(
+        self, direction: TransportTestDirection
+    ) -> TransportTestOutputHandle | None:
+        """Duplicate the oldest committed item in one direction."""
+
+        state = self._states[direction]
+        if not state.accepted:
+            return None
+        return self.duplicate_accepted(state.accepted[0].handle)
+
+    def hold_accepted(self, handle: TransportTestOutputHandle) -> bool:
+        """Move one exact committed item into delayed storage."""
+
+        item = self.take_accepted(handle)
+        if item is None:
+            return False
+        self._states[handle.direction].held.append(item)
+        return True
+
+    def hold_next_accepted(self, direction: TransportTestDirection) -> bool:
+        """Delay the oldest committed item in one direction."""
+
+        state = self._states[direction]
+        if not state.accepted:
+            return False
+        return self.hold_accepted(state.accepted[0].handle)
+
+    def release_held(self, handle: TransportTestOutputHandle) -> bool:
+        """Return one exact delayed item to the committed-item queue."""
+
+        state = self._states[handle.direction]
+        for index, item in enumerate(state.held):
+            if item.handle == handle:
+                del state.held[index]
+                state.accepted.append(item)
+                return True
+        return False
+
+    def release_oldest_held(self, direction: TransportTestDirection) -> bool:
+        """Return the oldest delayed item to the committed-item queue."""
+
+        state = self._states[direction]
+        if not state.held:
+            return False
+        state.accepted.append(state.held.popleft())
+        return True
+
+    def corrupt_accepted_byte(
+        self, handle: TransportTestOutputHandle, byte_offset: int, xor_mask: int
+    ) -> bool:
+        """XOR one byte of one exact committed opaque item."""
+
+        if type(byte_offset) is not int or type(xor_mask) is not int:
+            raise TypeError("byte_offset and xor_mask must be ints")
+        if byte_offset < 0 or xor_mask < 0 or xor_mask > 0xFF:
+            raise ValueError("invalid corruption offset or mask")
+        state = self._states[handle.direction]
+        for index, item in enumerate(state.accepted):
+            if item.handle == handle:
+                if byte_offset >= len(item.data):
+                    return False
+                data = bytearray(item.data)
+                data[byte_offset] ^= xor_mask
+                state.accepted[index] = TransportTestOutputItem(item.handle, bytes(data))
+                return True
+        return False
+
+    def corrupt_next_accepted_byte(
+        self, direction: TransportTestDirection, byte_offset: int, xor_mask: int
+    ) -> bool:
+        """XOR one byte of the oldest committed item."""
+
+        state = self._states[direction]
+        if not state.accepted:
+            return False
+        return self.corrupt_accepted_byte(
+            state.accepted[0].handle, byte_offset, xor_mask
+        )
+
+    def queue_next_accepted_for_delivery(
+        self, direction: TransportTestDirection
+    ) -> bool:
+        """Move the oldest committed item into the direction byte stream."""
+
+        state = self._states[direction]
+        if not state.accepted:
+            return False
+        return self.queue_accepted_for_delivery(state.accepted[0].handle)
+
+    def queue_all_accepted_for_delivery(
+        self, direction: TransportTestDirection
+    ) -> int:
+        """Join every committed item in a direction into one ready byte stream."""
+
+        count = 0
+        while self.queue_next_accepted_for_delivery(direction):
+            count += 1
+        return count
+
+    def inject_ready_bytes(
+        self, direction: TransportTestDirection, data: bytes | bytearray | memoryview
+    ) -> None:
+        """Inject caller-owned opaque raw bytes into a ready byte stream."""
+
+        self._states[direction].ready_bytes.extend(bytes(data))
+
+    def accepted_item(
+        self, handle: TransportTestOutputHandle
+    ) -> TransportTestOutputItem | None:
+        """Return one committed item without changing ownership or queue order."""
+
+        for item in self._states[handle.direction].accepted:
+            if item.handle == handle:
+                return item
+        return None
+
     def queue_accepted_for_delivery(self, handle: TransportTestOutputHandle) -> bool:
         """Move one exact accepted item into its direction's ready byte stream."""
 
@@ -337,6 +504,15 @@ class TransportTestLink:
             bytes_consumed=0,
         )
 
+    def clear(self) -> None:
+        """Discard all simulated traffic while preserving handle uniqueness."""
+
+        for state in self._states.values():
+            state.pending_external_write = None
+            state.accepted.clear()
+            state.held.clear()
+            state.ready_bytes.clear()
+
     def pending_output_count(self, direction: TransportTestDirection) -> int:
         return int(self._states[direction].pending_external_write is not None)
 
@@ -356,6 +532,9 @@ class TransportTestLink:
 
     def accepted_item_count(self, direction: TransportTestDirection) -> int:
         return len(self._states[direction].accepted)
+
+    def held_item_count(self, direction: TransportTestDirection) -> int:
+        return len(self._states[direction].held)
 
     def ready_byte_count(self, direction: TransportTestDirection) -> int:
         return len(self._states[direction].ready_bytes)
@@ -596,6 +775,7 @@ class TransportPairHarness:
                 f"{self.link.pending_output_accepted_offset(direction)}, "
                 f"pending_output_remaining={self.link.pending_output_remaining(direction)}, "
                 f"accepted_item_count={self.link.accepted_item_count(direction)}, "
+                f"held_item_count={self.link.held_item_count(direction)}, "
                 f"ready_byte_count={self.link.ready_byte_count(direction)}]"
             )
         return (
