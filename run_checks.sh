@@ -10,7 +10,6 @@
 #   include/
 #   src/
 #   tests/c/
-#   examples/c/
 
 set -e
 
@@ -32,7 +31,6 @@ SEARCH_DIRS=(
   "include"
   "src"
   "tests/c"
-  "examples/c"
 )
 
 EXISTING_SEARCH_DIRS=()

@@ -28,7 +28,6 @@ wheel.packages = ["python/hil_rig_protocol"]
 [tool.scikit-build.cmake.define]
 HIL_RIG_PROTOCOL_BUILD_PYTHON = true
 HIL_RIG_PROTOCOL_BUILD_TESTS = false
-HIL_RIG_PROTOCOL_BUILD_EXAMPLES = false
 HIL_RIG_PROTOCOL_TRANSPORT_PROFILE = "MVP"
 BUILD_SHARED_LIBS = false
 

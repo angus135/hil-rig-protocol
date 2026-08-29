@@ -12,10 +12,6 @@ option(HIL_RIG_PROTOCOL_BUILD_TESTS
     "Build HIL-RIG protocol C/C++ tests"
     ${HIL_RIG_PROTOCOL_IS_TOP_LEVEL}
 )
-option(HIL_RIG_PROTOCOL_BUILD_EXAMPLES
-    "Build HIL-RIG protocol examples"
-    OFF
-)
 option(HIL_RIG_PROTOCOL_BUILD_PYTHON
     "Build HIL-RIG protocol Python binding support"
     OFF
@@ -149,6 +145,3 @@ if(HIL_RIG_PROTOCOL_BUILD_PYTHON)
     add_subdirectory(bindings/python)
 endif()
 
-if(HIL_RIG_PROTOCOL_BUILD_EXAMPLES)
-    add_subdirectory(examples)
-endif()

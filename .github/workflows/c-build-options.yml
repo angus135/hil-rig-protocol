@@ -21,29 +21,16 @@ jobs:
             cmake_args: >-
               -DHIL_RIG_PROTOCOL_BUILD_TESTS=OFF
               -DHIL_RIG_PROTOCOL_BUILD_PYTHON=OFF
-              -DHIL_RIG_PROTOCOL_BUILD_EXAMPLES=OFF
               -DHIL_RIG_PROTOCOL_TRANSPORT_PROFILE=MVP
               -DHIL_RIG_PROTOCOL_ENABLE_WARNINGS=ON
               -DHIL_RIG_PROTOCOL_WARNINGS_AS_ERRORS=ON
             build_target: hil_rig_protocol
             run_tests: false
 
-          - name: examples
-            build_type: Debug
-            cmake_args: >-
-              -DHIL_RIG_PROTOCOL_BUILD_TESTS=OFF
-              -DHIL_RIG_PROTOCOL_BUILD_EXAMPLES=ON
-              -DHIL_RIG_PROTOCOL_TRANSPORT_PROFILE=MVP
-              -DHIL_RIG_PROTOCOL_ENABLE_WARNINGS=ON
-              -DHIL_RIG_PROTOCOL_WARNINGS_AS_ERRORS=ON
-            build_target: all
-            run_tests: false
-
           - name: sanitizers
             build_type: Debug
             cmake_args: >-
               -DHIL_RIG_PROTOCOL_BUILD_TESTS=ON
-              -DHIL_RIG_PROTOCOL_BUILD_EXAMPLES=OFF
               -DHIL_RIG_PROTOCOL_TRANSPORT_PROFILE=MVP
               -DHIL_RIG_PROTOCOL_ENABLE_WARNINGS=ON
               -DHIL_RIG_PROTOCOL_WARNINGS_AS_ERRORS=ON
@@ -55,7 +42,6 @@ jobs:
             build_type: Debug
             cmake_args: >-
               -DHIL_RIG_PROTOCOL_BUILD_TESTS=ON
-              -DHIL_RIG_PROTOCOL_BUILD_EXAMPLES=OFF
               -DHIL_RIG_PROTOCOL_TRANSPORT_PROFILE=MVP
               -DHIL_RIG_PROTOCOL_ENABLE_WARNINGS=ON
               -DHIL_RIG_PROTOCOL_WARNINGS_AS_ERRORS=OFF
