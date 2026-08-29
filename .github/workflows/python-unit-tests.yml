@@ -9,15 +9,231 @@ on:
   pull_request:
 
 jobs:
-  placeholder:
+  native-and-package:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Python tests placeholder
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build and test dependencies
         run: |
-          echo "Python protocol bindings/tests are not implemented yet."
-          echo "Passing this workflow as a temporary placeholder."
-          exit 0
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build binutils
+          python -m pip install --upgrade pip build cffi pytest scikit-build-core
+
+      - name: Configure direct Python-enabled CMake build
+        run: |
+          cmake -S . -B build-python -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DPython_EXECUTABLE="$(command -v python)" \
+            -DHIL_RIG_PROTOCOL_BUILD_PYTHON=ON \
+            -DHIL_RIG_PROTOCOL_BUILD_TESTS=ON \
+            -DHIL_RIG_PROTOCOL_BUILD_EXAMPLES=OFF \
+            -DHIL_RIG_PROTOCOL_ENABLE_WARNINGS=ON \
+            -DHIL_RIG_PROTOCOL_WARNINGS_AS_ERRORS=ON \
+            -DBUILD_SHARED_LIBS=OFF
+
+      - name: Build native module and adapter test
+        run: |
+          cmake --build build-python \
+            --target hil_rig_protocol_python_native hil_rig_protocol_python_adapter_tests \
+            --verbose
+          test -f build-python/bindings/python/hil_rig_protocol_native.c
+          test ! -f bindings/python/hil_rig_protocol_native.c
+
+      - name: Run adapter test
+        run: |
+          ctest --test-dir build-python --output-on-failure -L python-adapter
+
+      - name: Build sdist and wheel
+        run: |
+          python -m build
+          test "$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq 1
+          test "$(find dist -maxdepth 1 -name '*.whl' | wc -l)" -eq 1
+
+      - name: Build wheel from sdist
+        run: |
+          mkdir dist-from-sdist
+          python -m pip wheel --no-deps --wheel-dir dist-from-sdist dist/*.tar.gz
+          test "$(find dist-from-sdist -maxdepth 1 -name '*.whl' | wc -l)" -eq 1
+
+      - name: Inspect wheel contents
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheel = next(Path("dist").glob("*.whl"))
+          with ZipFile(wheel) as archive:
+              names = archive.namelist()
+
+          required = {
+              "hil_rig_protocol/__init__.py",
+              "hil_rig_protocol/_binding.py",
+          }
+          missing = required.difference(names)
+          assert not missing, missing
+          native = [
+              name for name in names
+              if name.startswith("hil_rig_protocol/_native") and name.endswith(".so")
+          ]
+          assert len(native) == 1, native
+          prohibited = [
+              name for name in names
+              if name.endswith("hil_rig_protocol_native.c")
+              or "hil_rig_protocol_python_adapter_tests" in name
+              or "libhil_rig_protocol" in name
+              or "CMakeFiles" in name
+              or "CMakeCache.txt" in name
+          ]
+          assert not prohibited, prohibited
+          assert any(name.endswith(".dist-info/METADATA") for name in names)
+          print("\n".join(names))
+          PY
+
+      - name: Test normal source installation in isolation
+        run: |
+          python -m venv /tmp/hil-rig-normal
+          /tmp/hil-rig-normal/bin/python -m pip install --upgrade pip
+          /tmp/hil-rig-normal/bin/python -m pip install '.[test]'
+          cd /tmp
+          REPOSITORY_ROOT="$GITHUB_WORKSPACE" /tmp/hil-rig-normal/bin/python - <<'PY'
+          import os
+          from pathlib import Path
+          import hil_rig_protocol
+          import hil_rig_protocol._native as native
+
+          root = Path(os.environ["REPOSITORY_ROOT"]).resolve()
+          package = Path(hil_rig_protocol.__file__).resolve()
+          extension = Path(native.__file__).resolve()
+          assert root not in package.parents, package
+          assert root not in extension.parents, extension
+          print(package)
+          print(extension)
+          PY
+          /tmp/hil-rig-normal/bin/python -m pytest \
+            "$GITHUB_WORKSPACE/tests/python/test_native_smoke.py"
+
+      - name: Test wheel installation and native dependencies in isolation
+        run: |
+          python -m venv /tmp/hil-rig-wheel
+          /tmp/hil-rig-wheel/bin/python -m pip install --upgrade pip pytest
+          /tmp/hil-rig-wheel/bin/python -m pip install dist/*.whl
+          cd /tmp
+          native=$(/tmp/hil-rig-wheel/bin/python -c \
+            'import hil_rig_protocol; import hil_rig_protocol._native as n; print(hil_rig_protocol.__file__); print(n.__file__)' \
+            | tee /dev/stderr | tail -n 1)
+          /tmp/hil-rig-wheel/bin/python -m pytest \
+            "$GITHUB_WORKSPACE/tests/python/test_native_smoke.py"
+          ldd "$native"
+          if ldd "$native" | grep -Eqi 'hil_rig_protocol|asan|ubsan'; then
+            echo "Unexpected protocol or instrumentation dependency"
+            exit 1
+          fi
+
+      - name: Test editable installation in isolation
+        run: |
+          python -m venv /tmp/hil-rig-editable
+          /tmp/hil-rig-editable/bin/python -m pip install --upgrade pip
+          /tmp/hil-rig-editable/bin/python -m pip install -e '.[test]'
+          cd /tmp
+          REPOSITORY_ROOT="$GITHUB_WORKSPACE" /tmp/hil-rig-editable/bin/python - <<'PY'
+          import os
+          from pathlib import Path
+          import hil_rig_protocol
+          import hil_rig_protocol._native as native
+
+          root = Path(os.environ["REPOSITORY_ROOT"]).resolve()
+          package = Path(hil_rig_protocol.__file__).resolve()
+          extension = Path(native.__file__).resolve()
+          assert package.is_relative_to(root / "python"), package
+          assert not extension.is_relative_to(root / "python"), extension
+          print(package)
+          print(extension)
+          PY
+          /tmp/hil-rig-editable/bin/python -m pytest \
+            "$GITHUB_WORKSPACE/tests/python/test_native_smoke.py"
+
+  instrumented-native:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: sanitizers
+            option: HIL_RIG_PROTOCOL_ENABLE_SANITIZERS
+          - name: coverage
+            option: HIL_RIG_PROTOCOL_ENABLE_COVERAGE
+
+    name: instrumented-native-${{ matrix.name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build binutils
+          python -m pip install --upgrade pip cffi pytest
+
+      - name: Configure and build ${{ matrix.name }} module
+        run: |
+          cmake -S . -B build-instrumented -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DPython_EXECUTABLE="$(command -v python)" \
+            -DHIL_RIG_PROTOCOL_BUILD_PYTHON=ON \
+            -DHIL_RIG_PROTOCOL_BUILD_TESTS=ON \
+            -DHIL_RIG_PROTOCOL_BUILD_EXAMPLES=OFF \
+            -DHIL_RIG_PROTOCOL_ENABLE_WARNINGS=ON \
+            -DHIL_RIG_PROTOCOL_WARNINGS_AS_ERRORS=ON \
+            -D${{ matrix.option }}=ON \
+            -DBUILD_SHARED_LIBS=OFF
+          cmake --build build-instrumented \
+            --target hil_rig_protocol_python_native hil_rig_protocol_python_adapter_tests \
+            --verbose
+
+      - name: Run instrumented adapter test
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: |
+          ctest --test-dir build-instrumented --output-on-failure -L python-adapter
+
+      - name: Import instrumented module
+        run: |
+          rm -rf /tmp/hil-rig-instrumented
+          mkdir -p /tmp/hil-rig-instrumented
+          cp -R python/hil_rig_protocol /tmp/hil-rig-instrumented/
+          cp build-instrumented/bindings/python/_native*.so \
+            /tmp/hil-rig-instrumented/hil_rig_protocol/
+          native=$(find /tmp/hil-rig-instrumented/hil_rig_protocol -name '_native*.so')
+          ldd "$native"
+          if [ "${{ matrix.name }}" = sanitizers ]; then
+            ldd "$native" | grep -q 'libasan'
+            cd /tmp/hil-rig-instrumented
+            LD_PRELOAD="$(gcc -print-file-name=libasan.so)" \
+              ASAN_OPTIONS=detect_leaks=0 \
+              python -c 'import hil_rig_protocol._native'
+            LD_PRELOAD="$(gcc -print-file-name=libasan.so)" \
+              ASAN_OPTIONS=detect_leaks=0 \
+              python -m pytest "$GITHUB_WORKSPACE/tests/python/test_native_smoke.py"
+          else
+            if nm -D --undefined-only "$native" | grep -q '__gcov_'; then
+              echo "Coverage runtime symbols remain unresolved"
+              exit 1
+            fi
+            cd /tmp/hil-rig-instrumented
+            python -c 'import hil_rig_protocol._native'
+            python -m pytest "$GITHUB_WORKSPACE/tests/python/test_native_smoke.py"
+          fi
