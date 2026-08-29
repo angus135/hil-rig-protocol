@@ -20,6 +20,7 @@ jobs:
             build_type: Debug
             cmake_args: >-
               -DHIL_RIG_PROTOCOL_BUILD_TESTS=OFF
+              -DHIL_RIG_PROTOCOL_BUILD_PYTHON=OFF
               -DHIL_RIG_PROTOCOL_BUILD_EXAMPLES=OFF
               -DHIL_RIG_PROTOCOL_TRANSPORT_PROFILE=MVP
               -DHIL_RIG_PROTOCOL_ENABLE_WARNINGS=ON
