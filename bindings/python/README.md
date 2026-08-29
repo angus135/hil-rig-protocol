@@ -21,9 +21,9 @@ The installed Python package has two private binding details:
 
 Neither module is a supported public Transport API. Public Python code should import the supported value and lifetime layer from `hil_rig_protocol`; `_native` and `_binding` remain private implementation details. Future Application declarations should extend this same `_native` module so the C core is not compiled into a second Python extension.
 
-## Public Transport value and lifetime layer
+## Public Transport facade
 
-The package now exposes the public Transport enums, immutable configuration/result value types, Transport exceptions, and `Transport` native lifetime owner. Operational Transport methods remain intentionally deferred to the next binding PR, and Application bindings remain separate later work.
+The package exposes the public Transport enums, immutable configuration/result value types, Transport exceptions, and the complete caller-driven `Transport` facade. The Python layer forwards the existing C Transport contract; it does not add protocol scheduling, external I/O, retries, output caching, or Application decoding. Application bindings remain separate later work.
 
 `TransportConfig.session_seed` is role-aware at construction time. A HOST with `session_seed=None` receives a cryptographically secure seed in the inclusive range `1..UINT64_MAX-1`; explicit valid HOST seeds are preserved for deterministic tests. A RIG resolves `None` to zero, accepts explicit zero, and rejects every nonzero seed. The resolved immutable configuration is available through `transport.config`.
 
@@ -37,6 +37,18 @@ with Transport(Role.HOST, TransportConfig()) as transport:
 ```
 
 `close()` is idempotent. CFFI garbage-collection cleanup remains a fallback when deterministic cleanup is missed; callers should not rely on GC timing. The native context is single-owner: construction records the creating thread, and live native use or deterministic release from another thread raises `TransportOwnershipError`. Transport objects cannot be copied, deep-copied, or pickled.
+
+### Caller-driven servicing contract
+
+Every live `Transport` operation must run on the creating thread. The caller owns the monotonic millisecond domain supplied to `notify_link_state()`, `process()`, and `commit_output()`; the binding never reads a clock, clamps time, or synthesizes timestamps. Normal protocol outcomes such as `NOT_READY`, `CAPACITY_EXHAUSTED`, `MESSAGE_TOO_LARGE`, and `DELIVERY_FAILED` remain explicit `TransportStatus` values. Native invariant failures raise `TransportInternalError`, while impossible binding/status combinations raise `TransportBindingError`.
+
+`receive_bytes()` borrows one C-contiguous buffer only for the native call and reports the exact accepted prefix in `ReceiveResult.bytes_consumed`. On `CAPACITY_EXHAUSTED`, the caller retries only the unconsumed suffix. A zero-length input is still forwarded because it can resume a completed frame retained by native Transport. Mutable buffers must not be modified concurrently with the call.
+
+`peek_output()` copies one complete opaque encoded item into immutable Python `bytes`. A successful peek pins that native item; repeated peeks continue to ask native Transport for the same pinned output. The caller owns any partial external-write offset and must call `commit_output(now_ms)` only after the complete peeked byte string has been accepted by the external interface. The binding never caches output, commits automatically, or interprets Transport frames.
+
+`read_event()` consumes one event at a time. Event draining is caller service work because unread events occupy bounded native capacity. `read_application_data()` returns one complete opaque Application byte string and consumes it only after the full native copy succeeds. Reliable Transport delivery and `DELIVERY_CONFIRMED` report byte delivery, not semantic Application acceptance; Application responses remain separate opaque messages.
+
+A production servicing loop, physical serial/USB integration, recovery policy, and comprehensive two-endpoint testing remain later work.
 
 ## Prerequisites
 
@@ -92,7 +104,7 @@ Install the package first, then run:
 python -m pytest tests/python
 ```
 
-The complete Python suite retains the private native smoke tests and also verifies public enum parity, configuration validation, role-specific seed handling, creation error mapping, deterministic/context-manager/GC cleanup, single-thread ownership, and public package exports.
+The complete Python suite retains the private native smoke tests and also verifies public enum parity, configuration validation, role-specific seed handling, creation error mapping, deterministic/context-manager/GC cleanup, single-thread ownership, buffer borrowing, exact receive consumption, output peek/commit separation, Application reads, event conversion, status snapshots, and public package exports.
 
 ### Windows PowerShell
 

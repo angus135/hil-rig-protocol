@@ -66,7 +66,7 @@ def test_exception_hierarchy_includes_value_error_for_configuration() -> None:
     assert issubclass(TransportConfigurationError, ValueError)
 
 
-def test_pr4_operational_methods_are_not_exposed_yet() -> None:
+def test_complete_transport_operations_are_exposed() -> None:
     for name in (
         "reset",
         "notify_link_state",
@@ -79,4 +79,4 @@ def test_pr4_operational_methods_are_not_exposed_yet() -> None:
         "read_event",
         "get_status",
     ):
-        assert not hasattr(Transport, name)
+        assert hasattr(Transport, name)
