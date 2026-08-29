@@ -19,13 +19,31 @@ The installed Python package has two private binding details:
 - `hil_rig_protocol._native`: compiled CFFI extension containing the adapter and C Transport core.
 - `hil_rig_protocol._binding`: the only handwritten package module that imports `_native`; later Python modules should depend on this internal access point instead of importing `_native` directly.
 
-Neither module is a supported public Transport API. The public Python `Transport` class, enums, configuration objects, lifetime wrappers, and operation wrappers are intentionally deferred to later PRs. Future Application declarations should extend this same `_native` module so the C core is not compiled into a second Python extension.
+Neither module is a supported public Transport API. Public Python code should import the supported value and lifetime layer from `hil_rig_protocol`; `_native` and `_binding` remain private implementation details. Future Application declarations should extend this same `_native` module so the C core is not compiled into a second Python extension.
+
+## Public Transport value and lifetime layer
+
+The package now exposes the public Transport enums, immutable configuration/result value types, Transport exceptions, and `Transport` native lifetime owner. Operational Transport methods remain intentionally deferred to the next binding PR, and Application bindings remain separate later work.
+
+`TransportConfig.session_seed` is role-aware at construction time. A HOST with `session_seed=None` receives a cryptographically secure seed in the inclusive range `1..UINT64_MAX-1`; explicit valid HOST seeds are preserved for deterministic tests. A RIG resolves `None` to zero, accepts explicit zero, and rejects every nonzero seed. The resolved immutable configuration is available through `transport.config`.
+
+One Python `Transport` owns one opaque native adapter handle. Call `close()` for deterministic cleanup, or use the object as a context manager:
+
+```python
+from hil_rig_protocol import Role, Transport, TransportConfig
+
+with Transport(Role.HOST, TransportConfig()) as transport:
+    effective_config = transport.config
+```
+
+`close()` is idempotent. CFFI garbage-collection cleanup remains a fallback when deterministic cleanup is missed; callers should not rely on GC timing. The native context is single-owner: construction records the creating thread, and live native use or deterministic release from another thread raises `TransportOwnershipError`. Transport objects cannot be copied, deep-copied, or pickled.
 
 ## Prerequisites
 
 A Python package build requires:
 
-- Python with development/module headers for the active interpreter.
+- Python 3.12 or newer. Python 3.12 is the currently verified CI baseline.
+- Python development/module headers for the active interpreter.
 - CMake 3.17 or newer for the Python-enabled build path.
 - A C11 compiler.
 - CFFI.
@@ -66,15 +84,15 @@ python -c "import hil_rig_protocol; import hil_rig_protocol._native"
 
 Editable and normal installations use the same native CMake build path.
 
-## Python smoke tests
+## Python tests
 
 Install the package first, then run:
 
 ```sh
-python -m pytest tests/python/test_native_smoke.py
+python -m pytest tests/python
 ```
 
-The smoke tests import the private binding, create a valid HOST adapter using the same session seed as the C adapter tests, create a valid RIG adapter using the core defaults, and destroy both handles.
+The complete Python suite retains the private native smoke tests and also verifies public enum parity, configuration validation, role-specific seed handling, creation error mapping, deterministic/context-manager/GC cleanup, single-thread ownership, and public package exports.
 
 ### Windows PowerShell
 
@@ -98,11 +116,11 @@ Set-Location $env:TEMP
   "import hil_rig_protocol; import hil_rig_protocol._native as native; print(hil_rig_protocol.__file__); print(native.__file__)"
 
 & "$Repository\.venv\Scripts\python.exe" -m pytest `
-  "$Repository\tests\python\test_native_smoke.py"
+  "$Repository\tests\python"
 ```
 
 The two import paths should point into `.venv\Lib\site-packages`, the native
-module should end in `.pyd`, and pytest should report four passing tests. If
+module should end in `.pyd`, and the complete Python test suite should pass. If
 CMake cannot find MSVC, run the commands from the Visual Studio 2022 Developer
 PowerShell.
 
