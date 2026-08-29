@@ -76,3 +76,25 @@ MVP Transport fixtures exercised through the public facade by
 and integration tests cover core behaviour and several complex recovery cases.
 Application-codec fixtures and consumer-style `add_subdirectory` validation
 remain unfinished.
+
+## Python Transport integration tests
+
+`tests/python/test_*.py` continues to exercise the Python binding facade, value model, lifetime, and individual native operation wrappers. `tests/python/integration/` adds a separate black-box layer that composes two real Python-bound `Transport` objects through only the supported public Python API.
+
+The Python `TransportPairHarness` follows the same caller-owned boundary as the C integration support: it owns one HOST, one RIG, independent deterministic `uint32_t` clocks, and a `TransportTestLink` representing the external byte stream. Output servicing explicitly separates the native pinned item from simulated external acceptance. A complete `peek_output()` result is copied into per-direction pending-write state with a caller-owned accepted offset. Partial acceptance keeps the native output pinned and re-validates that repeated peeks remain byte-for-byte stable; `commit_output()` is called only after every byte has been externally accepted. Only then does the link own a complete committed output item.
+
+Committed items can be queued into the simulated receive byte stream independently of external-write chunking. On receive the link can offer arbitrary chunk sizes, removes only the exact `bytes_consumed` prefix, and retains the unconsumed suffix for a later call. An explicit zero-byte delivery helper calls the real `receive_bytes(b"")` path even when no new link bytes are ready. This keeps external partial writes and receive chunking as separate caller-owned controls.
+
+The harness does not decode Transport frames and never automatically drains events or Application data. The initial infrastructure scenarios prove clean session establishment, basic opaque Application delivery in both directions, real native partial external-write pinning, and real one-byte receive delivery. Loss, duplication, corruption, retry timing, capacity exhaustion, reset/reconnection, and recovery scenarios remain separate later integration work.
+
+Run only this integration layer with:
+
+```sh
+python -m pytest tests/python/integration
+```
+
+Run the complete Python binding suite with:
+
+```sh
+python -m pytest tests/python
+```
