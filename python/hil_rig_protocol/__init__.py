@@ -1,8 +1,8 @@
 """Supported Python interface for the HIL-RIG protocol.
 
-This release provides Transport value types, validated configuration, and
-native lifetime ownership. Operational Transport methods are added in later
-binding PRs.
+This release provides the complete caller-driven Transport facade, including
+validated configuration, native lifetime ownership, encoded I/O servicing,
+opaque Application data, events, and status snapshots.
 """
 
 from .errors import (

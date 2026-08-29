@@ -42,7 +42,22 @@ class TransportOwnershipError(TransportError):
 
 
 class TransportInternalError(TransportError):
-    """The native Transport reported an internal invariant failure."""
+    """The native Transport reported an internal invariant failure.
+
+    ``bytes_consumed`` preserves the accepted receive prefix when an internal
+    failure is reported by ``Transport.receive_bytes()``. It is ``None`` for
+    internal failures from other Transport operations.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status: TransportStatus | None = None,
+        bytes_consumed: int | None = None,
+    ) -> None:
+        super().__init__(message, status=status)
+        self.bytes_consumed: int | None = bytes_consumed
 
 
 __all__ = [
