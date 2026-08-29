@@ -564,6 +564,9 @@ class TransportPairHarness:
         host_now_ms: int = 0,
         rig_now_ms: int = 0,
     ) -> None:
+        validated_host_now_ms = self._validate_clock(host_now_ms)
+        validated_rig_now_ms = self._validate_clock(rig_now_ms)
+
         self.host = Transport(Role.HOST, host_config)
         try:
             self.rig = Transport(Role.RIG, rig_config)
@@ -571,8 +574,8 @@ class TransportPairHarness:
             self.host.close()
             raise
         self.link = TransportTestLink()
-        self.host_now_ms = self._validate_clock(host_now_ms)
-        self.rig_now_ms = self._validate_clock(rig_now_ms)
+        self.host_now_ms = validated_host_now_ms
+        self.rig_now_ms = validated_rig_now_ms
         self._closed = False
 
     def __enter__(self) -> TransportPairHarness:

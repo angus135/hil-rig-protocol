@@ -7,6 +7,7 @@ import pytest
 
 from hil_rig_protocol import ReceiveResult, Role, TransportStatus
 
+from . import transport_pair_harness as harness_module
 from .transport_pair_harness import (
     TransportLinkAcceptResult,
     TransportLinkDeliveryResult,
@@ -201,6 +202,116 @@ def test_link_zero_delivery_calls_receive_even_without_ready_bytes() -> None:
     assert result.bytes_offered == 0
     assert result.bytes_consumed == 0
     assert receiver.calls == 1
+
+
+def test_link_clear_discards_every_traffic_form_and_preserves_handle_uniqueness() -> None:
+    link = TransportTestLink()
+    host_sender = _FakeSender(role=Role.HOST, output=b"partial-host-output")
+    rig_sender = _FakeSender(role=Role.RIG, output=b"accepted-rig-output")
+    h2r = TransportTestDirection.HOST_TO_RIG
+    r2h = TransportTestDirection.RIG_TO_HOST
+
+    partial = link.accept_output(host_sender, now_ms=1, max_bytes=3)
+    assert not partial.committed
+    assert link.pending_output_count(h2r) == 1
+
+    accepted = link.accept_output(rig_sender, now_ms=2)
+    assert accepted.handle is not None
+
+    rig_sender.output = b"held-rig-output"
+    held = link.accept_output(rig_sender, now_ms=3)
+    assert held.handle is not None
+    assert link.hold_accepted(held.handle)
+
+    rig_sender.output = b"ready-rig-output"
+    ready = link.accept_output(rig_sender, now_ms=4)
+    assert ready.handle is not None
+    assert link.queue_accepted_for_delivery(ready.handle)
+
+    highest_ordinal = max(
+        accepted.handle.ordinal,
+        held.handle.ordinal,
+        ready.handle.ordinal,
+    )
+
+    assert link.pending_output_count(h2r) == 1
+    assert link.accepted_item_count(r2h) == 1
+    assert link.held_item_count(r2h) == 1
+    assert link.ready_byte_count(r2h) > 0
+
+    link.clear()
+
+    for direction in (h2r, r2h):
+        assert link.pending_output_count(direction) == 0
+        assert link.pending_output_size(direction) == 0
+        assert link.pending_output_accepted_offset(direction) == 0
+        assert link.pending_output_remaining(direction) == 0
+        assert link.accepted_item_count(direction) == 0
+        assert link.held_item_count(direction) == 0
+        assert link.ready_byte_count(direction) == 0
+
+    rig_sender.output = b"post-clear-output"
+    after_clear = link.accept_output(rig_sender, now_ms=5)
+    assert after_clear.handle is not None
+    assert after_clear.handle.ordinal > highest_ordinal
+
+
+@pytest.mark.parametrize(
+    ("host_now_ms", "rig_now_ms", "expected_exception"),
+    [
+        ("invalid", 0, TypeError),
+        (0, (1 << 32), ValueError),
+    ],
+)
+def test_pair_validates_both_initial_clocks_before_constructing_native_transports(
+    monkeypatch: pytest.MonkeyPatch,
+    host_now_ms: object,
+    rig_now_ms: object,
+    expected_exception: type[Exception],
+) -> None:
+    constructions: list[tuple[Role, object]] = []
+
+    def unexpected_transport(role: Role, config: object):
+        constructions.append((role, config))
+        raise AssertionError("Transport constructor must not run for invalid clocks")
+
+    monkeypatch.setattr(harness_module, "Transport", unexpected_transport)
+
+    with pytest.raises(expected_exception):
+        TransportPairHarness(
+            host_now_ms=host_now_ms,  # type: ignore[arg-type]
+            rig_now_ms=rig_now_ms,  # type: ignore[arg-type]
+        )
+
+    assert constructions == []
+
+
+def test_pair_closes_host_if_rig_construction_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeHost:
+        closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    host = FakeHost()
+    calls: list[Role] = []
+
+    def fake_transport(role: Role, config: object):
+        del config
+        calls.append(role)
+        if role is Role.HOST:
+            return host
+        raise RuntimeError("rig construction failed")
+
+    monkeypatch.setattr(harness_module, "Transport", fake_transport)
+
+    with pytest.raises(RuntimeError, match="rig construction failed"):
+        TransportPairHarness(host_now_ms=1, rig_now_ms=2)
+
+    assert calls == [Role.HOST, Role.RIG]
+    assert host.closed
 
 
 def test_healthy_output_pump_allows_exact_budget_when_output_becomes_quiescent() -> None:
