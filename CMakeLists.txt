@@ -16,6 +16,10 @@ option(HIL_RIG_PROTOCOL_BUILD_EXAMPLES
     "Build HIL-RIG protocol examples"
     OFF
 )
+option(HIL_RIG_PROTOCOL_BUILD_PYTHON
+    "Build HIL-RIG protocol Python binding support"
+    OFF
+)
 option(HIL_RIG_PROTOCOL_ENABLE_WARNINGS
     "Enable warnings for HIL-RIG protocol targets"
     ON
@@ -139,6 +143,10 @@ hil_rig_protocol_apply_coverage(hil_rig_protocol)
 if(HIL_RIG_PROTOCOL_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests/c)
+endif()
+
+if(HIL_RIG_PROTOCOL_BUILD_PYTHON)
+    add_subdirectory(bindings/python)
 endif()
 
 if(HIL_RIG_PROTOCOL_BUILD_EXAMPLES)
