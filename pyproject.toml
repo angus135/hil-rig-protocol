@@ -9,6 +9,7 @@ build-backend = "scikit_build_core.build"
 name = "hil-rig-protocol"
 version = "0.1.0"
 description = "Shared C11 protocol boundary for HIL-RIG firmware and host-side Python software."
+requires-python = ">=3.12"
 readme = "README.md"
 dependencies = [
     "cffi>=1.17.1",
