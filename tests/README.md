@@ -100,3 +100,19 @@ Run the complete Python binding suite with:
 ```sh
 python -m pytest tests/python
 ```
+
+### Python-specific integration coverage
+
+Beyond parity with caller-visible C integration behaviours, the Python suite has a small set of real-native scenarios for risks introduced specifically by Python and CFFI. These tests intentionally remain separate from the `test_c_parity_*` files.
+
+- Application submission is exercised end-to-end with `bytes`, `bytearray`, read-only `memoryview`, and writable `memoryview` inputs.
+- A contiguous multi-byte `memoryview` proves the binding forwards `view.nbytes` rather than Python element count.
+- Nonzero-offset C-contiguous `memoryview` slices are exercised on both Application submission and encoded receive paths, proving guard bytes outside the slice are never offered to native Transport.
+- Mutable submission and receive buffers are resized immediately after native calls to prove CFFI exports are released before the method returns; later protocol progress also proves native Transport does not retain Python buffer pointers.
+- Mutable receive storage is also exercised when native receive accepts only a prefix: the view is released immediately, the caller saves and later re-offers the exact unconsumed suffix reported by `bytes_consumed`, and retained native work is resumed separately with zero-byte receive.
+- Application data and peeked output returned as Python `bytes` are retained across later native buffer reuse, reset, commit, and Transport destruction to prove they are detached Python-owned copies.
+- Two independent Python HOST/RIG pairs are interleaved with distinct sessions and payloads to detect accidental module-level or CFFI context sharing.
+- Explicit destruction and CFFI garbage-collection fallback of unrelated native contexts are exercised while another established pair continues to exchange Application data.
+- A HOST created with `session_seed=None` uses the Python-generated effective seed in a real native session and successfully exchanges opaque Application data.
+
+These scenarios are binding-specific. Pure Python validation such as wrong-thread rejection, copy/pickle prevention, enum parity, configuration range checks, and non-contiguous-buffer rejection remains in the focused Python unit tests rather than being duplicated here.

@@ -46,15 +46,24 @@ def _drain_disconnect_events(transport: Transport) -> None:
 
 
 def _hard_reconnect(pair: TransportPairHarness, now_ms: int) -> None:
+    pair.link.clear()
     disconnect_pair(pair, now_ms)
     _drain_disconnect_events(pair.host)
     _drain_disconnect_events(pair.rig)
     reconnect_pair(pair, now_ms + 1)
-    drain_events(pair.host)
-    drain_events(pair.rig)
+    assert [event.type for event in drain_events(pair.host)] == [
+        EventType.LINK_STATE_CHANGED
+    ]
+    assert [event.type for event in drain_events(pair.rig)] == [
+        EventType.LINK_STATE_CHANGED
+    ]
     pair.establish_clean_session()
-    drain_events(pair.host)
-    drain_events(pair.rig)
+    assert [event.type for event in drain_events(pair.host)] == [
+        EventType.SESSION_ESTABLISHED
+    ]
+    assert [event.type for event in drain_events(pair.rig)] == [
+        EventType.SESSION_ESTABLISHED
+    ]
 
 
 def _find_minimum_encoded_capacity(application_capacity: int) -> int:
@@ -396,10 +405,6 @@ def test_disconnect_discards_partial_incoming_frame_before_replacement_session()
         assert partial.bytes_consumed > 0
         assert pair.link.ready_byte_count(H2R) > 0
         assert not pair.rig.get_status().application_message_pending
-        # Simulated physical link loss discards caller-owned stale stream bytes.
-        while pair.link.ready_byte_count(H2R):
-            # The C harness clears the link. Recreate only the test-side link state.
-            pair.link._states[H2R].ready_bytes.clear()  # type: ignore[attr-defined]
         _hard_reconnect(pair, 210)
         complete_application(pair, H2R, b"qrs")
 
@@ -413,6 +418,7 @@ def test_disconnect_during_handshake_restarts_instead_of_resuming_old_attempt() 
         assert pair.link.hold_accepted(accepted.handle)
         assert pair.host.get_status().session_state is SessionState.CONNECTING
         _hard_reconnect(pair, 20)
+        assert pair.link.held_item_count(H2R) == 0
         complete_application(pair, H2R, b"qrs")
 
 
