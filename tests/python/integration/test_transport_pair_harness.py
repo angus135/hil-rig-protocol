@@ -238,3 +238,65 @@ def test_pair_clocks_advance_independently_with_uint32_wrap() -> None:
         pair.advance_rig_time(5)
         assert pair.host_now_ms == 0
         assert pair.rig_now_ms == 15
+
+
+def test_preserves_accepted_item_identity_and_opaque_link_ownership() -> None:
+    """Mirror the C harness-structure test without inspecting protocol bytes."""
+
+    from hil_rig_protocol import TransportConfig
+
+    pair = TransportPairHarness(
+        host_config=TransportConfig(session_seed=0xABCD, initial_reliable_sequence=10),
+        rig_config=TransportConfig(session_seed=0, initial_reliable_sequence=500),
+        host_now_ms=5,
+        rig_now_ms=900,
+    )
+    with pair:
+        assert pair.connect() == (TransportStatus.OK, TransportStatus.OK)
+        pair.establish_clean_session()
+        assert pair.deliver_ready(TransportTestDirection.RIG_TO_HOST).status is None
+
+        assert pair.host.submit_application_data(b"\x11\x12") is TransportStatus.OK
+        assert pair.rig.submit_application_data(b"\x21\x22") is TransportStatus.OK
+        pair.set_host_time(10)
+        pair.set_rig_time(1000)
+        pair.advance_host_time(2)
+        pair.advance_rig_time(3)
+        assert pair.host_now_ms == 12
+        assert pair.rig_now_ms == 1003
+
+        old_host_output = pair.accept_output(TransportTestDirection.HOST_TO_RIG)
+        assert old_host_output.status is TransportStatus.OK
+        assert old_host_output.handle is not None
+        old_handle = old_host_output.handle
+        assert pair.link.accepted_item_count(TransportTestDirection.HOST_TO_RIG) == 1
+
+        pair.set_rig_time(1004)
+        rig_transfer = pair.transfer_one_output(TransportTestDirection.RIG_TO_HOST)
+        assert rig_transfer.accept.status is TransportStatus.OK
+        assert rig_transfer.delivery is not None
+        assert rig_transfer.delivery.status is TransportStatus.OK
+
+        assert pair.host.peek_output() is not None
+        pair.set_host_time(13)
+        control_transfer = pair.transfer_one_output(TransportTestDirection.HOST_TO_RIG)
+        assert control_transfer.accept.status is TransportStatus.OK
+        assert control_transfer.delivery is not None
+        assert control_transfer.delivery.status is TransportStatus.OK
+
+        # TransferOneOutput must have moved the newly accepted control output,
+        # leaving the older Application item under its original stable handle.
+        assert pair.link.accepted_item_count(TransportTestDirection.HOST_TO_RIG) == 1
+        assert pair.host.read_application_data() == b"\x21\x22"
+
+        assert pair.link.hold_accepted(old_handle)
+        assert pair.link.accepted_item_count(TransportTestDirection.HOST_TO_RIG) == 0
+        assert pair.link.held_item_count(TransportTestDirection.HOST_TO_RIG) == 1
+        assert pair.link.release_held(old_handle)
+        duplicate = pair.link.duplicate_accepted(old_handle)
+        assert duplicate is not None
+        assert pair.link.accepted_item_count(TransportTestDirection.HOST_TO_RIG) == 2
+        assert pair.link.corrupt_accepted_byte(old_handle, 0, 0x01)
+        assert pair.link.drop_accepted(old_handle)
+        assert pair.link.drop_accepted(duplicate)
+        assert pair.link.accepted_item_count(TransportTestDirection.HOST_TO_RIG) == 0
