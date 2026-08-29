@@ -1,0 +1,35 @@
+[build-system]
+requires = [
+    "scikit-build-core>=1.0",
+    "cffi>=1.17.1",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "hil-rig-protocol"
+version = "0.1.0"
+description = "Shared C11 protocol boundary for HIL-RIG firmware and host-side Python software."
+readme = "README.md"
+dependencies = [
+    "cffi>=1.17.1",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8",
+]
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+cmake.version = ">=3.17"
+wheel.packages = ["python/hil_rig_protocol"]
+
+[tool.scikit-build.cmake.define]
+HIL_RIG_PROTOCOL_BUILD_PYTHON = true
+HIL_RIG_PROTOCOL_BUILD_TESTS = false
+HIL_RIG_PROTOCOL_BUILD_EXAMPLES = false
+HIL_RIG_PROTOCOL_TRANSPORT_PROFILE = "MVP"
+BUILD_SHARED_LIBS = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]

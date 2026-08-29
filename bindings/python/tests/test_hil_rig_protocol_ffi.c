@@ -3,16 +3,17 @@
 #include <stdio.h>
 
 #include "hil_rig_protocol_ffi.h"
+#include "test_hil_rig_protocol_ffi_allocator.h"
 
-#define TEST_CHECK( condition )                                                                    \
-    do                                                                                             \
-    {                                                                                              \
-        if ( !( condition ) )                                                                      \
-        {                                                                                          \
-            ( void )fprintf( stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__,              \
-                             #condition );                                                         \
-            return 1;                                                                              \
-        }                                                                                          \
+#define TEST_CHECK( condition )                                                               \
+    do                                                                                        \
+    {                                                                                         \
+        if ( !( condition ) )                                                                 \
+        {                                                                                     \
+            ( void )fprintf( stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__,        \
+                              #condition );                                                   \
+            return 1;                                                                         \
+        }                                                                                     \
     } while ( 0 )
 
 typedef int ( *Test_Function_T )( void );
@@ -74,17 +75,16 @@ static int Test_Create_Valid_Host_And_Rig( void )
     HIL_Transport_Status_T          core_status = HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
     HIL_Transport_Status_Snapshot_T snapshot    = { 0 };
 
-    TEST_CHECK(
-        HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &host_config, &host, &core_status )
-        == HIL_PY_ADAPTER_STATUS_OK );
+    TEST_CHECK( HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &host_config, &host,
+                                         &core_status ) == HIL_PY_ADAPTER_STATUS_OK );
     TEST_CHECK( host != NULL );
     TEST_CHECK( core_status == HIL_TRANSPORT_STATUS_OK );
     TEST_CHECK( HIL_PY_TRANSPORT_Get_Status( host, &snapshot ) == HIL_TRANSPORT_STATUS_OK );
     TEST_CHECK( snapshot.role == HIL_TRANSPORT_ROLE_HOST );
 
     core_status = HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
-    TEST_CHECK( HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_RIG, &rig_config, &rig, &core_status )
-                == HIL_PY_ADAPTER_STATUS_OK );
+    TEST_CHECK( HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_RIG, &rig_config, &rig,
+                                         &core_status ) == HIL_PY_ADAPTER_STATUS_OK );
     TEST_CHECK( rig != NULL );
     TEST_CHECK( core_status == HIL_TRANSPORT_STATUS_OK );
     TEST_CHECK( HIL_PY_TRANSPORT_Get_Status( rig, &snapshot ) == HIL_TRANSPORT_STATUS_OK );
@@ -127,9 +127,8 @@ static int Test_Create_Preserves_Core_Configuration_Failures( void )
     config.session_seed = HIL_TRANSPORT_SESSION_SEED_INVALID;
     transport           = Fake_Transport_Pointer( &config );
     core_status         = HIL_TRANSPORT_STATUS_OK;
-    TEST_CHECK(
-        HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport, &core_status )
-        == HIL_PY_ADAPTER_STATUS_TRANSPORT_ERROR );
+    TEST_CHECK( HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport,
+                                         &core_status ) == HIL_PY_ADAPTER_STATUS_TRANSPORT_ERROR );
     TEST_CHECK( transport == NULL );
     TEST_CHECK( core_status == HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
 
@@ -137,9 +136,8 @@ static int Test_Create_Preserves_Core_Configuration_Failures( void )
     config.session_seed = HIL_TRANSPORT_SESSION_SEED_RESERVED;
     transport           = Fake_Transport_Pointer( &config );
     core_status         = HIL_TRANSPORT_STATUS_OK;
-    TEST_CHECK(
-        HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport, &core_status )
-        == HIL_PY_ADAPTER_STATUS_TRANSPORT_ERROR );
+    TEST_CHECK( HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport,
+                                         &core_status ) == HIL_PY_ADAPTER_STATUS_TRANSPORT_ERROR );
     TEST_CHECK( transport == NULL );
     TEST_CHECK( core_status == HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
 
@@ -147,8 +145,8 @@ static int Test_Create_Preserves_Core_Configuration_Failures( void )
     config.session_seed = UINT64_C( 1 );
     transport           = Fake_Transport_Pointer( &config );
     core_status         = HIL_TRANSPORT_STATUS_OK;
-    TEST_CHECK( HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_RIG, &config, &transport, &core_status )
-                == HIL_PY_ADAPTER_STATUS_TRANSPORT_ERROR );
+    TEST_CHECK( HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_RIG, &config, &transport,
+                                         &core_status ) == HIL_PY_ADAPTER_STATUS_TRANSPORT_ERROR );
     TEST_CHECK( transport == NULL );
     TEST_CHECK( core_status == HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
 
@@ -156,9 +154,8 @@ static int Test_Create_Preserves_Core_Configuration_Failures( void )
     config.connection_timeout_ms = 1u;
     transport                    = Fake_Transport_Pointer( &config );
     core_status                  = HIL_TRANSPORT_STATUS_OK;
-    TEST_CHECK(
-        HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport, &core_status )
-        == HIL_PY_ADAPTER_STATUS_TRANSPORT_ERROR );
+    TEST_CHECK( HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport,
+                                         &core_status ) == HIL_PY_ADAPTER_STATUS_TRANSPORT_ERROR );
     TEST_CHECK( transport == NULL );
     TEST_CHECK( core_status == HIL_TRANSPORT_STATUS_UNSUPPORTED_CONFIGURATION );
 
@@ -166,9 +163,8 @@ static int Test_Create_Preserves_Core_Configuration_Failures( void )
     config.max_application_message_size = 0u;
     transport                           = Fake_Transport_Pointer( &config );
     core_status                         = HIL_TRANSPORT_STATUS_OK;
-    TEST_CHECK(
-        HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport, &core_status )
-        == HIL_PY_ADAPTER_STATUS_TRANSPORT_ERROR );
+    TEST_CHECK( HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport,
+                                         &core_status ) == HIL_PY_ADAPTER_STATUS_TRANSPORT_ERROR );
     TEST_CHECK( transport == NULL );
     TEST_CHECK( core_status == HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
 
@@ -176,22 +172,59 @@ static int Test_Create_Preserves_Core_Configuration_Failures( void )
     config.max_encoded_frame_size = 1u;
     transport                     = Fake_Transport_Pointer( &config );
     core_status                   = HIL_TRANSPORT_STATUS_OK;
-    TEST_CHECK(
-        HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport, &core_status )
-        == HIL_PY_ADAPTER_STATUS_TRANSPORT_ERROR );
+    TEST_CHECK( HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport,
+                                         &core_status ) == HIL_PY_ADAPTER_STATUS_TRANSPORT_ERROR );
     TEST_CHECK( transport == NULL );
     TEST_CHECK( core_status == HIL_TRANSPORT_STATUS_UNSUPPORTED_CONFIGURATION );
 
     return 0;
 }
 
+static int Test_Create_Reports_Handle_Allocation_Failure( void )
+{
+    HIL_Transport_Config_T  config      = Make_Host_Config();
+    HIL_Transport_Status_T  core_status = HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    HIL_Python_Transport_T* transport   = Fake_Transport_Pointer( &config );
+
+    HIL_PY_TEST_ALLOCATOR_Reset( 1u );
+    TEST_CHECK( HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport,
+                                         &core_status )
+                == HIL_PY_ADAPTER_STATUS_ALLOCATION_FAILED );
+    TEST_CHECK( transport == NULL );
+    TEST_CHECK( core_status == HIL_TRANSPORT_STATUS_OK );
+    TEST_CHECK( HIL_PY_TEST_ALLOCATOR_Allocation_Count() == 1u );
+    TEST_CHECK( HIL_PY_TEST_ALLOCATOR_Free_Count() == 0u );
+    TEST_CHECK( HIL_PY_TEST_ALLOCATOR_Live_Count() == 0u );
+    TEST_CHECK( HIL_PY_TEST_ALLOCATOR_Invalid_Free_Count() == 0u );
+    return 0;
+}
+
+static int Test_Create_Frees_Handle_After_Workspace_Allocation_Failure( void )
+{
+    HIL_Transport_Config_T  config      = Make_Host_Config();
+    HIL_Transport_Status_T  core_status = HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
+    HIL_Python_Transport_T* transport   = Fake_Transport_Pointer( &config );
+
+    HIL_PY_TEST_ALLOCATOR_Reset( 2u );
+    TEST_CHECK( HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport,
+                                         &core_status )
+                == HIL_PY_ADAPTER_STATUS_ALLOCATION_FAILED );
+    TEST_CHECK( transport == NULL );
+    TEST_CHECK( core_status == HIL_TRANSPORT_STATUS_OK );
+    TEST_CHECK( HIL_PY_TEST_ALLOCATOR_Allocation_Count() == 2u );
+    TEST_CHECK( HIL_PY_TEST_ALLOCATOR_Free_Count() == 1u );
+    TEST_CHECK( HIL_PY_TEST_ALLOCATOR_Live_Count() == 0u );
+    TEST_CHECK( HIL_PY_TEST_ALLOCATOR_Invalid_Free_Count() == 0u );
+    return 0;
+}
+
 static int Test_Null_Handle_Forwarding( void )
 {
-    uint8_t                         byte     = 0u;
-    size_t                          size     = 0u;
-    HIL_Transport_Event_T           event    = { 0 };
-    HIL_Transport_Status_Snapshot_T snapshot = { 0 };
-    const uint8_t* const            byte_ptr = &byte;
+    uint8_t                         byte           = 0u;
+    size_t                          size           = 0u;
+    HIL_Transport_Event_T           event          = { 0 };
+    HIL_Transport_Status_Snapshot_T snapshot       = { 0 };
+    const uint8_t*                  const byte_ptr = &byte;
 
     TEST_CHECK( HIL_PY_TRANSPORT_Reset( NULL ) == HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
     TEST_CHECK( HIL_PY_TRANSPORT_Notify_Link_State( NULL, HIL_TRANSPORT_LINK_STATE_CONNECTED, 0u )
@@ -222,15 +255,14 @@ static int Test_Representative_Forwarding_Preserves_Core_Behaviour( void )
     HIL_Transport_Status_T          core_status = HIL_TRANSPORT_STATUS_INTERNAL_ERROR;
     HIL_Transport_Status_Snapshot_T snapshot    = { 0 };
     HIL_Transport_Event_T           event       = { 0 };
-    uint8_t                         output[HIL_TRANSPORT_DEFAULT_MAX_ENCODED_FRAME_SIZE] = { 0 };
-    const uint8_t                   receive_bytes[] = { 0x01u, 0x02u, 0x03u };
-    size_t                          output_size     = 0u;
-    size_t                          bytes_consumed  = 99u;
-    size_t                          message_size    = 99u;
+    uint8_t output[HIL_TRANSPORT_DEFAULT_MAX_ENCODED_FRAME_SIZE] = { 0 };
+    const uint8_t receive_bytes[]                                  = { 0x01u, 0x02u, 0x03u };
+    size_t        output_size                                      = 0u;
+    size_t        bytes_consumed                                   = 99u;
+    size_t        message_size                                     = 99u;
 
-    TEST_CHECK(
-        HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport, &core_status )
-        == HIL_PY_ADAPTER_STATUS_OK );
+    TEST_CHECK( HIL_PY_TRANSPORT_Create( HIL_TRANSPORT_ROLE_HOST, &config, &transport,
+                                         &core_status ) == HIL_PY_ADAPTER_STATUS_OK );
     TEST_CHECK( transport != NULL );
     TEST_CHECK( core_status == HIL_TRANSPORT_STATUS_OK );
 
@@ -238,9 +270,8 @@ static int Test_Representative_Forwarding_Preserves_Core_Behaviour( void )
     TEST_CHECK( snapshot.role == HIL_TRANSPORT_ROLE_HOST );
     TEST_CHECK( snapshot.link_state == HIL_TRANSPORT_LINK_STATE_DISCONNECTED );
 
-    TEST_CHECK(
-        HIL_PY_TRANSPORT_Notify_Link_State( transport, HIL_TRANSPORT_LINK_STATE_CONNECTED, 10u )
-        == HIL_TRANSPORT_STATUS_OK );
+    TEST_CHECK( HIL_PY_TRANSPORT_Notify_Link_State( transport, HIL_TRANSPORT_LINK_STATE_CONNECTED,
+                                                    10u ) == HIL_TRANSPORT_STATUS_OK );
     TEST_CHECK( HIL_PY_TRANSPORT_Get_Status( transport, &snapshot ) == HIL_TRANSPORT_STATUS_OK );
     TEST_CHECK( snapshot.link_state == HIL_TRANSPORT_LINK_STATE_CONNECTED );
     TEST_CHECK( snapshot.session_state == HIL_TRANSPORT_SESSION_STATE_CONNECTING );
@@ -250,9 +281,9 @@ static int Test_Representative_Forwarding_Preserves_Core_Behaviour( void )
     TEST_CHECK( HIL_PY_TRANSPORT_Read_Event( transport, &event )
                 == HIL_TRANSPORT_STATUS_NOT_READY );
 
-    TEST_CHECK(
-        HIL_PY_TRANSPORT_Process( transport, 11u, HIL_TRANSPORT_OPERATING_MODE_BULK_TRANSFER )
-        == HIL_TRANSPORT_STATUS_OK );
+    TEST_CHECK( HIL_PY_TRANSPORT_Process( transport, 11u,
+                                          HIL_TRANSPORT_OPERATING_MODE_BULK_TRANSFER )
+                == HIL_TRANSPORT_STATUS_OK );
     TEST_CHECK( HIL_PY_TRANSPORT_Get_Status( transport, &snapshot ) == HIL_TRANSPORT_STATUS_OK );
     TEST_CHECK( snapshot.operating_mode == HIL_TRANSPORT_OPERATING_MODE_BULK_TRANSFER );
     TEST_CHECK( snapshot.operating_mode_valid == 1u );
@@ -264,9 +295,8 @@ static int Test_Representative_Forwarding_Preserves_Core_Behaviour( void )
     TEST_CHECK( output_size <= sizeof( output ) );
     {
         const size_t queried_size = output_size;
-        TEST_CHECK(
-            HIL_PY_TRANSPORT_Peek_Output( transport, output, sizeof( output ), &output_size )
-            == HIL_TRANSPORT_STATUS_OK );
+        TEST_CHECK( HIL_PY_TRANSPORT_Peek_Output( transport, output, sizeof( output ),
+                                                  &output_size ) == HIL_TRANSPORT_STATUS_OK );
         TEST_CHECK( output_size == queried_size );
     }
     TEST_CHECK( HIL_PY_TRANSPORT_Commit_Output( transport, 12u ) == HIL_TRANSPORT_STATUS_OK );
@@ -274,8 +304,7 @@ static int Test_Representative_Forwarding_Preserves_Core_Behaviour( void )
                 == HIL_TRANSPORT_STATUS_NOT_READY );
 
     TEST_CHECK( HIL_PY_TRANSPORT_Receive_Bytes( transport, receive_bytes, sizeof( receive_bytes ),
-                                                &bytes_consumed )
-                == HIL_TRANSPORT_STATUS_OK );
+                                                &bytes_consumed ) == HIL_TRANSPORT_STATUS_OK );
     TEST_CHECK( bytes_consumed == sizeof( receive_bytes ) );
 
     TEST_CHECK( HIL_PY_TRANSPORT_Read_Application_Data( transport, NULL, 0u, &message_size )
@@ -298,9 +327,9 @@ static int Test_Representative_Forwarding_Preserves_Core_Behaviour( void )
                 == HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
     TEST_CHECK( HIL_PY_TRANSPORT_Get_Status( transport, NULL )
                 == HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
-    TEST_CHECK(
-        HIL_PY_TRANSPORT_Notify_Link_State( transport, ( HIL_Transport_Link_State_T )99, 15u )
-        == HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
+    TEST_CHECK( HIL_PY_TRANSPORT_Notify_Link_State( transport, ( HIL_Transport_Link_State_T )99,
+                                                    15u )
+                == HIL_TRANSPORT_STATUS_INVALID_ARGUMENT );
 
     TEST_CHECK( HIL_PY_TRANSPORT_Reset( transport ) == HIL_TRANSPORT_STATUS_OK );
     TEST_CHECK( HIL_PY_TRANSPORT_Get_Status( transport, &snapshot ) == HIL_TRANSPORT_STATUS_OK );
@@ -320,6 +349,9 @@ int main( void )
         { "valid host and rig creation", Test_Create_Valid_Host_And_Rig },
         { "adapter output validation", Test_Create_Validates_Adapter_Outputs },
         { "core creation failures", Test_Create_Preserves_Core_Configuration_Failures },
+        { "handle allocation failure", Test_Create_Reports_Handle_Allocation_Failure },
+        { "workspace allocation failure",
+          Test_Create_Frees_Handle_After_Workspace_Allocation_Failure },
         { "null handle forwarding", Test_Null_Handle_Forwarding },
         { "representative forwarding", Test_Representative_Forwarding_Preserves_Core_Behaviour },
     };
