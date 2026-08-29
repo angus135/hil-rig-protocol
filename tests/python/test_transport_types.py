@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import FrozenInstanceError
 
 import pytest
-
 from hil_rig_protocol import (
     EventType,
     Failure,
@@ -18,8 +17,8 @@ from hil_rig_protocol import (
     TransportEvent,
     TransportSnapshot,
     TransportStatus,
+    _binding,
 )
-from hil_rig_protocol import _binding
 
 
 def test_transport_status_matches_compiled_c_constants() -> None:
@@ -52,7 +51,9 @@ def test_link_state_matches_compiled_c_constants() -> None:
 
 def test_operating_mode_matches_compiled_c_constants() -> None:
     assert int(OperatingMode.NORMAL) == _binding.lib.HIL_TRANSPORT_OPERATING_MODE_NORMAL
-    assert int(OperatingMode.BULK_TRANSFER) == _binding.lib.HIL_TRANSPORT_OPERATING_MODE_BULK_TRANSFER
+    assert (
+        int(OperatingMode.BULK_TRANSFER) == _binding.lib.HIL_TRANSPORT_OPERATING_MODE_BULK_TRANSFER
+    )
     assert (
         int(OperatingMode.QUIET_REAL_TIME)
         == _binding.lib.HIL_TRANSPORT_OPERATING_MODE_QUIET_REAL_TIME

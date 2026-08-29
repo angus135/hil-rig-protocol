@@ -31,6 +31,7 @@ SEARCH_DIRS=(
   "include"
   "src"
   "tests/c"
+  "tests/consumer"
 )
 
 EXISTING_SEARCH_DIRS=()

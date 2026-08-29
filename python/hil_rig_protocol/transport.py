@@ -6,7 +6,8 @@ import secrets
 import threading
 from collections.abc import Buffer, Iterator
 from contextlib import contextmanager
-from typing import Any, TypeVar
+from enum import IntEnum
+from typing import Any, Literal, NoReturn, SupportsIndex, TypeVar
 
 from . import _binding
 from .errors import (
@@ -34,7 +35,7 @@ from .transport_types import (
 _UINT64_MAX = (1 << 64) - 1
 _UINT32_MAX = (1 << 32) - 1
 
-_EnumT = TypeVar("_EnumT")
+_EnumT = TypeVar("_EnumT", bound=IntEnum)
 
 
 def _resolve_effective_config(role: Role, config: TransportConfig) -> TransportConfig:
@@ -233,9 +234,7 @@ def _operation_status(
 
     status = _known_transport_status(int(value))
     if status is None:
-        raise TransportBindingError(
-            f"{operation} returned unknown Transport status {int(value)}"
-        )
+        raise TransportBindingError(f"{operation} returned unknown Transport status {int(value)}")
     if status is TransportStatus.INTERNAL_ERROR:
         raise TransportInternalError(
             f"native Transport reported an internal error during {operation}",
@@ -292,9 +291,7 @@ def _borrow_buffer(data: Buffer) -> Iterator[tuple[Any, int]]:
             yield _binding.ffi.NULL, 0
             return
 
-        cdata = _binding.ffi.from_buffer(
-            "const uint8_t[]", view, require_writable=False
-        )
+        cdata = _binding.ffi.from_buffer("const uint8_t[]", view, require_writable=False)
         yield cdata, size
     finally:
         if cdata is not None:
@@ -438,9 +435,7 @@ class Transport:
         handle = self._require_open_owner()
         with _borrow_buffer(data) as (native_data, data_size):
             consumed_ptr = _binding.ffi.new("size_t *")
-            native_status = _native_receive_bytes(
-                handle, native_data, data_size, consumed_ptr
-            )
+            native_status = _native_receive_bytes(handle, native_data, data_size, consumed_ptr)
             bytes_consumed = int(consumed_ptr[0])
 
         if bytes_consumed > data_size:
@@ -595,9 +590,7 @@ class Transport:
             output = _binding.ffi.new("uint8_t[]", required_size)
         output_size_ptr = _binding.ffi.new("size_t *")
         status = _operation_status(
-            _native_read_application_data(
-                handle, output, required_size, output_size_ptr
-            ),
+            _native_read_application_data(handle, output, required_size, output_size_ptr),
             "read_application_data copy",
             frozenset({TransportStatus.OK}),
         )
@@ -627,9 +620,7 @@ class Transport:
         event_type = _enum_value(EventType, native_event.type, "event type")
         if event_type is EventType.NONE:
             raise TransportBindingError("native read_event returned the NONE sentinel")
-        event_status = _enum_value(
-            TransportStatus, native_event.status, "event status"
-        )
+        event_status = _enum_value(TransportStatus, native_event.status, "event status")
         failure = _enum_value(Failure, native_event.failure, "event failure")
         return TransportEvent(
             type=event_type,
@@ -663,18 +654,14 @@ class Transport:
         )
         return TransportSnapshot(
             role=_enum_value(Role, native_status.role, "snapshot role"),
-            link_state=_enum_value(
-                LinkState, native_status.link_state, "snapshot link_state"
-            ),
+            link_state=_enum_value(LinkState, native_status.link_state, "snapshot link_state"),
             session_state=_enum_value(
                 SessionState,
                 native_status.session_state,
                 "snapshot session_state",
             ),
             operating_mode=operating_mode,
-            output_pending=_native_bool(
-                native_status.output_pending, "output_pending"
-            ),
+            output_pending=_native_bool(native_status.output_pending, "output_pending"),
             application_message_pending=_native_bool(
                 native_status.application_message_pending,
                 "application_message_pending",
@@ -684,16 +671,14 @@ class Transport:
                 native_status.reliable_delivery_pending,
                 "reliable_delivery_pending",
             ),
-            last_failure=_enum_value(
-                Failure, native_status.last_failure, "snapshot last_failure"
-            ),
+            last_failure=_enum_value(Failure, native_status.last_failure, "snapshot last_failure"),
         )
 
     def __enter__(self) -> Transport:
         self._require_open_owner()
         return self
 
-    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> bool:
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> Literal[False]:
         self.close()
         return False
 
@@ -703,10 +688,10 @@ class Transport:
     def __deepcopy__(self, memo: object) -> None:
         raise TypeError("Transport instances cannot be deep-copied")
 
-    def __reduce__(self) -> None:
+    def __reduce__(self) -> NoReturn:
         raise TypeError("Transport instances cannot be pickled")
 
-    def __reduce_ex__(self, protocol: int) -> None:
+    def __reduce_ex__(self, protocol: SupportsIndex) -> NoReturn:
         raise TypeError("Transport instances cannot be pickled")
 
 

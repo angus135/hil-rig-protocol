@@ -52,12 +52,10 @@ The layer boundary is deliberate:
 The MVP Transport implementation includes framing, COBS, CRC, reliable and
 control output, output arbitration, bounded events, link/session recovery, the
 handshake, transactional receive, and bidirectional complete-message delivery.
-Integration and consumer readiness remain partial. Existing unit and integration
-tests cover core
-behaviour and several complex recovery cases, but the complete public
-two-endpoint fault-injection matrix, language-neutral golden vectors, a concrete
-runnable consumer example, and consumer-style `add_subdirectory` validation are
-not finished.
+The C and Python consumer surfaces execute the same C Transport implementation;
+the Python wheel statically contains that core behind a private CFFI extension.
+Comprehensive public two-endpoint C and Python integration suites cover normal,
+backpressure, reliability, corruption, reset, recovery, and ownership behavior.
 
 Application encoding, decoding, and structural validation are intentional
 `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` stubs, and the common Application wire
@@ -207,3 +205,14 @@ types, field rules, integrity coverage, and size bounds.
 
 Detailed setup and workflow examples live in the layer documentation and
 compile-level tests rather than this repository overview.
+
+Python callers should start with the
+[Python Transport caller guide](docs/python/transport.md) and the tested
+[caller-owned I/O example](examples/python/transport_servicing.py).
+
+## Licence
+
+The project is distributed under the root [MIT licence](LICENSE). The bundled
+COBS implementation retains its own MIT licence and is identified in
+[third-party notices](THIRD_PARTY_NOTICES.md); both licence texts are retained
+in source and binary Python distributions.

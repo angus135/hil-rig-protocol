@@ -10,7 +10,6 @@ import threading
 import weakref
 
 import pytest
-
 from hil_rig_protocol import (
     Role,
     Transport,
@@ -22,8 +21,8 @@ from hil_rig_protocol import (
     TransportInternalError,
     TransportOwnershipError,
     TransportStatus,
+    _binding,
 )
-from hil_rig_protocol import _binding
 from hil_rig_protocol import transport as transport_module
 
 UINT64_MAX = (1 << 64) - 1

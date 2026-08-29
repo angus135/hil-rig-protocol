@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import hil_rig_protocol
 from hil_rig_protocol import _binding
 
 
-def _create_transport(role: int, *, session_seed: Optional[int] = None):
+def _create_transport(role: int, *, session_seed: int | None = None):
     ffi = _binding.ffi
     lib = _binding.lib
     config = ffi.new("HIL_Transport_Config_T *")

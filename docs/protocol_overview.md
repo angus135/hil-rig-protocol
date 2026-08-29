@@ -12,10 +12,19 @@ exact wire layouts, and validation behaviour remain unimplemented. Current
 functions returning `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` are not
 operational, and no Python bindings or Python codec exist.
 
-The MVP Transport capabilities described above are implemented. Integration and
-consumer readiness is partial: core unit/integration coverage and several
-complex recovery cases exist, but the complete public two-endpoint
-fault-injection matrix, language-neutral golden vectors, a concrete runnable
-consumer example, and consumer-style `add_subdirectory` validation are not yet
-complete. Overall IDC readiness depends on the Application codec and endpoint
-integration as well as the implemented Transport layer.
+The MVP Transport path has broad deterministic verification at the public
+boundary. The repository includes C unit/integration suites, a Python wrapper
+suite using the same native implementation, two-endpoint fault/recovery and
+capacity scenarios, language-neutral golden-vector coverage, a runnable
+caller-owned Python servicing example, direct-source version compilation, and a
+parent-project `add_subdirectory()` consumer smoke build. Transport delivery
+confirmation means only that the peer Transport accepted the complete opaque
+message; it does not mean that the peer Application layer decoded, validated,
+or acted on it.
+
+Remaining verification work is mainly outside the deterministic in-process host
+matrix: real hardware/physical-driver testing, cross-process C/Python
+interoperability, broader installed C-consumer packaging validation, embedded
+target-toolchain builds, randomized/fuzz testing, and long-running soak tests.
+Overall IDC readiness also depends on the unfinished Application codec and
+endpoint integration.

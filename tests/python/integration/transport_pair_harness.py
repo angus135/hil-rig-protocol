@@ -275,7 +275,6 @@ class TransportTestLink:
             committed=True,
         )
 
-
     def take_next_accepted(
         self, direction: TransportTestDirection
     ) -> TransportTestOutputItem | None:
@@ -284,9 +283,7 @@ class TransportTestLink:
         state = self._states[direction]
         return state.accepted.popleft() if state.accepted else None
 
-    def take_accepted(
-        self, handle: TransportTestOutputHandle
-    ) -> TransportTestOutputItem | None:
+    def take_accepted(self, handle: TransportTestOutputHandle) -> TransportTestOutputItem | None:
         """Remove one exact committed item by stable link identity."""
 
         state = self._states[handle.direction]
@@ -314,9 +311,7 @@ class TransportTestLink:
         state = self._states[handle.direction]
         for index, item in enumerate(state.accepted):
             if item.handle == handle:
-                duplicate_handle = TransportTestOutputHandle(
-                    handle.direction, self._next_ordinal
-                )
+                duplicate_handle = TransportTestOutputHandle(handle.direction, self._next_ordinal)
                 self._next_ordinal += 1
                 duplicate = TransportTestOutputItem(duplicate_handle, item.data)
                 state.accepted.insert(index + 1, duplicate)
@@ -398,13 +393,9 @@ class TransportTestLink:
         state = self._states[direction]
         if not state.accepted:
             return False
-        return self.corrupt_accepted_byte(
-            state.accepted[0].handle, byte_offset, xor_mask
-        )
+        return self.corrupt_accepted_byte(state.accepted[0].handle, byte_offset, xor_mask)
 
-    def queue_next_accepted_for_delivery(
-        self, direction: TransportTestDirection
-    ) -> bool:
+    def queue_next_accepted_for_delivery(self, direction: TransportTestDirection) -> bool:
         """Move the oldest committed item into the direction byte stream."""
 
         state = self._states[direction]
@@ -412,9 +403,7 @@ class TransportTestLink:
             return False
         return self.queue_accepted_for_delivery(state.accepted[0].handle)
 
-    def queue_all_accepted_for_delivery(
-        self, direction: TransportTestDirection
-    ) -> int:
+    def queue_all_accepted_for_delivery(self, direction: TransportTestDirection) -> int:
         """Join every committed item in a direction into one ready byte stream."""
 
         count = 0
@@ -429,9 +418,7 @@ class TransportTestLink:
 
         self._states[direction].ready_bytes.extend(bytes(data))
 
-    def accepted_item(
-        self, handle: TransportTestOutputHandle
-    ) -> TransportTestOutputItem | None:
+    def accepted_item(self, handle: TransportTestOutputHandle) -> TransportTestOutputItem | None:
         """Return one committed item without changing ownership or queue order."""
 
         for item in self._states[handle.direction].accepted:
@@ -599,14 +586,10 @@ class TransportPairHarness:
         rig_status = self.rig.notify_link_state(LinkState.CONNECTED, self.rig_now_ms)
         return host_status, rig_status
 
-    def process_host(
-        self, operating_mode: OperatingMode = OperatingMode.NORMAL
-    ) -> TransportStatus:
+    def process_host(self, operating_mode: OperatingMode = OperatingMode.NORMAL) -> TransportStatus:
         return self.host.process(self.host_now_ms, operating_mode)
 
-    def process_rig(
-        self, operating_mode: OperatingMode = OperatingMode.NORMAL
-    ) -> TransportStatus:
+    def process_rig(self, operating_mode: OperatingMode = OperatingMode.NORMAL) -> TransportStatus:
         return self.rig.process(self.rig_now_ms, operating_mode)
 
     def process_both(
@@ -638,17 +621,13 @@ class TransportPairHarness:
         _, receiver, _ = self._endpoints_for_direction(direction)
         return self.link.deliver_ready(receiver, max_bytes=max_bytes)
 
-    def deliver_zero(
-        self, direction: TransportTestDirection
-    ) -> TransportLinkDeliveryResult:
+    def deliver_zero(self, direction: TransportTestDirection) -> TransportLinkDeliveryResult:
         """Invoke zero-byte receive at the direction's receiver."""
 
         _, receiver, _ = self._endpoints_for_direction(direction)
         return self.link.deliver_zero(receiver)
 
-    def transfer_one_output(
-        self, direction: TransportTestDirection
-    ) -> TransportPairTransferResult:
+    def transfer_one_output(self, direction: TransportTestDirection) -> TransportPairTransferResult:
         """Accept, commit, queue, and immediately deliver one exact output item."""
 
         accept = self.accept_output(direction)

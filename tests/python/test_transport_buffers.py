@@ -4,11 +4,16 @@ from __future__ import annotations
 
 from array import array
 
-import pytest
-
-from hil_rig_protocol import ReceiveResult, Role, Transport, TransportConfig, TransportStatus
-from hil_rig_protocol import _binding
 import hil_rig_protocol.transport as transport_module
+import pytest
+from hil_rig_protocol import (
+    ReceiveResult,
+    Role,
+    Transport,
+    TransportConfig,
+    TransportStatus,
+    _binding,
+)
 
 
 @pytest.fixture
@@ -60,9 +65,7 @@ def test_receive_accepts_common_contiguous_buffers(
 ) -> None:
     seen: list[bytes] = []
 
-    def fake_receive(
-        handle: object, pointer: object, size: int, consumed: object
-    ) -> int:
+    def fake_receive(handle: object, pointer: object, size: int, consumed: object) -> int:
         assert handle is not None
         seen.append(bytes(_binding.ffi.buffer(pointer, size)))
         consumed[0] = size  # type: ignore[index]
@@ -84,9 +87,7 @@ def test_multibyte_view_uses_nbytes_not_len(
     assert view.nbytes > len(view)
     seen_sizes: list[int] = []
 
-    def fake_receive(
-        handle: object, pointer: object, size: int, consumed: object
-    ) -> int:
+    def fake_receive(handle: object, pointer: object, size: int, consumed: object) -> int:
         seen_sizes.append(size)
         consumed[0] = size  # type: ignore[index]
         return int(TransportStatus.OK)
@@ -99,9 +100,7 @@ def test_multibyte_view_uses_nbytes_not_len(
 
 
 @pytest.mark.parametrize("method_name", ["submit_application_data", "receive_bytes"])
-def test_non_contiguous_buffers_are_rejected(
-    transport: Transport, method_name: str
-) -> None:
+def test_non_contiguous_buffers_are_rejected(transport: Transport, method_name: str) -> None:
     view = memoryview(bytearray(b"abcdef"))[::2]
     try:
         with pytest.raises(BufferError, match="C-contiguous"):
@@ -135,9 +134,7 @@ def test_receive_releases_bytearray_export_immediately(
 ) -> None:
     data = bytearray(b"abc")
 
-    def fake_receive(
-        handle: object, pointer: object, size: int, consumed: object
-    ) -> int:
+    def fake_receive(handle: object, pointer: object, size: int, consumed: object) -> int:
         consumed[0] = size  # type: ignore[index]
         return int(TransportStatus.OK)
 
@@ -183,9 +180,7 @@ def test_zero_byte_receive_calls_native_with_null_pointer(
 ) -> None:
     calls = 0
 
-    def fake_receive(
-        handle: object, pointer: object, size: int, consumed: object
-    ) -> int:
+    def fake_receive(handle: object, pointer: object, size: int, consumed: object) -> int:
         nonlocal calls
         calls += 1
         assert pointer == _binding.ffi.NULL

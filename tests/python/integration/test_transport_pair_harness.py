@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import pytest
 
+import pytest
 from hil_rig_protocol import ReceiveResult, Role, TransportStatus
 
 from . import transport_pair_harness as harness_module
@@ -74,11 +74,7 @@ def _make_fake_pump_pair(
 
     def transfer(direction: TransportTestDirection) -> TransportPairTransferResult:
         calls.append(direction)
-        endpoint = (
-            pair.host
-            if direction is TransportTestDirection.HOST_TO_RIG
-            else pair.rig
-        )
+        endpoint = pair.host if direction is TransportTestDirection.HOST_TO_RIG else pair.rig
         endpoint.output_pending = False  # type: ignore[attr-defined]
         return TransportPairTransferResult(
             accept=TransportLinkAcceptResult(

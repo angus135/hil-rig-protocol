@@ -1,0 +1,48 @@
+name: python-quality
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+  pull_request:
+
+jobs:
+  quality:
+    name: ruff-and-mypy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install quality dependencies and package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install '.[test,dev]'
+
+      - name: Validate version configuration
+        run: python scripts/check_version.py
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Ruff formatting
+        run: ruff format --check .
+
+      - name: Mypy
+        run: |
+          mypy python/hil_rig_protocol \
+            bindings/python/build_ffi.py bindings/python/cdef.py \
+            scripts/check_version.py scripts/verify_distribution.py \
+            scripts/run_installed_tests.py \
+            examples/python/transport_servicing.py
+
+      - name: Validator tests
+        run: python -m pytest tests/packaging tests/examples

@@ -25,7 +25,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build binutils
-          python -m pip install --upgrade pip build cffi pytest scikit-build-core
+          python -m pip install --upgrade pip build cffi pytest scikit-build-core twine
+
+      - name: Validate package version
+        run: python scripts/check_version.py
 
       - name: Configure direct Python-enabled CMake build
         run: |
@@ -49,6 +52,7 @@ jobs:
       - name: Run adapter test
         run: |
           ctest --test-dir build-python --output-on-failure -L python-adapter
+          python scripts/check_version.py
 
       - name: Build sdist and wheel
         run: |
@@ -62,46 +66,11 @@ jobs:
           python -m pip wheel --no-deps --wheel-dir dist-from-sdist dist/*.tar.gz
           test "$(find dist-from-sdist -maxdepth 1 -name '*.whl' | wc -l)" -eq 1
 
-      - name: Inspect wheel contents
+      - name: Validate distribution metadata and contents
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          from zipfile import ZipFile
-
-          wheel = next(Path("dist").glob("*.whl"))
-          with ZipFile(wheel) as archive:
-              names = archive.namelist()
-
-          required = {
-              "hil_rig_protocol/__init__.py",
-              "hil_rig_protocol/_binding.py",
-              "hil_rig_protocol/errors.py",
-              "hil_rig_protocol/transport_types.py",
-              "hil_rig_protocol/transport.py",
-              "hil_rig_protocol/py.typed",
-          }
-          missing = required.difference(names)
-          assert not missing, missing
-          native = [
-              name for name in names
-              if name.startswith("hil_rig_protocol/_native") and name.endswith(".so")
-          ]
-          assert len(native) == 1, native
-          prohibited = [
-              name for name in names
-              if name.endswith("hil_rig_protocol_native.c")
-              or "hil_rig_protocol_python_adapter_tests" in name
-              or "libhil_rig_protocol" in name
-              or "CMakeFiles" in name
-              or "CMakeCache.txt" in name
-              or "__pycache__" in name
-              or name.endswith(".pyc")
-              or name.startswith("tests/")
-          ]
-          assert not prohibited, prohibited
-          assert any(name.endswith(".dist-info/METADATA") for name in names)
-          print("\n".join(names))
-          PY
+          python scripts/verify_distribution.py sdist dist/*.tar.gz
+          python scripts/verify_distribution.py wheel dist/*.whl dist-from-sdist/*.whl
+          python -m twine check dist/* dist-from-sdist/*
 
       - name: Test normal source installation in isolation
         run: |

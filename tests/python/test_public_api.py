@@ -12,7 +12,6 @@ from hil_rig_protocol import (
     TransportError,
 )
 
-
 EXPECTED_EXPORTS = {
     "ProtocolError",
     "TransportError",

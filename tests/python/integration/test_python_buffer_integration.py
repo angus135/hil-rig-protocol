@@ -5,7 +5,6 @@ from __future__ import annotations
 from array import array
 
 import pytest
-
 from hil_rig_protocol import EventType, TransportStatus
 
 from .parity_helpers import H2R, R2H, deliver_item, establish, make_pair, take_output

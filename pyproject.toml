@@ -7,29 +7,140 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "hil-rig-protocol"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Shared C11 protocol boundary for HIL-RIG firmware and host-side Python software."
 requires-python = ">=3.12"
 readme = "README.md"
+license = "MIT"
+license-files = [
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "src/transport/internal/third_party/cobs/LICENSE.txt",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: C",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
 dependencies = [
     "cffi>=1.17.1",
 ]
+
+[project.urls]
+Repository = "https://github.com/angus135/hil-rig-protocol"
+Issues = "https://github.com/angus135/hil-rig-protocol/issues"
 
 [project.optional-dependencies]
 test = [
     "pytest>=8",
 ]
+dev = [
+    "build>=1.2",
+    "cibuildwheel>=3.2,<4",
+    "mypy>=1.17",
+    "pytest>=8",
+    "ruff>=0.12",
+    "twine>=6",
+]
+
+[[tool.dynamic-metadata]]
+provider = "scikit_build_core.metadata.regex"
+field = "version"
+input = "VERSION"
+regex = '''\A(?P<value>(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))\r?\n?\Z'''
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 cmake.version = ">=3.17"
 wheel.packages = ["python/hil_rig_protocol"]
+sdist.include = [
+    "VERSION",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "CMakeLists.txt",
+    "README.md",
+    "pyproject.toml",
+    "bindings/python/*.c",
+    "bindings/python/*.h",
+    "bindings/python/*.py",
+    "bindings/python/CMakeLists.txt",
+    "bindings/python/README.md",
+    "docs/python/transport.md",
+    "examples/CMakeLists.txt",
+    "examples/README.md",
+    "examples/python/*.py",
+    "include",
+    "python/hil_rig_protocol/*.py",
+    "python/hil_rig_protocol/py.typed",
+    "scripts/*.py",
+    "src",
+]
+sdist.exclude = [
+    ".idea",
+    ".pytest_cache",
+    ".venv",
+    "**/__pycache__",
+    "**/__pycache__/**",
+    "**/*.pyc",
+    "build*",
+    "cmake-build*",
+    "dist",
+]
 
 [tool.scikit-build.cmake.define]
 HIL_RIG_PROTOCOL_BUILD_PYTHON = true
 HIL_RIG_PROTOCOL_BUILD_TESTS = false
+HIL_RIG_PROTOCOL_BUILD_EXAMPLES = false
 HIL_RIG_PROTOCOL_TRANSPORT_PROFILE = "MVP"
 BUILD_SHARED_LIBS = false
 
+[tool.cibuildwheel]
+build = "cp3{12,13,14}-*"
+skip = ["*-musllinux_*", "pp*", "gp*", "cp314t-*"]
+build-verbosity = 1
+test-requires = ["pytest>=8"]
+test-sources = ["VERSION", "examples", "scripts", "tests"]
+test-command = "python {project}/scripts/run_installed_tests.py --project-root {project}"
+
+[tool.cibuildwheel.linux]
+archs = ["x86_64"]
+manylinux-x86_64-image = "manylinux_2_28"
+
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]
+
 [tool.pytest.ini_options]
-testpaths = ["tests/python"]
+testpaths = ["tests/python", "tests/examples", "tests/packaging"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["build*", "cmake-build*", "dist", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF022", "RUF023", "UP047"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["B017", "E731", "SIM117"]
+
+[tool.mypy]
+python_version = "3.12"
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["cffi", "hil_rig_protocol._native"]
+ignore_missing_imports = true

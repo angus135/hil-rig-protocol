@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from hil_rig_protocol import EventType, Failure, SessionState, TransportStatus
 
 from .parity_helpers import (

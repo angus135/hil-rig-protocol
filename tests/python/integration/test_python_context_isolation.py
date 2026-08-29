@@ -7,26 +7,37 @@ import weakref
 
 from hil_rig_protocol import EventType, SessionState, TransportStatus
 
-from .parity_helpers import H2R, R2H, complete_application, deliver_item, establish, make_pair, take_output
+from .parity_helpers import (
+    H2R,
+    R2H,
+    complete_application,
+    deliver_item,
+    establish,
+    make_pair,
+    take_output,
+)
 
 
 def test_two_python_transport_pairs_remain_isolated_when_interleaved() -> None:
     payload_a = b"pair-A-only"
     payload_b = b"pair-B-only"
 
-    with make_pair(
-        host_seed=0x1111222233334444,
-        host_sequence=101,
-        rig_sequence=501,
-        host_now_ms=1000,
-        rig_now_ms=2000,
-    ) as pair_a, make_pair(
-        host_seed=0xAAAABBBBCCCCDDDD,
-        host_sequence=202,
-        rig_sequence=602,
-        host_now_ms=3000,
-        rig_now_ms=4000,
-    ) as pair_b:
+    with (
+        make_pair(
+            host_seed=0x1111222233334444,
+            host_sequence=101,
+            rig_sequence=501,
+            host_now_ms=1000,
+            rig_now_ms=2000,
+        ) as pair_a,
+        make_pair(
+            host_seed=0xAAAABBBBCCCCDDDD,
+            host_sequence=202,
+            rig_sequence=602,
+            host_now_ms=3000,
+            rig_now_ms=4000,
+        ) as pair_b,
+    ):
         establish(pair_a)
         establish(pair_b)
 

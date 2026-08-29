@@ -1,0 +1,276 @@
+name: python-distributions
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+    tags:
+      - 'v*'
+  pull_request:
+
+jobs:
+  version:
+    name: version-and-release-tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            python scripts/check_version.py --tag "${GITHUB_REF_NAME}"
+          else
+            python scripts/check_version.py
+          fi
+
+  linux-wheels:
+    name: linux-manylinux_2_28-x86_64-wheels
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install wheel tools
+        run: python -m pip install --upgrade pip 'cibuildwheel>=3.2,<4' auditwheel twine
+
+      - name: Build and test supported wheels
+        run: python -m cibuildwheel --platform linux --output-dir wheelhouse
+
+      - name: Validate wheel count, contents, and metadata
+        run: |
+          test "$(find wheelhouse -maxdepth 1 -name '*.whl' | wc -l)" -eq 3
+          for wheel in wheelhouse/*.whl; do
+            case "$wheel" in
+              *manylinux_2_28_x86_64.whl) ;;
+              *) echo "Wheel lacks manylinux_2_28 x86-64 tag: $wheel"; exit 1 ;;
+            esac
+          done
+          python scripts/verify_distribution.py wheel wheelhouse/*.whl
+          python -m twine check wheelhouse/*.whl
+
+      - name: Inspect repaired platform tags and native dependencies
+        run: |
+          for wheel in wheelhouse/*.whl; do
+            auditwheel show "$wheel"
+            unzip -q "$wheel" -d wheel-inspect
+            native=$(find wheel-inspect/hil_rig_protocol -maxdepth 1 -name '_native*.so')
+            ldd "$native"
+            if ldd "$native" | grep -Eqi 'hil_rig_protocol|asan|ubsan|gcov'; then
+              echo "Unexpected protocol or instrumentation dependency in $wheel"
+              exit 1
+            fi
+            rm -rf wheel-inspect
+          done
+
+      - name: Upload Linux wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: hil-rig-protocol-linux-manylinux_2_28-x86_64-cp312-cp314
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  windows-wheels:
+    name: windows-amd64-wheels
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Enable MSVC command-line tools
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install wheel tools
+        run: python -m pip install --upgrade pip "cibuildwheel>=3.2,<4" twine
+
+      - name: Build and test supported wheels
+        run: python -m cibuildwheel --platform windows --output-dir wheelhouse
+
+      - name: Validate wheel count, contents, and metadata
+        shell: pwsh
+        run: |
+          $wheels = @(Get-ChildItem -LiteralPath wheelhouse -Filter *.whl)
+          if ($wheels.Count -ne 3) { throw "Expected 3 Windows wheels, found $($wheels.Count)" }
+          $wheelPaths = @($wheels.FullName)
+          python scripts/verify_distribution.py wheel $wheelPaths
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m twine check $wheelPaths
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Inspect native DLL dependencies
+        shell: pwsh
+        run: |
+          $inspectRoot = Join-Path $env:RUNNER_TEMP 'hil-rig-wheel-inspect'
+          foreach ($wheel in Get-ChildItem -LiteralPath wheelhouse -Filter *.whl) {
+            $destination = Join-Path $inspectRoot $wheel.BaseName
+            New-Item -ItemType Directory -Force -Path $destination | Out-Null
+            python -m zipfile -e $wheel.FullName $destination
+            $native = @(Get-ChildItem -LiteralPath (Join-Path $destination 'hil_rig_protocol') -Filter '_native*.pyd')
+            if ($native.Count -ne 1) { throw "Expected one _native.pyd in $($wheel.Name)" }
+            $dependencies = & dumpbin /dependents $native[0].FullName | Out-String
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $dependencies
+            if ($dependencies -match '(?i)hil_rig_protocol.*\.dll|asan|ubsan|gcov') {
+              throw "Unexpected protocol or instrumentation DLL dependency in $($wheel.Name)"
+            }
+          }
+
+      - name: Upload Windows wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: hil-rig-protocol-windows-amd64-cp312-cp314
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  sdist:
+    name: sdist-clean-rebuild
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build and test tools
+        run: python -m pip install --upgrade pip build twine pytest
+
+      - name: Build and validate one sdist
+        run: |
+          python -m build --sdist
+          test "$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq 1
+          python scripts/verify_distribution.py sdist dist/*.tar.gz
+          python -m twine check dist/*.tar.gz
+
+      - name: Rebuild outside checkout without Git metadata
+        run: |
+          mkdir -p /tmp/hil-rig-sdist-source /tmp/hil-rig-sdist-wheel
+          tar -xzf dist/*.tar.gz -C /tmp/hil-rig-sdist-source
+          source_root=$(find /tmp/hil-rig-sdist-source -mindepth 1 -maxdepth 1 -type d)
+          python -m build --wheel --outdir /tmp/hil-rig-sdist-wheel "$source_root"
+          test "$(find /tmp/hil-rig-sdist-wheel -maxdepth 1 -name '*.whl' | wc -l)" -eq 1
+          python scripts/verify_distribution.py wheel /tmp/hil-rig-sdist-wheel/*.whl
+          python -m twine check /tmp/hil-rig-sdist-wheel/*.whl
+
+      - name: Install rebuilt wheel and run downstream tests outside checkout
+        run: |
+          python -m venv /tmp/hil-rig-sdist-venv
+          /tmp/hil-rig-sdist-venv/bin/python -m pip install --upgrade pip pytest
+          /tmp/hil-rig-sdist-venv/bin/python -m pip install /tmp/hil-rig-sdist-wheel/*.whl
+          cd /tmp
+          /tmp/hil-rig-sdist-venv/bin/python \
+            "$GITHUB_WORKSPACE/scripts/run_installed_tests.py" \
+            --project-root "$GITHUB_WORKSPACE"
+
+      - name: Upload source distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: hil-rig-protocol-source-sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  windows-native-msvc:
+    name: windows-msvc-direct-native
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Enable MSVC command-line tools
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install native test dependencies
+        run: python -m pip install --upgrade pip cffi pytest
+
+      - name: Configure direct native build
+        shell: pwsh
+        run: |
+          cmake -S . -B build-msvc -A x64 `
+            -DPython_EXECUTABLE="$((Get-Command python).Source)" `
+            -DHIL_RIG_PROTOCOL_BUILD_PYTHON=ON `
+            -DHIL_RIG_PROTOCOL_BUILD_TESTS=ON `
+            -DHIL_RIG_PROTOCOL_BUILD_EXAMPLES=OFF `
+            -DHIL_RIG_PROTOCOL_TRANSPORT_PROFILE=MVP `
+            -DHIL_RIG_PROTOCOL_ENABLE_WARNINGS=ON `
+            -DHIL_RIG_PROTOCOL_WARNINGS_AS_ERRORS=ON `
+            -DBUILD_SHARED_LIBS=OFF
+
+      - name: Build extension and native C tests
+        run: >-
+          cmake --build build-msvc --config Release
+          --target hil_rig_protocol_python_native hil_rig_protocol_python_adapter_tests
+          hil_rig_protocol_unit_tests hil_rig_protocol_integration_tests
+          hil_rig_protocol_c_api_compile_test --verbose
+
+      - name: Run adapter and native C tests
+        shell: pwsh
+        run: |
+          ctest --test-dir build-msvc -C Release --output-on-failure -L python-adapter
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ctest --test-dir build-msvc -C Release --output-on-failure -L unit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ctest --test-dir build-msvc -C Release --output-on-failure -L integration
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ctest --test-dir build-msvc -C Release --output-on-failure -L c-api
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Validate VERSION and checked-in public header
+        run: python scripts/check_version.py
+
+      - name: Test direct MSVC extension in isolated package layout
+        shell: pwsh
+        run: |
+          $layout = Join-Path $env:RUNNER_TEMP 'hil-rig-direct-msvc'
+          New-Item -ItemType Directory -Force -Path $layout | Out-Null
+          Copy-Item -Recurse -LiteralPath python/hil_rig_protocol -Destination $layout
+          $native = @(Get-ChildItem -Path build-msvc/bindings/python/Release -Filter '_native*.pyd')
+          if ($native.Count -ne 1) { throw "Expected exactly one direct _native.pyd" }
+          Copy-Item -LiteralPath $native[0].FullName -Destination (Join-Path $layout 'hil_rig_protocol')
+          Push-Location $layout
+          try {
+            python -c "import hil_rig_protocol._native as n; print(n.__file__)"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            python -m pytest "$env:GITHUB_WORKSPACE/tests/python"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Pop-Location
+          }
+          $dependencies = & dumpbin /dependents $native[0].FullName | Out-String
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $dependencies
+          if ($dependencies -match '(?i)hil_rig_protocol.*\.dll|asan|ubsan|gcov') {
+            throw 'Direct extension has an external protocol or instrumentation dependency'
+          }

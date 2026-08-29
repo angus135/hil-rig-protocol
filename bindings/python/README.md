@@ -48,13 +48,19 @@ Every live `Transport` operation must run on the creating thread. The caller own
 
 `read_event()` consumes one event at a time. Event draining is caller service work because unread events occupy bounded native capacity. `read_application_data()` returns one complete opaque Application byte string and consumes it only after the full native copy succeeds. Reliable Transport delivery and `DELIVERY_CONFIRMED` report byte delivery, not semantic Application acceptance; Application responses remain separate opaque messages.
 
-A production servicing loop, physical serial/USB integration, recovery policy, and comprehensive two-endpoint testing remain later work.
+The complete caller contract, verified wheel matrix, and installation guidance
+are in the [public Python Transport guide](../../docs/python/transport.md). A
+tested [caller-owned servicing example](../../examples/python/transport_servicing.py)
+demonstrates receive suffix ownership and partial external writes. Production
+serial/USB integration and higher-level recovery policy remain outside this
+package.
 
 ## Prerequisites
 
 A Python package build requires:
 
-- Python 3.12 or newer. Python 3.12 is the currently verified CI baseline.
+- Python 3.12 or newer. Binary wheels are verified for CPython 3.12, 3.13, and
+  3.14 on `manylinux_2_28` x86-64 and Windows AMD64.
 - Python development/module headers for the active interpreter.
 - CMake 3.17 or newer for the Python-enabled build path.
 - A C11 compiler.

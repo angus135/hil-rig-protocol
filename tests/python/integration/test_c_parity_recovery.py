@@ -236,7 +236,7 @@ def test_recovery_reset_commit_then_receive_initiate_does_not_require_process_fi
 def test_delayed_old_application_before_replacement_initiate_does_not_abort_handshake() -> None:
     with make_pair(host_seed=0xE223, host_sequence=10, rig_sequence=500) as pair:
         establish(pair)
-        assert pair.host.submit_application_data(b"!\"#") is TransportStatus.OK
+        assert pair.host.submit_application_data(b'!"#') is TransportStatus.OK
         old_application = take_output(pair, H2R, now_ms=20).data
         assert pair.rig.reset() is TransportStatus.OK
         reset = take_output(pair, R2H, now_ms=21)

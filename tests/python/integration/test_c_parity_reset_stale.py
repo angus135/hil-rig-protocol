@@ -10,7 +10,6 @@ from .parity_helpers import (
     complete_application,
     deliver_bytes,
     establish,
-    initialize_connected,
     make_pair,
     take_output,
 )
@@ -116,9 +115,10 @@ def test_dropped_best_effort_reset_recovers_through_physical_reconnect() -> None
 
 
 def test_unrelated_established_session_identity_forces_recovery_without_exposure() -> None:
-    with make_pair(host_seed=0xE1000001, host_sequence=100, rig_sequence=100) as target, make_pair(
-        host_seed=0xE2000002, host_sequence=100, rig_sequence=100
-    ) as foreign:
+    with (
+        make_pair(host_seed=0xE1000001, host_sequence=100, rig_sequence=100) as target,
+        make_pair(host_seed=0xE2000002, host_sequence=100, rig_sequence=100) as foreign,
+    ):
         establish(target)
         establish(foreign)
         assert foreign.host.submit_application_data(b"foreign") is TransportStatus.OK
