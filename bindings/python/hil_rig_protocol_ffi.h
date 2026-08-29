@@ -86,10 +86,9 @@ void HIL_PY_TRANSPORT_Default_Config( HIL_Transport_Config_T* config );
  * @param[out] out_transport_status Receives OK, or the exact failing core status.
  * @return Adapter-specific creation result.
  */
-HIL_Python_Adapter_Status_T HIL_PY_TRANSPORT_Create( HIL_Transport_Role_T          role,
-                                                     const HIL_Transport_Config_T* config,
-                                                     HIL_Python_Transport_T**      out_transport,
-                                                     HIL_Transport_Status_T* out_transport_status );
+HIL_Python_Adapter_Status_T HIL_PY_TRANSPORT_Create(
+    HIL_Transport_Role_T role, const HIL_Transport_Config_T* config,
+    HIL_Python_Transport_T** out_transport, HIL_Transport_Status_T* out_transport_status );
 
 /**
  * @brief Release one adapter and its owned Transport workspace.
@@ -106,14 +105,14 @@ void HIL_PY_TRANSPORT_Destroy( HIL_Python_Transport_T* transport );
 HIL_Transport_Status_T HIL_PY_TRANSPORT_Reset( HIL_Python_Transport_T* transport );
 
 /** Forward HIL_TRANSPORT_Notify_Link_State() for the owned context. */
-HIL_Transport_Status_T HIL_PY_TRANSPORT_Notify_Link_State( HIL_Python_Transport_T*    transport,
+HIL_Transport_Status_T HIL_PY_TRANSPORT_Notify_Link_State( HIL_Python_Transport_T* transport,
                                                            HIL_Transport_Link_State_T link_state,
-                                                           uint32_t                   now_ms );
+                                                           uint32_t now_ms );
 
 /** Forward HIL_TRANSPORT_Submit_Application_Data() for the owned context. */
-HIL_Transport_Status_T HIL_PY_TRANSPORT_Submit_Application_Data( HIL_Python_Transport_T* transport,
-                                                                 const uint8_t*          payload,
-                                                                 size_t payload_size );
+HIL_Transport_Status_T
+HIL_PY_TRANSPORT_Submit_Application_Data( HIL_Python_Transport_T* transport, const uint8_t* payload,
+                                          size_t payload_size );
 
 /** Forward HIL_TRANSPORT_Receive_Bytes() for the owned context. */
 HIL_Transport_Status_T HIL_PY_TRANSPORT_Receive_Bytes( HIL_Python_Transport_T* transport,
@@ -121,7 +120,8 @@ HIL_Transport_Status_T HIL_PY_TRANSPORT_Receive_Bytes( HIL_Python_Transport_T* t
                                                        size_t* bytes_consumed );
 
 /** Forward HIL_TRANSPORT_Process() for the owned context. */
-HIL_Transport_Status_T HIL_PY_TRANSPORT_Process( HIL_Python_Transport_T* transport, uint32_t now_ms,
+HIL_Transport_Status_T HIL_PY_TRANSPORT_Process( HIL_Python_Transport_T* transport,
+                                                 uint32_t now_ms,
                                                  HIL_Transport_Operating_Mode_T operating_mode );
 
 /** Forward HIL_TRANSPORT_Peek_Output() for the owned context. */
@@ -131,21 +131,20 @@ HIL_Transport_Status_T HIL_PY_TRANSPORT_Peek_Output( HIL_Python_Transport_T* tra
 
 /** Forward HIL_TRANSPORT_Commit_Output() for the owned context. */
 HIL_Transport_Status_T HIL_PY_TRANSPORT_Commit_Output( HIL_Python_Transport_T* transport,
-                                                       uint32_t                now_ms );
+                                                       uint32_t now_ms );
 
 /** Forward HIL_TRANSPORT_Read_Application_Data() for the owned context. */
-HIL_Transport_Status_T HIL_PY_TRANSPORT_Read_Application_Data( HIL_Python_Transport_T* transport,
-                                                               uint8_t*                output,
-                                                               size_t  output_capacity,
-                                                               size_t* output_size );
+HIL_Transport_Status_T HIL_PY_TRANSPORT_Read_Application_Data(
+    HIL_Python_Transport_T* transport, uint8_t* output, size_t output_capacity,
+    size_t* output_size );
 
 /** Forward HIL_TRANSPORT_Read_Event() for the owned context. */
 HIL_Transport_Status_T HIL_PY_TRANSPORT_Read_Event( HIL_Python_Transport_T* transport,
-                                                    HIL_Transport_Event_T*  event );
+                                                    HIL_Transport_Event_T* event );
 
 /** Forward HIL_TRANSPORT_Get_Status() for the owned context. */
-HIL_Transport_Status_T HIL_PY_TRANSPORT_Get_Status( const HIL_Python_Transport_T*    transport,
-                                                    HIL_Transport_Status_Snapshot_T* status );
+HIL_Transport_Status_T HIL_PY_TRANSPORT_Get_Status(
+    const HIL_Python_Transport_T* transport, HIL_Transport_Status_Snapshot_T* status );
 
 #ifdef __cplusplus
 }

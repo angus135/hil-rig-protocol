@@ -6,3 +6,10 @@ build/
 
 build*/
 cmake-build*/
+
+# Python package/build outputs
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+dist/
