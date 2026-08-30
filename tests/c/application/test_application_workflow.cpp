@@ -694,16 +694,17 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
             return peripheral;
         }(),
 
-        [] {
-            HIL_Application_Peripheral_Config_T peripheral{};
-            peripheral.type = HIL_APPLICATION_PERIPHERAL_CONFIG_COMMUNICATION;
-            peripheral.value.communication.channel.peripheral  = HIL_APPLICATION_PERIPHERAL_UART;
-            peripheral.value.communication.channel.channel     = 0u;
-            peripheral.value.communication.bit_rate            = 115200u;
-            peripheral.value.communication.flags               = 0u;
-            peripheral.value.communication.capture_limit_bytes = variable_bytes.size();
-            return peripheral;
-        }() };
+        // [] {
+        //     HIL_Application_Peripheral_Config_T peripheral{};
+        //     peripheral.type = HIL_APPLICATION_PERIPHERAL_CONFIG_COMMUNICATION;
+        //     peripheral.value.communication.channel.peripheral  = HIL_APPLICATION_PERIPHERAL_UART;
+        //     peripheral.value.communication.channel.channel     = 0u;
+        //     peripheral.value.communication.bit_rate            = 115200u;
+        //     peripheral.value.communication.flags               = 0u;
+        //     peripheral.value.communication.capture_limit_bytes = variable_bytes.size();
+        //     return peripheral;
+        // }() 
+        };
     static const std::array<HIL_Application_Data_Declaration_T, 1u> instruction_data{
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },

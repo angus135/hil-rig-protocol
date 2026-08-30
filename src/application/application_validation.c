@@ -51,29 +51,29 @@ HIL_APPLICATION_peripheral_config_validate( const HIL_Application_Peripheral_Con
             }
             break;
         /** UART/SPI/I2C/CAN communication and capture configuration. */
-        case HIL_APPLICATION_PERIPHERAL_CONFIG_COMMUNICATION:
-            if ( peripheral->value.communication.channel.peripheral
-                     != HIL_APPLICATION_PERIPHERAL_UART
-                 && peripheral->value.communication.channel.peripheral
-                        != HIL_APPLICATION_PERIPHERAL_CAN
-                 && peripheral->value.communication.channel.peripheral
-                        != HIL_APPLICATION_PERIPHERAL_SPI
-                 && peripheral->value.communication.channel.peripheral
-                        != HIL_APPLICATION_PERIPHERAL_I2C )
-            {
-                return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-            }
-            if ( peripheral->value.communication.channel.channel
-                 > HIL_APPLICATION_UART_CHANNEL_COUNT )
-            {
-                return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-            }
-            if ( peripheral->value.communication.capture_limit_bytes
-                 > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE )
-            {
-                return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-            }
-            break;
+        // case HIL_APPLICATION_PERIPHERAL_CONFIG_COMMUNICATION:
+        //     if ( peripheral->value.communication.channel.peripheral
+        //              != HIL_APPLICATION_PERIPHERAL_UART
+        //          && peripheral->value.communication.channel.peripheral
+        //                 != HIL_APPLICATION_PERIPHERAL_CAN
+        //          && peripheral->value.communication.channel.peripheral
+        //                 != HIL_APPLICATION_PERIPHERAL_SPI
+        //          && peripheral->value.communication.channel.peripheral
+        //                 != HIL_APPLICATION_PERIPHERAL_I2C )
+        //     {
+        //         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        //     }
+        //     if ( peripheral->value.communication.channel.channel
+        //          > HIL_APPLICATION_UART_CHANNEL_COUNT )
+        //     {
+        //         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        //     }
+        //     if ( peripheral->value.communication.capture_limit_bytes
+        //          > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE )
+        //     {
+        //         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        //     }
+        //     break;
         /** Reserved sentinel. */
         case HIL_APPLICATION_PERIPHERAL_CONFIG_RESERVED:
             return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;

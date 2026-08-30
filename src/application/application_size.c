@@ -100,12 +100,12 @@ HIL_APPLICATION_Peripheral_Config_size( const HIL_Application_Peripheral_Config_
             size_local += sizeof( data->value.pwm.initial_duty_cycle_permyriad );
             size_local += sizeof( data->value.pwm.voltage_level );
             break;
-        case HIL_APPLICATION_PERIPHERAL_CONFIG_COMMUNICATION:
-            size_local += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-            size_local += sizeof( data->value.communication.bit_rate );
-            size_local += sizeof( data->value.communication.flags );
-            size_local += sizeof( data->value.communication.capture_limit_bytes );
-            break;
+        // case HIL_APPLICATION_PERIPHERAL_CONFIG_COMMUNICATION:
+        //     size_local += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
+        //     size_local += sizeof( data->value.communication.bit_rate );
+        //     size_local += sizeof( data->value.communication.flags );
+        //     size_local += sizeof( data->value.communication.capture_limit_bytes );
+        //     break;
         case HIL_APPLICATION_PERIPHERAL_CONFIG_RESERVED:
             return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
         default:

@@ -217,7 +217,7 @@ typedef struct
         /** Valid when type is PWM. */
         HIL_Application_Pwm_Config_T pwm;
         /** Valid when type is COMMUNICATION. */
-        HIL_Application_Communication_Config_T communication;
+        // HIL_Application_Communication_Config_T communication;
     } value;
 } HIL_Application_Peripheral_Config_T;
 
