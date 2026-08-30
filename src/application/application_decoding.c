@@ -438,12 +438,45 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_decode(
     ( void )context;
     ( void )sub_type;
     ( void )test_id;
-    ( void )data;
-    ( void )payload;
-    ( void )decoded_data;
-    ( void )max_decoded_data_size;
-    ( void )used_decoded_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+
+    /**
+    _______________________________________________________
+    |                         |                            |
+    |     tick number {4}     |       remainging {4}       |
+    |_________________________|____________________________|
+    |                         |                            |
+    |       channel {6}       |          data {X}          |
+    |_________________________|____________________________|
+
+    */
+
+    // size check
+    size_t running_total = 0;
+    memcpy( &( data->tick_number ), payload,
+            sizeof( data->tick_number ) );
+    running_total += sizeof( data->tick_number );
+    memcpy(  &( data->remaining ), &( payload[running_total] ),
+            sizeof( data->remaining ) );
+    running_total += sizeof( data->remaining );
+    HIL_APPLICATION_Channel_Id_decode(&(data->channel), &(payload[running_total]));
+    running_total += sizeof(data->channel.channel) + sizeof(data->channel.peripheral) ;
+
+    data->data.data = decoded_data;
+    memcpy( &( data->data.size ), &( payload[running_total] ),
+            sizeof( data->data.size ) );
+    if ( data->data.size > max_decoded_data_size )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+    HIL_APPLICATION_Byte_Span_decode( &( data->data ), &( payload[running_total] ),
+                                      decoded_data );
+    running_total += sizeof( data->data.size );
+    running_total += data->data.size;
+    *used_decoded_size = data->data.size;
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Execution_Control_decode(

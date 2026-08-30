@@ -475,11 +475,39 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_encode(
     ( void )context;
     ( void )sub_type;
     ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    ( void )used_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+
+    /**
+    _______________________________________________________
+    |                         |                            |
+    |     tick number {4}     |       remainging {4}       |
+    |_________________________|____________________________|
+    |                         |                            |
+    |       channel {6}       |          data {X}          |
+    |_________________________|____________________________|
+
+    */
+
+    // size check
+    size_t payload_size = sizeof(data->tick_number) + sizeof(data->remaining) + sizeof(data->channel.channel) + sizeof(data->channel.peripheral) + data->data.size;
+    if ( payload_size > max_payload_size )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+    size_t running_total = 0;
+    memcpy( payload, &( data->tick_number ),
+            sizeof( data->tick_number ) );
+    running_total += sizeof( data->tick_number );
+    memcpy( &( payload[running_total] ), &( data->remaining ),
+            sizeof( data->remaining ) );
+    running_total += sizeof( data->remaining );
+    HIL_APPLICATION_Channel_Id_encode(&(data->channel), &(payload[running_total]));
+    running_total += sizeof(data->channel.channel) + sizeof(data->channel.peripheral) ;
+    HIL_APPLICATION_Byte_Span_encode( &( data->data ),
+                                        &( payload[running_total] ) );
+    running_total += sizeof( data->data.size );
+    running_total += data->data.size;
+    *used_size = running_total;
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Execution_Control_encode(
