@@ -152,7 +152,7 @@ void PrintMessage( const HIL_Application_Message_T& message )
 
             std::cout << "  Test Configuration\n";
 
-            std::cout << "    tick_duration_us.nanoseconds: " << data.tick_duration_us.nanoseconds
+            std::cout << "    tick_duration_us.useconds: " << data.tick_duration_us.useconds
                       << "\n";
 
             std::cout << "    expected_tick_count: " << data.expected_tick_count << "\n";
@@ -508,8 +508,8 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
             std::cout << "testing test config..."
                       << "\n";
-            EXPECT_EQ( expected.body.test_configuration.tick_duration_us.nanoseconds,
-                       actual.body.test_configuration.tick_duration_us.nanoseconds );
+            EXPECT_EQ( expected.body.test_configuration.tick_duration_us.useconds,
+                       actual.body.test_configuration.tick_duration_us.useconds );
             EXPECT_EQ( expected.body.test_configuration.expected_tick_count,
                        actual.body.test_configuration.expected_tick_count );
             EXPECT_EQ( expected.body.test_configuration.flags,
@@ -743,7 +743,7 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
     messages[2].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     messages[2].has_test_id = 1u;
     messages[2].test_id     = test_id;
-    messages[2].body.test_configuration.tick_duration_us.nanoseconds = 1000000u;
+    messages[2].body.test_configuration.tick_duration_us.useconds = 1000000u;
     messages[2].body.test_configuration.expected_tick_count          = 100u;
     messages[2].body.test_configuration.flags                        = 0u;
     messages[2].body.test_configuration.peripherals                  = peripherals.data();
@@ -873,7 +873,7 @@ void CompileCodecFacadeUsage()
     configuration.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     configuration.has_test_id = 1u;
     configuration.test_id     = ExampleTestId( 0x11u );
-    configuration.body.test_configuration.tick_duration_us.nanoseconds = 1000000u;
+    configuration.body.test_configuration.tick_duration_us.useconds = 1000000u;
     configuration.body.test_configuration.expected_tick_count          = 2u;
     configuration.body.test_configuration.flags                        = 0u;
     configuration.body.test_configuration.extension_data =
@@ -909,7 +909,7 @@ void CompileUploadConformanceScenarios()
     configuration.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     configuration.has_test_id = 1u;
     configuration.test_id     = test_a;
-    configuration.body.test_configuration.tick_duration_us.nanoseconds = 1000000u;
+    configuration.body.test_configuration.tick_duration_us.useconds = 1000000u;
     configuration.body.test_configuration.expected_tick_count          = 2u;
     configuration.body.test_configuration.flags                        = 0u;
     configuration.body.test_configuration.extension_data =
@@ -1235,7 +1235,7 @@ void CompileSerializedOperationScenario()
     configuration.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     configuration.has_test_id = 1u;
     configuration.test_id     = test_a;
-    configuration.body.test_configuration.tick_duration_us.nanoseconds = 1000000u;
+    configuration.body.test_configuration.tick_duration_us.useconds = 1000000u;
     configuration.body.test_configuration.expected_tick_count          = 1u;
     configuration.body.test_configuration.flags                        = 0u;
     configuration.body.test_configuration.extension_data =
@@ -1323,7 +1323,7 @@ void CompileRecoveryConformanceScenarios()
     restarted_configuration.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     restarted_configuration.has_test_id = 1u;
     restarted_configuration.test_id     = restarted_test;
-    restarted_configuration.body.test_configuration.tick_duration_us.nanoseconds = 1000000u;
+    restarted_configuration.body.test_configuration.tick_duration_us.useconds = 1000000u;
     restarted_configuration.body.test_configuration.expected_tick_count          = 2u;
     restarted_configuration.body.test_configuration.flags                        = 0u;
     restarted_configuration.body.test_configuration.extension_data =

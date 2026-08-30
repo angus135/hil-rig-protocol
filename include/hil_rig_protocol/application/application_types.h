@@ -171,7 +171,7 @@ typedef struct
 typedef struct
 {
     /** Requested duration of one tick; zero is structurally invalid. */
-    uint32_t nanoseconds;
+    uint32_t useconds;
 } HIL_Application_Tick_Duration_T;
 
 /**

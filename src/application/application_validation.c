@@ -161,7 +161,7 @@ HIL_APPLICATION_Test_Configuration_validate( const HIL_Application_Context_T*   
     uint32_t periods[] = HIL_APPLICATION_VALID_TICK_PERIODS_NS;
     for ( uint32_t i = 0; i < sizeof( periods ); i++ )
     {
-        if ( periods[i] == data->tick_duration_us.nanoseconds )
+        if ( periods[i] == data->tick_duration_us.useconds )
         {
             check = 1;
         }

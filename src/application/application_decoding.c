@@ -297,8 +297,8 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
 
 
     */
-    memcpy( &( data->tick_duration_us ), payload, sizeof( data->tick_duration_us ) );
-    size_t running_total = sizeof( data->tick_duration_us );
+    memcpy( &( data->tick_duration_us.useconds ), payload, sizeof( data->tick_duration_us.useconds ) );
+    size_t running_total = sizeof( data->tick_duration_us.useconds );
     memcpy( &( data->expected_tick_count ), &( payload[running_total] ),
             sizeof( data->expected_tick_count ) );
     running_total += sizeof( data->expected_tick_count );

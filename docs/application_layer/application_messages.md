@@ -255,7 +255,7 @@ This is exactly one first test-specific message for each new upload. The Python
 host supplies a fresh random Test ID. `HIL_Application_Test_Configuration_T`
 contains:
 
-- nonzero `tick_duration_us.nanoseconds`;
+- nonzero `tick_duration_us.useconds`;
 - nonzero authoritative `expected_tick_count` N, defining ticks 0 through N - 1;
 - reserved `flags`, which must be zero;
 - typed `peripherals` and `peripheral_count`; and
