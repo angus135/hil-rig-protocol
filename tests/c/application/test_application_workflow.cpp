@@ -11,6 +11,8 @@
 #include <gtest/gtest.h>
 
 #include "hil_rig_protocol/application/application.h"
+#include "hil_rig_protocol/application/application_test_config.h"
+#include "hil_rig_protocol/version.h"
 
 namespace {
 struct alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ) AlignedDecodeStorageBuffer
@@ -123,6 +125,9 @@ void PrintMessage( const HIL_Application_Message_T& message )
 
             std::cout << "    application_protocol_minor: "
                       << static_cast<unsigned>( data.application_protocol_minor ) << "\n";
+            
+            std::cout << "    application_protocol_patch: "
+                      << static_cast<unsigned>( data.application_protocol_patch ) << "\n";
 
             std::cout << "    firmware_version_major: "
                       << static_cast<unsigned>( data.firmware_version_major ) << "\n";
@@ -181,21 +186,9 @@ void PrintMessage( const HIL_Application_Message_T& message )
                               << static_cast<unsigned>(
                                      data.peripherals[i].value.digital.channel.peripheral )
                               << "\n";
-                    std::cout << "      output mV: "
+                    std::cout << "      voltage level: "
                               << static_cast<unsigned>(
-                                     data.peripherals[i].value.digital.output_millivolts )
-                              << "\n";
-                    std::cout << "      initial high: "
-                              << static_cast<unsigned>(
-                                     data.peripherals[i].value.digital.initial_output_high )
-                              << "\n";
-                    std::cout << "      input mV: "
-                              << static_cast<unsigned>(
-                                     data.peripherals[i].value.digital.input_threshold_millivolts )
-                              << "\n";
-                    std::cout << "      capture: "
-                              << static_cast<unsigned>(
-                                     data.peripherals[i].value.digital.capture_enabled )
+                                     data.peripherals[i].value.digital.voltage_level )
                               << "\n";
                 }
                 else if ( data.peripherals[i].type == 2 )
@@ -224,27 +217,27 @@ void PrintMessage( const HIL_Application_Message_T& message )
             break;
         }
 
-        case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION: {
-            const auto& data = message.body.test_instruction;
+            // case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION: {
+            //     const auto& data = message.body.test_instruction;
 
-            std::cout << "  Test Instruction\n";
+            //     std::cout << "  Test Instruction\n";
 
-            std::cout << "    tick_number: " << data.tick_number << "\n";
+            //     std::cout << "    tick_number: " << data.tick_number << "\n";
 
-            std::cout << "    variable_data_count: " << data.variable_data_count << "\n";
+            //     std::cout << "    variable_data_count: " << data.variable_data_count << "\n";
 
-            for ( std::size_t i = 0u; i < data.variable_data_count; ++i )
-            {
-                std::cout << "    variable_data[" << i << "]\n";
+            //     for ( std::size_t i = 0u; i < data.variable_data_count; ++i )
+            //     {
+            //         std::cout << "    variable_data[" << i << "]\n";
 
-                PrintChannel( data.variable_data[i].channel );
+            //         PrintChannel( data.variable_data[i].channel );
 
-                std::cout << "      data:\n";
-                PrintByteSpan( data.variable_data[i].data );
-            }
+            //         std::cout << "      data:\n";
+            //         PrintByteSpan( data.variable_data[i].data );
+            //     }
 
-            break;
-        }
+            //     break;
+            // }
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA: {
             const auto& data = message.body.variable_instruction_data;
@@ -294,21 +287,21 @@ void PrintMessage( const HIL_Application_Message_T& message )
             std::cout << "    tick_number: " << data.tick_number << "\n";
 
             std::cout << "    condition: " << static_cast<unsigned>( data.condition ) << "\n";
-
-            std::cout << "    variable_data_count: " << data.variable_data_count << "\n";
-
-            for ( std::size_t i = 0u; i < data.variable_data_count; ++i )
-            {
-                std::cout << "    variable_data[" << i << "]\n";
-
-                PrintChannel( data.variable_data[i].channel );
-
-                std::cout << "      data:\n";
-                PrintByteSpan( data.variable_data[i].data );
-            }
-
-            break;
         }
+            //     std::cout << "    variable_data_count: " << data.variable_data_count << "\n";
+
+            //     for ( std::size_t i = 0u; i < data.variable_data_count; ++i )
+            //     {
+            //         std::cout << "    variable_data[" << i << "]\n";
+
+            //         PrintChannel( data.variable_data[i].channel );
+
+            //         std::cout << "      data:\n";
+            //         PrintByteSpan( data.variable_data[i].data );
+            //     }
+
+            //     break;
+            // }
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA: {
             const auto& data = message.body.variable_result_data;
@@ -500,6 +493,8 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
                        actual.body.system_info_response.application_protocol_major );
             EXPECT_EQ( expected.body.system_info_response.application_protocol_minor,
                        actual.body.system_info_response.application_protocol_minor );
+            EXPECT_EQ( expected.body.system_info_response.application_protocol_patch,
+                       actual.body.system_info_response.application_protocol_patch );
             EXPECT_EQ( expected.body.system_info_response.firmware_version_major,
                        actual.body.system_info_response.firmware_version_major );
             EXPECT_EQ( expected.body.system_info_response.firmware_version_minor,
@@ -560,10 +555,10 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
                                     sizeof( expected.body.test_instruction.pwm_outputs ) ),
                        0 );
 
-            ExpectDataDeclarationsEqual( expected.body.test_instruction.variable_data,
-                                         expected.body.test_instruction.variable_data_count,
-                                         actual.body.test_instruction.variable_data,
-                                         actual.body.test_instruction.variable_data_count );
+            // ExpectDataDeclarationsEqual( expected.body.test_instruction.variable_data,
+            //                              expected.body.test_instruction.variable_data_count,
+            //                              actual.body.test_instruction.variable_data,
+            //                              actual.body.test_instruction.variable_data_count );
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
@@ -616,10 +611,10 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
 
             EXPECT_EQ( expected.body.test_result.condition, actual.body.test_result.condition );
 
-            ExpectDataDeclarationsEqual( expected.body.test_result.variable_data,
-                                         expected.body.test_result.variable_data_count,
-                                         actual.body.test_result.variable_data,
-                                         actual.body.test_result.variable_data_count );
+            // ExpectDataDeclarationsEqual( expected.body.test_result.variable_data,
+            //                              expected.body.test_result.variable_data_count,
+            //                              actual.body.test_result.variable_data,
+            //                              actual.body.test_result.variable_data_count );
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
@@ -686,8 +681,7 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
             peripheral.type                             = HIL_APPLICATION_PERIPHERAL_CONFIG_DIGITAL;
             peripheral.value.digital.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
             peripheral.value.digital.channel.channel    = 2u;
-            peripheral.value.digital.output_millivolts  = 3300u;
-            peripheral.value.digital.initial_output_high = 0u;
+            peripheral.value.digital.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
             return peripheral;
         }(),
 
@@ -696,8 +690,7 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
             peripheral.type                            = HIL_APPLICATION_PERIPHERAL_CONFIG_ANALOG;
             peripheral.value.analog.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT;
             peripheral.value.analog.channel.channel    = 0u;
-            peripheral.value.analog.minimum_microvolts = -1000000;
-            peripheral.value.analog.maximum_microvolts = 1000000;
+            peripheral.value.analog.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
             return peripheral;
         }(),
 
@@ -735,9 +728,11 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
     messages[1].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
     messages[1].has_test_id = 0u;
     messages[1].body.system_info_response.application_protocol_major =
-        HIL_APPLICATION_PROTOCOL_VERSION_MAJOR;
+        HIL_RIG_PROTOCOL_VERSION_MAJOR;
     messages[1].body.system_info_response.application_protocol_minor =
-        HIL_APPLICATION_PROTOCOL_VERSION_MINOR;
+        HIL_RIG_PROTOCOL_VERSION_MINOR;
+    messages[1].body.system_info_response.application_protocol_patch =
+        HIL_RIG_PROTOCOL_VERSION_PATCH;
     messages[1].body.system_info_response.firmware_version_major = 1u;
     messages[1].body.system_info_response.firmware_git_hash =
         HIL_Application_Byte_Span_T{ git_hash.data(), ( uint8_t )git_hash.size() };
@@ -749,10 +744,10 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
     messages[2].has_test_id = 1u;
     messages[2].test_id     = test_id;
     messages[2].body.test_configuration.tick_duration_us.nanoseconds = 1000000u;
-    messages[2].body.test_configuration.expected_tick_count       = 100u;
-    messages[2].body.test_configuration.flags                     = 0u;
-    messages[2].body.test_configuration.peripherals               = peripherals.data();
-    messages[2].body.test_configuration.peripheral_count          = peripherals.size();
+    messages[2].body.test_configuration.expected_tick_count          = 100u;
+    messages[2].body.test_configuration.flags                        = 0u;
+    messages[2].body.test_configuration.peripherals                  = peripherals.data();
+    messages[2].body.test_configuration.peripheral_count             = peripherals.size();
     messages[2].body.test_configuration.extension_data = HIL_Application_Byte_Span_T{ nullptr, 0u };
 
     messages[3].type                              = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
@@ -764,8 +759,9 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
     messages[3].body.test_instruction.analog_outputs[1].microvolts        = 1250000;
     messages[3].body.test_instruction.pwm_outputs[1].period_nanoseconds   = 1000000u;
     messages[3].body.test_instruction.pwm_outputs[1].duty_cycle_permyriad = 5000u;
-    messages[3].body.test_instruction.variable_data                       = instruction_data.data();
-    messages[3].body.test_instruction.variable_data_count                 = instruction_data.size();
+    // messages[3].body.test_instruction.variable_data                       =
+    // instruction_data.data(); messages[3].body.test_instruction.variable_data_count =
+    // instruction_data.size();
 
     messages[4].type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA;
     messages[4].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
@@ -799,8 +795,8 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
     messages[7].body.test_result.analog_inputs[1].microvolts        = 1210000;
     messages[7].body.test_result.pwm_inputs[1].period_nanoseconds   = 1000100u;
     messages[7].body.test_result.pwm_inputs[1].duty_cycle_permyriad = 4990u;
-    messages[7].body.test_result.variable_data                      = result_data.data();
-    messages[7].body.test_result.variable_data_count                = result_data.size();
+    // messages[7].body.test_result.variable_data                      = result_data.data();
+    // messages[7].body.test_result.variable_data_count                = result_data.size();
     messages[7].body.test_result.condition = HIL_APPLICATION_RESULT_CONDITION_OK;
 
     messages[8].type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA;
@@ -878,8 +874,8 @@ void CompileCodecFacadeUsage()
     configuration.has_test_id = 1u;
     configuration.test_id     = ExampleTestId( 0x11u );
     configuration.body.test_configuration.tick_duration_us.nanoseconds = 1000000u;
-    configuration.body.test_configuration.expected_tick_count       = 2u;
-    configuration.body.test_configuration.flags                     = 0u;
+    configuration.body.test_configuration.expected_tick_count          = 2u;
+    configuration.body.test_configuration.flags                        = 0u;
     configuration.body.test_configuration.extension_data =
         HIL_Application_Byte_Span_T{ nullptr, 0u };
 
@@ -914,8 +910,8 @@ void CompileUploadConformanceScenarios()
     configuration.has_test_id = 1u;
     configuration.test_id     = test_a;
     configuration.body.test_configuration.tick_duration_us.nanoseconds = 1000000u;
-    configuration.body.test_configuration.expected_tick_count       = 2u;
-    configuration.body.test_configuration.flags                     = 0u;
+    configuration.body.test_configuration.expected_tick_count          = 2u;
+    configuration.body.test_configuration.flags                        = 0u;
     configuration.body.test_configuration.extension_data =
         HIL_Application_Byte_Span_T{ nullptr, 0u };
 
@@ -938,13 +934,13 @@ void CompileUploadConformanceScenarios()
     };
 
     HIL_Application_Message_T fixed_tick{};
-    fixed_tick.type                                = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
-    fixed_tick.subtype                             = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
-    fixed_tick.has_test_id                         = 1u;
-    fixed_tick.test_id                             = test_a;
-    fixed_tick.body.test_instruction.tick_number   = 0u;
-    fixed_tick.body.test_instruction.variable_data = declarations.data();
-    fixed_tick.body.test_instruction.variable_data_count = declarations.size();
+    fixed_tick.type                              = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
+    fixed_tick.subtype                           = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    fixed_tick.has_test_id                       = 1u;
+    fixed_tick.test_id                           = test_a;
+    fixed_tick.body.test_instruction.tick_number = 0u;
+    // fixed_tick.body.test_instruction.variable_data = declarations.data();
+    // fixed_tick.body.test_instruction.variable_data_count = declarations.size();
 
     HIL_Application_Message_T variable_tick{};
     variable_tick.type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA;
@@ -972,11 +968,11 @@ void CompileUploadConformanceScenarios()
         HIL_APPLICATION_RESPONSE_REASON_NONE, 0u );
 
     /* Stop-and-wait: tick 1 is constructed as permitted only after this ACCEPTED. */
-    HIL_Application_Message_T fixed_tick_1                 = fixed_tick;
-    fixed_tick_1.body.test_instruction.tick_number         = 1u;
-    fixed_tick_1.body.test_instruction.variable_data       = nullptr;
-    fixed_tick_1.body.test_instruction.variable_data_count = 0u;
-    const HIL_Application_Message_T tick_1_accepted        = TestResponse(
+    HIL_Application_Message_T fixed_tick_1         = fixed_tick;
+    fixed_tick_1.body.test_instruction.tick_number = 1u;
+    // fixed_tick_1.body.test_instruction.variable_data       = nullptr;
+    // fixed_tick_1.body.test_instruction.variable_data_count = 0u;
+    const HIL_Application_Message_T tick_1_accepted = TestResponse(
         test_a, HIL_APPLICATION_RESPONSE_SCOPE_TICK, HIL_APPLICATION_RESPONSE_OUTCOME_ACCEPTED,
         HIL_APPLICATION_RESPONSE_REASON_NONE, 1u );
 
@@ -1087,8 +1083,8 @@ void CompileSuccessfulResultConformanceScenario()
     fixed_result_0.body.test_result.tick_number = 0u;
     fixed_result_0.body.test_result.analog_inputs[0].microvolts = 125000;
     fixed_result_0.body.test_result.analog_inputs[1].microvolts = 250000;
-    fixed_result_0.body.test_result.variable_data               = result_declarations.data();
-    fixed_result_0.body.test_result.variable_data_count         = result_declarations.size();
+    // fixed_result_0.body.test_result.variable_data               = result_declarations.data();
+    // fixed_result_0.body.test_result.variable_data_count         = result_declarations.size();
     fixed_result_0.body.test_result.condition = HIL_APPLICATION_RESULT_CONDITION_OK;
 
     HIL_Application_Message_T variable_result_0{};
@@ -1115,8 +1111,8 @@ void CompileSuccessfulResultConformanceScenario()
     fixed_result_1.body.test_result.tick_number                 = 1u;
     fixed_result_1.body.test_result.analog_inputs[0].microvolts = 126000;
     fixed_result_1.body.test_result.analog_inputs[1].microvolts = 251000;
-    fixed_result_1.body.test_result.variable_data               = nullptr;
-    fixed_result_1.body.test_result.variable_data_count         = 0u;
+    // fixed_result_1.body.test_result.variable_data               = nullptr;
+    // fixed_result_1.body.test_result.variable_data_count         = 0u;
 
     /*
      * Shared order for N=2: fixed tick 0, variables in declaration order, then
@@ -1148,8 +1144,8 @@ void CompilePartialVariableResultScenario()
     partial_result.body.test_result.tick_number = 0u;
     partial_result.body.test_result.digital_inputs[0].high      = 1u;
     partial_result.body.test_result.analog_inputs[0].microvolts = 125000;
-    partial_result.body.test_result.variable_data               = &valid_can_declaration;
-    partial_result.body.test_result.variable_data_count         = 1u;
+    // partial_result.body.test_result.variable_data               = &valid_can_declaration;
+    // partial_result.body.test_result.variable_data_count         = 1u;
     partial_result.body.test_result.condition = HIL_APPLICATION_RESULT_CONDITION_PARTIAL;
 
     HIL_Application_Message_T valid_variable_result{};
@@ -1187,14 +1183,14 @@ void CompileEarlyExecutionFailureResultScenario()
 
     for ( std::uint32_t tick = 1u; tick < expected_tick_count; ++tick )
     {
-        auto& result                                = fixed_results[tick];
-        result.type                                 = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
-        result.subtype                              = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
-        result.has_test_id                          = 1u;
-        result.test_id                              = test_a;
-        result.body.test_result.tick_number         = tick;
-        result.body.test_result.variable_data       = nullptr;
-        result.body.test_result.variable_data_count = 0u;
+        auto& result                        = fixed_results[tick];
+        result.type                         = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
+        result.subtype                      = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+        result.has_test_id                  = 1u;
+        result.test_id                      = test_a;
+        result.body.test_result.tick_number = tick;
+        // result.body.test_result.variable_data       = nullptr;
+        // result.body.test_result.variable_data_count = 0u;
         result.body.test_result.condition = HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM;
         /* Zero-initialized fixed captures are present but Python must ignore them. */
     }
@@ -1228,9 +1224,11 @@ void CompileSerializedOperationScenario()
     system_info_response.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
     system_info_response.has_test_id = 0u;
     system_info_response.body.system_info_response.application_protocol_major =
-        HIL_APPLICATION_PROTOCOL_VERSION_MAJOR;
+        HIL_RIG_PROTOCOL_VERSION_MAJOR;
     system_info_response.body.system_info_response.application_protocol_minor =
-        HIL_APPLICATION_PROTOCOL_VERSION_MINOR;
+        HIL_RIG_PROTOCOL_VERSION_MINOR;
+    system_info_response.body.system_info_response.application_protocol_patch =
+        HIL_RIG_PROTOCOL_VERSION_PATCH;
 
     HIL_Application_Message_T configuration{};
     configuration.type        = HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION;
@@ -1238,8 +1236,8 @@ void CompileSerializedOperationScenario()
     configuration.has_test_id = 1u;
     configuration.test_id     = test_a;
     configuration.body.test_configuration.tick_duration_us.nanoseconds = 1000000u;
-    configuration.body.test_configuration.expected_tick_count       = 1u;
-    configuration.body.test_configuration.flags                     = 0u;
+    configuration.body.test_configuration.expected_tick_count          = 1u;
+    configuration.body.test_configuration.flags                        = 0u;
     configuration.body.test_configuration.extension_data =
         HIL_Application_Byte_Span_T{ nullptr, 0u };
 
@@ -1326,8 +1324,8 @@ void CompileRecoveryConformanceScenarios()
     restarted_configuration.has_test_id = 1u;
     restarted_configuration.test_id     = restarted_test;
     restarted_configuration.body.test_configuration.tick_duration_us.nanoseconds = 1000000u;
-    restarted_configuration.body.test_configuration.expected_tick_count       = 2u;
-    restarted_configuration.body.test_configuration.flags                     = 0u;
+    restarted_configuration.body.test_configuration.expected_tick_count          = 2u;
+    restarted_configuration.body.test_configuration.flags                        = 0u;
     restarted_configuration.body.test_configuration.extension_data =
         HIL_Application_Byte_Span_T{ nullptr, 0u };
 

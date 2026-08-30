@@ -205,21 +205,21 @@ HIL_APPLICATION_Test_Instructions_validate( const HIL_Application_Context_T*    
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
-    if ( data->variable_data_count > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
-    {
-        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    }
-    for ( uint8_t i = 0; i < data->variable_data_count; i++ )
-    {
-        if ( data->variable_data[i].channel.peripheral == HIL_APPLICATION_PERIPHERAL_INVALID )
-        {
-            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-        }
-        if ( data->variable_data[i].channel.channel > HIL_APPLICATION_UART_CHANNEL_COUNT )
-        {
-            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-        }
-    }
+    // if ( data->variable_data_count > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
+    // {
+    //     return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    // }
+    // for ( uint8_t i = 0; i < data->variable_data_count; i++ )
+    // {
+    //     if ( data->variable_data[i].channel.peripheral == HIL_APPLICATION_PERIPHERAL_INVALID )
+    //     {
+    //         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    //     }
+    //     if ( data->variable_data[i].channel.channel > HIL_APPLICATION_UART_CHANNEL_COUNT )
+    //     {
+    //         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    //     }
+    // }
     return HIL_APPLICATION_STATUS_OK;
 }
 
@@ -325,21 +325,21 @@ HIL_APPLICATION_Test_Result_validate( const HIL_Application_Context_T*     conte
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
-    if ( data->variable_data_count > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
-    {
-        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    }
-    for ( uint8_t i = 0; i < data->variable_data_count; i++ )
-    {
-        if ( data->variable_data[i].channel.peripheral == HIL_APPLICATION_PERIPHERAL_INVALID )
-        {
-            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-        }
-        if ( data->variable_data[i].channel.channel > HIL_APPLICATION_UART_CHANNEL_COUNT )
-        {
-            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-        }
-    }
+    // if ( data->variable_data_count > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
+    // {
+    //     return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    // }
+    // for ( uint8_t i = 0; i < data->variable_data_count; i++ )
+    // {
+    //     if ( data->variable_data[i].channel.peripheral == HIL_APPLICATION_PERIPHERAL_INVALID )
+    //     {
+    //         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    //     }
+    //     if ( data->variable_data[i].channel.channel > HIL_APPLICATION_UART_CHANNEL_COUNT )
+    //     {
+    //         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    //     }
+    // }
     return HIL_APPLICATION_STATUS_OK;
 }
 

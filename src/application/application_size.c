@@ -88,21 +88,17 @@ HIL_APPLICATION_Peripheral_Config_size( const HIL_Application_Peripheral_Config_
             return HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE;
         case HIL_APPLICATION_PERIPHERAL_CONFIG_DIGITAL:
             size_local += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-            size_local += sizeof( data->value.digital.output_millivolts );
-            size_local += sizeof( data->value.digital.input_threshold_millivolts );
-            size_local += sizeof( data->value.digital.initial_output_high );
-            size_local += sizeof( data->value.digital.capture_enabled );
+            size_local += sizeof( data->value.digital.voltage_level );
             break;
         case HIL_APPLICATION_PERIPHERAL_CONFIG_ANALOG:
             size_local += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-            size_local += sizeof( data->value.analog.minimum_microvolts );
-            size_local += sizeof( data->value.analog.maximum_microvolts );
+            size_local += sizeof( data->value.analog.voltage_level );
             break;
         case HIL_APPLICATION_PERIPHERAL_CONFIG_PWM:
             size_local += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
             size_local += sizeof( data->value.pwm.period_nanoseconds );
             size_local += sizeof( data->value.pwm.initial_duty_cycle_permyriad );
-            size_local += sizeof( data->value.pwm.capture_enabled );
+            size_local += sizeof( data->value.pwm.voltage_level );
             break;
         case HIL_APPLICATION_PERIPHERAL_CONFIG_COMMUNICATION:
             size_local += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;

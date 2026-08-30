@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include "hil_rig_protocol/application/application.h"
+#include "hil_rig_protocol/version.h"
 
 namespace {
 constexpr std::array<HIL_Application_Control_Command_T, 2u> kInitialExecutionControlCommands{
@@ -70,8 +71,7 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
             peripheral.type                             = HIL_APPLICATION_PERIPHERAL_CONFIG_DIGITAL;
             peripheral.value.digital.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
             peripheral.value.digital.channel.channel    = 2u;
-            peripheral.value.digital.output_millivolts  = 3300u;
-            peripheral.value.digital.initial_output_high = 0u;
+            peripheral.value.digital.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
             return peripheral;
         }(),
         [] {
@@ -79,8 +79,7 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
             peripheral.type                            = HIL_APPLICATION_PERIPHERAL_CONFIG_ANALOG;
             peripheral.value.analog.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT;
             peripheral.value.analog.channel.channel    = 0u;
-            peripheral.value.analog.minimum_microvolts = -1000000;
-            peripheral.value.analog.maximum_microvolts = 1000000;
+            peripheral.value.analog.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_12V;
             return peripheral;
         }(),
         [] {
@@ -117,9 +116,11 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
     messages[1].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
     messages[1].has_test_id = 0u;
     messages[1].body.system_info_response.application_protocol_major =
-        HIL_APPLICATION_PROTOCOL_VERSION_MAJOR;
+        HIL_RIG_PROTOCOL_VERSION_MAJOR;
     messages[1].body.system_info_response.application_protocol_minor =
-        HIL_APPLICATION_PROTOCOL_VERSION_MINOR;
+        HIL_RIG_PROTOCOL_VERSION_MINOR;
+    messages[1].body.system_info_response.application_protocol_patch =
+        HIL_RIG_PROTOCOL_VERSION_PATCH;
     messages[1].body.system_info_response.firmware_version_major = 1u;
     messages[1].body.system_info_response.firmware_git_hash =
         HIL_Application_Byte_Span_T{ git_hash.data(), git_hash.size() };
@@ -131,10 +132,10 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
     messages[2].has_test_id = 1u;
     messages[2].test_id     = test_id;
     messages[2].body.test_configuration.tick_duration_us.nanoseconds = 1000000u;
-    messages[2].body.test_configuration.expected_tick_count       = 100u;
-    messages[2].body.test_configuration.flags                     = 0u;
-    messages[2].body.test_configuration.peripherals               = peripherals.data();
-    messages[2].body.test_configuration.peripheral_count          = peripherals.size();
+    messages[2].body.test_configuration.expected_tick_count          = 100u;
+    messages[2].body.test_configuration.flags                        = 0u;
+    messages[2].body.test_configuration.peripherals                  = peripherals.data();
+    messages[2].body.test_configuration.peripheral_count             = peripherals.size();
     messages[2].body.test_configuration.extension_data = HIL_Application_Byte_Span_T{ nullptr, 0u };
 
     messages[3].type                              = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
@@ -146,8 +147,9 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
     messages[3].body.test_instruction.analog_outputs[1].microvolts        = 1250000;
     messages[3].body.test_instruction.pwm_outputs[1].period_nanoseconds   = 1000000u;
     messages[3].body.test_instruction.pwm_outputs[1].duty_cycle_permyriad = 5000u;
-    messages[3].body.test_instruction.variable_data                       = instruction_data.data();
-    messages[3].body.test_instruction.variable_data_count                 = instruction_data.size();
+    // messages[3].body.test_instruction.variable_data                       =
+    // instruction_data.data(); messages[3].body.test_instruction.variable_data_count =
+    // instruction_data.size();
 
     messages[4].type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA;
     messages[4].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
@@ -181,8 +183,8 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
     messages[7].body.test_result.analog_inputs[1].microvolts        = 1210000;
     messages[7].body.test_result.pwm_inputs[1].period_nanoseconds   = 1000100u;
     messages[7].body.test_result.pwm_inputs[1].duty_cycle_permyriad = 4990u;
-    messages[7].body.test_result.variable_data                      = result_data.data();
-    messages[7].body.test_result.variable_data_count                = result_data.size();
+    // messages[7].body.test_result.variable_data                      = result_data.data();
+    // messages[7].body.test_result.variable_data_count                = result_data.size();
     messages[7].body.test_result.condition = HIL_APPLICATION_RESULT_CONDITION_OK;
 
     messages[8].type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA;
@@ -273,7 +275,9 @@ TEST( ApplicationApiDesign, EveryRequiredMessageFamilyIsConstructible )
     EXPECT_EQ( messages[5].body.execution_control.flags, 0u );
     EXPECT_EQ( messages[6].body.global_control.flags, 0u );
     EXPECT_EQ( messages[1].body.system_info_response.application_protocol_major,
-               HIL_APPLICATION_PROTOCOL_VERSION_MAJOR );
+               HIL_RIG_PROTOCOL_VERSION_MAJOR );
     EXPECT_EQ( messages[1].body.system_info_response.application_protocol_minor,
-               HIL_APPLICATION_PROTOCOL_VERSION_MINOR );
+               HIL_RIG_PROTOCOL_VERSION_MINOR );
+    EXPECT_EQ( messages[1].body.system_info_response.application_protocol_patch,
+               HIL_RIG_PROTOCOL_VERSION_PATCH );
 }

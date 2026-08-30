@@ -113,7 +113,7 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     running_total += sizeof( data->application_protocol_minor );
     memcpy( &( data->application_protocol_patch ), &( payload[running_total] ),
             sizeof( data->application_protocol_patch ) );
-    running_total += sizeof( data->application_protocol_minor );
+    running_total += sizeof( data->application_protocol_patch );
     memcpy( &( data->firmware_version_major ), &( payload[running_total] ),
             sizeof( data->firmware_version_major ) );
     running_total += sizeof( data->firmware_version_major );
@@ -455,24 +455,20 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_decode(
 
     // size check
     size_t running_total = 0;
-    memcpy( &( data->tick_number ), payload,
-            sizeof( data->tick_number ) );
+    memcpy( &( data->tick_number ), payload, sizeof( data->tick_number ) );
     running_total += sizeof( data->tick_number );
-    memcpy(  &( data->remaining ), &( payload[running_total] ),
-            sizeof( data->remaining ) );
+    memcpy( &( data->remaining ), &( payload[running_total] ), sizeof( data->remaining ) );
     running_total += sizeof( data->remaining );
-    HIL_APPLICATION_Channel_Id_decode(&(data->channel), &(payload[running_total]));
-    running_total += sizeof(data->channel.channel) + sizeof(data->channel.peripheral) ;
+    HIL_APPLICATION_Channel_Id_decode( &( data->channel ), &( payload[running_total] ) );
+    running_total += sizeof( data->channel.channel ) + sizeof( data->channel.peripheral );
 
     data->data.data = decoded_data;
-    memcpy( &( data->data.size ), &( payload[running_total] ),
-            sizeof( data->data.size ) );
+    memcpy( &( data->data.size ), &( payload[running_total] ), sizeof( data->data.size ) );
     if ( data->data.size > max_decoded_data_size )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    HIL_APPLICATION_Byte_Span_decode( &( data->data ), &( payload[running_total] ),
-                                      decoded_data );
+    HIL_APPLICATION_Byte_Span_decode( &( data->data ), &( payload[running_total] ), decoded_data );
     running_total += sizeof( data->data.size );
     running_total += data->data.size;
     *used_decoded_size = data->data.size;
@@ -629,7 +625,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     memcpy( &( data->problem_detail ), &( payload[running_total] ),
             sizeof( data->problem_detail ) );
     running_total += sizeof( data->problem_detail );
-    *used_decoded_size         = decoded_running;
+    *used_decoded_size = decoded_running;
     // *used_decoded_variable_num = data->variable_data_count;
     *used_decoded_variable_num = 0;
     return HIL_APPLICATION_STATUS_OK;

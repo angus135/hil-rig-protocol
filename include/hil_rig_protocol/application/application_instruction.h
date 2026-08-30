@@ -62,7 +62,6 @@ typedef struct
     // uint8_t variable_data_count;
 } HIL_Application_Test_Instruction_T;
 
-
 /**
  * @brief Variable communication bytes associated with one test tick.
  *
