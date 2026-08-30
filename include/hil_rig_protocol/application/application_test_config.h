@@ -257,7 +257,7 @@ typedef struct
     /** Reserved test-wide option bits; must be zero in the initial protocol. */
     uint32_t flags;
     /** Number of readable records at peripherals. */
-    size_t peripheral_count;
+    uint32_t peripheral_count;
     /** Peripheral/channel configuration records. */
     const HIL_Application_Peripheral_Config_T* peripherals;
     /** Reserved versioned settings bytes; must be empty in the initial protocol. */
