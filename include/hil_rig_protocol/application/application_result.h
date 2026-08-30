@@ -112,9 +112,9 @@ typedef struct
     /** Complete PWM-input state; element i is PWM_INPUT channel i. */
     HIL_Application_Pwm_Input_Value_T pwm_inputs[HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT];
     /** Unique, nonzero UART/SPI/I2C/CAN result transfers. */
-    const HIL_Application_Data_Declaration_T* variable_data;
-    /** Number of result declarations at variable_data. */
-    uint32_t variable_data_count;
+    // const HIL_Application_Data_Declaration_T* variable_data;
+    // /** Number of result declarations at variable_data. */
+    // uint32_t variable_data_count;
     /** Recorded condition reported after execution; not an execution-time Error. */
     HIL_Application_Result_Condition_T condition;
     /**

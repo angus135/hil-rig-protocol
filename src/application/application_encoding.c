@@ -589,13 +589,13 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
         payload_size += sizeof( data->pwm_inputs[i].duty_cycle_permyriad );
     }
     // variable data
-    payload_size += sizeof( data->variable_data_count );
-    for ( uint8_t i = 0; i < data->variable_data_count; i++ )
-    {
-        payload_size += sizeof( data->variable_data->channel.peripheral );
-        payload_size += sizeof( data->variable_data->channel.channel );
-        payload_size += data->variable_data->data.size;
-    }
+    // payload_size += sizeof( data->variable_data_count );
+    // for ( uint8_t i = 0; i < data->variable_data_count; i++ )
+    // {
+    //     payload_size += sizeof( data->variable_data->channel.peripheral );
+    //     payload_size += sizeof( data->variable_data->channel.channel );
+    //     payload_size += data->variable_data->data.size;
+    // }
     if ( max_payload_size < payload_size )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
@@ -630,22 +630,22 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
         running_total += sizeof( data->pwm_inputs[i].duty_cycle_permyriad );
     }
     // variable data
-    memcpy( &( payload[running_total] ), &( data->variable_data_count ),
-            sizeof( data->variable_data_count ) );
-    running_total += sizeof( data->variable_data_count );
-    for ( uint8_t i = 0; i < data->variable_data_count; i++ )
-    {
-        memcpy( &( payload[running_total] ), &( data->variable_data[i].channel.peripheral ),
-                sizeof( data->variable_data[i].channel.peripheral ) );
-        running_total += sizeof( data->variable_data[i].channel.peripheral );
-        memcpy( &( payload[running_total] ), &( data->variable_data[i].channel.channel ),
-                sizeof( data->variable_data[i].channel.channel ) );
-        running_total += sizeof( data->variable_data[i].channel.channel );
-        HIL_APPLICATION_Byte_Span_encode( &( data->variable_data[i].data ),
-                                          &( payload[running_total] ) );
-        running_total += sizeof( data->variable_data[i].data.size );
-        running_total += data->variable_data[i].data.size;
-    }
+    // memcpy( &( payload[running_total] ), &( data->variable_data_count ),
+    //         sizeof( data->variable_data_count ) );
+    // running_total += sizeof( data->variable_data_count );
+    // for ( uint8_t i = 0; i < data->variable_data_count; i++ )
+    // {
+    //     memcpy( &( payload[running_total] ), &( data->variable_data[i].channel.peripheral ),
+    //             sizeof( data->variable_data[i].channel.peripheral ) );
+    //     running_total += sizeof( data->variable_data[i].channel.peripheral );
+    //     memcpy( &( payload[running_total] ), &( data->variable_data[i].channel.channel ),
+    //             sizeof( data->variable_data[i].channel.channel ) );
+    //     running_total += sizeof( data->variable_data[i].channel.channel );
+    //     HIL_APPLICATION_Byte_Span_encode( &( data->variable_data[i].data ),
+    //                                       &( payload[running_total] ) );
+    //     running_total += sizeof( data->variable_data[i].data.size );
+    //     running_total += data->variable_data[i].data.size;
+    // }
     // Condition and problem
     memcpy( &( payload[running_total] ), &( data->condition ), sizeof( data->condition ) );
     running_total += sizeof( data->condition );

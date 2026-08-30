@@ -561,35 +561,35 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     }
     // variable data
     size_t decoded_running = 0;
-    memcpy( &( data->variable_data_count ), &( payload[running_total] ),
-            sizeof( data->variable_data_count ) );
-    running_total += sizeof( data->variable_data_count );
-    data->variable_data = decoded_variable_data;
-    if ( data->variable_data_count > max_decoded_variable_data_num )
-    {
-        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
-    }
-    for ( uint8_t i = 0; i < data->variable_data_count; i++ )
-    {
-        memcpy( &( data->variable_data[i].channel.peripheral ), &( payload[running_total] ),
-                sizeof( data->variable_data[i].channel.peripheral ) );
-        running_total += sizeof( data->variable_data[i].channel.peripheral );
-        memcpy( &( data->variable_data[i].channel.channel ), &( payload[running_total] ),
-                sizeof( data->variable_data[i].channel.channel ) );
-        running_total += sizeof( data->variable_data[i].channel.channel );
-        memcpy( &( data->variable_data[i].data.size ), &( payload[running_total] ),
-                sizeof( data->variable_data[i].data.size ) );
-        if ( data->variable_data[i].data.size + decoded_running > max_decoded_data_size )
-        {
-            return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
-        }
-        HIL_APPLICATION_Byte_Span_decode( &( data->variable_data[i].data ),
-                                          &( payload[running_total] ),
-                                          &decoded_data[decoded_running] );
-        running_total += sizeof( data->variable_data[i].data.size );
-        running_total += data->variable_data[i].data.size;
-        decoded_running += data->variable_data[i].data.size;
-    }
+    // memcpy( &( data->variable_data_count ), &( payload[running_total] ),
+    //         sizeof( data->variable_data_count ) );
+    // running_total += sizeof( data->variable_data_count );
+    // data->variable_data = decoded_variable_data;
+    // if ( data->variable_data_count > max_decoded_variable_data_num )
+    // {
+    //     return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    // }
+    // for ( uint8_t i = 0; i < data->variable_data_count; i++ )
+    // {
+    //     memcpy( &( data->variable_data[i].channel.peripheral ), &( payload[running_total] ),
+    //             sizeof( data->variable_data[i].channel.peripheral ) );
+    //     running_total += sizeof( data->variable_data[i].channel.peripheral );
+    //     memcpy( &( data->variable_data[i].channel.channel ), &( payload[running_total] ),
+    //             sizeof( data->variable_data[i].channel.channel ) );
+    //     running_total += sizeof( data->variable_data[i].channel.channel );
+    //     memcpy( &( data->variable_data[i].data.size ), &( payload[running_total] ),
+    //             sizeof( data->variable_data[i].data.size ) );
+    //     if ( data->variable_data[i].data.size + decoded_running > max_decoded_data_size )
+    //     {
+    //         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    //     }
+    //     HIL_APPLICATION_Byte_Span_decode( &( data->variable_data[i].data ),
+    //                                       &( payload[running_total] ),
+    //                                       &decoded_data[decoded_running] );
+    //     running_total += sizeof( data->variable_data[i].data.size );
+    //     running_total += data->variable_data[i].data.size;
+    //     decoded_running += data->variable_data[i].data.size;
+    // }
     // Condition and problem
     memcpy( &( data->condition ), &( payload[running_total] ), sizeof( data->condition ) );
     running_total += sizeof( data->condition );
@@ -597,7 +597,8 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
             sizeof( data->problem_detail ) );
     running_total += sizeof( data->problem_detail );
     *used_decoded_size         = decoded_running;
-    *used_decoded_variable_num = data->variable_data_count;
+    // *used_decoded_variable_num = data->variable_data_count;
+    *used_decoded_variable_num = 0;
     return HIL_APPLICATION_STATUS_OK;
 }
 
