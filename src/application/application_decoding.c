@@ -253,7 +253,8 @@ HIL_APPLICATION_Peripheral_Config_decode( HIL_Application_Peripheral_Config_T* d
         //     memcpy( &( data->value.communication.flags ), &( payload[running_total] ),
         //             sizeof( data->value.communication.flags ) );
         //     running_total += sizeof( data->value.communication.flags );
-        //     memcpy( &( data->value.communication.capture_limit_bytes ), &( payload[running_total] ),
+        //     memcpy( &( data->value.communication.capture_limit_bytes ), &( payload[running_total]
+        //     ),
         //             sizeof( data->value.communication.capture_limit_bytes ) );
         //     running_total += sizeof( data->value.communication.capture_limit_bytes );
         //     break;
@@ -297,7 +298,8 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
 
 
     */
-    memcpy( &( data->tick_duration_us.useconds ), payload, sizeof( data->tick_duration_us.useconds ) );
+    memcpy( &( data->tick_duration_us.useconds ), payload,
+            sizeof( data->tick_duration_us.useconds ) );
     size_t running_total = sizeof( data->tick_duration_us.useconds );
     memcpy( &( data->expected_tick_count ), &( payload[running_total] ),
             sizeof( data->expected_tick_count ) );

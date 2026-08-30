@@ -132,10 +132,10 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
     messages[2].has_test_id = 1u;
     messages[2].test_id     = test_id;
     messages[2].body.test_configuration.tick_duration_us.useconds = 1000000u;
-    messages[2].body.test_configuration.expected_tick_count          = 100u;
-    messages[2].body.test_configuration.flags                        = 0u;
-    messages[2].body.test_configuration.peripherals                  = peripherals.data();
-    messages[2].body.test_configuration.peripheral_count             = peripherals.size();
+    messages[2].body.test_configuration.expected_tick_count       = 100u;
+    messages[2].body.test_configuration.flags                     = 0u;
+    messages[2].body.test_configuration.peripherals               = peripherals.data();
+    messages[2].body.test_configuration.peripheral_count          = peripherals.size();
     messages[2].body.test_configuration.extension_data = HIL_Application_Byte_Span_T{ nullptr, 0u };
 
     messages[3].type                              = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
@@ -271,7 +271,8 @@ TEST( ApplicationApiDesign, EveryRequiredMessageFamilyIsConstructible )
     EXPECT_EQ( messages.back().type, HIL_APPLICATION_MESSAGE_TYPE_ERROR );
     EXPECT_EQ( messages[2].body.test_configuration.flags, 0u );
     EXPECT_EQ( messages[2].body.test_configuration.extension_data.size, 0u );
-    // EXPECT_EQ( messages[2].body.test_configuration.peripherals[2].value.communication.flags, 0u );
+    // EXPECT_EQ( messages[2].body.test_configuration.peripherals[2].value.communication.flags, 0u
+    // );
     EXPECT_EQ( messages[5].body.execution_control.flags, 0u );
     EXPECT_EQ( messages[6].body.global_control.flags, 0u );
     EXPECT_EQ( messages[1].body.system_info_response.application_protocol_major,

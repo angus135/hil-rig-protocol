@@ -125,7 +125,7 @@ void PrintMessage( const HIL_Application_Message_T& message )
 
             std::cout << "    application_protocol_minor: "
                       << static_cast<unsigned>( data.application_protocol_minor ) << "\n";
-            
+
             std::cout << "    application_protocol_patch: "
                       << static_cast<unsigned>( data.application_protocol_patch ) << "\n";
 
@@ -703,8 +703,8 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
         //     peripheral.value.communication.flags               = 0u;
         //     peripheral.value.communication.capture_limit_bytes = variable_bytes.size();
         //     return peripheral;
-        // }() 
-        };
+        // }()
+    };
     static const std::array<HIL_Application_Data_Declaration_T, 1u> instruction_data{
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },
@@ -745,10 +745,10 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
     messages[2].has_test_id = 1u;
     messages[2].test_id     = test_id;
     messages[2].body.test_configuration.tick_duration_us.useconds = 1000000u;
-    messages[2].body.test_configuration.expected_tick_count          = 100u;
-    messages[2].body.test_configuration.flags                        = 0u;
-    messages[2].body.test_configuration.peripherals                  = peripherals.data();
-    messages[2].body.test_configuration.peripheral_count             = peripherals.size();
+    messages[2].body.test_configuration.expected_tick_count       = 100u;
+    messages[2].body.test_configuration.flags                     = 0u;
+    messages[2].body.test_configuration.peripherals               = peripherals.data();
+    messages[2].body.test_configuration.peripheral_count          = peripherals.size();
     messages[2].body.test_configuration.extension_data = HIL_Application_Byte_Span_T{ nullptr, 0u };
 
     messages[3].type                              = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
@@ -875,8 +875,8 @@ void CompileCodecFacadeUsage()
     configuration.has_test_id = 1u;
     configuration.test_id     = ExampleTestId( 0x11u );
     configuration.body.test_configuration.tick_duration_us.useconds = 1000000u;
-    configuration.body.test_configuration.expected_tick_count          = 2u;
-    configuration.body.test_configuration.flags                        = 0u;
+    configuration.body.test_configuration.expected_tick_count       = 2u;
+    configuration.body.test_configuration.flags                     = 0u;
     configuration.body.test_configuration.extension_data =
         HIL_Application_Byte_Span_T{ nullptr, 0u };
 
@@ -911,8 +911,8 @@ void CompileUploadConformanceScenarios()
     configuration.has_test_id = 1u;
     configuration.test_id     = test_a;
     configuration.body.test_configuration.tick_duration_us.useconds = 1000000u;
-    configuration.body.test_configuration.expected_tick_count          = 2u;
-    configuration.body.test_configuration.flags                        = 0u;
+    configuration.body.test_configuration.expected_tick_count       = 2u;
+    configuration.body.test_configuration.flags                     = 0u;
     configuration.body.test_configuration.extension_data =
         HIL_Application_Byte_Span_T{ nullptr, 0u };
 
@@ -1237,8 +1237,8 @@ void CompileSerializedOperationScenario()
     configuration.has_test_id = 1u;
     configuration.test_id     = test_a;
     configuration.body.test_configuration.tick_duration_us.useconds = 1000000u;
-    configuration.body.test_configuration.expected_tick_count          = 1u;
-    configuration.body.test_configuration.flags                        = 0u;
+    configuration.body.test_configuration.expected_tick_count       = 1u;
+    configuration.body.test_configuration.flags                     = 0u;
     configuration.body.test_configuration.extension_data =
         HIL_Application_Byte_Span_T{ nullptr, 0u };
 
@@ -1325,8 +1325,8 @@ void CompileRecoveryConformanceScenarios()
     restarted_configuration.has_test_id = 1u;
     restarted_configuration.test_id     = restarted_test;
     restarted_configuration.body.test_configuration.tick_duration_us.useconds = 1000000u;
-    restarted_configuration.body.test_configuration.expected_tick_count          = 2u;
-    restarted_configuration.body.test_configuration.flags                        = 0u;
+    restarted_configuration.body.test_configuration.expected_tick_count       = 2u;
+    restarted_configuration.body.test_configuration.flags                     = 0u;
     restarted_configuration.body.test_configuration.extension_data =
         HIL_Application_Byte_Span_T{ nullptr, 0u };
 

@@ -251,27 +251,27 @@ HIL_APPLICATION_Peripheral_Config_encode( const HIL_Application_Peripheral_Confi
             running_total += sizeof( data->value.pwm.voltage_level );
             break;
         // case HIL_APPLICATION_PERIPHERAL_CONFIG_COMMUNICATION:
-            // payload_size += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE
-            //                 + sizeof( data->value.communication.bit_rate )
-            //                 + sizeof( data->value.communication.flags )
-            //                 + sizeof( data->value.communication.capture_limit_bytes );
-            // if ( max_payload_size < payload_size )
-            // {
-            //     return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
-            // }
-            // HIL_APPLICATION_Channel_Id_encode( &( data->value.communication.channel ),
-            //                                    &( payload[running_total] ) );
-            // running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-            // memcpy( &( payload[running_total] ), &( data->value.communication.bit_rate ),
-            //         sizeof( data->value.communication.bit_rate ) );
-            // running_total += sizeof( data->value.communication.bit_rate );
-            // memcpy( &( payload[running_total] ), &( data->value.communication.flags ),
-            //         sizeof( data->value.communication.flags ) );
-            // running_total += sizeof( data->value.communication.flags );
-            // memcpy( &( payload[running_total] ), &( data->value.communication.capture_limit_bytes ),
-            //         sizeof( data->value.communication.capture_limit_bytes ) );
-            // running_total += sizeof( data->value.communication.capture_limit_bytes );
-            // break;
+        // payload_size += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE
+        //                 + sizeof( data->value.communication.bit_rate )
+        //                 + sizeof( data->value.communication.flags )
+        //                 + sizeof( data->value.communication.capture_limit_bytes );
+        // if ( max_payload_size < payload_size )
+        // {
+        //     return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+        // }
+        // HIL_APPLICATION_Channel_Id_encode( &( data->value.communication.channel ),
+        //                                    &( payload[running_total] ) );
+        // running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
+        // memcpy( &( payload[running_total] ), &( data->value.communication.bit_rate ),
+        //         sizeof( data->value.communication.bit_rate ) );
+        // running_total += sizeof( data->value.communication.bit_rate );
+        // memcpy( &( payload[running_total] ), &( data->value.communication.flags ),
+        //         sizeof( data->value.communication.flags ) );
+        // running_total += sizeof( data->value.communication.flags );
+        // memcpy( &( payload[running_total] ), &( data->value.communication.capture_limit_bytes ),
+        //         sizeof( data->value.communication.capture_limit_bytes ) );
+        // running_total += sizeof( data->value.communication.capture_limit_bytes );
+        // break;
         case HIL_APPLICATION_PERIPHERAL_CONFIG_RESERVED:
             return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
         default:
@@ -319,7 +319,8 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    memcpy( payload, &( data->tick_duration_us.useconds ), sizeof( data->tick_duration_us.useconds ) );
+    memcpy( payload, &( data->tick_duration_us.useconds ),
+            sizeof( data->tick_duration_us.useconds ) );
     size_t running_total = sizeof( data->tick_duration_us.useconds );
     memcpy( &( payload[running_total] ), &( data->expected_tick_count ),
             sizeof( data->expected_tick_count ) );
