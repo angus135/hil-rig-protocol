@@ -152,7 +152,7 @@ HIL_APPLICATION_Channel_Id_encode( const HIL_Application_Channel_Id_T* data, uin
 
 HIL_Application_Status_T
 HIL_APPLICATION_Digital_Config_encode( const HIL_Application_Digital_Config_T* data,
-                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+                                       size_t max_payload_size, uint8_t* payload, size_t* size )
 {
     /**
     Digital :
@@ -163,18 +163,16 @@ HIL_APPLICATION_Digital_Config_encode( const HIL_Application_Digital_Config_T* d
 
     */
     size_t running_total = 0;
-    HIL_APPLICATION_Channel_Id_encode( &( data->channel ),
-                                        &( payload[running_total] ) );
+    HIL_APPLICATION_Channel_Id_encode( &( data->channel ), &( payload[running_total] ) );
     running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-    memcpy( &( payload[running_total] ), &( data->voltage_level ),
-            sizeof( data->voltage_level ) );
+    memcpy( &( payload[running_total] ), &( data->voltage_level ), sizeof( data->voltage_level ) );
     *size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T
 HIL_APPLICATION_Analog_Config_encode( const HIL_Application_Analog_Config_T* data,
-                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+                                      size_t max_payload_size, uint8_t* payload, size_t* size )
 {
     /**
     Analog :
@@ -185,11 +183,9 @@ HIL_APPLICATION_Analog_Config_encode( const HIL_Application_Analog_Config_T* dat
 
     */
     size_t running_total = 0;
-    HIL_APPLICATION_Channel_Id_encode( &( data->channel ),
-                                        &( payload[running_total] ) );
+    HIL_APPLICATION_Channel_Id_encode( &( data->channel ), &( payload[running_total] ) );
     running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-    memcpy( &( payload[running_total] ), &( data->voltage_level ),
-            sizeof( data->voltage_level ) );
+    memcpy( &( payload[running_total] ), &( data->voltage_level ), sizeof( data->voltage_level ) );
     running_total += sizeof( data->voltage_level );
     *size = running_total;
     return HIL_APPLICATION_STATUS_OK;
@@ -197,7 +193,7 @@ HIL_APPLICATION_Analog_Config_encode( const HIL_Application_Analog_Config_T* dat
 
 HIL_Application_Status_T
 HIL_APPLICATION_Pwm_Config_encode( const HIL_Application_Pwm_Config_T* data,
-                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+                                   size_t max_payload_size, uint8_t* payload, size_t* size )
 {
     /**
     Payload:
@@ -235,8 +231,7 @@ HIL_APPLICATION_Pwm_Config_encode( const HIL_Application_Pwm_Config_T* data,
 
     */
     size_t running_total = 0;
-    HIL_APPLICATION_Channel_Id_encode( &( data->channel ),
-                                        &( payload[running_total] ) );
+    HIL_APPLICATION_Channel_Id_encode( &( data->channel ), &( payload[running_total] ) );
     running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
     memcpy( &( payload[running_total] ), &( data->period_nanoseconds ),
             sizeof( data->period_nanoseconds ) );
@@ -244,8 +239,7 @@ HIL_APPLICATION_Pwm_Config_encode( const HIL_Application_Pwm_Config_T* data,
     memcpy( &( payload[running_total] ), &( data->initial_duty_cycle_permyriad ),
             sizeof( data->initial_duty_cycle_permyriad ) );
     running_total += sizeof( data->initial_duty_cycle_permyriad );
-    memcpy( &( payload[running_total] ), &( data->voltage_level ),
-            sizeof( data->voltage_level ) );
+    memcpy( &( payload[running_total] ), &( data->voltage_level ), sizeof( data->voltage_level ) );
     running_total += sizeof( data->voltage_level );
     *size = running_total;
     return HIL_APPLICATION_STATUS_OK;
@@ -253,7 +247,7 @@ HIL_APPLICATION_Pwm_Config_encode( const HIL_Application_Pwm_Config_T* data,
 
 HIL_Application_Status_T
 HIL_APPLICATION_Can_Config_encode( const HIL_Application_Can_Config_T* data,
-                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+                                   size_t max_payload_size, uint8_t* payload, size_t* size )
 {
     /**
     Communication :
@@ -271,7 +265,7 @@ HIL_APPLICATION_Can_Config_encode( const HIL_Application_Can_Config_T* data,
 
 HIL_Application_Status_T
 HIL_APPLICATION_Spi_Config_encode( const HIL_Application_Spi_Config_T* data,
-                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+                                   size_t max_payload_size, uint8_t* payload, size_t* size )
 {
     /**
     Communication :
@@ -289,7 +283,7 @@ HIL_APPLICATION_Spi_Config_encode( const HIL_Application_Spi_Config_T* data,
 
 HIL_Application_Status_T
 HIL_APPLICATION_Uart_Config_encode( const HIL_Application_Uart_Config_T* data,
-                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+                                    size_t max_payload_size, uint8_t* payload, size_t* size )
 {
     /**
     Communication :
@@ -307,7 +301,7 @@ HIL_APPLICATION_Uart_Config_encode( const HIL_Application_Uart_Config_T* data,
 
 HIL_Application_Status_T
 HIL_APPLICATION_I2c_Config_encode( const HIL_Application_I2c_Config_T* data,
-                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+                                   size_t max_payload_size, uint8_t* payload, size_t* size )
 {
     /**
     Communication :
@@ -485,12 +479,34 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     */
     size_t payload_size =
         sizeof( data->tick_duration_us.useconds ) + sizeof( data->expected_tick_count )
-        + sizeof( data->flags ) + (sizeof( data->digital_in[0].channel.channel ) + sizeof( data->digital_in[0].channel.peripheral ) + sizeof( data->digital_in[0].voltage_level ))*HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT 
-        + (sizeof( data->digital_out[0].channel.channel ) + sizeof( data->digital_out[0].channel.peripheral ) + sizeof( data->digital_out[0].voltage_level ))*HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT 
-        + (sizeof( data->analog_in[0].channel.channel ) + sizeof( data->analog_in[0].channel.peripheral ) + sizeof( data->analog_in[0].voltage_level ))*HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT 
-        + (sizeof( data->analog_out[0].channel.channel ) + sizeof( data->analog_out[0].channel.peripheral ) + sizeof( data->analog_out[0].voltage_level ))*HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT 
-        + (sizeof( data->pwm_in[0].channel.channel ) + sizeof( data->pwm_in[0].channel.peripheral ) + sizeof( data->pwm_in[0].voltage_level ) + sizeof( data->pwm_in[0].initial_duty_cycle_permyriad )+ sizeof( data->pwm_in[0].period_nanoseconds ))*HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT 
-        + (sizeof( data->pwm_out[0].channel.channel ) + sizeof( data->pwm_out[0].channel.peripheral ) + sizeof( data->pwm_out[0].voltage_level ) + sizeof( data->pwm_out[0].initial_duty_cycle_permyriad )+ sizeof( data->pwm_out[0].period_nanoseconds ))*HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; 
+        + sizeof( data->flags )
+        + ( sizeof( data->digital_in[0].channel.channel )
+            + sizeof( data->digital_in[0].channel.peripheral )
+            + sizeof( data->digital_in[0].voltage_level ) )
+              * HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT
+        + ( sizeof( data->digital_out[0].channel.channel )
+            + sizeof( data->digital_out[0].channel.peripheral )
+            + sizeof( data->digital_out[0].voltage_level ) )
+              * HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT
+        + ( sizeof( data->analog_in[0].channel.channel )
+            + sizeof( data->analog_in[0].channel.peripheral )
+            + sizeof( data->analog_in[0].voltage_level ) )
+              * HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT
+        + ( sizeof( data->analog_out[0].channel.channel )
+            + sizeof( data->analog_out[0].channel.peripheral )
+            + sizeof( data->analog_out[0].voltage_level ) )
+              * HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT
+        + ( sizeof( data->pwm_in[0].channel.channel ) + sizeof( data->pwm_in[0].channel.peripheral )
+            + sizeof( data->pwm_in[0].voltage_level )
+            + sizeof( data->pwm_in[0].initial_duty_cycle_permyriad )
+            + sizeof( data->pwm_in[0].period_nanoseconds ) )
+              * HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT
+        + ( sizeof( data->pwm_out[0].channel.channel )
+            + sizeof( data->pwm_out[0].channel.peripheral )
+            + sizeof( data->pwm_out[0].voltage_level )
+            + sizeof( data->pwm_out[0].initial_duty_cycle_permyriad )
+            + sizeof( data->pwm_out[0].period_nanoseconds ) )
+              * HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT;
     if ( max_payload_size < payload_size )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
@@ -507,48 +523,48 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     for ( uint32_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Digital_Config_encode( &( data->digital_in[i] ),
-                                                  ( max_payload_size - running_total ),
-                                                  &( payload[running_total] ), &var_size );
+                                               ( max_payload_size - running_total ),
+                                               &( payload[running_total] ), &var_size );
         running_total += var_size;
         var_size = 0;
     }
     for ( uint32_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Digital_Config_encode( &( data->digital_out[i] ),
-                                                  ( max_payload_size - running_total ),
-                                                  &( payload[running_total] ), &var_size );
+                                               ( max_payload_size - running_total ),
+                                               &( payload[running_total] ), &var_size );
         running_total += var_size;
         var_size = 0;
     }
     for ( uint32_t i = 0; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Analog_Config_encode( &( data->analog_in[i] ),
-                                                  ( max_payload_size - running_total ),
-                                                  &( payload[running_total] ), &var_size );
+                                              ( max_payload_size - running_total ),
+                                              &( payload[running_total] ), &var_size );
         running_total += var_size;
         var_size = 0;
     }
     for ( uint32_t i = 0; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Analog_Config_encode( &( data->analog_out[i] ),
-                                                  ( max_payload_size - running_total ),
-                                                  &( payload[running_total] ), &var_size );
+                                              ( max_payload_size - running_total ),
+                                              &( payload[running_total] ), &var_size );
         running_total += var_size;
         var_size = 0;
     }
     for ( uint32_t i = 0; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Pwm_Config_encode( &( data->pwm_in[i] ),
-                                                  ( max_payload_size - running_total ),
-                                                  &( payload[running_total] ), &var_size );
+                                           ( max_payload_size - running_total ),
+                                           &( payload[running_total] ), &var_size );
         running_total += var_size;
         var_size = 0;
     }
     for ( uint32_t i = 0; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Pwm_Config_encode( &( data->pwm_out[i] ),
-                                                  ( max_payload_size - running_total ),
-                                                  &( payload[running_total] ), &var_size );
+                                           ( max_payload_size - running_total ),
+                                           &( payload[running_total] ), &var_size );
         running_total += var_size;
         var_size = 0;
     }

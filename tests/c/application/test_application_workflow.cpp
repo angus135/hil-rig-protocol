@@ -159,57 +159,57 @@ void PrintMessage( const HIL_Application_Message_T& message )
 
             std::cout << "    flags: " << data.flags << "\n";
 
-            std::cout << "    peripheral_count: " << data.peripheral_count << "\n";
+            // std::cout << "    peripheral_count: " << data.peripheral_count << "\n";
 
-            for ( std::size_t i = 0u; i < data.peripheral_count; ++i )
-            {
-                std::cout << "    peripheral[" << i << "]\n";
+            // for ( std::size_t i = 0u; i < data.peripheral_count; ++i )
+            // {
+            //     std::cout << "    peripheral[" << i << "]\n";
 
-                std::cout << "      type: " << static_cast<unsigned>( data.peripherals[i].type )
-                          << ", ";
-                if ( data.peripherals[i].type == 0 )
-                {
-                    std::cout << "      type: "
-                              << "Config Invalid"
-                              << "\n";
-                }
-                else if ( data.peripherals[i].type == 1 )
-                {
-                    std::cout << "      type: "
-                              << "Digital"
-                              << "\n";
-                    std::cout << "      channel: "
-                              << static_cast<unsigned>(
-                                     data.peripherals[i].value.digital.channel.channel )
-                              << "\n";
-                    std::cout << "      peripheral: "
-                              << static_cast<unsigned>(
-                                     data.peripherals[i].value.digital.channel.peripheral )
-                              << "\n";
-                    std::cout << "      voltage level: "
-                              << static_cast<unsigned>(
-                                     data.peripherals[i].value.digital.voltage_level )
-                              << "\n";
-                }
-                else if ( data.peripherals[i].type == 2 )
-                {
-                    std::cout << "      type: "
-                              << "Analog"
-                              << "\n";
-                }
-                else if ( data.peripherals[i].type == 3 )
-                {
-                    std::cout << "      type: "
-                              << "PWM"
-                              << "\n";
-                }
-                else if ( data.peripherals[i].type == 4 )
-                {
-                    std::cout << "      type: "
-                              << "Communication"
-                              << "\n";
-                }
-            }
+            //     std::cout << "      type: " << static_cast<unsigned>( data.peripherals[i].type )
+            //               << ", ";
+            //     if ( data.peripherals[i].type == 0 )
+            //     {
+            //         std::cout << "      type: "
+            //                   << "Config Invalid"
+            //                   << "\n";
+            //     }
+            //     else if ( data.peripherals[i].type == 1 )
+            //     {
+            //         std::cout << "      type: "
+            //                   << "Digital"
+            //                   << "\n";
+            //         std::cout << "      channel: "
+            //                   << static_cast<unsigned>(
+            //                          data.peripherals[i].value.digital.channel.channel )
+            //                   << "\n";
+            //         std::cout << "      peripheral: "
+            //                   << static_cast<unsigned>(
+            //                          data.peripherals[i].value.digital.channel.peripheral )
+            //                   << "\n";
+            //         std::cout << "      voltage level: "
+            //                   << static_cast<unsigned>(
+            //                          data.peripherals[i].value.digital.voltage_level )
+            //                   << "\n";
+            //     }
+            //     else if ( data.peripherals[i].type == 2 )
+            //     {
+            //         std::cout << "      type: "
+            //                   << "Analog"
+            //                   << "\n";
+            //     }
+            //     else if ( data.peripherals[i].type == 3 )
+            //     {
+            //         std::cout << "      type: "
+            //                   << "PWM"
+            //                   << "\n";
+            //     }
+            //     else if ( data.peripherals[i].type == 4 )
+            //     {
+            //         std::cout << "      type: "
+            //                   << "Communication"
+            //                   << "\n";
+            //     }
+            // }
 
             std::cout << "    extension_data:\n";
             PrintByteSpan( data.extension_data );
@@ -514,21 +514,81 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
                        actual.body.test_configuration.expected_tick_count );
             EXPECT_EQ( expected.body.test_configuration.flags,
                        actual.body.test_configuration.flags );
-            EXPECT_EQ( expected.body.test_configuration.peripheral_count,
-                       actual.body.test_configuration.peripheral_count );
 
-            for ( std::size_t i = 0u; i < expected.body.test_configuration.peripheral_count; ++i )
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; ++i )
             {
                 std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
-                EXPECT_EQ( expected.body.test_configuration.peripherals[i].type,
-                           actual.body.test_configuration.peripherals[i].type );
 
-                EXPECT_EQ(
-                    std::memcmp( &expected.body.test_configuration.peripherals[i].value,
-                                 &actual.body.test_configuration.peripherals[i].value,
-                                 sizeof( expected.body.test_configuration.peripherals[i].value ) ),
-                    0 );
+                EXPECT_EQ( std::memcmp( &expected.body.test_configuration.digital_in[i],
+                                        &actual.body.test_configuration.digital_in[i],
+                                        sizeof( expected.body.test_configuration.digital_in[i] ) ),
+                           0 );
             }
+
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; ++i )
+            {
+                std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
+
+                EXPECT_EQ( std::memcmp( &expected.body.test_configuration.digital_out[i],
+                                        &actual.body.test_configuration.digital_out[i],
+                                        sizeof( expected.body.test_configuration.digital_out[i] ) ),
+                           0 );
+            }
+
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; ++i )
+            {
+                std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
+
+                EXPECT_EQ( std::memcmp( &expected.body.test_configuration.analog_in[i],
+                                        &actual.body.test_configuration.analog_in[i],
+                                        sizeof( expected.body.test_configuration.analog_in[i] ) ),
+                           0 );
+            }
+
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; ++i )
+            {
+                std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
+
+                EXPECT_EQ( std::memcmp( &expected.body.test_configuration.analog_out[i],
+                                        &actual.body.test_configuration.analog_out[i],
+                                        sizeof( expected.body.test_configuration.analog_out[i] ) ),
+                           0 );
+            }
+
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; ++i )
+            {
+                std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
+
+                EXPECT_EQ( std::memcmp( &expected.body.test_configuration.pwm_in[i],
+                                        &actual.body.test_configuration.pwm_in[i],
+                                        sizeof( expected.body.test_configuration.pwm_in[i] ) ),
+                           0 );
+            }
+
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; ++i )
+            {
+                std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
+
+                EXPECT_EQ( std::memcmp( &expected.body.test_configuration.pwm_out[i],
+                                        &actual.body.test_configuration.pwm_out[i],
+                                        sizeof( expected.body.test_configuration.pwm_out[i] ) ),
+                           0 );
+            }
+
+            // for ( std::size_t i = 0u; i < expected.body.test_configuration.peripheral_count; ++i
+            // )
+            // {
+            //     std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
+            //     EXPECT_EQ( expected.body.test_configuration.peripherals[i].type,
+            //                actual.body.test_configuration.peripherals[i].type );
+
+            //     EXPECT_EQ(
+            //         std::memcmp( &expected.body.test_configuration.peripherals[i].value,
+            //                      &actual.body.test_configuration.peripherals[i].value,
+            //                      sizeof( expected.body.test_configuration.peripherals[i].value )
+            //                      ),
+            //         0 );
+            // }
 
             ExpectByteSpanEqual( expected.body.test_configuration.extension_data,
                                  actual.body.test_configuration.extension_data );
@@ -675,36 +735,266 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
 
     static const std::array<std::uint8_t, 5u> variable_bytes{ 9u, 8u, 7u, 6u, 5u };
 
-    static const std::array<HIL_Application_Peripheral_Config_T, 3u> peripherals{
-        [] {
-            HIL_Application_Peripheral_Config_T peripheral{};
-            peripheral.type                             = HIL_APPLICATION_PERIPHERAL_CONFIG_DIGITAL;
-            peripheral.value.digital.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
-            peripheral.value.digital.channel.channel    = 2u;
-            peripheral.value.digital.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-            return peripheral;
-        }(),
+    static const std::array<HIL_Application_Digital_Config_T,
+                            HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT>
+        digital_out_config{
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
+                peripheral.channel.channel    = 1u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
+                peripheral.channel.channel    = 2u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
+                peripheral.channel.channel    = 3u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
+                peripheral.channel.channel    = 4u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
+                peripheral.channel.channel    = 5u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_24V;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
+                peripheral.channel.channel    = 6u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
+                peripheral.channel.channel    = 7u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
+                peripheral.channel.channel    = 8u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_12V;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
+                peripheral.channel.channel    = 9u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
+                peripheral.channel.channel    = 10u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+        };
 
-        [] {
-            HIL_Application_Peripheral_Config_T peripheral{};
-            peripheral.type                            = HIL_APPLICATION_PERIPHERAL_CONFIG_ANALOG;
-            peripheral.value.analog.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT;
-            peripheral.value.analog.channel.channel    = 0u;
-            peripheral.value.analog.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
-            return peripheral;
-        }(),
+    static const std::array<HIL_Application_Digital_Config_T,
+                            HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT>
+        digital_in_config{
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
+                peripheral.channel.channel    = 1u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
+                peripheral.channel.channel    = 2u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
+                peripheral.channel.channel    = 3u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
+                peripheral.channel.channel    = 4u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
+                peripheral.channel.channel    = 5u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_24V;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
+                peripheral.channel.channel    = 6u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
+                peripheral.channel.channel    = 7u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
+                peripheral.channel.channel    = 8u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_12V;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
+                peripheral.channel.channel    = 9u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Digital_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
+                peripheral.channel.channel    = 10u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+        };
 
-        // [] {
-        //     HIL_Application_Peripheral_Config_T peripheral{};
-        //     peripheral.type = HIL_APPLICATION_PERIPHERAL_CONFIG_COMMUNICATION;
-        //     peripheral.value.communication.channel.peripheral  = HIL_APPLICATION_PERIPHERAL_UART;
-        //     peripheral.value.communication.channel.channel     = 0u;
-        //     peripheral.value.communication.bit_rate            = 115200u;
-        //     peripheral.value.communication.flags               = 0u;
-        //     peripheral.value.communication.capture_limit_bytes = variable_bytes.size();
-        //     return peripheral;
-        // }()
-    };
+    static const std::array<HIL_Application_Analog_Config_T,
+                            HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT>
+        analog_out_config{
+            [] {
+                HIL_Application_Analog_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT;
+                peripheral.channel.channel    = 1u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_24V;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Analog_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT;
+                peripheral.channel.channel    = 2u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Analog_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT;
+                peripheral.channel.channel    = 3u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_12V;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Analog_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT;
+                peripheral.channel.channel    = 4u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Analog_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT;
+                peripheral.channel.channel    = 5u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Analog_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT;
+                peripheral.channel.channel    = 6u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+        };
+
+    static const std::array<HIL_Application_Analog_Config_T,
+                            HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT>
+        analog_in_config{
+            [] {
+                HIL_Application_Analog_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT;
+                peripheral.channel.channel    = 1u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Analog_Config_T peripheral{};
+                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT;
+                peripheral.channel.channel    = 2u;
+                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
+                return peripheral;
+            }(),
+        };
+
+    static const std::array<HIL_Application_Pwm_Config_T, HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT>
+        pwm_out_config{
+            [] {
+                HIL_Application_Pwm_Config_T peripheral{};
+                peripheral.channel.peripheral           = HIL_APPLICATION_PERIPHERAL_PWM_OUTPUT;
+                peripheral.channel.channel              = 1u;
+                peripheral.voltage_level                = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
+                peripheral.initial_duty_cycle_permyriad = 60u;
+                peripheral.period_nanoseconds           = 10000u;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Pwm_Config_T peripheral{};
+                peripheral.channel.peripheral           = HIL_APPLICATION_PERIPHERAL_PWM_OUTPUT;
+                peripheral.channel.channel              = 1u;
+                peripheral.voltage_level                = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
+                peripheral.initial_duty_cycle_permyriad = 60u;
+                peripheral.period_nanoseconds           = 10000u;
+                return peripheral;
+            }(),
+        };
+
+    static const std::array<HIL_Application_Pwm_Config_T, HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT>
+        pwm_in_config{
+            [] {
+                HIL_Application_Pwm_Config_T peripheral{};
+                peripheral.channel.peripheral           = HIL_APPLICATION_PERIPHERAL_PWM_INPUT;
+                peripheral.channel.channel              = 1u;
+                peripheral.voltage_level                = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
+                peripheral.initial_duty_cycle_permyriad = 60u;
+                peripheral.period_nanoseconds           = 10000u;
+                return peripheral;
+            }(),
+            [] {
+                HIL_Application_Pwm_Config_T peripheral{};
+                peripheral.channel.peripheral           = HIL_APPLICATION_PERIPHERAL_PWM_INPUT;
+                peripheral.channel.channel              = 1u;
+                peripheral.voltage_level                = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
+                peripheral.initial_duty_cycle_permyriad = 60u;
+                peripheral.period_nanoseconds           = 10000u;
+                return peripheral;
+            }(),
+        };
+
     static const std::array<HIL_Application_Data_Declaration_T, 1u> instruction_data{
         HIL_Application_Data_Declaration_T{
             HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },
@@ -747,8 +1037,30 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
     messages[2].body.test_configuration.tick_duration_us.useconds = 1000000u;
     messages[2].body.test_configuration.expected_tick_count       = 100u;
     messages[2].body.test_configuration.flags                     = 0u;
-    messages[2].body.test_configuration.peripherals               = peripherals.data();
-    messages[2].body.test_configuration.peripheral_count          = peripherals.size();
+    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
+    {
+        messages[2].body.test_configuration.digital_in[i] = digital_in_config.data()[i];
+    }
+    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
+    {
+        messages[2].body.test_configuration.digital_out[i] = digital_out_config.data()[i];
+    }
+    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; i++ )
+    {
+        messages[2].body.test_configuration.analog_in[i] = analog_in_config.data()[i];
+    }
+    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; i++ )
+    {
+        messages[2].body.test_configuration.analog_out[i] = analog_out_config.data()[i];
+    }
+    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; i++ )
+    {
+        messages[2].body.test_configuration.pwm_in[i] = pwm_in_config.data()[i];
+    }
+    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; i++ )
+    {
+        messages[2].body.test_configuration.pwm_out[i] = pwm_out_config.data()[i];
+    }
     messages[2].body.test_configuration.extension_data = HIL_Application_Byte_Span_T{ nullptr, 0u };
 
     messages[3].type                              = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
@@ -1610,8 +1922,6 @@ TEST( ApplicationEncodeDecode, TestConfigurationRoundTrips )
                HIL_APPLICATION_STATUS_OK );
 
     ExpectMessagesEqual( original, decoded );
-
-    EXPECT_EQ( decoded.body.test_configuration.peripheral_count, 3u );
 }
 
 // TEST( ApplicationEncodeDecode, VariableInstructionDataRoundTrips )

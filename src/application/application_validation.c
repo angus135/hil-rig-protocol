@@ -149,10 +149,10 @@ HIL_APPLICATION_Test_Configuration_validate( const HIL_Application_Context_T*   
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
     }
-    if ( data->peripheral_count > HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT )
-    {
-        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    }
+    // if ( data->peripheral_count > HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT )
+    // {
+    //     return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    // }
     if ( data->expected_tick_count > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
@@ -170,14 +170,14 @@ HIL_APPLICATION_Test_Configuration_validate( const HIL_Application_Context_T*   
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
-    for ( uint8_t i = 0; i < data->peripheral_count; i++ )
-    {
-        if ( HIL_APPLICATION_peripheral_config_validate( &( data->peripherals[i] ) )
-             != HIL_APPLICATION_STATUS_OK )
-        {
-            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-        }
-    }
+    // for ( uint8_t i = 0; i < data->peripheral_count; i++ )
+    // {
+    //     if ( HIL_APPLICATION_peripheral_config_validate( &( data->peripherals[i] ) )
+    //          != HIL_APPLICATION_STATUS_OK )
+    //     {
+    //         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    //     }
+    // }
     return HIL_APPLICATION_STATUS_OK;
 }
 
