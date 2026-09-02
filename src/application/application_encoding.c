@@ -24,6 +24,7 @@
 #include "hil_rig_protocol/application/application_system_info.h"
 #include "hil_rig_protocol/application/application_test_config.h"
 #include "hil_rig_protocol/application/application_types.h"
+#include "hil_rig_protocol/application/application_encoding.h"
 
 #include "hil_rig_protocol/version.h"
 
@@ -913,7 +914,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
 HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_encode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Result_Data_T* data,
-    size_t max_payload_size, uint8_t* payload )
+    size_t max_payload_size, uint8_t* payload, size_t* used_size )
 {
     ( void )context;
     ( void )sub_type;
