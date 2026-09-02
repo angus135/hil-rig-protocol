@@ -151,6 +151,179 @@ HIL_APPLICATION_Channel_Id_encode( const HIL_Application_Channel_Id_T* data, uin
 }
 
 HIL_Application_Status_T
+HIL_APPLICATION_Digital_Config_encode( const HIL_Application_Digital_Config_T* data,
+                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+{
+    /**
+    Digital :
+    _______________________________________________________
+    |                         |                            |
+    |       channel {6}       |     voltage_level {4}      |
+    |_________________________|____________________________|
+
+    */
+    size_t running_total = 0;
+    HIL_APPLICATION_Channel_Id_encode( &( data->channel ),
+                                        &( payload[running_total] ) );
+    running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
+    memcpy( &( payload[running_total] ), &( data->voltage_level ),
+            sizeof( data->voltage_level ) );
+    *size = running_total;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Analog_Config_encode( const HIL_Application_Analog_Config_T* data,
+                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+{
+    /**
+    Analog :
+    _______________________________________________________
+    |                         |                            |
+    |      channel {6}        |     voltage level {4}      |
+    |_________________________|____________________________|
+
+    */
+    size_t running_total = 0;
+    HIL_APPLICATION_Channel_Id_encode( &( data->channel ),
+                                        &( payload[running_total] ) );
+    running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
+    memcpy( &( payload[running_total] ), &( data->voltage_level ),
+            sizeof( data->voltage_level ) );
+    running_total += sizeof( data->voltage_level );
+    *size = running_total;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Pwm_Config_encode( const HIL_Application_Pwm_Config_T* data,
+                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+{
+    /**
+    Payload:
+    _______________________________________________________
+    |                         |                            |
+    |         type {4}        |         value {Z}          |
+    |_________________________|____________________________|
+    Value is a Union of 4 different types:
+    Digital :
+    _______________________________________________________
+    |                         |                            |
+    |       channel {6}       |     voltage_level {4}      |
+    |_________________________|____________________________|
+    Analog :
+    _______________________________________________________
+    |                         |                            |
+    |      channel {6}        |     voltage level {4}      |
+    |_________________________|____________________________|
+    PWM :
+    _______________________________________________________
+    |                         |                            |
+    |       channel {6}       |        period nS {4}       |
+    |_________________________|____________________________|
+    |                         |                            |
+    |initial duty cycle pm {2}|      voltage_level {4}     |
+    |_________________________|____________________________|
+    Communication :
+    _______________________________________________________
+    |                         |                            |
+    |       channel {6}       |      bit rate bps {4}      |
+    |_________________________|____________________________|
+    |                         |                            |
+    |        flags {4}        |   capture limit bytes {4}  |
+    |_________________________|____________________________|
+
+    */
+    size_t running_total = 0;
+    HIL_APPLICATION_Channel_Id_encode( &( data->channel ),
+                                        &( payload[running_total] ) );
+    running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
+    memcpy( &( payload[running_total] ), &( data->period_nanoseconds ),
+            sizeof( data->period_nanoseconds ) );
+    running_total += sizeof( data->period_nanoseconds );
+    memcpy( &( payload[running_total] ), &( data->initial_duty_cycle_permyriad ),
+            sizeof( data->initial_duty_cycle_permyriad ) );
+    running_total += sizeof( data->initial_duty_cycle_permyriad );
+    memcpy( &( payload[running_total] ), &( data->voltage_level ),
+            sizeof( data->voltage_level ) );
+    running_total += sizeof( data->voltage_level );
+    *size = running_total;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Can_Config_encode( const HIL_Application_Can_Config_T* data,
+                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+{
+    /**
+    Communication :
+    _______________________________________________________
+    |                         |                            |
+    |       channel {6}       |      bit rate bps {4}      |
+    |_________________________|____________________________|
+    |                         |                            |
+    |        flags {4}        |   capture limit bytes {4}  |
+    |_________________________|____________________________|
+
+    */
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Spi_Config_encode( const HIL_Application_Spi_Config_T* data,
+                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+{
+    /**
+    Communication :
+    _______________________________________________________
+    |                         |                            |
+    |       channel {6}       |      bit rate bps {4}      |
+    |_________________________|____________________________|
+    |                         |                            |
+    |        flags {4}        |   capture limit bytes {4}  |
+    |_________________________|____________________________|
+
+    */
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Uart_Config_encode( const HIL_Application_Uart_Config_T* data,
+                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+{
+    /**
+    Communication :
+    _______________________________________________________
+    |                         |                            |
+    |       channel {6}       |      bit rate bps {4}      |
+    |_________________________|____________________________|
+    |                         |                            |
+    |        flags {4}        |   capture limit bytes {4}  |
+    |_________________________|____________________________|
+
+    */
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_I2c_Config_encode( const HIL_Application_I2c_Config_T* data,
+                                          size_t max_payload_size, uint8_t* payload, size_t* size )
+{
+    /**
+    Communication :
+    _______________________________________________________
+    |                         |                            |
+    |       channel {6}       |      bit rate bps {4}      |
+    |_________________________|____________________________|
+    |                         |                            |
+    |        flags {4}        |   capture limit bytes {4}  |
+    |_________________________|____________________________|
+
+    */
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+}
+
+HIL_Application_Status_T
 HIL_APPLICATION_Peripheral_Config_encode( const HIL_Application_Peripheral_Config_T* data,
                                           size_t max_payload_size, uint8_t* payload, size_t* size )
 {
@@ -296,25 +469,28 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     |    tick duration {4}    |  expected tick count {4}   |
     |_________________________|____________________________|
     |                         |                            |
-    |        flags {4}        |    peripheral count {4}    |
+    |        flags {4}        |    digital out [10] {4}    |
     |_________________________|____________________________|
     |                         |                            |
-    |     *peripherals {Y}    |     extension data {X}     |
+    |   digital in [10] {4}   |     analog out [6] {4}     |
     |_________________________|____________________________|
-
-    *Peripherals expanded:
-    _______________________________________________________
     |                         |                            |
-    |         type {1}        |         *value {Z}         |
+    |     analog in [2] {4}   |        pwm out [2] {4}     |
+    |_________________________|____________________________|
+    |                         |                            |
+    |     pwm in [2] {4}      |     extension data {X}     |
     |_________________________|____________________________|
 
 
     */
     size_t payload_size =
         sizeof( data->tick_duration_us.useconds ) + sizeof( data->expected_tick_count )
-        + sizeof( data->flags ) + sizeof( data->peripheral_count )
-        + ( sizeof( data->peripherals->value ) + sizeof( data->peripherals->type ) )
-              * data->peripheral_count;
+        + sizeof( data->flags ) + (sizeof( data->digital_in[0].channel.channel ) + sizeof( data->digital_in[0].channel.peripheral ) + sizeof( data->digital_in[0].voltage_level ))*HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT 
+        + (sizeof( data->digital_out[0].channel.channel ) + sizeof( data->digital_out[0].channel.peripheral ) + sizeof( data->digital_out[0].voltage_level ))*HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT 
+        + (sizeof( data->analog_in[0].channel.channel ) + sizeof( data->analog_in[0].channel.peripheral ) + sizeof( data->analog_in[0].voltage_level ))*HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT 
+        + (sizeof( data->analog_out[0].channel.channel ) + sizeof( data->analog_out[0].channel.peripheral ) + sizeof( data->analog_out[0].voltage_level ))*HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT 
+        + (sizeof( data->pwm_in[0].channel.channel ) + sizeof( data->pwm_in[0].channel.peripheral ) + sizeof( data->pwm_in[0].voltage_level ) + sizeof( data->pwm_in[0].initial_duty_cycle_permyriad )+ sizeof( data->pwm_in[0].period_nanoseconds ))*HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT 
+        + (sizeof( data->pwm_out[0].channel.channel ) + sizeof( data->pwm_out[0].channel.peripheral ) + sizeof( data->pwm_out[0].voltage_level ) + sizeof( data->pwm_out[0].initial_duty_cycle_permyriad )+ sizeof( data->pwm_out[0].period_nanoseconds ))*HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; 
     if ( max_payload_size < payload_size )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
@@ -327,26 +503,61 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     running_total += sizeof( data->expected_tick_count );
     memcpy( &( payload[running_total] ), &( data->flags ), sizeof( data->flags ) );
     running_total += sizeof( data->flags );
-    memcpy( &( payload[running_total] ), &( data->peripheral_count ),
-            sizeof( data->peripheral_count ) );
-    running_total += sizeof( data->peripheral_count );
     size_t var_size = 0;
-    for ( uint32_t i = 0; i < data->peripheral_count; i++ )
+    for ( uint32_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
     {
-        HIL_APPLICATION_Peripheral_Config_encode( &( data->peripherals[i] ),
+        HIL_APPLICATION_Digital_Config_encode( &( data->digital_in[i] ),
                                                   ( max_payload_size - running_total ),
                                                   &( payload[running_total] ), &var_size );
         running_total += var_size;
         var_size = 0;
     }
-    payload_size = running_total + sizeof( data->flags ) + data->extension_data.size;
+    for ( uint32_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
+    {
+        HIL_APPLICATION_Digital_Config_encode( &( data->digital_out[i] ),
+                                                  ( max_payload_size - running_total ),
+                                                  &( payload[running_total] ), &var_size );
+        running_total += var_size;
+        var_size = 0;
+    }
+    for ( uint32_t i = 0; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; i++ )
+    {
+        HIL_APPLICATION_Analog_Config_encode( &( data->analog_in[i] ),
+                                                  ( max_payload_size - running_total ),
+                                                  &( payload[running_total] ), &var_size );
+        running_total += var_size;
+        var_size = 0;
+    }
+    for ( uint32_t i = 0; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; i++ )
+    {
+        HIL_APPLICATION_Analog_Config_encode( &( data->analog_out[i] ),
+                                                  ( max_payload_size - running_total ),
+                                                  &( payload[running_total] ), &var_size );
+        running_total += var_size;
+        var_size = 0;
+    }
+    for ( uint32_t i = 0; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; i++ )
+    {
+        HIL_APPLICATION_Pwm_Config_encode( &( data->pwm_in[i] ),
+                                                  ( max_payload_size - running_total ),
+                                                  &( payload[running_total] ), &var_size );
+        running_total += var_size;
+        var_size = 0;
+    }
+    for ( uint32_t i = 0; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; i++ )
+    {
+        HIL_APPLICATION_Pwm_Config_encode( &( data->pwm_out[i] ),
+                                                  ( max_payload_size - running_total ),
+                                                  &( payload[running_total] ), &var_size );
+        running_total += var_size;
+        var_size = 0;
+    }
+    payload_size += data->extension_data.size;
     if ( max_payload_size < payload_size )
     {
         *used_size = running_total;
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    memcpy( &( payload[running_total] ), &( data->flags ), sizeof( data->flags ) );
-    running_total += sizeof( data->flags );
     HIL_APPLICATION_Byte_Span_encode( &( data->extension_data ), &( payload[running_total] ) );
     running_total += sizeof( data->extension_data.size );
     running_total += data->extension_data.size;

@@ -150,7 +150,7 @@ typedef struct
     uint32_t flags;
     /** Maximum captured bytes per tick; zero disables result capture. */
     size_t capture_limit_bytes;
-} HIL_Application_CAN_Config_T;
+} HIL_Application_Can_Config_T;
 
 /**
  * @brief Protocol-level serial/bus channel configuration.
@@ -171,7 +171,7 @@ typedef struct
     uint32_t flags;
     /** Maximum captured bytes per tick; zero disables result capture. */
     size_t capture_limit_bytes;
-} HIL_Application_I2C_Config_T;
+} HIL_Application_I2c_Config_T;
 
 /**
  * @brief Protocol-level serial/bus channel configuration.
@@ -192,7 +192,28 @@ typedef struct
     uint32_t flags;
     /** Maximum captured bytes per tick; zero disables result capture. */
     size_t capture_limit_bytes;
-} HIL_Application_SPI_Config_T;
+} HIL_Application_Uart_Config_T;
+
+/**
+ * @brief Protocol-level serial/bus channel configuration.
+ *
+ * @details The flags field reserves family-specific protocol options whose
+ * exact bit assignments remain TODO. It must be zero in the initial protocol
+ * and must not contain MCU register values. A nonzero value is structurally
+ * unsupported.
+ */
+typedef struct
+{
+    // TODO CREATE STRUCT FIELDS
+    /** UART, SPI, I2C, or CAN logical channel. */
+    HIL_Application_Channel_Id_T channel;
+    /** Requested communication rate in bits per second. */
+    uint32_t bit_rate;
+    /** Reserved protocol option bits; must be zero in the initial protocol. */
+    uint32_t flags;
+    /** Maximum captured bytes per tick; zero disables result capture. */
+    size_t capture_limit_bytes;
+} HIL_Application_Spi_Config_T;
 
 /**
  * @brief Tagged peripheral configuration record.
@@ -256,10 +277,31 @@ typedef struct
     uint32_t expected_tick_count;
     /** Reserved test-wide option bits; must be zero in the initial protocol. */
     uint32_t flags;
+
+    HIL_Application_Digital_Config_T digital_out[HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT];
+
+    HIL_Application_Digital_Config_T digital_in[HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT];
+
+    HIL_Application_Analog_Config_T analog_out[HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT];
+
+    HIL_Application_Analog_Config_T analog_in[HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT];
+
+    HIL_Application_Pwm_Config_T pwm_out[HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT];
+
+    HIL_Application_Pwm_Config_T pwm_in[HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT];
+
+    HIL_Application_Can_Config_T can[HIL_APPLICATION_CAN_CHANNEL_COUNT];
+
+    HIL_Application_Spi_Config_T spi[HIL_APPLICATION_SPI_CHANNEL_COUNT];
+
+    HIL_Application_Uart_Config_T uart[HIL_APPLICATION_UART_CHANNEL_COUNT];
+
+    HIL_Application_I2c_Config_T i2c[HIL_APPLICATION_I2C_CHANNEL_COUNT];
+
     /** Number of readable records at peripherals. */
-    uint32_t peripheral_count;
-    /** Peripheral/channel configuration records. */
-    const HIL_Application_Peripheral_Config_T* peripherals;
+    // uint32_t peripheral_count;
+    // /** Peripheral/channel configuration records. */
+    // const HIL_Application_Peripheral_Config_T* peripherals;
     /** Reserved versioned settings bytes; must be empty in the initial protocol. */
     HIL_Application_Byte_Span_T extension_data;
 } HIL_Application_Test_Configuration_T;
