@@ -166,6 +166,7 @@ HIL_APPLICATION_Digital_Config_encode( const HIL_Application_Digital_Config_T* d
     HIL_APPLICATION_Channel_Id_encode( &( data->channel ), &( payload[running_total] ) );
     running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
     memcpy( &( payload[running_total] ), &( data->voltage_level ), sizeof( data->voltage_level ) );
+    running_total += sizeof( data->voltage_level );
     *size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }
@@ -457,22 +458,21 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     ( void )sub_type;
     ( void )test_id;
     /**
-    Payload = 16 Bytes + X + Y peripheral count {4}
     _______________________________________________________
     |                         |                            |
     |    tick duration {4}    |  expected tick count {4}   |
     |_________________________|____________________________|
     |                         |                            |
-    |        flags {4}        |    digital out [10] {4}    |
+    |        flags {4}        |   digital out [10] {10}    |
     |_________________________|____________________________|
     |                         |                            |
-    |   digital in [10] {4}   |     analog out [6] {4}     |
+    |  digital in [10] {10}   |    analog out [6] {10}     |
     |_________________________|____________________________|
     |                         |                            |
-    |     analog in [2] {4}   |        pwm out [2] {4}     |
+    |    analog in [2] {10}   |       pwm out [2] {16}     |
     |_________________________|____________________________|
     |                         |                            |
-    |     pwm in [2] {4}      |     extension data {X}     |
+    |    pwm in [2] {16}      |     extension data {X}     |
     |_________________________|____________________________|
 
 

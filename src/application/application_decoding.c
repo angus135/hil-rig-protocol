@@ -379,13 +379,6 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
     memcpy( &( data->flags ), &( payload[running_total] ), sizeof( data->flags ) );
     running_total += sizeof( data->flags );
     size_t var_total = 0;
-    for ( uint32_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
-    {
-        HIL_APPLICATION_Digital_Config_decode( &( data->digital_out[i] ),
-                                               &( payload[running_total] ), &var_total );
-        running_total += var_total;
-        var_total = 0;
-    }
     for ( uint32_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Digital_Config_decode( &( data->digital_in[i] ),
@@ -393,10 +386,10 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
         running_total += var_total;
         var_total = 0;
     }
-    for ( uint32_t i = 0; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint32_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
     {
-        HIL_APPLICATION_Analog_Config_decode( &( data->analog_out[i] ), &( payload[running_total] ),
-                                              &var_total );
+        HIL_APPLICATION_Digital_Config_decode( &( data->digital_out[i] ),
+                                               &( payload[running_total] ), &var_total );
         running_total += var_total;
         var_total = 0;
     }
@@ -407,16 +400,23 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
         running_total += var_total;
         var_total = 0;
     }
-    for ( uint32_t i = 0; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint32_t i = 0; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; i++ )
     {
-        HIL_APPLICATION_Pwm_Config_decode( &( data->pwm_out[i] ), &( payload[running_total] ),
-                                           &var_total );
+        HIL_APPLICATION_Analog_Config_decode( &( data->analog_out[i] ), &( payload[running_total] ),
+                                              &var_total );
         running_total += var_total;
         var_total = 0;
     }
     for ( uint32_t i = 0; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Pwm_Config_decode( &( data->pwm_in[i] ), &( payload[running_total] ),
+                                           &var_total );
+        running_total += var_total;
+        var_total = 0;
+    }
+    for ( uint32_t i = 0; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; i++ )
+    {
+        HIL_APPLICATION_Pwm_Config_decode( &( data->pwm_out[i] ), &( payload[running_total] ),
                                            &var_total );
         running_total += var_total;
         var_total = 0;

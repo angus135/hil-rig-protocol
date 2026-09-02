@@ -1943,13 +1943,12 @@ TEST( ApplicationEncodeDecode, EverySupportedCodecRoundTrips )
                            decoded_variable.size(), &used_variable_size ),
                        HIL_APPLICATION_STATUS_OK );
 
-            if ( original.type == 18 )
+            if ( original.type == 16 )
             {
                 PrintMessage( original );
                 PrintMessage( decoded );
                 printEncodedArr( encoded, 90 );
             }
-
             ExpectMessagesEqual( original, decoded );
         }
     }
