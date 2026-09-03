@@ -207,7 +207,7 @@ typedef struct
 typedef struct
 {
     /** Requested signed output in microvolts. */
-    int32_t microvolts;
+    uint32_t microvolts;
 } HIL_Application_Analog_Output_Value_T;
 
 /**
@@ -218,7 +218,7 @@ typedef struct
 typedef struct
 {
     /** Captured signed input in microvolts. */
-    int32_t microvolts;
+    uint32_t microvolts;
 } HIL_Application_Analog_Input_Value_T;
 
 /**

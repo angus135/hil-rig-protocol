@@ -159,118 +159,76 @@ void PrintMessage( const HIL_Application_Message_T& message )
 
             std::cout << "    flags: " << data.flags << "\n";
 
-
             for ( std::size_t i = 0u; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; ++i )
             {
                 std::cout << "    digital input [" << i << "]\n";
-                    std::cout << "      channel: "
-                              << static_cast<unsigned>(
-                                     data.digital_in[i].channel.channel )
-                              << "\n";
-                    std::cout << "      peripheral: "
-                              << static_cast<unsigned>(
-                                     data.digital_in[i].channel.peripheral )
-                              << "\n";
-                    std::cout << "      voltage level: "
-                              << static_cast<unsigned>(
-                                     data.digital_in[i].voltage_level )
-                              << "\n";
+                std::cout << "      channel: "
+                          << static_cast<unsigned>( data.digital_in[i].channel.channel ) << "\n";
+                std::cout << "      peripheral: "
+                          << static_cast<unsigned>( data.digital_in[i].channel.peripheral ) << "\n";
+                std::cout << "      voltage level: "
+                          << static_cast<unsigned>( data.digital_in[i].voltage_level ) << "\n";
             }
             for ( std::size_t i = 0u; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; ++i )
             {
                 std::cout << "    digital output [" << i << "]\n";
                 std::cout << "      channel: "
-                            << static_cast<unsigned>(
-                                    data.digital_out[i].channel.channel )
-                            << "\n";
+                          << static_cast<unsigned>( data.digital_out[i].channel.channel ) << "\n";
                 std::cout << "      peripheral: "
-                            << static_cast<unsigned>(
-                                    data.digital_out[i].channel.peripheral )
-                            << "\n";
+                          << static_cast<unsigned>( data.digital_out[i].channel.peripheral )
+                          << "\n";
                 std::cout << "      voltage level: "
-                            << static_cast<unsigned>(
-                                    data.digital_out[i].voltage_level )
-                            << "\n";
+                          << static_cast<unsigned>( data.digital_out[i].voltage_level ) << "\n";
             }
             for ( std::size_t i = 0u; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; ++i )
             {
                 std::cout << "    analog input [" << i << "]\n";
                 std::cout << "      channel: "
-                            << static_cast<unsigned>(
-                                    data.analog_in[i].channel.channel )
-                            << "\n";
+                          << static_cast<unsigned>( data.analog_in[i].channel.channel ) << "\n";
                 std::cout << "      peripheral: "
-                            << static_cast<unsigned>(
-                                    data.analog_in[i].channel.peripheral )
-                            << "\n";
+                          << static_cast<unsigned>( data.analog_in[i].channel.peripheral ) << "\n";
                 std::cout << "      voltage level: "
-                            << static_cast<unsigned>(
-                                    data.analog_in[i].voltage_level )
-                            << "\n";
+                          << static_cast<unsigned>( data.analog_in[i].voltage_level ) << "\n";
             }
             for ( std::size_t i = 0u; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; ++i )
             {
                 std::cout << "    analog output [" << i << "]\n";
                 std::cout << "      channel: "
-                            << static_cast<unsigned>(
-                                    data.analog_out[i].channel.channel )
-                            << "\n";
+                          << static_cast<unsigned>( data.analog_out[i].channel.channel ) << "\n";
                 std::cout << "      peripheral: "
-                            << static_cast<unsigned>(
-                                    data.analog_out[i].channel.peripheral )
-                            << "\n";
+                          << static_cast<unsigned>( data.analog_out[i].channel.peripheral ) << "\n";
                 std::cout << "      voltage level: "
-                            << static_cast<unsigned>(
-                                    data.analog_out[i].voltage_level )
-                            << "\n";
+                          << static_cast<unsigned>( data.analog_out[i].voltage_level ) << "\n";
             }
             for ( std::size_t i = 0u; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; ++i )
             {
                 std::cout << "    pwm input [" << i << "]\n";
                 std::cout << "      channel: "
-                            << static_cast<unsigned>(
-                                    data.pwm_in[i].channel.channel )
-                            << "\n";
+                          << static_cast<unsigned>( data.pwm_in[i].channel.channel ) << "\n";
                 std::cout << "      peripheral: "
-                            << static_cast<unsigned>(
-                                    data.pwm_in[i].channel.peripheral )
-                            << "\n";
+                          << static_cast<unsigned>( data.pwm_in[i].channel.peripheral ) << "\n";
                 std::cout << "      voltage level: "
-                            << static_cast<unsigned>(
-                                    data.pwm_in[i].voltage_level )
-                            << "\n";
+                          << static_cast<unsigned>( data.pwm_in[i].voltage_level ) << "\n";
                 std::cout << "      period ns: "
-                            << static_cast<unsigned>(
-                                    data.pwm_in[i].period_nanoseconds )
-                            << "\n";
+                          << static_cast<unsigned>( data.pwm_in[i].period_nanoseconds ) << "\n";
                 std::cout << "      duty: "
-                            << static_cast<unsigned>(
-                                    data.pwm_in[i].initial_duty_cycle_permyriad )
-                            << "\n";
+                          << static_cast<unsigned>( data.pwm_in[i].initial_duty_cycle_permyriad )
+                          << "\n";
             }
             for ( std::size_t i = 0u; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; ++i )
             {
                 std::cout << "    pwm input [" << i << "]\n";
                 std::cout << "      channel: "
-                            << static_cast<unsigned>(
-                                    data.pwm_out[i].channel.channel )
-                            << "\n";
+                          << static_cast<unsigned>( data.pwm_out[i].channel.channel ) << "\n";
                 std::cout << "      peripheral: "
-                            << static_cast<unsigned>(
-                                    data.pwm_out[i].channel.peripheral )
-                            << "\n";
+                          << static_cast<unsigned>( data.pwm_out[i].channel.peripheral ) << "\n";
                 std::cout << "      voltage level: "
-                            << static_cast<unsigned>(
-                                    data.pwm_out[i].voltage_level )
-                            << "\n";
+                          << static_cast<unsigned>( data.pwm_out[i].voltage_level ) << "\n";
                 std::cout << "      period ns: "
-                            << static_cast<unsigned>(
-                                    data.pwm_out[i].period_nanoseconds )
-                            << "\n";
+                          << static_cast<unsigned>( data.pwm_out[i].period_nanoseconds ) << "\n";
                 std::cout << "      duty: "
-                            << static_cast<unsigned>(
-                                    data.pwm_out[i].initial_duty_cycle_permyriad )
-                            << "\n";
+                          << static_cast<unsigned>( data.pwm_out[i].initial_duty_cycle_permyriad )
+                          << "\n";
             }
 
             std::cout << "    extension_data:\n";

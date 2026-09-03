@@ -21,7 +21,7 @@
  |   Message Type {4}  |  Message Sub-Type {4}  |
  |_____________________|________________________|
  |                                              |
- |         Payload Size (Bytes) {16}            |
+ |         Payload Size (Bytes) {4}            |
  |______________________________________________|
  |                                              |
  |                  Payload                     |
