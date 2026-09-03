@@ -14,14 +14,14 @@
 
 /**
  ________________________________________________
- |                                              |
- |                Test ID {16}                  |
- |______________________________________________|
+ |                     |                        |
+ |   Has Test ID {1}   |      Test ID {16}      |
+ |_____________________|________________________|
  |                     |                        |
  |   Message Type {4}  |  Message Sub-Type {4}  |
  |_____________________|________________________|
  |                                              |
- |         Payload Size (Bytes) {4}            |
+ |          Payload Size (Bytes) {4}            |
  |______________________________________________|
  |                                              |
  |                  Payload                     |
@@ -37,22 +37,27 @@ HIL_Application_Status_T HIL_APPLICATION_Header_Encoding( const HIL_Application_
      *
      */
     // Test ID
+    size_t running_total = 0;
+    memcpy( dest, &( message->has_test_id ), sizeof( message->has_test_id ) );
+    running_total += sizeof( message->has_test_id );
     if ( message->has_test_id != 0 )
     {
-        memcpy( dest, &( message->test_id ), sizeof( message->test_id ) );
+        memcpy( &( dest[running_total] ), &( message->test_id ), sizeof( message->test_id ) );
     }
     else
     {
-        for ( uint8_t i = 0; i < sizeof( message->test_id ); i++ )
+        for ( size_t i = running_total; i < running_total + sizeof( message->test_id ); i++ )
         {
             dest[i] = 0U;
         }
     }
+    running_total += sizeof( message->test_id );
     // Message Type
-    memcpy( &( dest[sizeof( message->test_id )] ), &( message->type ), sizeof( message->type ) );
+    memcpy( &( dest[running_total] ), &( message->type ), sizeof( message->type ) );
+    running_total += sizeof( message->type );
     // Message sub-Type
-    memcpy( &( dest[sizeof( message->test_id ) + sizeof( message->type )] ), &( message->subtype ),
-            sizeof( message->subtype ) );
+    memcpy( &( dest[running_total] ), &( message->subtype ), sizeof( message->subtype ) );
+    running_total += sizeof( message->subtype );
     // We don't know the size of the payload yet so leave it blank but store the pointer
     return HIL_APPLICATION_STATUS_OK;
 }
@@ -63,22 +68,20 @@ HIL_APPLICATION_Header_decoding( const HIL_Application_Context_T* old_context,
 {
     // Test ID
 
-    memcpy( &( new_message->test_id ), encoded_message, sizeof( new_message->test_id ) );
-    new_message->has_test_id = 0;
-    for ( size_t i = 0; i < sizeof( new_message->test_id ); i++ )
-    {
-        if ( new_message->test_id.bytes[i] != 0 )
-        {
-            new_message->has_test_id = 1;
-        }
-    }
+    size_t running_total = 0;
+    memcpy( &( new_message->has_test_id ), encoded_message, sizeof( new_message->has_test_id ) );
+    running_total += sizeof( new_message->has_test_id );
+    memcpy( &( new_message->test_id ), &( encoded_message[running_total] ),
+            sizeof( new_message->test_id ) );
+    running_total += sizeof( new_message->test_id );
     // Message Type
-    memcpy( &( new_message->type ), &( encoded_message[sizeof( new_message->test_id )] ),
+    memcpy( &( new_message->type ), &( encoded_message[running_total] ),
             sizeof( new_message->type ) );
+    running_total += sizeof( new_message->type );
     // Message sub-Type
-    memcpy( &( new_message->subtype ),
-            &( encoded_message[sizeof( new_message->test_id ) + sizeof( new_message->type )] ),
+    memcpy( &( new_message->subtype ), &( encoded_message[running_total] ),
             sizeof( new_message->subtype ) );
+    running_total += sizeof( new_message->subtype );
     // We don't know the size of the payload yet so leave it blank but store the pointer
     return HIL_APPLICATION_STATUS_OK;
 }

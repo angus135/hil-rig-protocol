@@ -273,10 +273,9 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
     size_t max_payload_size =
         out_buffer_size
         - HIL_APPLICATION_HEADER_SIZE_BYTES;  // calculate the maximum allow-able payload size
-    size_t   payload_size = 0;
-    uint8_t* payload_size_pointer =
-        &( out_buffer[sizeof( message->test_id ) + sizeof( message->type )
-                      + sizeof( message->subtype )] );
+    size_t   payload_size         = 0;
+    uint8_t* payload_size_pointer = &(
+        out_buffer[HIL_APPLICATION_HEADER_SIZE_BYTES - HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES] );
     HIL_Application_Status_T tracker =
         HIL_APPLICATION_Header_Encoding( message, context, out_buffer );
     if ( tracker != HIL_APPLICATION_STATUS_OK )
