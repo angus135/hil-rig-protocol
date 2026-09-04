@@ -10,8 +10,9 @@ The current design has two public layers:
 
 - **Application Layer** — defines typed messages and the exchange contract for
   system information, test configuration, instructions, execution control,
-  results, responses, and errors. Its future stateless codec converts between
-  typed data and one complete Application message.
+  results, responses, and errors. Its stateless C codec converts between typed
+  data and one complete, architecture-independent Application message. Several
+  message-family operations remain deliberately `NOT_IMPLEMENTED`.
 - **Transport Layer** — carries each complete, opaque Application message over
   a caller-owned byte stream. Its facade is designed to own framing, integrity,
   session establishment, ordered reliable delivery, and recovery without
@@ -28,9 +29,11 @@ typed firmware/Python data
     -> caller-owned USB/UART/serial I/O
 ```
 
-Reception follows the reverse path. The MVP returns one complete Application
-message before a future Application codec decodes it. It places each message in
-one Transport frame; fragmentation and reassembly are outside the MVP.
+Reception follows the reverse path. Transport returns one complete opaque
+Application message, which the stateless Application codec can decode and
+structurally validate where that message family is currently supported. The MVP
+places each message in one Transport frame; fragmentation and reassembly are
+outside the MVP.
 
 The layer boundary is deliberate:
 
@@ -57,10 +60,13 @@ the Python wheel statically contains that core behind a private CFFI extension.
 Comprehensive public two-endpoint C and Python integration suites cover normal,
 backpressure, reliability, corruption, reset, recovery, and ownership behavior.
 
-Application encoding, decoding, and structural validation are intentional
-`HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` stubs, and the common Application wire
-envelope is not defined. The MVP Transport wire path is implemented: versioned
-little-endian frames use CRC-32/ISO-HDLC for accidental-corruption detection,
+The Application layer now has a fixed 23-byte architecture-independent common
+envelope, bounded encode/decode paths, structural validation, and working fixed
+body codecs for the currently supported families. Deliberately deferred sizing,
+variable-data, Response/Error, communication-configuration, and detailed fixed-I/O
+semantics continue to return `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` where
+appropriate. The MVP Transport wire path is implemented: versioned little-endian
+frames use CRC-32/ISO-HDLC for accidental-corruption detection,
 standard COBS encoding, and a trailing `0x00` stream delimiter. Workspace
 sizing, initialization, and the bounded stream parser are also implemented.
 
@@ -174,9 +180,11 @@ Normal Application integrations include only:
 
 The public context holds structural codec bounds only. Callers own encoded
 buffers and aligned decode storage, and the codec retains no message or buffer
-pointers after a call. The MVP API has one compiled-in Application protocol
-version, 1.0; callers cannot select or negotiate another version.
+pointers after a call. The Application envelope uses the repository-wide
+compiled protocol major/minor version; callers cannot select or negotiate a
+separate Application version.
 
+- [Application wire-format reference](docs/application_layer/application_wire_format.md)
 - [Application codec and transaction contract](docs/application_layer/application_layer.md)
 - [Application message definitions](docs/application_layer/application_messages.md)
 - [Application caller workflow](docs/application_layer/application_api_usage.mmd)

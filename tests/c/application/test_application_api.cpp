@@ -362,9 +362,9 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
     messages[2].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     messages[2].has_test_id = 1u;
     messages[2].test_id     = test_id;
-    messages[2].body.test_configuration.tick_duration_us.useconds = 1000000u;
-    messages[2].body.test_configuration.expected_tick_count       = 100u;
-    messages[2].body.test_configuration.flags                     = 0u;
+    messages[2].body.test_configuration.tick_duration_us.microseconds = 1000u;
+    messages[2].body.test_configuration.expected_tick_count           = 100u;
+    messages[2].body.test_configuration.flags                         = 0u;
     for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
     {
         messages[2].body.test_configuration.digital_in[i] = digital_in_config.data()[i];
@@ -477,8 +477,9 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
 }  // namespace
 
 static_assert( HIL_APPLICATION_TEST_ID_SIZE == 16u );
-static_assert( HIL_APPLICATION_PROTOCOL_VERSION_MAJOR == 1u );
-static_assert( HIL_APPLICATION_PROTOCOL_VERSION_MINOR == 0u );
+static_assert( HIL_RIG_PROTOCOL_VERSION_MAJOR <= UINT8_MAX );
+static_assert( HIL_RIG_PROTOCOL_VERSION_MINOR <= UINT8_MAX );
+static_assert( HIL_APPLICATION_HEADER_SIZE_BYTES == 23u );
 static_assert( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT > 0u );
 static_assert( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT >= alignof( std::uint8_t ) );
 static_assert( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT

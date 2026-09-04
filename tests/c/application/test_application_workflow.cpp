@@ -152,7 +152,7 @@ void PrintMessage( const HIL_Application_Message_T& message )
 
             std::cout << "  Test Configuration\n";
 
-            std::cout << "    tick_duration_us.useconds: " << data.tick_duration_us.useconds
+            std::cout << "    tick_duration_us.microseconds: " << data.tick_duration_us.microseconds
                       << "\n";
 
             std::cout << "    expected_tick_count: " << data.expected_tick_count << "\n";
@@ -526,8 +526,8 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
             std::cout << "testing test config..." << "\n";
-            EXPECT_EQ( expected.body.test_configuration.tick_duration_us.useconds,
-                       actual.body.test_configuration.tick_duration_us.useconds );
+            EXPECT_EQ( expected.body.test_configuration.tick_duration_us.microseconds,
+                       actual.body.test_configuration.tick_duration_us.microseconds );
             EXPECT_EQ( expected.body.test_configuration.expected_tick_count,
                        actual.body.test_configuration.expected_tick_count );
             EXPECT_EQ( expected.body.test_configuration.flags,
@@ -1040,9 +1040,9 @@ std::array<HIL_Application_Message_T, 11u> ConstructCodecMessages()
     messages[2].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     messages[2].has_test_id = 1u;
     messages[2].test_id     = test_id;
-    messages[2].body.test_configuration.tick_duration_us.useconds = 1000000u;
-    messages[2].body.test_configuration.expected_tick_count       = 100u;
-    messages[2].body.test_configuration.flags                     = 0u;
+    messages[2].body.test_configuration.tick_duration_us.microseconds = 1000u;
+    messages[2].body.test_configuration.expected_tick_count           = 100u;
+    messages[2].body.test_configuration.flags                         = 0u;
     for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
     {
         messages[2].body.test_configuration.digital_in[i] = digital_in_config.data()[i];
@@ -1200,9 +1200,9 @@ void CompileCodecFacadeUsage()
     configuration.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     configuration.has_test_id = 1u;
     configuration.test_id     = ExampleTestId( 0x11u );
-    configuration.body.test_configuration.tick_duration_us.useconds = 1000000u;
-    configuration.body.test_configuration.expected_tick_count       = 2u;
-    configuration.body.test_configuration.flags                     = 0u;
+    configuration.body.test_configuration.tick_duration_us.microseconds = 1000u;
+    configuration.body.test_configuration.expected_tick_count           = 2u;
+    configuration.body.test_configuration.flags                         = 0u;
     configuration.body.test_configuration.extension_data =
         HIL_Application_Byte_Span_T{ nullptr, 0u };
 
@@ -1234,9 +1234,9 @@ void CompileUploadConformanceScenarios()
     configuration.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     configuration.has_test_id = 1u;
     configuration.test_id     = test_a;
-    configuration.body.test_configuration.tick_duration_us.useconds = 1000000u;
-    configuration.body.test_configuration.expected_tick_count       = 2u;
-    configuration.body.test_configuration.flags                     = 0u;
+    configuration.body.test_configuration.tick_duration_us.microseconds = 1000u;
+    configuration.body.test_configuration.expected_tick_count           = 2u;
+    configuration.body.test_configuration.flags                         = 0u;
     configuration.body.test_configuration.extension_data =
         HIL_Application_Byte_Span_T{ nullptr, 0u };
 
@@ -1560,9 +1560,9 @@ void CompileSerializedOperationScenario()
     configuration.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     configuration.has_test_id = 1u;
     configuration.test_id     = test_a;
-    configuration.body.test_configuration.tick_duration_us.useconds = 1000000u;
-    configuration.body.test_configuration.expected_tick_count       = 1u;
-    configuration.body.test_configuration.flags                     = 0u;
+    configuration.body.test_configuration.tick_duration_us.microseconds = 1000u;
+    configuration.body.test_configuration.expected_tick_count           = 1u;
+    configuration.body.test_configuration.flags                         = 0u;
     configuration.body.test_configuration.extension_data =
         HIL_Application_Byte_Span_T{ nullptr, 0u };
 
@@ -1648,9 +1648,9 @@ void CompileRecoveryConformanceScenarios()
     restarted_configuration.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     restarted_configuration.has_test_id = 1u;
     restarted_configuration.test_id     = restarted_test;
-    restarted_configuration.body.test_configuration.tick_duration_us.useconds = 1000000u;
-    restarted_configuration.body.test_configuration.expected_tick_count       = 2u;
-    restarted_configuration.body.test_configuration.flags                     = 0u;
+    restarted_configuration.body.test_configuration.tick_duration_us.microseconds = 1000u;
+    restarted_configuration.body.test_configuration.expected_tick_count           = 2u;
+    restarted_configuration.body.test_configuration.flags                         = 0u;
     restarted_configuration.body.test_configuration.extension_data =
         HIL_Application_Byte_Span_T{ nullptr, 0u };
 
@@ -1694,13 +1694,13 @@ TEST( ApplicationDefaultConfig, RejectsNullPointer )
     EXPECT_EQ( HIL_APPLICATION_Default_Config( nullptr ), HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
 }
 
-TEST( ApplicationDefaultConfig, ProducesProtocolMaximumConfiguration )
+TEST( ApplicationDefaultConfig, ProducesDefaultOperationalConfiguration )
 {
     HIL_Application_Config_T config{};
 
     ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
 
-    EXPECT_EQ( config.max_encoded_message_size, HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE );
+    EXPECT_EQ( config.max_encoded_message_size, HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE );
 
     EXPECT_EQ( config.max_variable_data_size, HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE );
 
@@ -1763,16 +1763,41 @@ TEST( ApplicationInit, RejectsExcessiveExpectedTickCount )
     EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_INVALID_LENGTH );
 }
 
-TEST( ApplicationInit, RejectsInsufficientEncodedMessageSize )
+TEST( ApplicationInit, RejectsEncodedMessageSizeBelowStructuralMinimum )
 {
     HIL_Application_Config_T  config{};
     HIL_Application_Context_T context{};
 
     ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
 
-    config.max_encoded_message_size = HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE - 1u;
+    config.max_encoded_message_size = HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE - 1u;
 
     EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL );
+    EXPECT_EQ( context.initialized, 0u );
+}
+
+TEST( ApplicationInit, AcceptsReducedValidEncodedMessageSize )
+{
+    HIL_Application_Config_T  config{};
+    HIL_Application_Context_T context{};
+
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+    config.max_encoded_message_size = 128u;
+
+    ASSERT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( context.config.max_encoded_message_size, 128u );
+}
+
+TEST( ApplicationInit, RejectsEncodedMessageSizeAboveRepresentableMaximum )
+{
+    HIL_Application_Config_T  config{};
+    HIL_Application_Context_T context{};
+
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+    config.max_encoded_message_size = HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE + 1u;
+
+    EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_INVALID_LENGTH );
+    EXPECT_EQ( context.initialized, 0u );
 }
 
 TEST( ApplicationInit, RejectsExcessiveVariableDataSize )
@@ -1867,7 +1892,9 @@ TEST( ApplicationEncodeDecode, EverySupportedCodecRoundTrips )
     {
         // skip if it is a variable length test
         if ( original.type != HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA
-             && original.type != HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA )
+             && original.type != HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA
+             && original.type != HIL_APPLICATION_MESSAGE_TYPE_RESPONSE
+             && original.type != HIL_APPLICATION_MESSAGE_TYPE_ERROR )
         {
             std::array<std::uint8_t, 4096u> encoded{};
             std::size_t                     encoded_size = 0u;
@@ -1912,6 +1939,13 @@ TEST( ApplicationEncodeDecode, TestConfigurationRoundTrips )
     ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &original, encoded.data(), encoded.size(),
                                                &encoded_size ),
                HIL_APPLICATION_STATUS_OK );
+
+    /* 1000 us is encoded directly as little-endian uint32_t 0x000003E8. */
+    ASSERT_GT( encoded_size, HIL_APPLICATION_HEADER_SIZE_BYTES + 3u );
+    EXPECT_EQ( encoded[HIL_APPLICATION_HEADER_SIZE_BYTES + 0u], 0xe8u );
+    EXPECT_EQ( encoded[HIL_APPLICATION_HEADER_SIZE_BYTES + 1u], 0x03u );
+    EXPECT_EQ( encoded[HIL_APPLICATION_HEADER_SIZE_BYTES + 2u], 0x00u );
+    EXPECT_EQ( encoded[HIL_APPLICATION_HEADER_SIZE_BYTES + 3u], 0x00u );
 
     HIL_Application_Message_T       decoded{};
     std::array<std::uint8_t, 2048u> decode_storage{};
@@ -2047,7 +2081,8 @@ TEST( ApplicationEncode, RejectsInvalidMessageType )
 
     EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, buffer.data(), buffer.size(),
                                                &output_size ),
-               HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE );
+               HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE );
+    EXPECT_EQ( output_size, 0u );
 }
 
 TEST( ApplicationEncode, RejectsReservedMessageType )
@@ -2062,7 +2097,24 @@ TEST( ApplicationEncode, RejectsReservedMessageType )
 
     EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, buffer.data(), buffer.size(),
                                                &output_size ),
-               HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
+               HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE );
+    EXPECT_EQ( output_size, 0u );
+}
+
+TEST( ApplicationEncode, DeliberatelyUnfinishedFamiliesRemainNotImplemented )
+{
+    HIL_Application_Context_T       context  = MakeContext();
+    const auto                      messages = ConstructCodecMessages();
+    std::array<std::uint8_t, 4096u> buffer{};
+
+    for ( const auto index : std::array<std::size_t, 4u>{ 4u, 8u, 9u, 10u } )
+    {
+        std::size_t output_size = 123u;
+        EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &messages[index], buffer.data(),
+                                                   buffer.size(), &output_size ),
+                   HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
+        EXPECT_EQ( output_size, 0u );
+    }
 }
 
 TEST( ApplicationDecode, InvalidHeaderIsRejected )

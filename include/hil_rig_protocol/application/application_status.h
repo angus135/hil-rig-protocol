@@ -19,8 +19,9 @@ extern "C"
  * @brief Result of one local Application API operation.
  *
  * @details Numeric assignments are explicit for stable bindings and diagnostic
- * output. They do not define the eventual wire representation. Function-level
- * documentation specifies output guarantees for each result.
+ * output. They are local API values and are never serialized as Application
+ * wire fields. Function-level documentation specifies output guarantees for
+ * each result.
  */
 typedef enum
 {
@@ -42,7 +43,7 @@ typedef enum
     /** The subtype is invalid for the selected message type. */
     HIL_APPLICATION_STATUS_INVALID_SUBTYPE = 5,
 
-    /** Encoded bytes violate the eventual Application envelope or body syntax. */
+    /** Encoded bytes violate the Application envelope or body syntax. */
     HIL_APPLICATION_STATUS_MALFORMED_MESSAGE = 6,
 
     /** A complete-message input ends before all declared fields are present. */
@@ -54,7 +55,7 @@ typedef enum
     /** An element count is invalid or exceeds configured policy. */
     HIL_APPLICATION_STATUS_INVALID_COUNT = 9,
 
-    /** Message feature or Application protocol version is unsupported. */
+    /** Message feature or overall HIL-RIG protocol version is unsupported. */
     HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE = 10,
 
     /** Test-ID presence is inconsistent with the selected message structure. */
