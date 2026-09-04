@@ -290,19 +290,14 @@ typedef struct
 
     HIL_Application_Pwm_Config_T pwm_in[HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT];
 
-    HIL_Application_Can_Config_T can[HIL_APPLICATION_CAN_CHANNEL_COUNT];
+    // HIL_Application_Can_Config_T can[HIL_APPLICATION_CAN_CHANNEL_COUNT];
 
-    HIL_Application_Spi_Config_T spi[HIL_APPLICATION_SPI_CHANNEL_COUNT];
+    // HIL_Application_Spi_Config_T spi[HIL_APPLICATION_SPI_CHANNEL_COUNT];
 
-    HIL_Application_Uart_Config_T uart[HIL_APPLICATION_UART_CHANNEL_COUNT];
+    // HIL_Application_Uart_Config_T uart[HIL_APPLICATION_UART_CHANNEL_COUNT];
 
-    HIL_Application_I2c_Config_T i2c[HIL_APPLICATION_I2C_CHANNEL_COUNT];
+    // HIL_Application_I2c_Config_T i2c[HIL_APPLICATION_I2C_CHANNEL_COUNT];
 
-    /** Number of readable records at peripherals. */
-    // uint32_t peripheral_count;
-    // /** Peripheral/channel configuration records. */
-    // const HIL_Application_Peripheral_Config_T* peripherals;
-    /** Reserved versioned settings bytes; must be empty in the initial protocol. */
     HIL_Application_Byte_Span_T extension_data;
 } HIL_Application_Test_Configuration_T;
 

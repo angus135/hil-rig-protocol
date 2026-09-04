@@ -41,8 +41,58 @@ extern "C"
 // DIO {20}, AIO {12}, PWMIO {4} + HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK =
 #define HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT 24U
 // Test Instruction
+/**
+    What is written to the wire:
+
+    ________________________________________________
+    |                                              |
+    |               Has Test ID {1}                |
+    |______________________________________________|
+    |                                              |
+    |                Test ID {16}                  |
+    |______________________________________________|
+    |                     |                        |
+    |   Message Type {4}  |  Message Sub-Type {4}  |
+    |_____________________|________________________|
+    |                                              |
+    |           Payload Size (Bytes) {4}           |
+    |______________________________________________|
+    |                                              |
+    |                Payload {X}                   |
+    |______________________________________________|
+    |                                              |
+    |            Payload end flag {1}              |
+    |______________________________________________|
+
+    i.e. 30 bytes plus payload bytes
+
+    The largest payload at the moment (4/09/2026) is configuration:
+
+    _______________________________________________________
+    |                         |                            |
+    |    tick duration {4}    |  expected tick count {4}   |
+    |_________________________|____________________________|
+    |                         |                            |
+    |        flags {4}        |   digital out [10] {10}    |
+    |_________________________|____________________________|
+    |                         |                            |
+    |  digital in [10] {10}   |    analog out [6] {10}     |
+    |_________________________|____________________________|
+    |                         |                            |
+    |    analog in [2] {10}   |       pwm out [2] {16}     |
+    |_________________________|____________________________|
+    |                         |                            |
+    |    pwm in [2] {16}      |     extension data {X}     |
+    |_________________________|____________________________|
+
+    extension data has a max size of 255 (defined by HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE)
+
+    meaning the max payload message size is: 611
+    and the max message size is: 641
+
+*/
 #define HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE                                                  \
-    2139U  // as calculated by HIL_APPLICATION_Test_Instructions_encode
+    641U  // as calculated by HIL_APPLICATION_Test_Instructions_encode
 #define HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT 1000000U  // Arbitrarily selected
 
 // Header defines
