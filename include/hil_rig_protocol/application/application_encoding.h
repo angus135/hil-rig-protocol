@@ -209,7 +209,7 @@ HIL_Application_Status_T HIL_APPLICATION_Response_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Response_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
-    /**
+/**
  * @brief Encode an error.
  *
  * @param[in]  context          Application context.
@@ -218,7 +218,7 @@ HIL_Application_Status_T HIL_APPLICATION_Response_encode(
  * @param[in]  data             Response data.
  * @param[in]  max_payload_size Maximum available payload size in bytes.
  * @param[out] payload          Destination payload buffer.
-  * @param[out] used_size       the number of bytes written to the payload buffe
+ * @param[out] used_size       the number of bytes written to the payload buffe
  *
  * @return Application status.
  */

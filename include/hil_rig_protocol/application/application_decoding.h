@@ -98,7 +98,8 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
  * @param[in] max_decoded_data_size       Number of bytes available within decoded_data.
  * @param[out] used_decoded_size          Number of bytes used in decoded_data.
  * @param[out] decoded_variable_data          A buffer of data structs for varialbe data.
- * @param[in] max_decoded_variable_data_num       Number of data structs available within decoded_data.
+ * @param[in] max_decoded_variable_data_num       Number of data structs available within
+ * decoded_data.
  * @param[out] used_decoded_variable_nume          Number of datastructs used in decoded_data.
  *
  * @return Application status.
@@ -191,7 +192,8 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_decode(
  * @param[in] max_decoded_data_size       Number of bytes available within decoded_data.
  * @param[out] used_decoded_size          Number of bytes used in decoded_data.
  * @param[out] decoded_variable_data          A buffer of data structs for varialbe data.
- * @param[in] max_decoded_variable_data_num       Number of data structs available within decoded_data.
+ * @param[in] max_decoded_variable_data_num       Number of data structs available within
+ * decoded_data.
  * @param[out] used_decoded_variable_nume          Number of datastructs used in decoded_data.
  *
  * @return Application status.
