@@ -141,7 +141,7 @@ typedef struct
  */
 typedef struct
 {
-    // TODO CREATE STRUCT FIELDS
+    /* Placeholder shape retained; family-specific configuration semantics are deferred. */
     /** UART, SPI, I2C, or CAN logical channel. */
     HIL_Application_Channel_Id_T channel;
     /** Requested communication rate in bits per second. */
@@ -162,7 +162,7 @@ typedef struct
  */
 typedef struct
 {
-    // TODO CREATE STRUCT FIELDS
+    /* Placeholder shape retained; family-specific configuration semantics are deferred. */
     /** UART, SPI, I2C, or CAN logical channel. */
     HIL_Application_Channel_Id_T channel;
     /** Requested communication rate in bits per second. */
@@ -183,7 +183,7 @@ typedef struct
  */
 typedef struct
 {
-    // TODO CREATE STRUCT FIELDS
+    /* Placeholder shape retained; family-specific configuration semantics are deferred. */
     /** UART, SPI, I2C, or CAN logical channel. */
     HIL_Application_Channel_Id_T channel;
     /** Requested communication rate in bits per second. */
@@ -204,7 +204,7 @@ typedef struct
  */
 typedef struct
 {
-    // TODO CREATE STRUCT FIELDS
+    /* Placeholder shape retained; family-specific configuration semantics are deferred. */
     /** UART, SPI, I2C, or CAN logical channel. */
     HIL_Application_Channel_Id_T channel;
     /** Requested communication rate in bits per second. */
@@ -220,9 +220,10 @@ typedef struct
  *
  * @details type selects exactly one union member. Within one Test
  * Configuration, each (peripheral, channel) pair may appear at most once;
- * duplicate records are structurally invalid rather than first-wins or
- * last-wins. The codec validates tag/member and uniqueness rules, but firmware
- * decides channel support and electrical feasibility.
+ * duplicate records are intended to be structurally invalid rather than
+ * first-wins or last-wins. Detailed configuration tag/member and uniqueness
+ * validation is deliberately deferred from the current foundation; firmware
+ * still decides channel support and electrical feasibility.
  */
 typedef struct
 {
@@ -260,34 +261,53 @@ typedef struct
  * transaction. A negative Response creates no transaction; host integration
  * starts a new upload from Test Configuration with a fresh random Test ID.
  *
- * peripherals points to peripheral_count records and is borrowed only during
- * validation/encoding; after decoding it points into caller-owned decode
- * storage.
+ * The current C representation contains fixed-size Digital, Analogue and PWM
+ * configuration arrays. Communication-family configuration remains reserved
+ * for later work rather than being represented by a generic peripherals array.
  *
- * flags must be zero and extension_data must be empty in the initial protocol.
- * They reserve versioned test-wide settings approved later. A nonzero flag or
- * nonempty extension produces HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE and
- * must not be used to smuggle hardware mappings.
+ * flags and extension_data reserve future test-wide settings. Their detailed
+ * semantic validation is deliberately deferred from the current foundation.
+ * The codec currently validates only the generic byte-span pointer invariant
+ * for extension_data; it does not require the span to be empty or flags to be
+ * zero in this foundation.
+ *
+ * The wire encoder does not copy this C structure. Its current fixed payload
+ * order is tick duration, expected tick count, flags, Digital Input records,
+ * Digital Output records, Analogue Input records, Analogue Output records, PWM
+ * Input records, PWM Output records, then the length-delimited extension span.
+ * See application_wire_format.md for exact byte offsets.
  */
 typedef struct
 {
-    /** Unit-explicit duration represented by one instruction tick. */
+    /**
+     * Duration represented by one instruction tick, in microseconds.
+     * Encoded directly as one little-endian uint32_t value.
+     */
     HIL_Application_Tick_Duration_T tick_duration_us;
     /** Nonzero upload length N, defining valid ticks 0 through N - 1. */
     uint32_t expected_tick_count;
-    /** Reserved test-wide option bits; must be zero in the initial protocol. */
+    /**
+     * Reserved test-wide option bits; zero is the initial design value, with
+     * enforcement deferred.
+     */
     uint32_t flags;
 
+    /** Fixed Digital Output configuration array; wire order is documented separately. */
     HIL_Application_Digital_Config_T digital_out[HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT];
 
+    /** Fixed Digital Input configuration array. */
     HIL_Application_Digital_Config_T digital_in[HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT];
 
+    /** Fixed Analogue Output configuration array; voltage selection uses the enum above. */
     HIL_Application_Analog_Config_T analog_out[HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT];
 
+    /** Fixed Analogue Input configuration array. */
     HIL_Application_Analog_Config_T analog_in[HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT];
 
+    /** Fixed PWM Output configuration array; period values remain nanoseconds. */
     HIL_Application_Pwm_Config_T pwm_out[HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT];
 
+    /** Fixed PWM Input configuration array; period values remain nanoseconds. */
     HIL_Application_Pwm_Config_T pwm_in[HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT];
 
     // HIL_Application_Can_Config_T can[HIL_APPLICATION_CAN_CHANNEL_COUNT];
@@ -298,6 +318,10 @@ typedef struct
 
     // HIL_Application_I2c_Config_T i2c[HIL_APPLICATION_I2C_CHANNEL_COUNT];
 
+    /**
+     * Reserved extension bytes. A zero length may use NULL; nonzero length
+     * requires a valid data pointer. Detailed extension semantics are deferred.
+     */
     HIL_Application_Byte_Span_T extension_data;
 } HIL_Application_Test_Configuration_T;
 

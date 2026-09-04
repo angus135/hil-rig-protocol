@@ -1,35 +1,24 @@
 # Application Layer codec and transaction design
 
+> **Wire-format quick reference:** See [Application wire-format reference](application_wire_format.md)
+> for the byte diagrams, fixed field widths, payload layouts, and literal System Information Request
+> vector. This document focuses on API ownership, validation boundaries, and transaction design.
+
 ## Status and scope
 
-This document defines the intended public C message-codec API and the shared
-Application transaction contract. Every function in `src/application/` remains
-an intentional `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` stub. No binary
-encoding, decoding, structural validation, firmware handler, Python client,
-storage manager, execution integration, hardware behavior, or runtime
-transaction logic is implemented by this PR.
+The C Application layer is a stateless message codec. This foundation implements the common architecture-independent envelope, bounded encode/decode behaviour, exact complete-message length checks, common Test-ID/type/subtype validation, and the existing supported message-specific body paths. It does not implement firmware state machines, test-upload tracking, hardware control, Transport behaviour or Python bindings.
 
-The shared codec converts between typed data and exactly one complete
-Application message:
+Existing partially implemented message families remain in place and return `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` where their sizing, variable storage, validation or body semantics are deliberately deferred.
+
+The shared codec converts between typed data and exactly one complete Application message:
 
 ```text
 typed firmware/Python-facing data
     -> HIL_APPLICATION_Encode_Message
     -> one complete Application message
-    -> one MVP Transport frame
 ```
 
-Reception is the reverse:
-
-```text
-one MVP Transport frame
-    -> one complete Application message
-    -> HIL_APPLICATION_Decode_Message
-    -> typed firmware/Python-facing data
-```
-
-The Transport MVP carries one complete Application message in one frame and has
-no fragmentation/reassembly. The codec never receives a partial Transport frame.
+Reception is the reverse. The codec expects the actual byte length of exactly one encoded Application message and rejects both truncation and trailing bytes.
 
 ## Ownership model
 
@@ -80,41 +69,54 @@ Firmware and bindings include:
 #include "hil_rig_protocol/application/application.h"
 ```
 
-| Operation | Future codec contract |
+| Operation | Current codec contract |
 | --- | --- |
-| `HIL_APPLICATION_Default_Config` | Initialize structural bounds to deterministic policy-disabled values. |
-| `HIL_APPLICATION_Init` | Validate and copy structural codec bounds into a lightweight context. |
-| `HIL_APPLICATION_Encoded_Size` | Validate typed structure and report exact future encoded size. |
-| `HIL_APPLICATION_Encode_Message` | Produce one complete Application message in caller output. |
-| `HIL_APPLICATION_Decode_Storage_Size` | Validate complete encoded structure and report usable caller decode capacity, assuming the required alignment. |
-| `HIL_APPLICATION_Decode_Message` | Decode one complete message into aligned, caller-owned storage. |
-| `HIL_APPLICATION_Validate_Message` | Perform typed codec-level structural validation. |
-| `HIL_APPLICATION_Validate_Encoded_Message` | Validate complete encoded structure without publishing typed output. |
+| `HIL_APPLICATION_Default_Config` | Populate a configuration accepted by `Init`, using a 512-byte default complete-message profile. |
+| `HIL_APPLICATION_Init` | Validate/copy local structural limits; reduced valid complete-message maxima are accepted. |
+| `HIL_APPLICATION_Encoded_Size` | Clear output, validate the common envelope fields, dispatch existing body sizing, add the fixed header with checked arithmetic. |
+| `HIL_APPLICATION_Encode_Message` | Encode the bounded common header and selected existing body; publish a nonzero size only after complete success. |
+| `HIL_APPLICATION_Decode_Storage_Size` | Bounded-parse one complete message, validate the exact width of supported fixed bodies and report zero storage, or return `NOT_IMPLEMENTED` for unfinished variable-storage families. |
+| `HIL_APPLICATION_Decode_Message` | Decode exactly one complete message; body decoders see only the declared payload extent. |
+| `HIL_APPLICATION_Validate_Message` | Perform common typed validation and existing message-specific validation. |
+| `HIL_APPLICATION_Validate_Encoded_Message` | Reuse the bounded decode path without publishing caller output. |
 
-The declarations specify future behavior. Current stubs return
-`NOT_IMPLEMENTED` and defensively clear documented output lengths/structures.
+### Current message-family implementation status
 
-## Reserved protocol version
+This foundation deliberately does not complete every message family. The current public façade behaviour is:
 
-The public constants
-`HIL_APPLICATION_PROTOCOL_VERSION_MAJOR` and
-`HIL_APPLICATION_PROTOCOL_VERSION_MINOR` reserve Application version 1.0. A
-future codec will encode that version and validate it while decoding; the
-current `NOT_IMPLEMENTED` encoder and decoder do not perform version handling.
-That future decoder will report an incompatible version as
-`HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE`.
+| Family | Current status |
+| --- | --- |
+| System Information Request | Encode, decode, validate and encoded-size calculation implemented. |
+| System Information Response | Existing encode/decode body retained; typed validation requires the canonical compiled protocol version and structurally valid byte spans. Message-specific encoded-size and decode-storage sizing remain unfinished. |
+| Test Configuration | Existing fixed-body encode/decode retained; tick duration in microseconds, configured expected-tick upper bound, and extension byte-span pointer structure are validated. Remaining configuration semantics and message-specific encoded-size calculation remain unfinished. |
+| Test Instruction | Existing fixed-body encode/decode retained; fixed-value semantics and message-specific encoded-size calculation remain unfinished. |
+| Execution Control | Existing encode/decode/validation retained, including zero reserved flags; message-specific encoded-size calculation remains unfinished. |
+| Global Control | Existing encode/decode/validation retained, including zero reserved flags; message-specific encoded-size calculation remains unfinished. |
+| Test Result | Existing fixed-body encode/decode/validation retained; fixed-value semantics and message-specific encoded-size calculation remain unfinished. |
+| Variable Instruction Data | Reserved structures and identifiers retained; body/storage workflow remains `NOT_IMPLEMENTED`. |
+| Variable Result Data | Reserved structures and identifiers retained; body/storage workflow remains `NOT_IMPLEMENTED`. |
+| Application Response | Existing structures/body code retained; public validation and message-specific sizing remain `NOT_IMPLEMENTED`. |
+| Application Error | Existing structures/body code retained; public validation/sizing and variable diagnostic-storage sizing remain `NOT_IMPLEMENTED`. |
 
-Callers cannot select or negotiate an encoding version through
-`HIL_Application_Config_T`, `HIL_Application_Context_T`, a message body, or an
-encode/decode call. The eventual common wire envelope must identify the
-Application version, but this PR neither defines nor implements that envelope's
-complete field layout, widths, byte order, or serialization.
+`HIL_APPLICATION_Encoded_Size` propagates the message-specific `NOT_IMPLEMENTED` result rather than guessing body sizes. Configuration-field semantics, fixed instruction/result value semantics, analogue conversion, variable-data correlation and endpoint transaction state remain later work.
 
-System Information reports Application protocol versions for diagnostics only.
-It does not negotiate or change the codec version. After Python detects an
-incompatible Application version, it must not proceed with Test Configuration
-or execution. Multi-version encoding, backward-compatible decoding, and
-minor-version compatibility rules require a future versioned API.
+## Common wire version and envelope
+
+The codec uses the repository-wide `HIL_RIG_PROTOCOL_VERSION_MAJOR` and `HIL_RIG_PROTOCOL_VERSION_MINOR` values from `hil_rig_protocol/version.h`. There is no independent Application version constant. The common envelope is summarized below; the normative byte diagrams and payload layouts are in the
+[Application wire-format reference](application_wire_format.md).
+
+| Offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 1 | overall protocol major |
+| 1 | 1 | overall protocol minor |
+| 2 | 1 | Test-ID-present flag |
+| 3 | 16 | Test ID |
+| 19 | 1 | message type |
+| 20 | 1 | message subtype |
+| 21 | 2 | payload length, little-endian `uint16_t` |
+| 23 | N | payload |
+
+The decoder initially requires an exact major/minor match. A missing Test ID is flag zero followed by sixteen zero bytes; an all-zero Test ID remains valid when the flag is one. There is no payload-end marker. Native enum widths, native byte order, `size_t`, C padding and pointer representation never define this envelope.
 
 ## Stateless context and single owner
 
@@ -150,14 +152,18 @@ logically read-only with respect to the context.
 
 - maximum complete encoded Application message size;
 - maximum variable byte-span size;
-- maximum peripheral configurations in one typed configuration;
+- a retained configuration-family bound for later configuration work;
 - maximum variable-data declarations in one typed tick; and
 - maximum permitted `expected_tick_count` field value.
 
-These are local structural limits, not final wire maxima. They reserve no test
-storage and do not mean the codec can retain or track the configured number of
-ticks. Endpoint integration separately decides whether retention and hardware
-capacity are available.
+These are local structural limits or reserved local policy bounds.
+`max_encoded_message_size` is an operational bound, not a requirement to
+provision the theoretical representable maximum. The current fixed Digital,
+Analogue and PWM Test Configuration arrays are protocol-sized and are not resized
+by `max_peripheral_config_count`; that field is retained for later configuration
+work. These values reserve no test storage and do not mean the codec can retain
+or track the configured number of ticks. Endpoint integration separately decides
+whether retention and hardware capacity are available.
 
 `max_variable_data_size` bounds each variable UART/SPI/I2C/CAN Application
 message, and `max_encoded_message_size` bounds each complete encoded Application
@@ -166,15 +172,19 @@ must configure Transport's maximum Application-message size to be at least the
 Application Layer's `max_encoded_message_size`; the codec does not inspect or
 change Transport configuration.
 
-Zero disables the corresponding capacity. This design deliberately chooses no
-production limits. A future `Default_Config` initializes every field without
-inventing policy. A future `Init` validates limit relationships and copies the
-configuration without allocation or pointer retention.
+`HIL_APPLICATION_Default_Config` uses a 512-byte complete-message profile and
+the existing structural maxima for the other fields.
+`HIL_APPLICATION_Init` accepts any complete-message maximum from
+`HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE` (25 bytes: the 23-byte envelope plus
+the two-byte System Information Request payload) through
+`HIL_APPLICATION_HEADER_SIZE_BYTES + UINT16_MAX`, validates the other configured
+limits, and copies the configuration without allocation or pointer retention.
 
-Within a Test Configuration, `expected_tick_count` must nevertheless be
-nonzero. Codec configuration limits and message-field validity are separate:
-zero may disable `max_expected_tick_count`, while a Test Configuration accepted
-by a configured codec always carries `expected_tick_count >= 1`.
+The foundation enforces
+`expected_tick_count <= context->config.max_expected_tick_count`. The protocol
+design also treats `expected_tick_count` as a nonzero test length, but that and
+other detailed Test Configuration semantic rules remain later configuration
+work.
 
 Fixed GPIO, analogue, and PWM arrays are protocol-sized rather than
 caller-configured. Their named channel counts and deterministic index mappings
@@ -216,48 +226,26 @@ after decoding; the codec context contains no endpoint role.
 
 ## Encoding and decoding ownership
 
-The caller constructs `HIL_Application_Message_T` and selects one typed body
-through its explicit `type` tag. Fixed signal arrays are inline in the typed
-message. Variable arrays and byte spans are borrowed only during the synchronous
-sizing, validation, or encoding call.
+Encoding and decoding borrow all caller pointers only for the duration of a call. A successful encode publishes exactly header-plus-payload bytes. A failed encode leaves `output_size == 0`; the buffer contents are unspecified and are not cleared as a side effect.
 
-Future successful encoding copies all message content into caller output and
-retains no pointer. The caller submits those complete bytes to Transport. On
-`BUFFER_TOO_SMALL`, `output_size` reports required bytes and partial output is
-not a message. Sizing and encoding never mutate the context.
+Decoding receives the actual byte count of one complete message. It requires a
+complete fixed header, validates repository-wide major/minor version bytes,
+checks header-plus-payload arithmetic before addition, and requires the supplied
+input length to equal the declared total. Input shorter than the envelope-declared
+total is `TRUNCATED_MESSAGE`; trailing bytes are `MALFORMED_MESSAGE`. The selected
+body decoder receives exactly the declared payload length and must consume it
+exactly. A declared fixed body that is too short is `MALFORMED_MESSAGE`. On every
+failed decode, the public output type is `INVALID` and decoded-storage usage is
+zero; the remaining output contents are unspecified.
 
-Transport supplies one complete Application message from one MVP frame for decoding.
-Future decoding copies every variable array/span into caller-owned
-`decode_storage`. Pointers in the decoded message point only into that region,
-not the encoded input. The Transport receive item can therefore be released
-after successful decode. The codec retains neither pointer.
+Byte spans use an encoded one-byte length. The decoder proves the length field
+and declared bytes are present before access. Missing encoded span bytes are
+`MALFORMED_MESSAGE`; `BUFFER_TOO_SMALL` is reserved for insufficient
+caller-provided decoded-data storage. After proving caller storage capacity, the
+decoder copies exactly the declared data bytes and only then publishes the output
+span pointer.
 
-Non-null decode storage must begin at an address aligned to
-`HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT`. The constant is a C11/C++ constant
-expression sufficient for every public typed object the decoder may place in
-that storage. `HIL_APPLICATION_Decode_Storage_Size` reports required usable byte
-capacity on the assumption that this base alignment is satisfied. A future
-decoder returns `HIL_APPLICATION_STATUS_INVALID_ARGUMENT` for misaligned
-storage; the intentional stubs do not yet perform that runtime check.
-
-C11 callers can declare static storage as:
-
-```c
-_Alignas(HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT)
-static uint8_t decode_storage[2048u];
-```
-
-C++ callers can use:
-
-```cpp
-alignas(HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT)
-static uint8_t decode_storage[2048u];
-```
-
-Decoding a configuration, control, reset, Response, Error, or result never
-accepts data, performs an operation, creates or invalidates a transaction,
-changes firmware state, or generates a reply. Those are endpoint-integration
-actions after a successful structural decode.
+Wire lengths and multi-byte body fields use fixed-width little-endian encodings. `size_t` remains appropriate only for local capacities, indexes and memory sizes.
 
 ## Validation and rejection boundaries
 
@@ -271,31 +259,11 @@ no Application Response merely because Transport rejected it.
 
 ### 2. Structurally invalid Application data
 
-The future codec checks:
+The current foundation checks the common structural boundary: exact repository-wide major/minor version, one-byte message type/subtype representation, Boolean Test-ID presence and its zero-fill rule, configured complete-message bounds, checked header-plus-payload arithmetic, declared payload extent, exact complete-message consumption, and the existing typed validation implemented for each supported fixed family.
 
-- the eventual envelope's Application version equals the reserved version;
-- message type/subtype and exact test-ID presence;
-- exact complete encoded length;
-- required fields and enum values;
-- every element of fixed GPIO, analogue, and PWM arrays;
-- variable pointer/count and NULL/zero combinations;
-- nonzero, unique variable-data declarations within each fixed tick;
-- unique `(peripheral, channel)` records within a Test Configuration;
-- configured codec bounds;
-- declared-length consistency;
-- nonzero `expected_tick_count`;
-- zero values for every currently reserved `flags` field;
-- empty Test Configuration `extension_data` until a schema is defined;
-- channel-family consistency;
-- checked size arithmetic; and
-- safe decoding without trailing or missing bytes.
+Feature-specific semantic validation remains deliberately deferred where the corresponding family is unfinished. In particular, this PR does not invent Digital/Analogue/PWM configuration rules, communication configuration fields, fixed instruction/result value rules, variable-data declaration/correlation rules, hardware capability checks, or stateful transaction ordering.
 
-Failures are local `HIL_Application_Status_T` values. They are not serialized as
-Application Responses or Errors. The codec has no active Test Configuration and
-cannot compare a later Test ID/tick against an active transaction.
-
-Nonzero reserved flags and nonempty unsupported Test Configuration extension
-data specifically produce `HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE`.
+Failures are local `HIL_Application_Status_T` values. They are not serialized as Application Responses or Errors. The codec has no active Test Configuration and cannot compare a later Test ID/tick against an active transaction.
 
 ### 3. Structurally valid but semantically unacceptable data
 
@@ -591,7 +559,7 @@ The intended Python boundary is:
 
 Python may prevent an obviously invalid local action such as requesting START
 before Complete Test acceptance. It must stop configuration/execution after
-detecting an incompatible Application version and enter recovery when a pending
+detecting an incompatible repository-wide protocol version and enter recovery when a pending
 operation's outcome becomes uncertain. It must not predict firmware hardware
 readiness or execution-manager state; firmware Responses are authoritative.
 
@@ -599,11 +567,11 @@ The Python client, bindings, serial/USB integration, asynchronous behavior,
 exceptions, and transaction controller are future work and are not implemented
 in this PR.
 
-## Required future conformance work
+## Remaining conformance work
 
 Compile-level API-design tests in this PR construct messages for the documented
 success, rejection, control, reset, result, and session-loss scenarios. They do
-not execute the transaction because all codec functions are still stubs.
+do not execute endpoint transactions because the codec is intentionally stateless and several feature-specific families remain unfinished.
 
 Before the protocol is considered implemented, future work must add:
 

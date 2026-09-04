@@ -1,69 +1,36 @@
 # Application messages
 
+> **Wire-format quick reference:** See [Application wire-format reference](application_wire_format.md)
+> for the common-envelope diagram, current body byte layouts, and literal golden-vector example.
+
 ## Status
 
-This is the message-level companion to
-[Application Layer design](application_layer.md). It documents the typed API in
-`include/hil_rig_protocol/application/`. The binary envelope, field widths,
-byte order, compatibility behavior, and all codec algorithms remain TODO. Every
-current `.c` function is an intentional `NOT_IMPLEMENTED` stub.
-
-Transport can already carry each complete opaque encoded Application message,
-but the Application encode/decode codec, exact wire layouts, and validation
-behaviour are not implemented. No Python binding or completed Python codec
-exists. End-to-end IDC readiness therefore still depends on this separate codec
-and on firmware/host endpoint integration.
-
-The structures below are C API representations, not packed wire layouts.
-`size_t`, enum representation, padding, unions, and pointers must never be
-copied directly onto the wire.
+This document describes the public typed messages and the common wire envelope implemented by the stateless C codec. The public C structures are API representations, not packed wire structures: native enum width, `size_t`, padding, unions and pointer representation do not define encoded bytes. Several message-family bodies remain deliberately unfinished and return `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED`; their existing identifiers and structures are reserved in place.
 
 ## Common envelope
 
-Every complete message is represented by `HIL_Application_Message_T`:
+Every complete encoded Application message starts with this fixed 23-byte envelope. The same layout
+is shown visually, together with current payload layouts, in the
+[Application wire-format reference](application_wire_format.md):
 
-| Field | Meaning |
-| --- | --- |
-| `type` | Explicit `HIL_Application_Message_Type_T` selecting one body union member. |
-| `subtype` | `BASIC` for System Information; `NONE` for current test-specific families. |
-| `has_test_id` | Explicit test-ID presence; no byte value represents absence. |
-| `test_id` | Opaque 16-byte identifier when present. |
-| `body` | Tagged union member selected by `type`. |
+| Offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 1 byte | Overall HIL-RIG protocol major version |
+| 1 | 1 byte | Overall HIL-RIG protocol minor version |
+| 2 | 1 byte | Test-ID-present flag, exactly 0 or 1 |
+| 3 | 16 bytes | Opaque Test ID |
+| 19 | 1 byte | Message type |
+| 20 | 1 byte | Message subtype |
+| 21 | 2 bytes | Payload length, little-endian `uint16_t` |
+| 23 | N bytes | Payload |
 
-There is no Application sequence number. Transport supplies reliable ordered
-delivery. Application correlation uses Test ID when applicable, Response scope,
-tick number, peripheral/channel, and the relevant control command. A Transport
-ACK confirms byte/frame delivery; an Application Response separately confirms a
-semantic outcome. Likewise, Transport `DELIVERY_CONFIRMED` means peer Transport
-accepted the message; it does not prove peer Application decoding or processing.
-An unread received message may be discarded by reset, session abandonment, or
-link loss. Application request/response correlation and Test IDs own the
-higher-level transaction semantics. Initial instruction upload uses stop-and-wait at tick
-granularity rather than an Application sequence field. More generally, Python
-serializes response-requiring operations so identical requests and Responses
-cannot become ambiguous; the codec stores no request identity or outstanding
-operation.
+There is no payload-end marker. A decoder receives the actual length of one complete message and accepts it only when that length is exactly `23 + payload_length`. Missing bytes and trailing bytes are errors. Message type and subtype are explicit one-byte wire values. Every multi-byte integer in encoded bodies is little-endian. Local capacities and offsets remain `size_t`; only encoded fixed-width fields use their specified integer widths.
 
-The eventual common wire envelope must identify the Application protocol
-version. Its complete layout, fields, widths, byte order, and serialization
-remain undefined in this PR.
+The envelope version comes from `hil_rig_protocol/version.h`. Only the repository-wide major and minor bytes are carried in every envelope; patch is not part of the common envelope. The initial decoder requires an exact major/minor match and returns `HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE` for a mismatch. Callers cannot select another version through Application configuration.
 
-### Reserved codec version
+For `has_test_id == 0`, the encoder writes sixteen zero Test-ID bytes and the decoder requires those bytes to be zero. For `has_test_id == 1`, all sixteen bytes are opaque and an all-zero Test ID is valid.
 
-The public constants `HIL_APPLICATION_PROTOCOL_VERSION_MAJOR == 1` and
-`HIL_APPLICATION_PROTOCOL_VERSION_MINOR == 0` reserve Application version 1.0.
-A future codec will encode and validate this version. The current
-`NOT_IMPLEMENTED` encoder and decoder do not perform version handling. The
-future decoder will report an incompatible version as
-`HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE`.
-
-Callers cannot select or negotiate another version through codec configuration,
-context, typed messages, or individual calls. System Information version fields
-are diagnostic only and do not negotiate or change the codec version. Python
-must not proceed with Test Configuration or execution after detecting an
-incompatible Application version. Multi-version encoding, backward-compatible
-decoding, and minor-version compatibility rules are deferred to a future
-versioned API.
+There is no Application sequence number. Transport delivery acknowledgement remains distinct from Application semantic Response messages and from local C return statuses.
 
 ### Message type identifiers
 
@@ -83,9 +50,7 @@ versioned API.
 | `ERROR` | 49 |
 | `RESERVED` | 255 |
 
-The explicit values are intended as future stable identifiers. Changing them
-after publication may break firmware/Python compatibility. Their encoded field
-width is not selected by this PR.
+The explicit values are stable one-byte wire identifiers. Changing an assigned value requires protocol-version compatibility review.
 
 ## Test ID
 
@@ -152,10 +117,7 @@ after decoding. `HIL_Application_Context_T` contains no endpoint role.
 Caller storage supplied to `HIL_APPLICATION_Decode_Message` must have at least
 `HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT` alignment. The constant is usable as
 a C11 `_Alignas` operand and a C++ `alignas` operand and is sufficient for every
-public typed object placed in decode storage. The size query reports usable byte
-capacity assuming that alignment. A future decoder returns
-`HIL_APPLICATION_STATUS_INVALID_ARGUMENT` for a non-null misaligned pointer;
-current stubs intentionally perform no runtime check.
+public typed object placed in decode storage. The size query reports usable byte capacity assuming that alignment. This foundation does not add a new runtime alignment policy; existing message-specific storage behaviour is preserved while variable-storage families remain unfinished.
 
 ```c
 _Alignas(HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT)
@@ -193,9 +155,11 @@ Peripheral identifiers are `DIGITAL_INPUT`, `DIGITAL_OUTPUT`,
 
 Unit-explicit fixed values are:
 
-- digital value: 0 or 1;
-- analogue values/ranges: signed microvolts;
-- tick and PWM periods: nanoseconds;
+- digital fixed instruction/result value: 0 or 1;
+- analogue fixed instruction/result value: microvolts;
+- analogue Test Configuration range selection: one-byte voltage-level enum;
+- tick duration: microseconds;
+- PWM periods: nanoseconds;
 - PWM duty: permyriad, 0 through 10000;
 - communication rate: bits per second.
 
@@ -225,9 +189,7 @@ independent analogue sampling rate or multiple samples per tick. For any fixed
 input channel whose capture is disabled or not configured, firmware encodes
 deterministic zero and Python treats that element as semantically invalid.
 
-Future encoded sizing includes exactly the named number of fixed elements. It
-must add future fixed-width fields with checked arithmetic rather than use
-`sizeof` on C structures. Exact wire widths, order, and byte order remain TODO.
+Encoded sizing uses the named fixed channel counts and fixed wire-width constants rather than native C structure or enum sizes. Detailed semantics for unfinished configuration and fixed-I/O validation remain deferred.
 
 ## System Information
 
@@ -239,7 +201,16 @@ must add future fixed-width fields with checked arithmetic rather than use
 - Direction: Python to firmware
 
 `HIL_Application_System_Info_Request_T` contains an initial `BASIC` query and a
-flag requesting an optional firmware Git hash.
+flag requesting an optional firmware Git hash. The fully supported `BASIC`
+payload has this normative layout:
+
+| Payload offset | Width | Field | Initial encoding |
+| ---: | ---: | --- | --- |
+| 0 | 1 byte | `request_firmware_git_hash` | boolean, exactly `0x00` or `0x01` |
+| 1 | 1 byte | `query` | `BASIC == 0x01` |
+
+The complete System Information Request is therefore 25 bytes: the 23-byte
+common envelope followed by this two-byte payload.
 
 ### Response
 
@@ -248,13 +219,21 @@ flag requesting an optional firmware Git hash.
 - Test ID: forbidden
 - Direction: firmware to Python
 
-`HIL_Application_System_Info_Response_T` contains Application protocol version
-diagnostics, firmware semantic version, optional Git hash bytes, and optional
-diagnostic bytes. Firmware-specific state may appear as opaque diagnostic data,
-but it does not define a shared protocol or firmware state machine. Hash and
-diagnostic schemas, limits, and capability discovery remain deferred. Reported
-versions do not negotiate or select the codec version; Python does not proceed
-with configuration or execution after detecting incompatibility.
+`HIL_Application_System_Info_Response_T` retains its existing version fields as
+diagnostics for the repository-wide HIL-RIG protocol version, firmware semantic
+version, optional Git hash bytes, and optional diagnostic bytes. The typed
+`application_protocol_major`, `application_protocol_minor`, and
+`application_protocol_patch` fields must exactly equal the compiled
+`HIL_RIG_PROTOCOL_VERSION_MAJOR`, `HIL_RIG_PROTOCOL_VERSION_MINOR`, and
+`HIL_RIG_PROTOCOL_VERSION_PATCH` values. The encoder writes those canonical
+compiled values after validation, so a caller cannot supply one version and
+silently encode another.
+
+Firmware-specific state may appear as opaque diagnostic data, but it does not
+define a shared protocol or firmware state machine. Hash and diagnostic schemas,
+limits, and capability discovery remain deferred. Reported versions do not
+negotiate or select the codec version; Python does not proceed with
+configuration or execution after detecting incompatibility.
 
 ## Test Configuration
 
@@ -264,24 +243,32 @@ with configuration or execution after detecting incompatibility.
 - Direction: Python to firmware
 
 This is exactly one first test-specific message for each new upload. The Python
-host supplies a fresh random Test ID. `HIL_Application_Test_Configuration_T`
-contains:
+host supplies a fresh random Test ID. The current
+`HIL_Application_Test_Configuration_T` contains:
 
-- nonzero `tick_duration_us.useconds`;
-- nonzero authoritative `expected_tick_count` N, defining ticks 0 through N - 1;
-- reserved `flags`, which must be zero;
-- typed `peripherals` and `peripheral_count`; and
-- reserved length-delimited `extension_data`, which must be empty.
+- `tick_duration_us.microseconds`;
+- authoritative `expected_tick_count` N, defining ticks 0 through N - 1;
+- reserved test-wide `flags`;
+- fixed Digital input/output configuration arrays;
+- fixed Analogue input/output configuration arrays;
+- fixed PWM input/output configuration arrays; and
+- reserved length-delimited `extension_data`.
 
-Each `(peripheral, channel)` may have at most one configuration record.
-Duplicates are structurally invalid; there is no first-wins or last-wins
-behavior. Analogue configuration contains only its channel and microvolt range:
-each configured analogue input is sampled once per tick at the test tick rate.
+Analogue configuration currently contains a channel ID and a voltage-level enum;
+it does not carry a signed microvolt range. Communication-family configuration
+fields remain reserved for later work and are not part of the current Test
+Configuration body.
 
-The codec eventually validates tag/member, uniqueness, and basic unit/count
-consistency. Nonzero reserved flags or nonempty extension data produce
-`HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE`. Firmware validates supported
-hardware, electrical ranges, timing, and retention capacity.
+The current foundation validates the supported tick-duration set of `10000`,
+`1000`, `100`, or `10` microseconds (100 Hz, 1 kHz, 10 kHz, or 100 kHz), enforces
+`expected_tick_count <= context->config.max_expected_tick_count`, and enforces
+the generic byte-span pointer invariant for `extension_data`. The initial
+protocol design reserves Test Configuration `flags` as zero and `extension_data`
+as an extension mechanism, but their detailed semantic acceptance rules are
+deliberately deferred here. The foundation therefore does not currently reject
+Test Configuration solely because `flags` is nonzero or `extension_data` is
+nonempty. Detailed Digital, Analogue, PWM, uniqueness, hardware-capability and
+unit/value semantics also remain deferred configuration work.
 
 A configuration-scoped `ACCEPTED` Response creates the active upload
 transaction. `REJECTED` or `FAILED` creates no transaction; instructions for
@@ -306,24 +293,30 @@ active Test Configuration or expected next tick.
 - Test ID: required
 - Direction: Python to firmware
 
-Each `HIL_Application_Test_Instruction_T` describes exactly one tick:
+The current `HIL_Application_Test_Instruction_T` and fixed wire body describe
+exactly one tick and contain only:
 
 - zero-based `tick_number`;
 - all 10 digital output values in channel-index order;
-- all 6 analogue output values in channel-index order;
-- both PWM output settings in channel-index order; and
-- variable-data declaration array/count.
+- all 6 analogue output values in channel-index order; and
+- both PWM output settings in channel-index order.
 
-Every `HIL_Application_Data_Declaration_T::byte_length` must be nonzero. A
-channel with no variable data is omitted. Within the fixed tick, each
-`(peripheral, channel)` pair appears at most once, and each declaration requires
-exactly one matching Variable Instruction Data message. Duplicate matching
-variable messages are invalid; no declaration ID or sequence field is added.
+Variable-data declarations are a **future design**, not part of the current C
+structure or fixed Test Instruction wire body. The declaration representation,
+including how a declared byte length will be represented, has not been approved
+yet. The intended later workflow is that a fixed tick may declare variable data
+for peripheral/channel pairs and matching Variable Instruction Data messages
+would carry those bytes, but this is not a current wire-level contract.
 
 No scheduling function, interrupt configuration, timer selection, hardware
 register, or execution-manager value appears in this message.
 
 ## Variable Instruction Data and Tick Response
+
+> **Future design:** Variable Instruction Data encoding/decoding and the declaration
+> representation are not implemented in the current foundation. The fixed Test
+> Instruction contains no declaration array. The workflow below records intended
+> transaction behavior only; it does not define an approved declaration wire layout.
 
 - Type: `VARIABLE_INSTRUCTION_DATA`
 - Subtype: `NONE`
@@ -425,15 +418,18 @@ The command never resets, reconnects, or reinitializes Transport.
 
 After a successfully completed START request for a test configured with N
 ticks, firmware produces exactly one fixed Test Result for every tick `0..N-1`.
-`HIL_Application_Test_Result_T` contains:
+The current `HIL_Application_Test_Result_T` and fixed wire body contain:
 
 - zero-based `tick_number` matching the instruction;
 - all 10 captured digital input values;
 - both captured analogue input values;
 - both captured PWM input measurements;
-- variable-result declaration array/count;
 - result `condition`: `OK`, `PARTIAL`, or `EXECUTION_PROBLEM`; and
 - integration-defined `problem_detail`.
+
+Variable-result declarations are a **future design** and are not members of the
+current Test Result structure or fixed wire body. Their representation and
+correlation with Variable Result Data messages remain deliberately deferred.
 
 Problems detected while executing are Application Error messages. A non-OK
 fixed-result condition records that tick's result quality. An Error may be sent
@@ -464,6 +460,11 @@ result message is sent. No validity masks or additional capture messages are
 introduced.
 
 ## Variable Result Data and completion
+
+> **Future design:** Variable Result Data encoding/decoding and the declaration
+> representation are not implemented in the current foundation. The fixed Test
+> Result contains no declaration array. The workflow below records intended
+> transaction behavior only; it does not define an approved declaration wire layout.
 
 - Type: `VARIABLE_RESULT_DATA`
 - Subtype: `NONE`
@@ -579,58 +580,51 @@ recovery and internal state transitions.
 
 ## Validation rules
 
-Future typed and encoded codec validation checks:
+This foundation implements the common structural boundary and preserves the
+message-specific validation that already exists. The common codec currently
+checks:
 
-- the encoded envelope uses the reserved Application protocol version;
-- valid supported type and correct subtype;
-- exact type/scope-specific test-ID presence;
-- selected union member;
-- exact encoded body length with no trailing bytes;
-- every enum excluding invalid/reserved sentinels;
-- allowed Response scope/outcome/correlation combinations;
-- every fixed signal-array element and value range;
-- variable pointer/count and NULL/zero pairs;
-- variable counts against codec configuration;
-- checked addition/multiplication/alignment;
-- byte spans against variable-data limits;
-- nonzero variable declaration and variable-message lengths;
-- unique `(peripheral, channel)` declarations within one fixed tick;
-- unique `(peripheral, channel)` records within one Test Configuration;
-- peripheral configuration tag/channel consistency;
-- digital values limited to 0/1;
-- PWM duty no greater than 10000;
-- nonzero Test Configuration tick duration and `expected_tick_count`;
-- zero values for Test Configuration, Execution Control, Global Control, and
-  Communication Configuration reserved `flags`;
-- empty Test Configuration `extension_data`; and
-- Application Error tick-presence consistency.
+- exact repository-wide HIL-RIG protocol major/minor version;
+- valid one-byte message type and subtype representations, rejecting invalid,
+  reserved, and unknown values;
+- Boolean Test-ID presence and the type/scope-specific Test-ID rules already
+  represented by the typed messages;
+- zero-filled Test-ID bytes when the presence flag is zero;
+- exact encoded body length with no missing or trailing bytes;
+- checked header/payload arithmetic and fixed-width length conversion;
+- byte spans against encoded input and caller decode-storage capacity; and
+- the existing validation implemented for supported fixed message families.
 
-Nonzero reserved flags or nonempty unsupported Test Configuration extension
-data return `HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE`.
+The following feature-specific rules remain later work and must not be inferred
+from this foundation codec: detailed Digital/Analogue/PWM configuration
+semantics, UART/SPI/I2C/CAN configuration fields, analogue unit conversion,
+fixed Test Instruction or Test Result value validation, variable-data
+declarations/correlation, Response and Error semantic combinations, reserved
+configuration-field policy, and hardware-capability validation. Families whose
+required validation is unfinished return `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED`
+rather than accepting guessed semantics.
 
-Firmware/Python integration separately validates active Test ID, tick range and
-stop-and-wait order, cross-message declaration matching/completeness and
+Firmware/Python integration separately owns active-Test-ID checks, tick range
+and stop-and-wait order, cross-message declaration matching/completeness,
 duplicate variable messages, retention capacity, whole-test consistency,
 transaction prerequisites, hardware support/safety, and execution-manager
 decisions.
 
-Structurally malformed examples include a forbidden/missing Test ID, wrong
-subtype, NULL pointer with nonzero count, invalid channel family, inconsistent
-length, overflow, invalid fixed value, incomplete fixed array, or Response with
-irrelevant correlation fields populated. Zero-length or duplicate declarations,
-duplicate configuration records, and zero expected tick count are also
-structurally invalid. Reserved flags and unsupported extension data are
-structurally well formed but unsupported by this protocol version.
+At the implemented common boundary, structurally malformed examples include a
+forbidden or missing Test ID, a non-Boolean Test-ID-present flag, nonzero Test-ID
+bytes with an absent flag, invalid/reserved type or subtype, incompatible
+protocol version, inconsistent payload length, arithmetic overflow, truncation,
+or trailing bytes. Additional malformed examples may be defined later when the
+deferred message-family validation is completed.
 
-Structurally valid but semantically rejectable examples include wrong active
-Test ID, out-of-range/out-of-order tick, missing declared data, unsupported
-hardware, insufficient retention capacity, START before Complete Test
-acceptance, or execution-manager refusal.
+Structurally valid but semantically rejectable endpoint cases include a wrong
+active Test ID, out-of-range or out-of-order tick, missing declared data,
+unsupported hardware, insufficient retention capacity, START before Complete
+Test acceptance, or execution-manager refusal.
 
 ## Shared conformance scenarios
 
-These sequences specify endpoint agreement. Current tests only construct their
-typed messages and compile against intentional stubs.
+These sequences specify endpoint agreement. Codec tests exercise implemented common framing and existing supported bodies; endpoint transaction behaviour remains outside the stateless codec.
 
 ### Successful configuration and upload
 
@@ -814,18 +808,16 @@ retry START. It abandons that pending operation, enters recovery, may request
 test-independent RESET_APPLICATION, and ignores a late Response for the
 abandoned START.
 
-### Incompatible Application version
+### Incompatible protocol version
 
 ```text
-Public constants reserve Application version 1.0
-Received envelope identifies an incompatible Application version
-Future codec reports HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE
-Python does not submit Test Configuration or START
-Python reports protocol mismatch/recovery required
+Envelope carries repository-wide HIL-RIG protocol major/minor bytes
+Received envelope major/minor does not exactly match the compiled version
+Codec reports HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE
+Endpoint integration does not proceed with configuration or execution
 ```
 
-System Information version diagnostics cannot select or negotiate a different
-encoding version.
+The common envelope has no independent Application version and does not encode the repository patch version. System Information version diagnostics cannot select or negotiate a different encoding version.
 
 ### Transport session loss during upload
 
@@ -843,12 +835,23 @@ Transport cannot automatically restart an upload, execution request, or result
 transaction. After Transport delivery failure or session loss, host or firmware
 integration decides whether and how to restart the higher-level operation.
 
+## Foundation decisions completed
+
+The current C foundation now defines and tests:
+
+- the 23-byte common envelope and current fixed-body field ordering;
+- explicit fixed wire widths and little-endian multi-byte fields;
+- literal golden vectors for the foundation wire contract; and
+- executable C codec tests for the supported foundation behavior.
+
+These items are no longer open design decisions. Later protocol versions may
+extend them only through the documented versioning process.
+
 ## Decisions still TODO
 
-- final common envelope and body field order;
-- fixed wire widths and byte order;
-- final unknown-field behavior;
+- final unknown-field behavior for future extensible bodies;
 - extension-data and diagnostic schemas;
+- the representation and correlation rules for variable instruction/result declarations;
 - communication flag bit assignments;
 - higher-rate or multi-sample analogue capture;
 - detailed Error and diagnostic taxonomy;
@@ -860,9 +863,9 @@ integration decides whether and how to restart the higher-level operation.
 - multi-version encoding, backward-compatible decoding, and minor-version
   compatibility rules;
 - versioned result pipelining, interleaving, and out-of-order delivery;
-- production codec limits;
-- golden wire vectors; and
-- executable codec, firmware, and Python conformance tests.
+- production codec limits; and
+- additional family-specific golden vectors plus firmware/Python cross-endpoint
+  conformance tests.
 
-Golden vectors and cross-endpoint executable conformance tests are required
-before the protocol is considered implemented.
+Cross-endpoint firmware/Python conformance remains required before those endpoint
+implementations can be considered protocol-conformant.

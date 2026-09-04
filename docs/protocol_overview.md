@@ -6,11 +6,14 @@ opaque Application message per MVP frame over a caller-owned byte stream. It
 implements framing, COBS, CRC, session establishment and recovery, bounded event
 backpressure, reliable output, and bidirectional complete-message delivery.
 
-The [Application Layer](application_layer/application_layer.md) defines public
-message types and intentional codec entry points, but its encoder, decoder,
-exact wire layouts, and validation behaviour remain unimplemented. Current
-functions returning `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` are not
-operational, and no Python bindings or Python codec exist.
+The [Application Layer](application_layer/application_layer.md) is a stateless C
+codec with a fixed, architecture-independent common envelope, bounded
+encoding/decoding, structural validation, and a deliberately partial set of
+message-family bodies. The exact common envelope and currently encoded body
+layouts are summarized in the
+[Application wire-format reference](application_layer/application_wire_format.md).
+Functions returning `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` remain reserved
+for later message-family work, and no Python bindings or Python codec exist yet.
 
 The MVP Transport path has broad deterministic verification at the public
 boundary. The repository includes C unit/integration suites, a Python wrapper
@@ -26,5 +29,5 @@ Remaining verification work is mainly outside the deterministic in-process host
 matrix: real hardware/physical-driver testing, cross-process C/Python
 interoperability, broader installed C-consumer packaging validation, embedded
 target-toolchain builds, randomized/fuzz testing, and long-running soak tests.
-Overall IDC readiness also depends on the unfinished Application codec and
-endpoint integration.
+Overall IDC readiness also depends on completing the deliberately deferred
+Application message families and endpoint integration.

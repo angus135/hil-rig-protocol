@@ -53,21 +53,29 @@ typedef struct
  * @brief Firmware-to-Python System Information response body.
  *
  * @details Version fields are diagnostics rather than a compatibility
- * negotiation mechanism. They do not select or change the codec's compiled-in
- * Application protocol version. git_hash and diagnostic_data are borrowed
- * during encoding and point into caller decode storage after successful decoding.
+ * negotiation mechanism. For a typed message to be structurally valid, the
+ * three application_protocol_* fields must exactly match the codec's compiled-in
+ * repository-wide HIL-RIG protocol version. They do not select or change that
+ * version. firmware_git_hash and diagnostic_data are borrowed during encoding
+ * and point into caller decode storage after successful
+ * decoding.
  * Integration may expose firmware-specific runtime diagnostics in
  * diagnostic_data, but those bytes do not define a shared protocol or firmware
- * state machine. Precise text/binary conventions and maximum wire lengths
- * remain TODO.
+ * state machine. Precise content/schema conventions and family-specific
+ * semantic limits remain deferred. Each span uses the common uint8_t wire
+ * length and therefore carries at most 255 data bytes.
+ *
+ * The current wire order is repository protocol major/minor/patch, firmware
+ * major/minor/patch, diagnostic_data span, then firmware_git_hash span. The
+ * public C member order does not define this wire order.
  */
 typedef struct
 {
-    /** Diagnostic Application protocol major version reported by the peer. */
+    /** Diagnostic repository-wide HIL-RIG protocol major version reported by the peer. */
     uint16_t application_protocol_major;
-    /** Diagnostic Application protocol minor version reported by the peer. */
+    /** Diagnostic repository-wide HIL-RIG protocol minor version reported by the peer. */
     uint16_t application_protocol_minor;
-
+    /** Repository-wide protocol patch diagnostic; legacy member name retained. */
     uint16_t application_protocol_patch;
     /** Firmware semantic-version major component. */
     uint16_t firmware_version_major;

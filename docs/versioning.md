@@ -32,7 +32,11 @@ incompatibility recovery. Without a bound current session, receive processing
 uses the existing diagnostic rejection path. It does not implement major/minor
 negotiation, compatibility ranges, or fallback.
 
-Application public types name a compiled-in 1.0 version, but the Application
-wire envelope and codec are not implemented. Consequently there is no active
-Application decoder compatibility behaviour to promise today. System
-Information version fields are diagnostics, not negotiation.
+The Application common envelope carries the repository-wide compiled major and
+minor version as explicit one-byte fields. The encoder writes
+`HIL_RIG_PROTOCOL_VERSION_MAJOR` and `HIL_RIG_PROTOCOL_VERSION_MINOR`; the
+decoder currently requires an exact major/minor match and reports a mismatch as
+`HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE`. Patch is not carried in every
+Application envelope. System Information Response carries major, minor, and
+patch as diagnostic fields and validates them against the same compiled
+repository version; these fields do not negotiate or select a version.
