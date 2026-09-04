@@ -1,6 +1,7 @@
 add_executable(hil_rig_protocol_application_tests
     test_application_api.cpp
     test_application_workflow.cpp
+    test_application_codec.cpp
 )
 
 target_compile_features(hil_rig_protocol_application_tests PRIVATE cxx_std_17)

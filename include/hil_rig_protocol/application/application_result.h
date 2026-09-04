@@ -120,7 +120,8 @@ typedef struct
     /**
      * Integration-defined diagnostic value when condition is not OK.
      *
-     * Detailed classification and final wire width remain TODO.
+     * Detailed semantic classification remains deferred. The current fixed
+     * Test Result wire body encodes this value as a little-endian uint32_t.
      */
     uint32_t problem_detail;
 } HIL_Application_Test_Result_T;

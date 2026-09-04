@@ -1,6 +1,14 @@
+/**
+ * @file application_validation.c
+ * @brief Structural validation for typed Application message bodies.
+ *
+ * @details This file implements only rules owned by the stateless codec.
+ * Stateful transaction ordering, hardware capability checks, detailed fixed-I/O
+ * semantics, and unfinished variable/Response/Error semantics remain deferred.
+ */
 
 #include "hil_rig_protocol/application/application_message.h"
-#include "hil_rig_protocol/application/application_size.h"
+#include "application_size.h"
 #include "hil_rig_protocol/application/application_control.h"
 #include "hil_rig_protocol/application/application_error.h"
 #include "hil_rig_protocol/application/application_instruction.h"
@@ -10,8 +18,28 @@
 #include "hil_rig_protocol/application/application_system_info.h"
 #include "hil_rig_protocol/application/application_test_config.h"
 #include "hil_rig_protocol/application/application_types.h"
+#include "hil_rig_protocol/version.h"
 
 #include <string.h>
+
+static HIL_Application_Status_T
+HIL_APPLICATION_Byte_Span_validate( const HIL_Application_Byte_Span_T* span,
+                                    size_t                             max_allowed_size )
+{
+    if ( span == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( ( size_t )span->size > max_allowed_size )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( span->size != 0u && span->data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    return HIL_APPLICATION_STATUS_OK;
+}
 
 HIL_Application_Status_T
 HIL_APPLICATION_peripheral_config_validate( const HIL_Application_Peripheral_Config_T* peripheral )
@@ -82,67 +110,49 @@ HIL_APPLICATION_peripheral_config_validate( const HIL_Application_Peripheral_Con
     }
     return HIL_APPLICATION_STATUS_OK;
 }
-/**
- * @brief validate a system information request.
- *
- * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
- * @param[in]  test_id          Test ID.
- * @param[in]  data             System information request data.
- * @param[in]  max_payload_size Maximum available payload size in bytes.
- * @param[out] payload          Destination payload buffer.
- *
- * @return Application status.
- */
 HIL_Application_Status_T
 HIL_APPLICATION_System_Info_Request_validate( const HIL_Application_Context_T*             context,
                                               const HIL_Application_System_Info_Request_T* data )
 {
-    ( void )data;
     if ( context->initialized == 0 )
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
     }
-
+    if ( data->request_firmware_git_hash > 1u
+         || data->query != HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
     return HIL_APPLICATION_STATUS_OK;
 }
 
-/**
- * @brief validate a system information response.
- *
- * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
- * @param[in]  test_id          Test ID.
- * @param[in]  data             System information response data.
- * @param[in]  max_payload_size Maximum available payload size in bytes.
- * @param[out] payload          Destination payload buffer.
- *
- * @return Application status.
- */
 HIL_Application_Status_T
 HIL_APPLICATION_System_Info_Response_validate( const HIL_Application_Context_T* context,
                                                const HIL_Application_System_Info_Response_T* data )
 {
-    ( void )data;
+    HIL_Application_Status_T status;
+
     if ( context->initialized == 0 )
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
     }
-    return HIL_APPLICATION_STATUS_OK;
+    /* Typed diagnostics must match the repository protocol version encoded by this codec. */
+    if ( data->application_protocol_major != HIL_RIG_PROTOCOL_VERSION_MAJOR
+         || data->application_protocol_minor != HIL_RIG_PROTOCOL_VERSION_MINOR
+         || data->application_protocol_patch != HIL_RIG_PROTOCOL_VERSION_PATCH )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    status = HIL_APPLICATION_Byte_Span_validate( &data->firmware_git_hash,
+                                                 HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    return HIL_APPLICATION_Byte_Span_validate( &data->diagnostic_data,
+                                               HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE );
 }
 
-/**
- * @brief validate a test configuration.
- *
- * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
- * @param[in]  test_id          Test ID.
- * @param[in]  data             Test configuration data.
- * @param[in]  max_payload_size Maximum available payload size in bytes.
- * @param[out] payload          Destination payload buffer.
- *
- * @return Application status.
- */
 HIL_Application_Status_T
 HIL_APPLICATION_Test_Configuration_validate( const HIL_Application_Context_T*            context,
                                              const HIL_Application_Test_Configuration_T* data )
@@ -151,19 +161,17 @@ HIL_APPLICATION_Test_Configuration_validate( const HIL_Application_Context_T*   
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
     }
-    // if ( data->peripheral_count > HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT )
-    // {
-    //     return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    // }
-    if ( data->expected_tick_count > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT )
+    /* This is a structural policy bound; the stateless codec does not retain uploaded ticks. */
+    if ( data->expected_tick_count > context->config.max_expected_tick_count )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
-    uint8_t  check     = 0;
-    uint32_t periods[] = HIL_APPLICATION_VALID_TICK_PERIODS_NS;
-    for ( uint32_t i = 0; i < sizeof( periods ); i++ )
+    /* Tick duration is carried directly on the wire in microseconds. */
+    uint8_t               check              = 0;
+    static const uint32_t valid_periods_us[] = HIL_APPLICATION_VALID_TICK_PERIODS_US;
+    for ( size_t i = 0u; i < sizeof( valid_periods_us ) / sizeof( valid_periods_us[0] ); ++i )
     {
-        if ( periods[i] == data->tick_duration_us.useconds )
+        if ( valid_periods_us[i] == data->tick_duration_us.microseconds )
         {
             check = 1;
         }
@@ -172,29 +180,15 @@ HIL_APPLICATION_Test_Configuration_validate( const HIL_Application_Context_T*   
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
-    // for ( uint8_t i = 0; i < data->peripheral_count; i++ )
-    // {
-    //     if ( HIL_APPLICATION_peripheral_config_validate( &( data->peripherals[i] ) )
-    //          != HIL_APPLICATION_STATUS_OK )
-    //     {
-    //         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    //     }
-    // }
+    if ( HIL_APPLICATION_Byte_Span_validate( &data->extension_data,
+                                             HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE )
+         != HIL_APPLICATION_STATUS_OK )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
     return HIL_APPLICATION_STATUS_OK;
 }
 
-/**
- * @brief validate test instruction data.
- *
- * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
- * @param[in]  test_id          Test ID.
- * @param[in]  data             Test instruction data.
- * @param[in]  max_payload_size Maximum available payload size in bytes.
- * @param[out] payload          Destination payload buffer.
- *
- * @return Application status.
- */
 HIL_Application_Status_T
 HIL_APPLICATION_Test_Instructions_validate( const HIL_Application_Context_T*          context,
                                             const HIL_Application_Test_Instruction_T* data )
@@ -207,36 +201,10 @@ HIL_APPLICATION_Test_Instructions_validate( const HIL_Application_Context_T*    
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
-    // if ( data->variable_data_count > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
-    // {
-    //     return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    // }
-    // for ( uint8_t i = 0; i < data->variable_data_count; i++ )
-    // {
-    //     if ( data->variable_data[i].channel.peripheral == HIL_APPLICATION_PERIPHERAL_INVALID )
-    //     {
-    //         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    //     }
-    //     if ( data->variable_data[i].channel.channel > HIL_APPLICATION_UART_CHANNEL_COUNT )
-    //     {
-    //         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    //     }
-    // }
+    /* Variable declaration count/channel semantics are deliberately deferred. */
     return HIL_APPLICATION_STATUS_OK;
 }
 
-/**
- * @brief validate variable instruction data.
- *
- * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
- * @param[in]  test_id          Test ID.
- * @param[in]  data             Variable instruction data.
- * @param[in]  max_payload_size Maximum available payload size in bytes.
- * @param[out] payload          Destination payload buffer.
- *
- * @return Application status.
- */
 HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_validate(
     const HIL_Application_Context_T*                   context,
     const HIL_Application_Variable_Instruction_Data_T* data )
@@ -249,18 +217,6 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_validate(
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
-/**
- * @brief validate execution control data.
- *
- * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
- * @param[in]  test_id          Test ID.
- * @param[in]  data             Execution control data.
- * @param[in]  max_payload_size Maximum available payload size in bytes.
- * @param[out] payload          Destination payload buffer.
- *
- * @return Application status.
- */
 HIL_Application_Status_T
 HIL_APPLICATION_Execution_Control_validate( const HIL_Application_Context_T*           context,
                                             const HIL_Application_Execution_Control_T* data )
@@ -269,25 +225,19 @@ HIL_APPLICATION_Execution_Control_validate( const HIL_Application_Context_T*    
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
     }
-    if ( data->command == HIL_APPLICATION_CONTROL_INVALID )
+    if ( data->command != HIL_APPLICATION_CONTROL_START
+         && data->command != HIL_APPLICATION_CONTROL_ABORT )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    /* Execution Control flags are reserved and must remain zero. */
+    if ( data->flags != 0u )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
     return HIL_APPLICATION_STATUS_OK;
 }
 
-/**
- * @brief validate global control data.
- *
- * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
- * @param[in]  test_id          Test ID.
- * @param[in]  data             Global control data.
- * @param[in]  max_payload_size Maximum available payload size in bytes.
- * @param[out] payload          Destination payload buffer.
- *
- * @return Application status.
- */
 HIL_Application_Status_T
 HIL_APPLICATION_Global_Control_validate( const HIL_Application_Context_T*        context,
                                          const HIL_Application_Global_Control_T* data )
@@ -296,25 +246,18 @@ HIL_APPLICATION_Global_Control_validate( const HIL_Application_Context_T*       
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
     }
-    if ( data->command == HIL_APPLICATION_GLOBAL_CONTROL_INVALID )
+    if ( data->command != HIL_APPLICATION_GLOBAL_CONTROL_RESET_APPLICATION )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    /* Global Control flags are reserved and must remain zero. */
+    if ( data->flags != 0u )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
     return HIL_APPLICATION_STATUS_OK;
 }
 
-/**
- * @brief validate test result data.
- *
- * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
- * @param[in]  test_id          Test ID.
- * @param[in]  data             Test result data.
- * @param[in]  max_payload_size Maximum available payload size in bytes.
- * @param[out] payload          Destination payload buffer.
- *
- * @return Application status.
- */
 HIL_Application_Status_T
 HIL_APPLICATION_Test_Result_validate( const HIL_Application_Context_T*     context,
                                       const HIL_Application_Test_Result_T* data )
@@ -327,36 +270,16 @@ HIL_APPLICATION_Test_Result_validate( const HIL_Application_Context_T*     conte
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
-    // if ( data->variable_data_count > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
-    // {
-    //     return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    // }
-    // for ( uint8_t i = 0; i < data->variable_data_count; i++ )
-    // {
-    //     if ( data->variable_data[i].channel.peripheral == HIL_APPLICATION_PERIPHERAL_INVALID )
-    //     {
-    //         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    //     }
-    //     if ( data->variable_data[i].channel.channel > HIL_APPLICATION_UART_CHANNEL_COUNT )
-    //     {
-    //         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    //     }
-    // }
+    if ( data->condition != HIL_APPLICATION_RESULT_CONDITION_OK
+         && data->condition != HIL_APPLICATION_RESULT_CONDITION_PARTIAL
+         && data->condition != HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    /* Variable declaration count/channel semantics are deliberately deferred. */
     return HIL_APPLICATION_STATUS_OK;
 }
 
-/**
- * @brief validate variable result data.
- *
- * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
- * @param[in]  test_id          Test ID.
- * @param[in]  data             Variable result data.
- * @param[in]  max_payload_size Maximum available payload size in bytes.
- * @param[out] payload           Destination payload buffer.
- *
- * @return Application status.
- */
 HIL_Application_Status_T
 HIL_APPLICATION_Variable_Result_Data_validate( const HIL_Application_Context_T* context,
                                                const HIL_Application_Variable_Result_Data_T* data )
@@ -369,18 +292,6 @@ HIL_APPLICATION_Variable_Result_Data_validate( const HIL_Application_Context_T* 
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
-/**
- * @brief validate variable result data.
- *
- * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
- * @param[in]  test_id          Test ID.
- * @param[in]  data             Variable result data.
- * @param[in]  max_payload_size Maximum available payload size in bytes.
- * @param[out] payload           Destination payload buffer.
- *
- * @return Application status.
- */
 HIL_Application_Status_T
 HIL_APPLICATION_Response_validate( const HIL_Application_Context_T*  context,
                                    const HIL_Application_Response_T* data )
@@ -389,25 +300,6 @@ HIL_APPLICATION_Response_validate( const HIL_Application_Context_T*  context,
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
     }
-    if ( data->tick_number > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT )
-    {
-        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    }
-    if ( data->scope == HIL_APPLICATION_RESPONSE_SCOPE_INVALID )
-    {
-        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    }
-    if ( data->outcome == HIL_APPLICATION_RESPONSE_OUTCOME_INVALID )
-    {
-        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    }
-    if ( data->control_command == HIL_APPLICATION_CONTROL_INVALID )
-    {
-        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    }
-    if ( data->global_control_command == HIL_APPLICATION_GLOBAL_CONTROL_INVALID )
-    {
-        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    }
+    ( void )data;
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }

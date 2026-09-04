@@ -121,8 +121,8 @@ Application message. Transport does not decode Application messages.
 
 `EventType.DELIVERY_CONFIRMED` means the peer Transport accepted the bytes. It
 does not mean the peer Application layer decoded, validated, or semantically
-accepted them. Semantic acceptance requires a future Application-level
-response.
+accepted them. Semantic acceptance is reported separately at the Application
+layer, using the Application Response contract when that integration is complete.
 
 ## Link changes, reset, and recovery
 

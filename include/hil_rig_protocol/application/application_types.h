@@ -3,8 +3,8 @@
  * @brief Common identifiers, spans, channel values, and context metadata.
  *
  * @details Types in this header are public C API representations, not packed
- * wire structures. A future codec must serialize each approved field with an
- * explicit fixed width and byte order. Native enum size, size_t, structure
+ * wire structures. The codec serializes approved wire fields with explicit
+ * fixed widths and byte order. Native enum size, size_t, structure
  * padding, and pointers must never be copied directly into a message.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_TYPES_H
@@ -20,12 +20,6 @@ extern "C"
 
 /** Number of opaque bytes in every HIL-RIG test identifier. */
 #define HIL_APPLICATION_TEST_ID_SIZE ( 16u )
-
-/** Compiled-in Application protocol major version produced and accepted. */
-#define HIL_APPLICATION_PROTOCOL_VERSION_MAJOR ( 1u )
-
-/** Compiled-in Application protocol minor version produced and accepted. */
-#define HIL_APPLICATION_PROTOCOL_VERSION_MINOR ( 0u )
 
 /**
  * @brief Minimum alignment required for caller-provided decode storage.
@@ -163,7 +157,7 @@ typedef struct
 } HIL_Application_Channel_Id_T;
 
 /**
- * @brief Tick duration expressed explicitly in nanoseconds.
+ * @brief Tick duration expressed explicitly in microseconds.
  *
  * @details This represents configured protocol data only. It does not select a
  * timer, interrupt, scheduling strategy, or achievable hardware precision.
@@ -171,7 +165,7 @@ typedef struct
 typedef struct
 {
     /** Requested duration of one tick; zero is structurally invalid. */
-    uint32_t useconds;
+    uint32_t microseconds;
 } HIL_Application_Tick_Duration_T;
 
 /**
@@ -198,26 +192,29 @@ typedef struct
 } HIL_Application_Digital_Input_Value_T;
 
 /**
- * @brief One analogue output value in unit-explicit microvolts.
+ * @brief One analogue output value represented in microvolts.
  *
  * @details Array index i identifies external HIL-RIG ANALOG_OUTPUT channel i.
- * Hardware conversion, calibration, range support, and electrical safety are
- * semantic responsibilities of the firmware integration.
+ * The current C/wire value is an unsigned uint32_t. Detailed analogue range,
+ * conversion, calibration, and electrical-safety semantics remain deferred to
+ * later protocol/firmware work.
  */
 typedef struct
 {
-    /** Requested signed output in microvolts. */
+    /** Requested encoded output value in microvolts. */
     uint32_t microvolts;
 } HIL_Application_Analog_Output_Value_T;
 
 /**
- * @brief One captured analogue input value in unit-explicit microvolts.
+ * @brief One captured analogue input value represented in microvolts.
  *
  * @details Array index i identifies external HIL-RIG ANALOG_INPUT channel i.
+ * The current C/wire value is an unsigned uint32_t; detailed analogue range and
+ * conversion semantics remain deferred.
  */
 typedef struct
 {
-    /** Captured signed input in microvolts. */
+    /** Captured encoded input value in microvolts. */
     uint32_t microvolts;
 } HIL_Application_Analog_Input_Value_T;
 
@@ -301,19 +298,20 @@ typedef struct
  * @brief Caller-selected structural bounds for stateless codec operations.
  *
  * @details HIL_APPLICATION_Init() copies this structure into the lightweight
- * codec context. Values limit message sizing, encoding, decoding, and structural
- * validation; they are local resource/policy bounds, not final wire maxima and
- * not reservations for an uploaded test.
+ * codec context. Implemented checks use the applicable values for message sizing,
+ * encoding, decoding, and structural validation. Other fields are retained for
+ * deliberately deferred message-family work. These are local resource/policy
+ * bounds, not final wire maxima and not reservations for an uploaded test.
  *
  * In particular, max_expected_tick_count limits whether the value carried by a
  * Test Configuration is structurally acceptable. The codec never allocates
  * storage for that many ticks, remembers received ticks, or decides that an
  * upload is complete. Firmware and host Application logic own those tasks.
  *
- * Zero disables the corresponding capacity until integration deliberately
- * configures it. This design does not invent production defaults. Configuration
- * does not select an Application protocol version; encoding and decoding use
- * the library's compiled-in version.
+ * HIL_APPLICATION_Default_Config() supplies the initial operational profile;
+ * callers may reduce valid limits before initialization. Configuration does not
+ * select a wire version; encoding and decoding use the repository-wide
+ * compiled-in HIL-RIG protocol version.
  */
 typedef struct
 {
@@ -328,7 +326,13 @@ typedef struct
     /** Largest byte span in one variable instruction/result/error field. */
     size_t max_variable_data_size;
 
-    /** Maximum peripheral configuration records in one typed configuration. */
+    /**
+     * Reserved configuration-family structural bound.
+     *
+     * The current Test Configuration uses fixed Digital, Analogue and PWM
+     * arrays, so this bound is retained for later configuration work and does
+     * not resize or limit those fixed arrays in this foundation.
+     */
     size_t max_peripheral_config_count;
 
     /** Maximum variable-data declarations in one typed tick body. */
