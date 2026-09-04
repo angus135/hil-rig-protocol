@@ -131,11 +131,14 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
     */
     size_t   running_total = 0;
     uint32_t payload_size =
-        sizeof( data->application_protocol_major ) + sizeof( data->application_protocol_minor )
-        + sizeof( data->application_protocol_patch ) + sizeof( data->firmware_version_major )
-        + sizeof( data->firmware_version_minor ) + sizeof( data->firmware_version_patch )
-        + data->firmware_git_hash.size + sizeof( data->firmware_git_hash.size )
-        + data->diagnostic_data.size + sizeof( data->diagnostic_data.size );
+        ( uint32_t )( sizeof( data->application_protocol_major )
+                      + sizeof( data->application_protocol_minor )
+                      + sizeof( data->application_protocol_patch )
+                      + sizeof( data->firmware_version_major )
+                      + sizeof( data->firmware_version_minor )
+                      + sizeof( data->firmware_version_patch ) + data->firmware_git_hash.size
+                      + sizeof( data->firmware_git_hash.size ) + data->diagnostic_data.size
+                      + sizeof( data->diagnostic_data.size ) );
     if ( max_payload_size < payload_size )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
