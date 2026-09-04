@@ -142,7 +142,7 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     |_________________________|____________________________|
     */
     size_t   running_total = 0;
-    uint8_t  decoded_total = 0;
+    uint32_t  decoded_total = 0;
     uint32_t predicted_payload_size =
         sizeof( data->application_protocol_major ) + sizeof( data->application_protocol_minor )
         + sizeof( data->application_protocol_patch ) + sizeof( data->firmware_version_major )
