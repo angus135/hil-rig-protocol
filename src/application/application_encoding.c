@@ -844,17 +844,17 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
     // size calculation
     uint32_t payload_size =
         sizeof( data->tick_number ) + sizeof( data->condition ) + sizeof( data->problem_detail );
-    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
     {
         payload_size += sizeof( data->digital_inputs[i].high );
     }
     // Analog out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; i++ )
     {
         payload_size += sizeof( data->analog_inputs[i].microvolts );
     }
     // pwm out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; i++ )
     {
         payload_size += sizeof( data->pwm_inputs[i].period_nanoseconds );
         payload_size += sizeof( data->pwm_inputs[i].duty_cycle_permyriad );
@@ -877,20 +877,20 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
     size_t running_total = 0;
     HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ), data->tick_number, &running_total );
     //  digital out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
     {
         memcpy( &( payload[running_total] ), &( data->digital_inputs[i].high ),
                 sizeof( data->digital_inputs[i].high ) );
         running_total += sizeof( data->digital_inputs[i].high );
     }
     // Analog out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ),
                                        data->analog_inputs[i].microvolts, &running_total );
     }
     // pwm out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ),
                                        data->pwm_inputs[i].period_nanoseconds, &running_total );

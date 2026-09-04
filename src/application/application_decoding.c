@@ -804,17 +804,17 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     size_t   running_total = 0;
     uint32_t predicted_payload_size =
         sizeof( data->tick_number ) + sizeof( data->condition ) + sizeof( data->problem_detail );
-    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
     {
         predicted_payload_size += sizeof( data->digital_inputs[i].high );
     }
     // Analog out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; i++ )
     {
         predicted_payload_size += sizeof( data->analog_inputs[i].microvolts );
     }
     // pwm out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; i++ )
     {
         predicted_payload_size += sizeof( data->pwm_inputs[i].period_nanoseconds );
         predicted_payload_size += sizeof( data->pwm_inputs[i].duty_cycle_permyriad );
@@ -826,20 +826,20 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     HIL_APPLICATION_Decode_U32_le( &( data->tick_number ), &( payload[running_total] ),
                                    &running_total );
     //  digital out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
     {
         memcpy( &( data->digital_inputs[i].high ), &( payload[running_total] ),
                 sizeof( data->digital_inputs[i].high ) );
         running_total += sizeof( data->digital_inputs[i].high );
     }
     // Analog out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Decode_U32_le( &( data->analog_inputs[i].microvolts ),
                                        &( payload[running_total] ), &running_total );
     }
     // pwm out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Decode_U32_le( &( data->pwm_inputs[i].period_nanoseconds ),
                                        &( payload[running_total] ), &running_total );
