@@ -592,7 +592,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
         running_total += var_size;
         var_size = 0;
     }
-    payload_size += data->extension_data.size;
+    payload_size += data->extension_data.size + sizeof( data->extension_data.size );
     if ( max_payload_size < payload_size )
     {
         *used_size = running_total;
@@ -710,7 +710,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
     //     running_total += sizeof( data->variable_data[i].data.size );
     //     running_total += data->variable_data[i].data.size;
     // }
-    *used_size = 0;
+    *used_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }
 

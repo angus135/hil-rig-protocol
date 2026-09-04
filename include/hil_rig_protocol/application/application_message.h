@@ -176,7 +176,8 @@ HIL_Application_Status_T HIL_APPLICATION_Header_Encoding( const HIL_Application_
 
 HIL_Application_Status_T
 HIL_APPLICATION_Header_decoding( const HIL_Application_Context_T* old_context,
-                                 HIL_Application_Message_T* new_message, uint8_t* encoded_message );
+                                 HIL_Application_Message_T* new_message, uint8_t* encoded_message,
+                                 size_t* payload_size );
 
 #ifdef __cplusplus
 }

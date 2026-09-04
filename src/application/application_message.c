@@ -26,6 +26,9 @@
  |                                              |
  |                  Payload                     |
  |______________________________________________|
+ |                                              |
+ |            End Payload Flag {1}              |
+ |______________________________________________|
 */
 
 HIL_Application_Status_T HIL_APPLICATION_Header_Encoding( const HIL_Application_Message_T* message,
@@ -64,7 +67,8 @@ HIL_Application_Status_T HIL_APPLICATION_Header_Encoding( const HIL_Application_
 
 HIL_Application_Status_T
 HIL_APPLICATION_Header_decoding( const HIL_Application_Context_T* old_context,
-                                 HIL_Application_Message_T* new_message, uint8_t* encoded_message )
+                                 HIL_Application_Message_T* new_message, uint8_t* encoded_message,
+                                 size_t* payload_size )
 {
     // Test ID
 
@@ -82,6 +86,9 @@ HIL_APPLICATION_Header_decoding( const HIL_Application_Context_T* old_context,
     memcpy( &( new_message->subtype ), &( encoded_message[running_total] ),
             sizeof( new_message->subtype ) );
     running_total += sizeof( new_message->subtype );
-    // We don't know the size of the payload yet so leave it blank but store the pointer
+    // the expected payload size
+    memcpy( payload_size, &( encoded_message[running_total] ),
+            HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES );
+    running_total += HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES;
     return HIL_APPLICATION_STATUS_OK;
 }

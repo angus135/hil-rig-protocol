@@ -537,7 +537,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
 
             for ( std::size_t i = 0u; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; ++i )
             {
-                std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
 
                 EXPECT_EQ( std::memcmp( &expected.body.test_configuration.digital_in[i],
                                         &actual.body.test_configuration.digital_in[i],
@@ -547,7 +546,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
 
             for ( std::size_t i = 0u; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; ++i )
             {
-                std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
 
                 EXPECT_EQ( std::memcmp( &expected.body.test_configuration.digital_out[i],
                                         &actual.body.test_configuration.digital_out[i],
@@ -557,7 +555,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
 
             for ( std::size_t i = 0u; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; ++i )
             {
-                std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
 
                 EXPECT_EQ( std::memcmp( &expected.body.test_configuration.analog_in[i],
                                         &actual.body.test_configuration.analog_in[i],
@@ -567,7 +564,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
 
             for ( std::size_t i = 0u; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; ++i )
             {
-                std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
 
                 EXPECT_EQ( std::memcmp( &expected.body.test_configuration.analog_out[i],
                                         &actual.body.test_configuration.analog_out[i],
@@ -577,7 +573,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
 
             for ( std::size_t i = 0u; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; ++i )
             {
-                std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
 
                 EXPECT_EQ( std::memcmp( &expected.body.test_configuration.pwm_in[i],
                                         &actual.body.test_configuration.pwm_in[i],
@@ -587,7 +582,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
 
             for ( std::size_t i = 0u; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; ++i )
             {
-                std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
 
                 EXPECT_EQ( std::memcmp( &expected.body.test_configuration.pwm_out[i],
                                         &actual.body.test_configuration.pwm_out[i],
