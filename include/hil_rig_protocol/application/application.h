@@ -54,52 +54,51 @@ extern "C"
 #endif
 
 /**
- * @brief Populate safe, policy-disabled Application configuration values.
+ * @brief Initialise an Application layer configuration with default limits.
  *
- * @details A future implementation must initialize every field
- * deterministically without choosing production codec capacities. Zero values
- * require integration to select explicit capacities. This function allocates
- * nothing and mutates no context.
+ * Sets all configurable Application layer limits to their protocol-defined
+ * maximum values. No memory is allocated and no Application context is
+ * modified.
  *
- * @param[out] config Configuration object to clear/populate; must not be NULL.
+ * @param[out] config Pointer to the configuration structure to initialise.
  *
- * @retval HIL_APPLICATION_STATUS_OK Configuration initialized.
- * @retval HIL_APPLICATION_STATUS_INVALID_ARGUMENT config is NULL.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Current intentional stub.
- *
- * @post On future OK, all fields are initialized. The current stub defensively
- * zeroes config when non-NULL and returns NOT_IMPLEMENTED.
+ * @return HIL_APPLICATION_STATUS_OK
+ *         Configuration was successfully initialised.
+ * @return HIL_APPLICATION_STATUS_INVALID_ARGUMENT
+ *         The config pointer is NULL.
  */
 HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_T* config );
+
 /**
- * @brief Initialize a lightweight context with copied structural codec limits.
+ * @brief Initialise an Application context with a supplied configuration.
  *
- * @details A future implementation validates every configured limit and their
- * relationships, then copies the complete configuration and sets initialized
- * only after successful validation. It performs checked reasoning for values
- * later used in size arithmetic but allocates no memory and retains no pointer
- * from config.
+ * - Validates the supplied Application configuration against the absolute
+ *   protocol limits.
+ * - Copies the validated configuration into the Application context.
+ * - Marks the Application context as initialised after successful validation.
+ * - Does not allocate memory.
+ * - Does not retain a pointer to the supplied configuration.
+ * - The Transport layer must support at least the configured maximum encoded
+ *   Application message size.
  *
- * The context remains logically read-only after initialization. Sizing,
- * validation, encoding, and decoding inspect only copied bounds. They do not
- * store messages, output bytes, decode storage, an active Test ID, upload/tick
- * progress, result-transfer progress, retention ownership, execution state, or
- * statistics.
+ * @param[out] context
+ *        Pointer to the Application context to initialise.
+ * @param[in] config
+ *        Pointer to the Application configuration to validate and copy.
  *
- * config is borrowed only for this call and may be released immediately after
- * future success.
- *
- * @param[out] context Caller-allocated codec context to initialize.
- * @param[in] config Explicit structural codec limits; must not be NULL.
- *
- * @retval HIL_APPLICATION_STATUS_OK Configuration validated and copied.
- * @retval HIL_APPLICATION_STATUS_INVALID_ARGUMENT Invalid pointer or limit.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Current intentional stub.
- *
- * @warning All later operations for context must be made by its single owning
- * execution context. Calls must not be distributed across tasks, callbacks, or
- * interrupts even with external locking. The library is not thread-safe or
- * re-entrant and adds no locks, atomics, callbacks, or RTOS dependencies.
+ * @return HIL_APPLICATION_STATUS_OK
+ *         The Application context was successfully initialised.
+ * @return HIL_APPLICATION_STATUS_INVALID_ARGUMENT
+ *         The context or config pointer is NULL.
+ * @return HIL_APPLICATION_STATUS_INVALID_LENGTH
+ *         The configured maximum expected tick count exceeds the protocol
+ *         limit.
+ * @return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL
+ *         The configured maximum encoded message size is smaller than the
+ *         required protocol maximum.
+ * @return HIL_APPLICATION_STATUS_INVALID_COUNT
+ *         A configured variable-data size, peripheral count, or variable
+ *         transfers-per-tick count exceeds its protocol limit.
  */
 HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      context,
                                                const HIL_Application_Config_T* config );
@@ -138,35 +137,41 @@ HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Con
                                                        size_t* encoded_size );
 
 /**
- * @brief Encode typed data into one complete Application message.
+ * @brief Encode an Application message into a byte buffer.
  *
- * @details The future implementation validates the tagged message, calculates
- * size with checked arithmetic, explicitly serializes approved fixed-width
- * fields, serializes all fixed tick-array elements in deterministic channel
- * order, writes the compiled-in Application protocol version into the future
- * envelope, copies every variable array/span, rejects inconsistent
- * declarations, and publishes output_size only after complete success. It never
- * performs a Global Control operation, Transport framing/fragmentation, or
- * pointer retention. No API parameter selects another encoding version.
+ * - Encodes the Application message into the supplied output buffer.
+ * - Encodes the Application header before encoding the message payload.
+ * - Selects the appropriate message-specific encoder based on the message type.
+ * - Writes the encoded payload size into the Application header.
+ * - Appends the end-of-payload flag after the encoded payload.
+ * - Returns the total number of bytes written through output_size.
+ * - Clears the output buffer before encoding.
+ * - Clears the output buffer if an encoding error occurs.
  *
- * On OK output_size is the bytes copied. On BUFFER_TOO_SMALL it is the required
- * size and out_buffer remains unusable as a message. On other failures and
- * NOT_IMPLEMENTED it is zero. NULL out_buffer with size zero is a nonmutating
- * size query and returns BUFFER_TOO_SMALL with the required nonzero size.
+ * @param[in] context
+ *        Pointer to the Application context.
+ * @param[in] message
+ *        Pointer to the Application message to encode.
+ * @param[out] out_buffer
+ *        Buffer into which the encoded message is written.
+ * @param[in] out_buffer_size
+ *        Total capacity of out_buffer in bytes.
+ * @param[out] output_size
+ *        Pointer to receive the number of bytes written to out_buffer.
  *
- * @param[in] context Successfully initialized context.
- * @param[in] message Complete tagged typed message borrowed synchronously.
- * @param[out] out_buffer Complete-message destination; NULL only when
- *             out_buffer_size is zero.
- * @param[in] out_buffer_size Writable destination capacity.
- * @param[out] output_size Copied, required, or zero byte count per result.
- *
- * @retval HIL_APPLICATION_STATUS_OK Complete message encoded.
- * @retval HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL Destination/query too small.
- * @retval HIL_APPLICATION_STATUS_INVALID_ARGUMENT Invalid pointer combination.
- * @retval HIL_APPLICATION_STATUS_UNINITIALIZED Invalid context.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Current intentional stub.
- * @return Other structural statuses documented by HIL_APPLICATION_Encoded_Size.
+ * @return HIL_APPLICATION_STATUS_OK
+ *         The message was successfully encoded.
+ * @return HIL_APPLICATION_STATUS_INVALID_ARGUMENT
+ *         A required pointer argument is NULL.
+ * @return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL
+ *         The output buffer is too small to contain the required message
+ *         header and payload end flag.
+ * @return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE
+ *         The message type is invalid or unsupported.
+ * @return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED
+ *         The message type is reserved and not implemented.
+ * @return Other HIL_Application_Status_T values
+ *         An error returned by the message-specific encoder.
  */
 HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_Context_T* context,
                                                          const HIL_Application_Message_T* message,
@@ -205,65 +210,62 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
                                      size_t* required_storage_size );
 
 /**
- * @brief Decode one complete Application message into typed caller storage.
+ * @brief Decode an encoded Application message.
  *
- * @details Transport must supply exactly one complete reassembled Application
- * message. The future implementation validates envelope/type/subtype/test-ID
- * presence, compiled-in Application protocol version, and exact length;
- * calculates/reserves caller decode storage; copies variable arrays and byte
- * spans; decodes fixed tick arrays directly into the typed output; decodes the
- * selected union body; rejects trailing or missing bytes; and publishes
- * out_message only after complete success.
+ * - Decodes an encoded Application message into a typed
+ *   HIL_Application_Message_T structure.
+ * - Decodes the Application header before decoding the message payload.
+ * - Selects the appropriate message-specific decoder based on the message type.
+ * - Decodes variable-length data into caller-provided storage.
+ * - Returns the number of decoded data bytes used through used_decoded_size.
+ * - Returns the number of decoded variable-data declarations used through
+ *   used_decoded_variable_num.
+ * - Verifies that the decoded payload size matches the payload size specified
+ *   in the Application header.
+ * - Verifies that the end-of-payload flag is present at the expected location.
  *
- * Variable pointers in out_message point into decode_storage and remain valid
- * until the caller modifies/releases that region. No pointer references
- * encoded_message, so the Transport receive item may be released after return.
- * Context retains neither input nor decode storage.
+ * @param[in] context
+ *        Pointer to the Application context.
+ * @param[in] encoded_message
+ *        Pointer to the encoded Application message.
+ * @param[in] max_encoded_message_size
+ *        Maximum number of bytes available in encoded_message.
+ * @param[out] out_message
+ *        Pointer to the structure in which the decoded message is stored.
+ * @param[out] decoded_data
+ *        Caller-provided storage for decoded variable-length data.
+ * @param[in] max_decoded_data_size
+ *        Maximum capacity of decoded_data in bytes.
+ * @param[out] used_decoded_size
+ *        Pointer to receive the number of decoded_data bytes used.
+ * @param[out] decoded_peripherals
+ *        Caller-provided storage for decoded peripheral configuration records.
+ * @param[in] max_decoded_peripherals_num
+ *        Maximum number of peripheral configuration records that can be
+ *        stored in decoded_peripherals.
+ * @param[out] decoded_variable_data
+ *        Caller-provided storage for decoded variable-data declarations.
+ * @param[in] max_decoded_variable_data_num
+ *        Maximum number of variable-data declarations that can be stored in
+ *        decoded_variable_data.
+ * @param[out] used_decoded_variable_num
+ *        Pointer to receive the number of decoded variable-data declarations
+ *        used.
  *
- * On OK decode_storage_size is bytes used and out_message is fully initialized.
- * On BUFFER_TOO_SMALL it reports required bytes and out_message is INVALID. On
- * all other failure and NOT_IMPLEMENTED it is zero and out_message is INVALID.
- * NULL storage with zero capacity is a size query when required storage is
- * nonzero. A zero-storage fixed message may decode with that combination.
- * Every non-NULL decode_storage pointer must be aligned to
- * HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT. A future implementation returns
- * HIL_APPLICATION_STATUS_INVALID_ARGUMENT for a misaligned pointer; the current
- * intentional stub performs no runtime alignment check.
- *
- * Decoding RESET_APPLICATION never performs recovery or affects Transport.
- * Decoding also never creates, completes, or invalidates a transaction;
- * semantically accepts or retains a test; performs control; queries firmware
- * modules; or creates a Response.
- *
- * @param[in] context Successfully initialized context.
- * @param[in] encoded_message Complete reassembled bytes, borrowed for this call.
- * @param[in] encoded_message_size Exact complete-message bytes.
- * @param[out] decode_storage Caller workspace for variable arrays/spans; NULL
- *             only when decode_storage_capacity is zero. A non-NULL pointer
- *             must satisfy HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT.
- * @param[in] decode_storage_capacity Writable workspace capacity.
- * @param[out] out_message Typed output; set to INVALID on failure.
- * @param[out] decode_storage_size Used, required, or zero bytes per result.
- *
- * @retval HIL_APPLICATION_STATUS_OK Message fully decoded.
- * @retval HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL Decode workspace insufficient.
- * @retval HIL_APPLICATION_STATUS_INVALID_ARGUMENT Invalid pointer combination.
- * @retval HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE Version is incompatible.
- * @retval HIL_APPLICATION_STATUS_UNINITIALIZED Invalid context.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Current intentional stub.
- * @return Other codec statuses documented by Decode_Storage_Size.
- *
- * @par C11 static storage
- * @code{.c}
- * _Alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT )
- * static uint8_t decode_storage[2048u];
- * @endcode
- *
- * @par C++ static storage
- * @code{.cpp}
- * alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT )
- * static uint8_t decode_storage[2048u];
- * @endcode
+ * @return HIL_APPLICATION_STATUS_OK
+ *         The Application message was successfully decoded.
+ * @return HIL_APPLICATION_STATUS_INVALID_ARGUMENT
+ *         A required context, encoded-message, or output-message pointer is
+ *         NULL.
+ * @return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE
+ *         The message type is invalid or unsupported.
+ * @return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED
+ *         The message type is reserved and not implemented.
+ * @return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE
+ *         The decoded payload size does not match the header or the
+ *         end-of-payload flag is missing or invalid.
+ * @return Other HIL_Application_Status_T values
+ *         An error returned by the message-specific decoder.
  */
 HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
     const HIL_Application_Context_T* context, const uint8_t* encoded_message,
@@ -274,29 +276,32 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
     size_t* used_decoded_variable_num );
 
 /**
- * @brief Structurally validate one typed tagged message.
+ * @brief Validate a typed Application message.
  *
- * @details Future validation covers type/subtype/test-ID presence, enum values,
- * variable pointer/count pairs, configured bounds, fixed-array element values,
- * channel-family consistency, nonzero and unique variable declarations, unique
- * peripheral/channel configuration records, nonzero expected_tick_count, zero
- * reserved flags, empty unsupported extension data, and checked size
- * relationships. Nonzero reserved flags or nonempty Test Configuration
- * extension_data return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE. Validation
- * enforces that Global Control forbids a Test ID and that test-scoped messages
- * require one. It does not check sender direction,
- * tick_number against an active Test Configuration, transaction prerequisites,
- * hardware support/electrical limits, retention availability, upload
- * completion, execution-manager permission, or whole-test consistency.
+ * - Validates the supplied Application message according to its message type.
+ * - Selects the appropriate message-specific validation function.
+ * - Validates the contents of the message body using the corresponding
+ *   message-specific validator.
+ * - Does not perform cross-message transaction validation.
+ * - Does not perform Transport-layer validation or behaviour.
  *
- * @param[in] context Successfully initialized context.
- * @param[in] message Typed message borrowed synchronously.
+ * @param[in] context
+ *        Pointer to the Application context.
+ * @param[in] message
+ *        Pointer to the Application message to validate.
  *
- * @retval HIL_APPLICATION_STATUS_OK Typed structure is codec-valid.
- * @retval HIL_APPLICATION_STATUS_UNINITIALIZED Invalid context.
- * @retval HIL_APPLICATION_STATUS_INVALID_ARGUMENT message is NULL.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Current intentional stub.
- * @return A specific message, subtype, length, count, or unsupported status.
+ * @return HIL_APPLICATION_STATUS_OK
+ *         The message is valid.
+ * @return HIL_APPLICATION_STATUS_INVALID_ARGUMENT
+ *         The context or message pointer is NULL.
+ * @return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE
+ *         The message type is invalid or unsupported.
+ * @return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED
+ *         The message type is reserved and not implemented.
+ * @return HIL_APPLICATION_STATUS_INTERNAL_ERROR
+ *         The message type does not currently support validation.
+ * @return Other HIL_Application_Status_T values
+ *         An error returned by the message-specific validation function.
  */
 HIL_Application_Status_T
 HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
