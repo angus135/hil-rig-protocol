@@ -380,6 +380,8 @@ HIL_APPLICATION_Peripheral_Config_encode( const HIL_Application_Peripheral_Confi
     |_________________________|____________________________|
 
     */
+
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
     uint32_t payload_size = sizeof( data->type );
     if ( max_payload_size < payload_size )
     {
@@ -734,7 +736,7 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_encode(
     |_________________________|____________________________|
 
     */
-
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
     // size check
     size_t payload_size = sizeof( data->tick_number ) + sizeof( data->remaining )
                           + sizeof( data->channel.channel ) + sizeof( data->channel.peripheral )

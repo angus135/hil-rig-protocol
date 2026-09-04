@@ -255,6 +255,8 @@ HIL_APPLICATION_Peripheral_Config_decode( HIL_Application_Peripheral_Config_T* d
     |_________________________|____________________________|
 
     */
+
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
     size_t running_total = 0;
     memcpy( &( data->type ), &( payload[running_total] ), sizeof( data->type ) );
     running_total += sizeof( data->type );
@@ -658,7 +660,7 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_decode(
     |_________________________|____________________________|
 
     */
-
+    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
     // size check
     size_t running_total          = 0;
     size_t predicted_payload_size = sizeof( data->tick_number ) + sizeof( data->remaining )
