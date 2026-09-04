@@ -739,7 +739,7 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
  * application_test_api.cpp, reproduced here so the behavioural
  * tests can actually exercise every codec family.
  */
-std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
+std::array<HIL_Application_Message_T, 11u> ConstructCodecMessages()
 {
     const HIL_Application_Test_Id_T test_id = ExampleTestId( 0x11u );  // CHANGED
 
@@ -748,6 +748,8 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
     static const std::array<std::uint8_t, 3u> diagnostic{ 1u, 2u, 3u };
 
     static const std::array<std::uint8_t, 5u> variable_bytes{ 9u, 8u, 7u, 6u, 5u };
+
+    static const std::array<std::uint8_t, 2u> error_bytes{ 0xaau, 0x55u };
 
     static const std::array<HIL_Application_Digital_Config_T,
                             HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT>
@@ -1021,7 +1023,7 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
             HIL_Application_Byte_Span_T{ variable_bytes.data(),
                                          ( uint8_t )variable_bytes.size() } } };
 
-    std::array<HIL_Application_Message_T, 10u> messages{};
+    std::array<HIL_Application_Message_T, 11u> messages{};
 
     messages[0].type                           = HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST;
     messages[0].subtype                        = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
@@ -1146,6 +1148,17 @@ std::array<HIL_Application_Message_T, 10u> ConstructCodecMessages()
     messages[9].body.response.tick_number            = 0u;
     messages[9].body.response.control_command        = HIL_APPLICATION_CONTROL_INVALID;
     messages[9].body.response.global_control_command = HIL_APPLICATION_GLOBAL_CONTROL_INVALID;
+
+    messages[10].type                       = HIL_APPLICATION_MESSAGE_TYPE_ERROR;
+    messages[10].subtype                    = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    messages[10].has_test_id                = 1u;
+    messages[10].test_id                    = test_id;
+    messages[10].body.error.category        = HIL_APPLICATION_ERROR_CATEGORY_EXECUTION;
+    messages[10].body.error.recoverable     = 1u;
+    messages[10].body.error.has_tick_number = 1u;
+    messages[10].body.error.tick_number     = 0u;
+    messages[10].body.error.diagnostic_data =
+        HIL_Application_Byte_Span_T{ error_bytes.data(), error_bytes.size() };
 
     return messages;
 }
@@ -1895,7 +1908,7 @@ TEST( ApplicationEncodeDecode, EverySupportedCodecRoundTrips )
                            decoded_variable.size(), &used_variable_size ),
                        HIL_APPLICATION_STATUS_OK );
 
-            if ( original.type == 16 )
+            if ( original.type == HIL_APPLICATION_MESSAGE_TYPE_ERROR )
             {
                 PrintMessage( original );
                 PrintMessage( decoded );
@@ -2094,21 +2107,6 @@ TEST( ApplicationEncode, RejectsReservedMessageType )
     EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, buffer.data(), buffer.size(),
                                                &output_size ),
                HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
-}
-
-TEST( ApplicationEncode, ErrorMessageReturnsInternalError )
-{
-    HIL_Application_Context_T context = MakeContext();
-
-    HIL_Application_Message_T message{};
-    message.type = HIL_APPLICATION_MESSAGE_TYPE_ERROR;
-
-    std::array<std::uint8_t, 256u> buffer{};
-    std::size_t                    output_size = 0u;
-
-    EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, buffer.data(), buffer.size(),
-                                               &output_size ),
-               HIL_APPLICATION_STATUS_INTERNAL_ERROR );
 }
 
 TEST( ApplicationDecode, InvalidHeaderIsRejected )

@@ -27,13 +27,13 @@
 
 #include <string.h>
 
-void HIL_APPLICATION_Decode_U16_le( uint16_t* dest, const uint8_t* src, size_t* running_total )
+void HIL_APPLICATION_Decode_U16_Le( uint16_t* dest, const uint8_t* src, size_t* running_total )
 {
     *dest          = ( ( uint16_t )src[0] ) | ( ( uint16_t )src[1] << 8 );
     *running_total = *running_total + 2;
 }
 
-void HIL_APPLICATION_Decode_U32_le( uint32_t* dest, const uint8_t* src, size_t* running_total )
+void HIL_APPLICATION_Decode_U32_Le( uint32_t* dest, const uint8_t* src, size_t* running_total )
 {
     *dest = ( ( uint32_t )src[0] ) | ( ( uint32_t )src[1] << 8 ) | ( ( uint32_t )src[2] << 16 )
             | ( ( uint32_t )src[3] << 24 );
@@ -142,26 +142,27 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     |_________________________|____________________________|
     */
     size_t   running_total = 0;
-    uint32_t  decoded_total = 0;
+    uint32_t decoded_total = 0;
     uint32_t predicted_payload_size =
         sizeof( data->application_protocol_major ) + sizeof( data->application_protocol_minor )
         + sizeof( data->application_protocol_patch ) + sizeof( data->firmware_version_major )
-        + sizeof( data->firmware_version_minor ) + sizeof( data->firmware_version_patch ) + sizeof( data->diagnostic_data.size ) + sizeof( data->firmware_git_hash.size ) ;
+        + sizeof( data->firmware_version_minor ) + sizeof( data->firmware_version_patch )
+        + sizeof( data->diagnostic_data.size ) + sizeof( data->firmware_git_hash.size );
     if ( max_payload_size < predicted_payload_size )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    HIL_APPLICATION_Decode_U16_le( &( data->application_protocol_major ),
+    HIL_APPLICATION_Decode_U16_Le( &( data->application_protocol_major ),
                                    &( payload[running_total] ), &running_total );
-    HIL_APPLICATION_Decode_U16_le( &( data->application_protocol_minor ),
+    HIL_APPLICATION_Decode_U16_Le( &( data->application_protocol_minor ),
                                    &( payload[running_total] ), &running_total );
-    HIL_APPLICATION_Decode_U16_le( &( data->application_protocol_patch ),
+    HIL_APPLICATION_Decode_U16_Le( &( data->application_protocol_patch ),
                                    &( payload[running_total] ), &running_total );
-    HIL_APPLICATION_Decode_U16_le( &( data->firmware_version_major ), &( payload[running_total] ),
+    HIL_APPLICATION_Decode_U16_Le( &( data->firmware_version_major ), &( payload[running_total] ),
                                    &running_total );
-    HIL_APPLICATION_Decode_U16_le( &( data->firmware_version_minor ), &( payload[running_total] ),
+    HIL_APPLICATION_Decode_U16_Le( &( data->firmware_version_minor ), &( payload[running_total] ),
                                    &running_total );
-    HIL_APPLICATION_Decode_U16_le( &( data->firmware_version_patch ), &( payload[running_total] ),
+    HIL_APPLICATION_Decode_U16_Le( &( data->firmware_version_patch ), &( payload[running_total] ),
                                    &running_total );
 
     // Variable data
@@ -187,7 +188,7 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     running_total += sizeof( data->firmware_git_hash.size );
     running_total += data->firmware_git_hash.size;
     decoded_total += data->firmware_git_hash.size;
-    if ( running_total-decoded_total != predicted_payload_size )
+    if ( running_total - decoded_total != predicted_payload_size )
     {
         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
     }
@@ -209,7 +210,7 @@ HIL_Application_Status_T HIL_APPLICATION_Channel_Id_decode( HIL_Application_Chan
     size_t running_total = 0;
     memcpy( &( data->peripheral ), &( payload[running_total] ), sizeof( data->peripheral ) );
     running_total += sizeof( data->peripheral );
-    HIL_APPLICATION_Decode_U16_le( &( data->channel ), &( payload[running_total] ),
+    HIL_APPLICATION_Decode_U16_Le( &( data->channel ), &( payload[running_total] ),
                                    &running_total );
     return HIL_APPLICATION_STATUS_OK;
 }
@@ -284,9 +285,9 @@ HIL_APPLICATION_Peripheral_Config_decode( HIL_Application_Peripheral_Config_T* d
             HIL_APPLICATION_Channel_Id_decode( &( data->value.pwm.channel ),
                                                &( payload[running_total] ) );
             running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-            HIL_APPLICATION_Decode_U32_le( &( data->value.pwm.period_nanoseconds ),
+            HIL_APPLICATION_Decode_U32_Le( &( data->value.pwm.period_nanoseconds ),
                                            &( payload[running_total] ), &running_total );
-            HIL_APPLICATION_Decode_U16_le( &( data->value.pwm.initial_duty_cycle_permyriad ),
+            HIL_APPLICATION_Decode_U16_Le( &( data->value.pwm.initial_duty_cycle_permyriad ),
                                            payload, &running_total );
             memcpy( &( data->value.pwm.voltage_level ), &( payload[running_total] ),
                     sizeof( data->value.pwm.voltage_level ) );
@@ -376,9 +377,9 @@ HIL_Application_Status_T HIL_APPLICATION_Pwm_Config_decode( HIL_Application_Pwm_
     size_t running_total = 0;
     HIL_APPLICATION_Channel_Id_decode( &( data->channel ), &( payload[running_total] ) );
     running_total += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-    HIL_APPLICATION_Decode_U32_le( &( data->period_nanoseconds ), &( payload[running_total] ),
+    HIL_APPLICATION_Decode_U32_Le( &( data->period_nanoseconds ), &( payload[running_total] ),
                                    &running_total );
-    HIL_APPLICATION_Decode_U16_le( &( data->initial_duty_cycle_permyriad ),
+    HIL_APPLICATION_Decode_U16_Le( &( data->initial_duty_cycle_permyriad ),
                                    &( payload[running_total] ), &running_total );
     memcpy( &( data->voltage_level ), &( payload[running_total] ), sizeof( data->voltage_level ) );
     running_total += sizeof( data->voltage_level );
@@ -448,16 +449,16 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
             + sizeof( data->pwm_out[0].initial_duty_cycle_permyriad )
             + sizeof( data->pwm_out[0].period_nanoseconds ) )
               * HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT
-        + sizeof(data->extension_data.size);
+        + sizeof( data->extension_data.size );
     if ( max_payload_size < predicted_payload_size )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    HIL_APPLICATION_Decode_U32_le( &( data->tick_duration_us.useconds ),
+    HIL_APPLICATION_Decode_U32_Le( &( data->tick_duration_us.useconds ),
                                    &( payload[running_total] ), &running_total );
-    HIL_APPLICATION_Decode_U32_le( &( data->expected_tick_count ), &( payload[running_total] ),
+    HIL_APPLICATION_Decode_U32_Le( &( data->expected_tick_count ), &( payload[running_total] ),
                                    &running_total );
-    HIL_APPLICATION_Decode_U32_le( &( data->flags ), &( payload[running_total] ), &running_total );
+    HIL_APPLICATION_Decode_U32_Le( &( data->flags ), &( payload[running_total] ), &running_total );
     size_t var_total = 0;
     for ( uint32_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
     {
@@ -511,7 +512,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
                                       decoded_data );
     running_total += sizeof( data->extension_data.size );
     running_total += data->extension_data.size;
-    if ( running_total- data->extension_data.size != predicted_payload_size )
+    if ( running_total - data->extension_data.size != predicted_payload_size )
     {
         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
     }
@@ -572,7 +573,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    HIL_APPLICATION_Decode_U32_le( &( data->tick_number ), &( payload[running_total] ),
+    HIL_APPLICATION_Decode_U32_Le( &( data->tick_number ), &( payload[running_total] ),
                                    &running_total );
     //  digital out
     for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
@@ -584,15 +585,15 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
     // Analog out
     for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; i++ )
     {
-        HIL_APPLICATION_Decode_U32_le( &( data->analog_outputs[i].microvolts ),
+        HIL_APPLICATION_Decode_U32_Le( &( data->analog_outputs[i].microvolts ),
                                        &( payload[running_total] ), &running_total );
     }
     // pwm out
     for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; i++ )
     {
-        HIL_APPLICATION_Decode_U32_le( &( data->pwm_outputs[i].period_nanoseconds ),
+        HIL_APPLICATION_Decode_U32_Le( &( data->pwm_outputs[i].period_nanoseconds ),
                                        &( payload[running_total] ), &running_total );
-        HIL_APPLICATION_Decode_U16_le( &( data->pwm_outputs[i].duty_cycle_permyriad ),
+        HIL_APPLICATION_Decode_U16_Le( &( data->pwm_outputs[i].duty_cycle_permyriad ),
                                        &( payload[running_total] ), &running_total );
     }
     // variable data
@@ -670,9 +671,9 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_decode(
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    HIL_APPLICATION_Decode_U32_le( &( data->tick_number ), &( payload[running_total] ),
+    HIL_APPLICATION_Decode_U32_Le( &( data->tick_number ), &( payload[running_total] ),
                                    &running_total );
-    HIL_APPLICATION_Decode_U32_le( &( data->remaining ), &( payload[running_total] ),
+    HIL_APPLICATION_Decode_U32_Le( &( data->remaining ), &( payload[running_total] ),
                                    &running_total );
     HIL_APPLICATION_Channel_Id_decode( &( data->channel ), &( payload[running_total] ) );
     running_total += sizeof( data->channel.channel ) + sizeof( data->channel.peripheral );
@@ -721,7 +722,7 @@ HIL_Application_Status_T HIL_APPLICATION_Execution_Control_decode(
     }
     memcpy( &( data->command ), &( payload[running_total] ), sizeof( data->command ) );
     running_total += sizeof( data->command );
-    HIL_APPLICATION_Decode_U32_le( &( data->flags ), &( payload[running_total] ), &running_total );
+    HIL_APPLICATION_Decode_U32_Le( &( data->flags ), &( payload[running_total] ), &running_total );
     if ( running_total != predicted_payload_size )
     {
         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
@@ -757,7 +758,7 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_decode(
     }
     memcpy( &( data->command ), &( payload[running_total] ), sizeof( data->command ) );
     running_total += sizeof( data->command );
-    HIL_APPLICATION_Decode_U32_le( &( data->flags ), &( payload[running_total] ), &running_total );
+    HIL_APPLICATION_Decode_U32_Le( &( data->flags ), &( payload[running_total] ), &running_total );
     if ( running_total != predicted_payload_size )
     {
         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
@@ -825,7 +826,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    HIL_APPLICATION_Decode_U32_le( &( data->tick_number ), &( payload[running_total] ),
+    HIL_APPLICATION_Decode_U32_Le( &( data->tick_number ), &( payload[running_total] ),
                                    &running_total );
     //  digital out
     for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
@@ -837,15 +838,15 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     // Analog out
     for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; i++ )
     {
-        HIL_APPLICATION_Decode_U32_le( &( data->analog_inputs[i].microvolts ),
+        HIL_APPLICATION_Decode_U32_Le( &( data->analog_inputs[i].microvolts ),
                                        &( payload[running_total] ), &running_total );
     }
     // pwm out
     for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; i++ )
     {
-        HIL_APPLICATION_Decode_U32_le( &( data->pwm_inputs[i].period_nanoseconds ),
+        HIL_APPLICATION_Decode_U32_Le( &( data->pwm_inputs[i].period_nanoseconds ),
                                        &( payload[running_total] ), &running_total );
-        HIL_APPLICATION_Decode_U16_le( &( data->pwm_inputs[i].duty_cycle_permyriad ),
+        HIL_APPLICATION_Decode_U16_Le( &( data->pwm_inputs[i].duty_cycle_permyriad ),
                                        &( payload[running_total] ), &running_total );
     }
     // variable data
@@ -882,7 +883,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     // Condition and problem
     memcpy( &( data->condition ), &( payload[running_total] ), sizeof( data->condition ) );
     running_total += sizeof( data->condition );
-    HIL_APPLICATION_Decode_U32_le( &( data->problem_detail ), &( payload[running_total] ),
+    HIL_APPLICATION_Decode_U32_Le( &( data->problem_detail ), &( payload[running_total] ),
                                    &running_total );
     if ( running_total != predicted_payload_size )
     {
@@ -954,7 +955,7 @@ HIL_Application_Status_T HIL_APPLICATION_Response_decode(
     running_total += sizeof( data->outcome );
     memcpy( &( data->reason ), &( payload[running_total] ), sizeof( data->reason ) );
     running_total += sizeof( data->reason );
-    HIL_APPLICATION_Decode_U32_le( &( data->tick_number ), &( payload[running_total] ),
+    HIL_APPLICATION_Decode_U32_Le( &( data->tick_number ), &( payload[running_total] ),
                                    &running_total );
     memcpy( &( data->control_command ), &( payload[running_total] ),
             sizeof( data->control_command ) );
@@ -962,12 +963,70 @@ HIL_Application_Status_T HIL_APPLICATION_Response_decode(
     memcpy( &( data->global_control_command ), &( payload[running_total] ),
             sizeof( data->global_control_command ) );
     running_total += sizeof( data->global_control_command );
-    HIL_APPLICATION_Decode_U32_le( &( data->detail ), &( payload[running_total] ), &running_total );
+    HIL_APPLICATION_Decode_U32_Le( &( data->detail ), &( payload[running_total] ), &running_total );
     if ( running_total != predicted_payload_size )
     {
         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
     }
     *payload_size      = running_total;
     *used_decoded_size = 0;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Error_decode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, HIL_Application_Error_T* data, const uint8_t* payload,
+    size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
+    size_t max_decoded_data_size, size_t* used_decoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    /**
+    _______________________________________________________
+    |                         |                            |
+    |   error catagory {4}    |      recoverable {1}       |
+    |_________________________|____________________________|
+    |                         |                            |
+    |   has tick number {1}   |       tick number {4}      |
+    |_________________________|____________________________|
+    |                         |                            |
+    |        detail {4}       |     diagnostic_data {X}    |
+    |_________________________|____________________________|
+
+    */
+    size_t   running_total = 0;
+    uint32_t predicted_payload_size =
+        sizeof( data->category ) + sizeof( data->recoverable ) + sizeof( data->has_tick_number )
+        + sizeof( data->tick_number ) + sizeof( data->detail )
+        + sizeof( data->diagnostic_data.size ) + data->diagnostic_data.size;
+    if ( max_payload_size < predicted_payload_size )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+    memcpy( &( data->category ), &( payload[running_total] ), sizeof( data->category ) );
+    running_total += sizeof( data->category );
+    memcpy( &( data->recoverable ), &( payload[running_total] ), sizeof( data->recoverable ) );
+    running_total += sizeof( data->recoverable );
+    memcpy( &( data->has_tick_number ), &( payload[running_total] ),
+            sizeof( data->has_tick_number ) );
+    running_total += sizeof( data->has_tick_number );
+    HIL_APPLICATION_Decode_U32_Le( &( data->tick_number ), &( payload[running_total] ),
+                                   &running_total );
+    HIL_APPLICATION_Decode_U32_Le( &( data->detail ), &( payload[running_total] ), &running_total );
+    if ( data->diagnostic_data.size > max_decoded_data_size )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+    HIL_APPLICATION_Byte_Span_decode( &( data->diagnostic_data ), &( payload[running_total] ),
+                                      decoded_data );
+    running_total += sizeof( data->diagnostic_data.size );
+    running_total += data->diagnostic_data.size;
+    *used_decoded_size = data->diagnostic_data.size;
+    if ( running_total - data->diagnostic_data.size != predicted_payload_size )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
+    *payload_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }

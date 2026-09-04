@@ -440,7 +440,18 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
-            return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+            tracker = HIL_APPLICATION_Error_encode( context, &( message->subtype ),
+                                                    message->test_id, &( message->body.error ),
+                                                    max_payload_size, payload, &payload_size );
+            memcpy( payload_size_pointer, &payload_size,
+                    HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES );
+            if ( tracker != HIL_APPLICATION_STATUS_OK )
+            {
+                // clear available memory
+                memset( out_buffer, 0, out_buffer_size );
+                return tracker;
+            };
+            break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
             return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
@@ -652,7 +663,15 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
-            return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+            tracker = HIL_APPLICATION_Error_decode(
+                context, &( out_message->subtype ), out_message->test_id,
+                &( out_message->body.error ), payload, max_encoded_message_size,
+                &actual_payload_size, decoded_data, max_decoded_data_size, used_decoded_size );
+            if ( tracker != HIL_APPLICATION_STATUS_OK )
+            {
+                return tracker;
+            };
+            break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
             return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;

@@ -202,6 +202,12 @@ HIL_Application_Status_T HIL_APPLICATION_Response_decode(
     const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
     size_t max_decoded_data_size, size_t* used_decoded_size );
 
+HIL_Application_Status_T HIL_APPLICATION_Error_decode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, HIL_Application_Error_T* data, const uint8_t* payload,
+    size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
+    size_t max_decoded_data_size, size_t* used_decoded_size );
+
 #ifdef __cplusplus
 }
 #endif

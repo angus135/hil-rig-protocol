@@ -131,7 +131,8 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
         sizeof( data->application_protocol_major ) + sizeof( data->application_protocol_minor )
         + sizeof( data->application_protocol_patch ) + sizeof( data->firmware_version_major )
         + sizeof( data->firmware_version_minor ) + sizeof( data->firmware_version_patch )
-        + data->firmware_git_hash.size + sizeof( data->firmware_git_hash.size ) + data->diagnostic_data.size + sizeof( data->diagnostic_data.size );
+        + data->firmware_git_hash.size + sizeof( data->firmware_git_hash.size )
+        + data->diagnostic_data.size + sizeof( data->diagnostic_data.size );
     if ( max_payload_size < payload_size )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
@@ -984,6 +985,51 @@ HIL_Application_Status_T HIL_APPLICATION_Response_encode(
             sizeof( data->global_control_command ) );
     running_total += sizeof( data->global_control_command );
     HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ), data->detail, &running_total );
+    *used_size = running_total;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Error_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Error_T* data,
+    size_t max_payload_size, uint8_t* payload, size_t* used_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    /**
+    _______________________________________________________
+    |                         |                            |
+    |   error catagory {4}    |      recoverable {1}       |
+    |_________________________|____________________________|
+    |                         |                            |
+    |   has tick number {1}   |       tick number {4}      |
+    |_________________________|____________________________|
+    |                         |                            |
+    |        detail {4}       |     diagnostic_data {X}    |
+    |_________________________|____________________________|
+
+    */
+    uint32_t payload_size = sizeof( data->category ) + sizeof( data->recoverable )
+                            + sizeof( data->has_tick_number ) + sizeof( data->tick_number )
+                            + sizeof( data->detail ) + sizeof( data->diagnostic_data.size )
+                            + data->diagnostic_data.size;
+    if ( max_payload_size < payload_size )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+    memcpy( payload, &( data->category ), sizeof( data->category ) );
+    size_t running_total = sizeof( data->category );
+    memcpy( &( payload[running_total] ), &( data->recoverable ), sizeof( data->recoverable ) );
+    running_total += sizeof( data->recoverable );
+    memcpy( &( payload[running_total] ), &( data->has_tick_number ),
+            sizeof( data->has_tick_number ) );
+    running_total += sizeof( data->has_tick_number );
+    HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ), data->tick_number, &running_total );
+    HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ), data->detail, &running_total );
+    HIL_APPLICATION_Byte_Span_encode( &( data->diagnostic_data ), &( payload[running_total] ) );
+    running_total += sizeof( data->diagnostic_data.size );
+    running_total += data->diagnostic_data.size;
     *used_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }

@@ -199,6 +199,11 @@ HIL_Application_Status_T HIL_APPLICATION_Response_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Response_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
+HIL_Application_Status_T HIL_APPLICATION_Error_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Error_T* data,
+    size_t max_payload_size, uint8_t* payload, size_t* used_size );
+
 #ifdef __cplusplus
 }
 #endif
