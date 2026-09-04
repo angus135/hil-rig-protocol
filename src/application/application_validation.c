@@ -98,6 +98,7 @@ HIL_Application_Status_T
 HIL_APPLICATION_System_Info_Request_validate( const HIL_Application_Context_T*             context,
                                               const HIL_Application_System_Info_Request_T* data )
 {
+    ( void )data;
     if ( context->initialized == 0 )
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
@@ -122,6 +123,7 @@ HIL_Application_Status_T
 HIL_APPLICATION_System_Info_Response_validate( const HIL_Application_Context_T* context,
                                                const HIL_Application_System_Info_Response_T* data )
 {
+    ( void )data;
     if ( context->initialized == 0 )
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;

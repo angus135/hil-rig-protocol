@@ -181,7 +181,7 @@ HIL_APPLICATION_Channel_Id_encode( const HIL_Application_Channel_Id_T* data, uin
 
 HIL_Application_Status_T
 HIL_APPLICATION_Digital_Config_encode( const HIL_Application_Digital_Config_T* data,
-                                       size_t max_payload_size, uint8_t* payload, size_t* size )
+                                       uint8_t* payload, size_t* size )
 {
     /**
     Digital :
@@ -201,8 +201,8 @@ HIL_APPLICATION_Digital_Config_encode( const HIL_Application_Digital_Config_T* d
 }
 
 HIL_Application_Status_T
-HIL_APPLICATION_Analog_Config_encode( const HIL_Application_Analog_Config_T* data,
-                                      size_t max_payload_size, uint8_t* payload, size_t* size )
+HIL_APPLICATION_Analog_Config_encode( const HIL_Application_Analog_Config_T* data, uint8_t* payload,
+                                      size_t* size )
 {
     /**
     Analog :
@@ -222,8 +222,8 @@ HIL_APPLICATION_Analog_Config_encode( const HIL_Application_Analog_Config_T* dat
 }
 
 HIL_Application_Status_T
-HIL_APPLICATION_Pwm_Config_encode( const HIL_Application_Pwm_Config_T* data,
-                                   size_t max_payload_size, uint8_t* payload, size_t* size )
+HIL_APPLICATION_Pwm_Config_encode( const HIL_Application_Pwm_Config_T* data, uint8_t* payload,
+                                   size_t* size )
 {
     /**
     Payload:
@@ -288,6 +288,10 @@ HIL_APPLICATION_Can_Config_encode( const HIL_Application_Can_Config_T* data,
     |_________________________|____________________________|
 
     */
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    ( void )size;
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
@@ -306,6 +310,10 @@ HIL_APPLICATION_Spi_Config_encode( const HIL_Application_Spi_Config_T* data,
     |_________________________|____________________________|
 
     */
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    ( void )size;
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
@@ -324,6 +332,10 @@ HIL_APPLICATION_Uart_Config_encode( const HIL_Application_Uart_Config_T* data,
     |_________________________|____________________________|
 
     */
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    ( void )size;
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
@@ -342,6 +354,10 @@ HIL_APPLICATION_I2c_Config_encode( const HIL_Application_I2c_Config_T* data,
     |_________________________|____________________________|
 
     */
+    ( void )data;
+    ( void )max_payload_size;
+    ( void )payload;
+    ( void )size;
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
@@ -553,7 +569,6 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     for ( uint32_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Digital_Config_encode( &( data->digital_in[i] ),
-                                               ( max_payload_size - running_total ),
                                                &( payload[running_total] ), &var_size );
         running_total += var_size;
         var_size = 0;
@@ -561,40 +576,35 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     for ( uint32_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
     {
         HIL_APPLICATION_Digital_Config_encode( &( data->digital_out[i] ),
-                                               ( max_payload_size - running_total ),
                                                &( payload[running_total] ), &var_size );
         running_total += var_size;
         var_size = 0;
     }
     for ( uint32_t i = 0; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; i++ )
     {
-        HIL_APPLICATION_Analog_Config_encode( &( data->analog_in[i] ),
-                                              ( max_payload_size - running_total ),
-                                              &( payload[running_total] ), &var_size );
+        HIL_APPLICATION_Analog_Config_encode( &( data->analog_in[i] ), &( payload[running_total] ),
+                                              &var_size );
         running_total += var_size;
         var_size = 0;
     }
     for ( uint32_t i = 0; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; i++ )
     {
-        HIL_APPLICATION_Analog_Config_encode( &( data->analog_out[i] ),
-                                              ( max_payload_size - running_total ),
-                                              &( payload[running_total] ), &var_size );
+        HIL_APPLICATION_Analog_Config_encode( &( data->analog_out[i] ), &( payload[running_total] ),
+                                              &var_size );
         running_total += var_size;
         var_size = 0;
     }
     for ( uint32_t i = 0; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; i++ )
     {
-        HIL_APPLICATION_Pwm_Config_encode( &( data->pwm_in[i] ),
-                                           ( max_payload_size - running_total ),
-                                           &( payload[running_total] ), &var_size );
+        HIL_APPLICATION_Pwm_Config_encode( &( data->pwm_in[i] ), &( payload[running_total] ),
+                                           &var_size );
         running_total += var_size;
         var_size = 0;
     }
     for ( uint32_t i = 0; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; i++ )
     {
-        HIL_APPLICATION_Pwm_Config_encode( &( data->pwm_out[i] ),
-                                           ( max_payload_size - running_total ),
-                                           &( payload[running_total] ), &var_size );
+        HIL_APPLICATION_Pwm_Config_encode( &( data->pwm_out[i] ), &( payload[running_total] ),
+                                           &var_size );
         running_total += var_size;
         var_size = 0;
     }
@@ -940,6 +950,7 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_encode(
     ( void )data;
     ( void )max_payload_size;
     ( void )payload;
+    ( void )used_size;
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 

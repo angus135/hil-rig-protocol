@@ -24,6 +24,7 @@
 #include "hil_rig_protocol/application/application_system_info.h"
 #include "hil_rig_protocol/application/application_test_config.h"
 #include "hil_rig_protocol/application/application_types.h"
+#include "hil_rig_protocol/application/application_decoding.h"
 
 #include <string.h>
 
@@ -390,9 +391,8 @@ HIL_Application_Status_T HIL_APPLICATION_Pwm_Config_decode( HIL_Application_Pwm_
 HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Test_Configuration_T* data,
-    const uint8_t* payload, size_t max_payload_size, size_t* payload_size,
-    HIL_Application_Peripheral_Config_T* decoded_peripherals, size_t max_decoded_peripherals_num,
-    uint8_t* decoded_data, size_t max_decoded_data_size, size_t* used_decoded_size )
+    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
+    size_t max_decoded_data_size, size_t* used_decoded_size )
 {
     ( void )context;
     ( void )sub_type;
@@ -524,10 +524,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
 HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Test_Instruction_T* data,
-    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
-    size_t max_decoded_data_size, size_t* used_decoded_size,
-    HIL_Application_Data_Declaration_T* decoded_variable_data, size_t max_decoded_variable_data_num,
-    size_t* used_devoded_variable_num )
+    const uint8_t* payload, size_t max_payload_size, size_t* payload_size )
 {
     ( void )context;
     ( void )sub_type;
@@ -633,8 +630,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
     {
         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
     }
-    *used_decoded_size = 0;
-    *payload_size      = running_total;
+    *payload_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }
 
@@ -771,10 +767,7 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_decode(
 HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Test_Result_T* data,
-    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
-    size_t max_decoded_data_size, size_t* used_decoded_size,
-    HIL_Application_Data_Declaration_T* decoded_variable_data, size_t max_decoded_variable_data_num,
-    size_t* used_decoded_variable_num )
+    const uint8_t* payload, size_t max_payload_size, size_t* payload_size )
 {
     ( void )context;
     ( void )sub_type;
@@ -850,7 +843,6 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
                                        &( payload[running_total] ), &running_total );
     }
     // variable data
-    size_t decoded_running = 0;
     // memcpy( &( data->variable_data_count ), &( payload[running_total] ),
     //         sizeof( data->variable_data_count ) );
     // running_total += sizeof( data->variable_data_count );
@@ -889,10 +881,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     {
         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
     }
-    *payload_size      = running_total;
-    *used_decoded_size = decoded_running;
-    // *used_decoded_variable_num = data->variable_data_count;
-    *used_decoded_variable_num = 0;
+    *payload_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }
 
@@ -907,6 +896,8 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_decode(
     ( void )test_id;
     ( void )data;
     ( void )payload;
+    ( void )max_payload_size;
+    ( void )payload_size;
     ( void )decoded_data;
     ( void )max_decoded_data_size;
     ( void )used_decoded_size;

@@ -32,7 +32,6 @@
 */
 
 HIL_Application_Status_T HIL_APPLICATION_Header_Encoding( const HIL_Application_Message_T* message,
-                                                          const HIL_Application_Context_T* context,
                                                           uint8_t*                         dest )
 {
     /**
@@ -65,10 +64,9 @@ HIL_Application_Status_T HIL_APPLICATION_Header_Encoding( const HIL_Application_
     return HIL_APPLICATION_STATUS_OK;
 }
 
-HIL_Application_Status_T
-HIL_APPLICATION_Header_decoding( const HIL_Application_Context_T* old_context,
-                                 HIL_Application_Message_T*       new_message,
-                                 const uint8_t* encoded_message, size_t* payload_size )
+HIL_Application_Status_T HIL_APPLICATION_Header_decoding( HIL_Application_Message_T* new_message,
+                                                          const uint8_t* encoded_message,
+                                                          size_t*        payload_size )
 {
     // Test ID
 

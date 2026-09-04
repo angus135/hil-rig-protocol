@@ -2,7 +2,6 @@
 #include "hil_rig_protocol/application/application_size.h"
 #include "hil_rig_protocol/application/application_encoding.h"
 #include "hil_rig_protocol/application/application_control.h"
-#include "hil_rig_protocol/application/application_error.h"
 #include "hil_rig_protocol/application/application_instruction.h"
 #include "hil_rig_protocol/application/application_response.h"
 #include "hil_rig_protocol/application/application_result.h"
@@ -11,13 +10,16 @@
 #include "hil_rig_protocol/application/application_test_config.h"
 #include "hil_rig_protocol/application/application_types.h"
 
-#include <string.h>
-
 HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_size(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Request_T* data,
     uint32_t* encoded_size )
 {
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )encoded_size;
     // The message will be the application header and the HIL_Application_System_Info_Request_T
     *encoded_size = HIL_APPLICATION_SYSTEM_INFO_REQUEST_FIXED_ENCODE_SIZE;
     return HIL_APPLICATION_STATUS_OK;
@@ -28,6 +30,11 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_size(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Response_T* data,
     uint32_t* encoded_size )
 {
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )data;
+    ( void )encoded_size;
     *encoded_size = HIL_APPLICATION_SYSTEM_INFO_RESPONSE_FIXED_ENCODE_SIZE
                     + data->firmware_git_hash.size + data->diagnostic_data.size;
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;

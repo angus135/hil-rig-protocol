@@ -311,8 +311,7 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
     // Set available memory to 0
     memset( out_buffer, 0, out_buffer_size );
     // Encode Header
-    HIL_Application_Status_T tracker =
-        HIL_APPLICATION_Header_Encoding( message, context, out_buffer );
+    HIL_Application_Status_T tracker = HIL_APPLICATION_Header_Encoding( message, out_buffer );
     if ( tracker != HIL_APPLICATION_STATUS_OK )
     {
         // clear available memory
@@ -574,13 +573,11 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
  * @return Other HIL_Application_Status_T values
  *         An error returned by the message-specific decoder.
  */
-HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
-    const HIL_Application_Context_T* context, const uint8_t* encoded_message,
-    size_t max_encoded_message_size, HIL_Application_Message_T* out_message, uint8_t* decoded_data,
-    size_t max_decoded_data_size, size_t* used_decoded_size,
-    HIL_Application_Peripheral_Config_T* decoded_peripherals, size_t max_decoded_peripherals_num,
-    HIL_Application_Data_Declaration_T* decoded_variable_data, size_t max_decoded_variable_data_num,
-    size_t* used_decoded_variable_num )
+HIL_Application_Status_T
+HIL_APPLICATION_Decode_Message( const HIL_Application_Context_T* context,
+                                const uint8_t* encoded_message, size_t max_encoded_message_size,
+                                HIL_Application_Message_T* out_message, uint8_t* decoded_data,
+                                size_t max_decoded_data_size, size_t* used_decoded_size )
 {
 
     if ( encoded_message == NULL || out_message == NULL || context == NULL )
@@ -589,8 +586,8 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
     }
     size_t                   expected_payload_size = 0;
     size_t                   actual_payload_size   = 0;
-    HIL_Application_Status_T tracker               = HIL_APPLICATION_Header_decoding(
-        context, out_message, encoded_message, &expected_payload_size );
+    HIL_Application_Status_T tracker =
+        HIL_APPLICATION_Header_decoding( out_message, encoded_message, &expected_payload_size );
     if ( tracker != HIL_APPLICATION_STATUS_OK )
     {
         return tracker;
@@ -628,8 +625,7 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
             tracker = HIL_APPLICATION_Test_Configuration_decode(
                 context, &( out_message->subtype ), out_message->test_id,
                 &( out_message->body.test_configuration ), payload, max_encoded_message_size,
-                &actual_payload_size, decoded_peripherals, max_decoded_peripherals_num,
-                decoded_data, max_decoded_data_size, used_decoded_size );
+                &actual_payload_size, decoded_data, max_decoded_data_size, used_decoded_size );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -640,8 +636,7 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
             tracker = HIL_APPLICATION_Test_Instructions_decode(
                 context, &( out_message->subtype ), out_message->test_id,
                 &( out_message->body.test_instruction ), payload, max_encoded_message_size,
-                &actual_payload_size, decoded_data, max_decoded_data_size, used_decoded_size,
-                decoded_variable_data, max_decoded_variable_data_num, used_decoded_variable_num );
+                &actual_payload_size );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
@@ -685,8 +680,7 @@ HIL_Application_Status_T HIL_APPLICATION_Decode_Message(
             tracker = HIL_APPLICATION_Test_Result_decode(
                 context, &( out_message->subtype ), out_message->test_id,
                 &( out_message->body.test_result ), payload, max_encoded_message_size,
-                &actual_payload_size, decoded_data, max_decoded_data_size, used_decoded_size,
-                decoded_variable_data, max_decoded_variable_data_num, used_decoded_variable_num );
+                &actual_payload_size );
             if ( tracker != HIL_APPLICATION_STATUS_OK )
             {
                 return tracker;
