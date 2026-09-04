@@ -51,9 +51,11 @@ HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_
  * @details max_encoded_message_size is an operational upper bound, not a
  * requirement to provision the theoretical maximum. A usable configuration
  * permits at least HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE bytes and no more
- * than HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE bytes. The context is marked
- * initialized only after every check succeeds. Any failure leaves it
- * deterministically uninitialized with cleared copied configuration.
+ * than HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE bytes. config may point to
+ * context->config; initialization snapshots the supplied value before clearing
+ * and publishing the destination context. The context is marked initialized
+ * only after every check succeeds. Any failure leaves it deterministically
+ * uninitialized with cleared copied configuration.
  *
  * @param[out] context Context to initialize.
  * @param[in]  config  Structural codec limits to copy.
@@ -125,8 +127,11 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
  * message, not buffer capacity. The same bounded common-envelope parser used by
  * normal decoding classifies the body. Supported fixed-size messages require
  * an exact family-specific payload width and zero additional storage; malformed
- * undersized or oversized fixed bodies return MALFORMED_MESSAGE. Variable-storage
- * families whose sizing remains unfinished return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED.
+ * undersized or oversized fixed bodies return MALFORMED_MESSAGE. Test Configuration
+ * extension storage is also bounded by context->config.max_variable_data_size; a
+ * correctly shaped message that exceeds that local policy returns VALIDATION_FAILED.
+ * Variable-storage families whose sizing remains unfinished return
+ * HIL_APPLICATION_STATUS_NOT_IMPLEMENTED.
  *
  * This operation uses a lightweight private envelope object rather than a full
  * HIL_Application_Message_T merely to classify the family.
@@ -195,7 +200,7 @@ HIL_APPLICATION_Decode_Message( const HIL_Application_Context_T* context,
  * @details Common validation covers context state, defined type/subtype,
  * boolean Test-ID presence, Test-ID structural rules, and existing family-
  * specific structural validation. It deliberately does not enforce stateful
- * transactions, firmware capabilities, or deferred detailed fixed-I/O rules.
+ * transactions, firmware capabilities, or semantics of deferred message families.
  *
  * @param[in] context Initialized codec context.
  * @param[in] message Typed message to validate.

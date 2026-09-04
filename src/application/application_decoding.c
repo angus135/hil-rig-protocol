@@ -10,6 +10,7 @@
 
 #include "application_decoding.h"
 #include "application_internal.h"
+#include "application_test_config_internal.h"
 #include "application_size.h"
 
 #include "hil_rig_protocol/application/application_control.h"
@@ -60,8 +61,11 @@ HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_Application_Message_Type_T type, s
             expected_size =
                 5u * HIL_APPLICATION_WIRE_ENUM_SIZE + 2u * HIL_APPLICATION_WIRE_U32_SIZE;
             break;
-        case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
+            /* Test Configuration is variable-length because of its extension and is
+             * validated by the dedicated bounded scanner, never this fixed-body helper. */
+            return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+        case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
@@ -155,49 +159,6 @@ HIL_APPLICATION_Byte_Span_decode( HIL_Application_Byte_Span_T* byte_span, const 
     return HIL_APPLICATION_STATUS_OK;
 }
 
-static HIL_Application_Status_T
-HIL_APPLICATION_Channel_Id_decode( HIL_Application_Channel_Id_T* data, const uint8_t* payload )
-{
-    data->peripheral = ( HIL_Application_Peripheral_Type_T )payload[0];
-    data->channel    = HIL_APPLICATION_Read_U16_Le( &payload[HIL_APPLICATION_WIRE_ENUM_SIZE] );
-    return HIL_APPLICATION_STATUS_OK;
-}
-
-static HIL_Application_Status_T
-HIL_APPLICATION_Digital_Config_decode( HIL_Application_Digital_Config_T* data,
-                                       const uint8_t* payload, size_t* size )
-{
-    HIL_APPLICATION_Channel_Id_decode( &data->channel, payload );
-    data->voltage_level = ( HIL_Application_Peripheral_Config_Voltage_Level_T )
-        payload[HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE];
-    *size = HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE + HIL_APPLICATION_WIRE_ENUM_SIZE;
-    return HIL_APPLICATION_STATUS_OK;
-}
-
-static HIL_Application_Status_T
-HIL_APPLICATION_Analog_Config_decode( HIL_Application_Analog_Config_T* data, const uint8_t* payload,
-                                      size_t* size )
-{
-    HIL_APPLICATION_Channel_Id_decode( &data->channel, payload );
-    data->voltage_level = ( HIL_Application_Peripheral_Config_Voltage_Level_T )
-        payload[HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE];
-    *size = HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE + HIL_APPLICATION_WIRE_ENUM_SIZE;
-    return HIL_APPLICATION_STATUS_OK;
-}
-
-static HIL_Application_Status_T
-HIL_APPLICATION_Pwm_Config_decode( HIL_Application_Pwm_Config_T* data, const uint8_t* payload,
-                                   size_t* size )
-{
-    size_t offset = HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-    HIL_APPLICATION_Channel_Id_decode( &data->channel, payload );
-    HIL_APPLICATION_Decode_U32_Le( &data->period_nanoseconds, &payload[offset], &offset );
-    HIL_APPLICATION_Decode_U16_Le( &data->initial_duty_cycle_permyriad, &payload[offset], &offset );
-    data->voltage_level = ( HIL_Application_Peripheral_Config_Voltage_Level_T )payload[offset++];
-    *size               = offset;
-    return HIL_APPLICATION_STATUS_OK;
-}
-
 HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_System_Info_Request_T* data,
@@ -283,18 +244,113 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     return HIL_APPLICATION_STATUS_OK;
 }
 
-HIL_Application_Status_T
-HIL_APPLICATION_Peripheral_Config_decode( HIL_Application_Peripheral_Config_T* data,
-                                          const uint8_t* payload, size_t* size )
+static void
+HIL_APPLICATION_Digital_Input_Config_decode( HIL_Application_Digital_Input_Config_T* data,
+                                             const uint8_t* payload, size_t* size )
 {
-    /* Reserved for the later variable peripheral-configuration representation. */
-    ( void )data;
-    ( void )payload;
-    if ( size != NULL )
-    {
-        *size = 0u;
-    }
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    data->enabled       = payload[0];
+    data->voltage_level = ( HIL_Application_Peripheral_Config_Voltage_Level_T )payload[1];
+    *size               = HIL_APPLICATION_TEST_CONFIG_DIGITAL_INPUT_RECORD_SIZE;
+}
+
+static void
+HIL_APPLICATION_Digital_Output_Config_decode( HIL_Application_Digital_Output_Config_T* data,
+                                              const uint8_t* payload, size_t* size )
+{
+    data->enabled       = payload[0];
+    data->voltage_level = ( HIL_Application_Peripheral_Config_Voltage_Level_T )payload[1];
+    data->initial_high  = payload[2];
+    *size               = HIL_APPLICATION_TEST_CONFIG_DIGITAL_OUTPUT_RECORD_SIZE;
+}
+
+static void HIL_APPLICATION_Analog_Input_Config_decode( HIL_Application_Analog_Input_Config_T* data,
+                                                        const uint8_t* payload, size_t* size )
+{
+    data->enabled = payload[0];
+    *size         = HIL_APPLICATION_TEST_CONFIG_ANALOG_INPUT_RECORD_SIZE;
+}
+
+static void
+HIL_APPLICATION_Analog_Output_Config_decode( HIL_Application_Analog_Output_Config_T* data,
+                                             const uint8_t* payload, size_t* size )
+{
+    data->enabled = payload[0];
+    *size         = HIL_APPLICATION_TEST_CONFIG_ANALOG_OUTPUT_RECORD_SIZE;
+}
+
+static void HIL_APPLICATION_Pwm_Input_Config_decode( HIL_Application_Pwm_Input_Config_T* data,
+                                                     const uint8_t* payload, size_t* size )
+{
+    data->enabled       = payload[0];
+    data->voltage_level = ( HIL_Application_Peripheral_Config_Voltage_Level_T )payload[1];
+    *size               = HIL_APPLICATION_TEST_CONFIG_PWM_INPUT_RECORD_SIZE;
+}
+
+static void HIL_APPLICATION_Pwm_Output_Config_decode( HIL_Application_Pwm_Output_Config_T* data,
+                                                      const uint8_t* payload, size_t* size )
+{
+    size_t offset       = 0u;
+    data->enabled       = payload[offset++];
+    data->voltage_level = ( HIL_Application_Peripheral_Config_Voltage_Level_T )payload[offset++];
+    HIL_APPLICATION_Decode_U32_Le( &data->initial_period_nanoseconds, &payload[offset], &offset );
+    HIL_APPLICATION_Decode_U16_Le( &data->initial_duty_cycle_permyriad, &payload[offset], &offset );
+    *size = HIL_APPLICATION_TEST_CONFIG_PWM_OUTPUT_RECORD_SIZE;
+}
+
+static void HIL_APPLICATION_Can_Config_decode( HIL_Application_Can_Config_T* data,
+                                               const uint8_t* payload, size_t* size )
+{
+    size_t offset = 0u;
+    data->enabled = payload[offset++];
+    HIL_APPLICATION_Decode_U32_Le( &data->bit_rate, &payload[offset], &offset );
+    data->termination_enabled = payload[offset++];
+    HIL_APPLICATION_Decode_U32_Le( &data->capture_limit_bytes, &payload[offset], &offset );
+    *size = HIL_APPLICATION_TEST_CONFIG_CAN_RECORD_SIZE;
+}
+
+static void HIL_APPLICATION_Spi_Config_decode( HIL_Application_Spi_Config_T* data,
+                                               const uint8_t* payload, size_t* size )
+{
+    size_t offset = 0u;
+    data->enabled = payload[offset++];
+    HIL_APPLICATION_Decode_U32_Le( &data->bit_rate, &payload[offset], &offset );
+    data->role           = ( HIL_Application_Bus_Role_T )payload[offset++];
+    data->data_width     = ( HIL_Application_Spi_Data_Width_T )payload[offset++];
+    data->bit_order      = ( HIL_Application_Spi_Bit_Order_T )payload[offset++];
+    data->clock_polarity = ( HIL_Application_Spi_Clock_Polarity_T )payload[offset++];
+    data->clock_phase    = ( HIL_Application_Spi_Clock_Phase_T )payload[offset++];
+    HIL_APPLICATION_Decode_U32_Le( &data->capture_limit_bytes, &payload[offset], &offset );
+    *size = HIL_APPLICATION_TEST_CONFIG_SPI_RECORD_SIZE;
+}
+
+static void HIL_APPLICATION_Uart_Config_decode( HIL_Application_Uart_Config_T* data,
+                                                const uint8_t* payload, size_t* size )
+{
+    size_t offset = 0u;
+    data->enabled = payload[offset++];
+    HIL_APPLICATION_Decode_U32_Le( &data->baud_rate, &payload[offset], &offset );
+    data->electrical_mode = ( HIL_Application_Uart_Electrical_Mode_T )payload[offset++];
+    data->word_length     = ( HIL_Application_Uart_Word_Length_T )payload[offset++];
+    data->parity          = ( HIL_Application_Uart_Parity_T )payload[offset++];
+    data->stop_bits       = ( HIL_Application_Uart_Stop_Bits_T )payload[offset++];
+    data->rx_enabled      = payload[offset++];
+    data->tx_enabled      = payload[offset++];
+    HIL_APPLICATION_Decode_U32_Le( &data->capture_limit_bytes, &payload[offset], &offset );
+    *size = HIL_APPLICATION_TEST_CONFIG_UART_RECORD_SIZE;
+}
+
+static void HIL_APPLICATION_I2c_Config_decode( HIL_Application_I2c_Config_T* data,
+                                               const uint8_t* payload, size_t* size )
+{
+    size_t offset = 0u;
+    data->enabled = payload[offset++];
+    HIL_APPLICATION_Decode_U32_Le( &data->bit_rate, &payload[offset], &offset );
+    data->role = ( HIL_Application_Bus_Role_T )payload[offset++];
+    HIL_APPLICATION_Decode_U16_Le( &data->own_address_7bit, &payload[offset], &offset );
+    data->voltage_level = ( HIL_Application_I2c_Voltage_Level_T )payload[offset++];
+    data->pull_up       = ( HIL_Application_I2c_Pull_Up_T )payload[offset++];
+    HIL_APPLICATION_Decode_U32_Le( &data->capture_limit_bytes, &payload[offset], &offset );
+    *size = HIL_APPLICATION_TEST_CONFIG_I2C_RECORD_SIZE;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
@@ -303,84 +359,96 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
     const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
     size_t max_decoded_data_size, size_t* used_decoded_size )
 {
-    const size_t digital_size =
-        HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE + HIL_APPLICATION_WIRE_ENUM_SIZE;
-    const size_t pwm_size = HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE + HIL_APPLICATION_WIRE_U32_SIZE
-                            + HIL_APPLICATION_WIRE_U16_SIZE + HIL_APPLICATION_WIRE_ENUM_SIZE;
-    size_t                   fixed_size    = 3u * HIL_APPLICATION_WIRE_U32_SIZE;
-    size_t                   running_total = 0u;
-    size_t                   item_size     = 0u;
-    size_t                   span_encoded  = 0u;
-    size_t                   span_decoded  = 0u;
-    size_t                   count_size    = 0u;
+    size_t                   running_total         = 0u;
+    size_t                   record_size           = 0u;
+    size_t                   span_encoded          = 0u;
+    size_t                   span_decoded          = 0u;
+    size_t                   required_payload_size = 0u;
+    uint8_t                  extension_size;
     HIL_Application_Status_T status;
-    ( void )context;
     ( void )sub_type;
     ( void )test_id;
 
-    if ( !HIL_APPLICATION_Checked_Mul_Size( HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT
-                                                + HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT
-                                                + HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT
-                                                + HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT,
-                                            digital_size, &count_size )
-         || !HIL_APPLICATION_Checked_Add_Size( fixed_size, count_size, &fixed_size )
-         || !HIL_APPLICATION_Checked_Mul_Size( HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT
-                                                   + HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT,
-                                               pwm_size, &count_size )
-         || !HIL_APPLICATION_Checked_Add_Size( fixed_size, count_size, &fixed_size )
-         || !HIL_APPLICATION_Checked_Add_Size( fixed_size, HIL_APPLICATION_BYTE_SPAN_LENGTH_SIZE,
-                                               &fixed_size ) )
+    if ( payload_size == NULL || used_decoded_size == NULL )
     {
-        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
-    if ( max_payload_size < fixed_size )
+    *payload_size      = 0u;
+    *used_decoded_size = 0u;
+    if ( data == NULL || payload == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    /* No array loop may begin until the complete fixed body, including extension length, exists. */
+    if ( max_payload_size < HIL_APPLICATION_TEST_CONFIG_FIXED_PAYLOAD_SIZE )
     {
         return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
     }
 
-    /* Test tick duration is encoded in microseconds; PWM periods later remain nanoseconds. */
+    extension_size = payload[HIL_APPLICATION_TEST_CONFIG_EXTENSION_LENGTH_OFFSET];
+    if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_TEST_CONFIG_FIXED_PAYLOAD_SIZE,
+                                            ( size_t )extension_size, &required_payload_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    /* Preserve malformed-shape precedence over configured resource-policy checks. */
+    if ( max_payload_size != required_payload_size )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    if ( ( size_t )extension_size > context->config.max_variable_data_size )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+
+    memset( data, 0, sizeof( *data ) );
     HIL_APPLICATION_Decode_U32_Le( &data->tick_duration_us.microseconds, &payload[running_total],
                                    &running_total );
     HIL_APPLICATION_Decode_U32_Le( &data->expected_tick_count, &payload[running_total],
                                    &running_total );
     HIL_APPLICATION_Decode_U32_Le( &data->flags, &payload[running_total], &running_total );
 
-    /* Fixed configuration arrays are encoded in input-before-output order for each family. */
-    for ( size_t i = 0u; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; ++i )
-    {
-        HIL_APPLICATION_Digital_Config_decode( &data->digital_in[i], &payload[running_total],
-                                               &item_size );
-        running_total += item_size;
-    }
-    for ( size_t i = 0u; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; ++i )
-    {
-        HIL_APPLICATION_Digital_Config_decode( &data->digital_out[i], &payload[running_total],
-                                               &item_size );
-        running_total += item_size;
-    }
-    for ( size_t i = 0u; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; ++i )
-    {
-        HIL_APPLICATION_Analog_Config_decode( &data->analog_in[i], &payload[running_total],
-                                              &item_size );
-        running_total += item_size;
-    }
-    for ( size_t i = 0u; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; ++i )
-    {
-        HIL_APPLICATION_Analog_Config_decode( &data->analog_out[i], &payload[running_total],
-                                              &item_size );
-        running_total += item_size;
-    }
-    for ( size_t i = 0u; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; ++i )
-    {
-        HIL_APPLICATION_Pwm_Config_decode( &data->pwm_in[i], &payload[running_total], &item_size );
-        running_total += item_size;
-    }
-    for ( size_t i = 0u; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; ++i )
-    {
-        HIL_APPLICATION_Pwm_Config_decode( &data->pwm_out[i], &payload[running_total], &item_size );
-        running_total += item_size;
-    }
+#define HIL_APPLICATION_DECODE_CONFIG_ARRAY( array_, count_, decoder_ )                            \
+    do                                                                                             \
+    {                                                                                              \
+        for ( size_t i_ = 0u; i_ < ( count_ ); ++i_ )                                              \
+        {                                                                                          \
+            decoder_( &( array_ )[i_], &payload[running_total], &record_size );                    \
+            running_total += record_size;                                                          \
+        }                                                                                          \
+    } while ( 0 )
 
+    HIL_APPLICATION_DECODE_CONFIG_ARRAY( data->digital_in,
+                                         HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT,
+                                         HIL_APPLICATION_Digital_Input_Config_decode );
+    HIL_APPLICATION_DECODE_CONFIG_ARRAY( data->digital_out,
+                                         HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT,
+                                         HIL_APPLICATION_Digital_Output_Config_decode );
+    HIL_APPLICATION_DECODE_CONFIG_ARRAY( data->analog_in,
+                                         HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT,
+                                         HIL_APPLICATION_Analog_Input_Config_decode );
+    HIL_APPLICATION_DECODE_CONFIG_ARRAY( data->analog_out,
+                                         HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT,
+                                         HIL_APPLICATION_Analog_Output_Config_decode );
+    HIL_APPLICATION_DECODE_CONFIG_ARRAY( data->pwm_in, HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT,
+                                         HIL_APPLICATION_Pwm_Input_Config_decode );
+    HIL_APPLICATION_DECODE_CONFIG_ARRAY( data->pwm_out, HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT,
+                                         HIL_APPLICATION_Pwm_Output_Config_decode );
+    HIL_APPLICATION_DECODE_CONFIG_ARRAY( data->can, HIL_APPLICATION_CAN_CHANNEL_COUNT,
+                                         HIL_APPLICATION_Can_Config_decode );
+    HIL_APPLICATION_DECODE_CONFIG_ARRAY( data->spi, HIL_APPLICATION_SPI_CHANNEL_COUNT,
+                                         HIL_APPLICATION_Spi_Config_decode );
+    HIL_APPLICATION_DECODE_CONFIG_ARRAY( data->uart, HIL_APPLICATION_UART_CHANNEL_COUNT,
+                                         HIL_APPLICATION_Uart_Config_decode );
+    HIL_APPLICATION_DECODE_CONFIG_ARRAY( data->i2c, HIL_APPLICATION_I2C_CHANNEL_COUNT,
+                                         HIL_APPLICATION_I2c_Config_decode );
+
+#undef HIL_APPLICATION_DECODE_CONFIG_ARRAY
+
+    if ( running_total != HIL_APPLICATION_TEST_CONFIG_EXTENSION_LENGTH_OFFSET )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
     status = HIL_APPLICATION_Byte_Span_decode(
         &data->extension_data, &payload[running_total], max_payload_size - running_total,
         decoded_data, max_decoded_data_size, &span_encoded, &span_decoded );

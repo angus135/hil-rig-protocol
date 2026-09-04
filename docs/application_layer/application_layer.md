@@ -72,10 +72,10 @@ Firmware and bindings include:
 | Operation | Current codec contract |
 | --- | --- |
 | `HIL_APPLICATION_Default_Config` | Populate a configuration accepted by `Init`, using a 512-byte default complete-message profile. |
-| `HIL_APPLICATION_Init` | Validate/copy local structural limits; reduced valid complete-message maxima are accepted. |
+| `HIL_APPLICATION_Init` | Validate/copy local structural limits; reduced valid complete-message maxima are accepted, and `config` may alias `context->config`. |
 | `HIL_APPLICATION_Encoded_Size` | Clear output, validate the common envelope fields, dispatch existing body sizing, add the fixed header with checked arithmetic. |
 | `HIL_APPLICATION_Encode_Message` | Encode the bounded common header and selected existing body; publish a nonzero size only after complete success. |
-| `HIL_APPLICATION_Decode_Storage_Size` | Bounded-parse one complete message, validate the exact width of supported fixed bodies and report zero storage, or return `NOT_IMPLEMENTED` for unfinished variable-storage families. |
+| `HIL_APPLICATION_Decode_Storage_Size` | Bounded-parse one complete message, validate the exact width of supported fixed bodies, enforce configured Test Configuration extension storage limits, and report required storage; unfinished variable-storage families return `NOT_IMPLEMENTED`. |
 | `HIL_APPLICATION_Decode_Message` | Decode exactly one complete message; body decoders see only the declared payload extent. |
 | `HIL_APPLICATION_Validate_Message` | Perform common typed validation and existing message-specific validation. |
 | `HIL_APPLICATION_Validate_Encoded_Message` | Reuse the bounded decode path without publishing caller output. |
@@ -88,7 +88,7 @@ This foundation deliberately does not complete every message family. The current
 | --- | --- |
 | System Information Request | Encode, decode, validate and encoded-size calculation implemented. |
 | System Information Response | Existing encode/decode body retained; typed validation requires the canonical compiled protocol version and structurally valid byte spans. Message-specific encoded-size and decode-storage sizing remain unfinished. |
-| Test Configuration | Existing fixed-body encode/decode retained; tick duration in microseconds, configured expected-tick upper bound, and extension byte-span pointer structure are validated. Remaining configuration semantics and message-specific encoded-size calculation remain unfinished. |
+| Test Configuration | Fully supported by the codec: typed validation, body sizing, encode/decode, decode-storage scanning, fixed Digital/Analogue/PWM/CAN/SPI/UART/I2C arrays, and the length-delimited extension are implemented. The extension has a 255-byte wire maximum and is additionally bounded by `context->config.max_variable_data_size`. |
 | Test Instruction | Existing fixed-body encode/decode retained; fixed-value semantics and message-specific encoded-size calculation remain unfinished. |
 | Execution Control | Existing encode/decode/validation retained, including zero reserved flags; message-specific encoded-size calculation remains unfinished. |
 | Global Control | Existing encode/decode/validation retained, including zero reserved flags; message-specific encoded-size calculation remains unfinished. |
@@ -98,7 +98,7 @@ This foundation deliberately does not complete every message family. The current
 | Application Response | Existing structures/body code retained; public validation and message-specific sizing remain `NOT_IMPLEMENTED`. |
 | Application Error | Existing structures/body code retained; public validation/sizing and variable diagnostic-storage sizing remain `NOT_IMPLEMENTED`. |
 
-`HIL_APPLICATION_Encoded_Size` propagates the message-specific `NOT_IMPLEMENTED` result rather than guessing body sizes. Configuration-field semantics, fixed instruction/result value semantics, analogue conversion, variable-data correlation and endpoint transaction state remain later work.
+`HIL_APPLICATION_Encoded_Size` propagates a message-specific `NOT_IMPLEMENTED` result for the unfinished families rather than guessing body sizes. Test Configuration is no longer one of those families. Fixed instruction/result value semantics, analogue conversion, variable-data correlation and endpoint transaction state remain later work.
 
 ## Common wire version and envelope
 
@@ -152,23 +152,25 @@ logically read-only with respect to the context.
 
 - maximum complete encoded Application message size;
 - maximum variable byte-span size;
-- a retained configuration-family bound for later configuration work;
 - maximum variable-data declarations in one typed tick; and
 - maximum permitted `expected_tick_count` field value.
 
 These are local structural limits or reserved local policy bounds.
 `max_encoded_message_size` is an operational bound, not a requirement to
-provision the theoretical representable maximum. The current fixed Digital,
-Analogue and PWM Test Configuration arrays are protocol-sized and are not resized
-by `max_peripheral_config_count`; that field is retained for later configuration
-work. These values reserve no test storage and do not mean the codec can retain
-or track the configured number of ticks. Endpoint integration separately decides
-whether retention and hardware capacity are available.
+provision the theoretical representable maximum. All Test Configuration arrays
+are protocol-sized by the physical-channel constants. Element `i` is logical
+channel `i`; there is no caller-configurable peripheral count and no sparse
+configuration list. These values reserve no test storage and do not mean the
+codec can retain or track the configured number of ticks. Endpoint integration
+separately decides whether retention and hardware capacity are available.
 
-`max_variable_data_size` bounds each variable UART/SPI/I2C/CAN Application
-message, and `max_encoded_message_size` bounds each complete encoded Application
-message. They do not describe one monolithic test or tick package. Integration
-must configure Transport's maximum Application-message size to be at least the
+`max_variable_data_size` bounds the Test Configuration extension byte span,
+each Test Configuration communication-capture limit, and the byte spans used by
+variable Application families. The extension still has an absolute 255-byte
+wire maximum because its encoded length is one byte.
+`max_encoded_message_size` bounds each complete encoded Application message.
+They do not describe one monolithic test or tick package. Integration must
+configure Transport's maximum Application-message size to be at least the
 Application Layer's `max_encoded_message_size`; the codec does not inspect or
 change Transport configuration.
 
@@ -180,15 +182,18 @@ the two-byte System Information Request payload) through
 `HIL_APPLICATION_HEADER_SIZE_BYTES + UINT16_MAX`, validates the other configured
 limits, and copies the configuration without allocation or pointer retention.
 
-The foundation enforces
-`expected_tick_count <= context->config.max_expected_tick_count`. The protocol
-design also treats `expected_tick_count` as a nonzero test length, but that and
-other detailed Test Configuration semantic rules remain later configuration
-work.
+Test Configuration validation enforces a nonzero `expected_tick_count` not
+greater than `context->config.max_expected_tick_count`, the supported tick
+durations, zero test-wide flags, canonical disabled records, valid protocol
+enums/Booleans, PWM structural limits, communication rate/capture constraints,
+and the UART/I2C structural combinations defined by the wire protocol. It does
+not validate hardware availability, exact supported rates, power state, MCU
+timing, cross-driver conflicts, complete-test retention capacity, or workflow
+state.
 
-Fixed GPIO, analogue, and PWM arrays are protocol-sized rather than
-caller-configured. Their named channel counts and deterministic index mappings
-are described in [Application messages](application_messages.md).
+All fixed configuration arrays are protocol-sized rather than caller-configured.
+Their named channel counts and deterministic index mappings are described in
+[Application messages](application_messages.md).
 
 ## Test ID integration contract
 
@@ -261,7 +266,7 @@ no Application Response merely because Transport rejected it.
 
 The current foundation checks the common structural boundary: exact repository-wide major/minor version, one-byte message type/subtype representation, Boolean Test-ID presence and its zero-fill rule, configured complete-message bounds, checked header-plus-payload arithmetic, declared payload extent, exact complete-message consumption, and the existing typed validation implemented for each supported fixed family.
 
-Feature-specific semantic validation remains deliberately deferred where the corresponding family is unfinished. In particular, this PR does not invent Digital/Analogue/PWM configuration rules, communication configuration fields, fixed instruction/result value rules, variable-data declaration/correlation rules, hardware capability checks, or stateful transaction ordering.
+Feature-specific semantic validation remains deliberately deferred where the corresponding family is unfinished. Test Configuration is structurally complete in the codec, including Digital/Analogue/PWM and CAN/SPI/UART/I2C records. Fixed instruction/result value rules, variable-data declaration/correlation rules, hardware capability checks, and stateful transaction ordering remain outside this codec.
 
 Failures are local `HIL_Application_Status_T` values. They are not serialized as Application Responses or Errors. The codec has no active Test Configuration and cannot compare a later Test ID/tick against an active transaction.
 

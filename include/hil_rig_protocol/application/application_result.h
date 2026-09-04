@@ -23,14 +23,16 @@ extern "C"
 typedef enum
 {
     /**
-     * Every configured fixed capture is valid and every declaration identifies
-     * valid variable result data that follows this result.
+     * Every configured fixed capture is valid. Under the future variable-data
+     * declaration design, every declaration would identify valid variable
+     * result data associated with this result.
      */
     HIL_APPLICATION_RESULT_CONDITION_OK = 0,
     /**
-     * Every configured fixed capture is valid, but one or more requested
-     * variable communication captures failed or are incomplete. Declarations
-     * identify only valid variable result data that follows this result.
+     * Reserved for future variable-data semantics in which every configured
+     * fixed capture is valid but one or more requested variable communication
+     * captures failed or are incomplete. The current implementation does not
+     * encode result declarations or variable result-data messages.
      */
     HIL_APPLICATION_RESULT_CONDITION_PARTIAL = 1,
     /**
@@ -38,7 +40,7 @@ typedef enum
      *
      * The complete set of fixed captured-value fields remains present for
      * structural consistency but is semantically invalid and must be ignored.
-     * Declarations may still identify valid variable result data that follows.
+     * A future declaration design may still identify valid variable result data.
      * This condition does not replace an Application Error sent when the
      * problem is detected.
      */
@@ -69,36 +71,26 @@ typedef enum
  *
  * Firmware encodes deterministic zero values for fixed capture channels that
  * are disabled or not configured, and Python ignores those elements. Their
- * presence does not cause PARTIAL or EXECUTION_PROBLEM. OK means every
- * configured fixed capture is valid and every declaration identifies valid
- * variable data. PARTIAL means every configured fixed capture remains valid,
- * but one or more requested variable communication captures failed or are
- * incomplete; declarations identify only the valid variable messages that
- * follow. If any configured fixed capture cannot be trusted, firmware uses
- * EXECUTION_PROBLEM. Python then ignores the complete set of fixed values;
- * declarations may still identify valid variable data. The initial protocol
- * cannot express selective validity among fixed digital, analogue, or PWM
- * fields.
+ * presence does not cause PARTIAL or EXECUTION_PROBLEM. If any configured fixed
+ * capture cannot be trusted, firmware uses EXECUTION_PROBLEM and the complete
+ * set of fixed values is ignored. The initial protocol cannot express selective
+ * validity among fixed digital, analogue, or PWM fields.
  *
- * Each declaration has nonzero byte_length and a unique (peripheral, channel)
- * pair within the fixed result. It identifies exactly one complete variable
- * result message; duplicate matching messages are invalid. For tick T,
- * firmware sends this fixed result first and then sends every declared variable
- * result in declaration order. It completes all declarations before sending
- * the fixed result for tick T + 1. Fixed results are sent in increasing order
- * from tick 0 through N - 1, and variable data never precedes its declaring
- * fixed result. Each encoded Application message uses one MVP Transport frame.
+ * @par Future variable-data declaration design
+ * A future version may add declarations that associate nonzero data.size values
+ * with variable result-data messages and define their uniqueness, ordering,
+ * completeness, and PARTIAL-result semantics. Those declarations are not
+ * represented by HIL_Application_Test_Result_T and are not encoded or validated
+ * by the current implementation. The commented declaration members below are
+ * retained only as design notes and must not be treated as part of the current
+ * public wire contract.
  *
- * For a test with N ticks, host integration considers result transfer complete
- * only after decoding every fixed result for ticks 0 through N - 1 and every
- * variable result declared by those fixed messages. The codec does not track
- * that progress. Result messages have no Application Response or
- * Application-level stop-and-wait acknowledgement. Transport owns delivery
- * acknowledgement and retransmission. Early execution failure and an optional
- * Application Error do not replace or reorder the required result set. Future
- * pipelining, interleaving, ranges, or out-of-order result delivery require a
- * versioned extension. The initial protocol has no result-finalization or
- * result-summary message.
+ * Result messages have no Application Response or Application-level
+ * stop-and-wait acknowledgement. Transport owns delivery acknowledgement and
+ * retransmission. Future pipelining, interleaving, ranges, declaration-based
+ * variable-result delivery, or out-of-order result delivery require a versioned
+ * extension. The initial protocol has no result-finalization or result-summary
+ * message.
  */
 typedef struct
 {
@@ -111,7 +103,7 @@ typedef struct
     HIL_Application_Analog_Input_Value_T analog_inputs[HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT];
     /** Complete PWM-input state; element i is PWM_INPUT channel i. */
     HIL_Application_Pwm_Input_Value_T pwm_inputs[HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT];
-    /** Unique, nonzero UART/SPI/I2C/CAN result transfers. */
+    /** Future design only: variable-data declarations are not currently encoded. */
     // const HIL_Application_Data_Declaration_T* variable_data;
     // /** Number of result declarations at variable_data. */
     // uint32_t variable_data_count;
@@ -127,11 +119,13 @@ typedef struct
 } HIL_Application_Test_Result_T;
 
 /**
- * @brief Complete variable result-data body for one tick/channel.
+ * @brief Future variable result-data body for one tick/channel.
  *
- * @details Correlation and caller decode-storage ownership match variable
- * instruction data. Firmware sends each message after the fixed result that
- * declares it, in declaration order, before sending the next fixed result.
+ * @details This alias is retained for future variable-message design. The
+ * current Application implementation does not encode or decode variable
+ * result-data messages, and Test Result bodies do not contain declarations that
+ * reference them. Future correlation and storage ownership are expected to
+ * follow the corresponding variable instruction-data design.
  */
 typedef HIL_Application_Peripheral_Data_T HIL_Application_Variable_Result_Data_T;
 

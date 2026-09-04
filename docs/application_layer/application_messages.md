@@ -157,7 +157,7 @@ Unit-explicit fixed values are:
 
 - digital fixed instruction/result value: 0 or 1;
 - analogue fixed instruction/result value: microvolts;
-- analogue Test Configuration range selection: one-byte voltage-level enum;
+- Digital/PWM Test Configuration voltage selection: one-byte protocol enum;
 - tick duration: microseconds;
 - PWM periods: nanoseconds;
 - PWM duty: permyriad, 0 through 10000;
@@ -165,7 +165,7 @@ Unit-explicit fixed values are:
 
 Hardware capability and electrical safety remain firmware semantic decisions.
 
-### Fixed signal-channel arrays
+### Fixed channel arrays
 
 | Fixed array | Constant | Elements | Index mapping |
 | --- | --- | ---: | --- |
@@ -175,12 +175,18 @@ Hardware capability and electrical safety remain firmware semantic decisions.
 | Analogue inputs | `HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT` | 2 | index i is ANALOG_INPUT channel i |
 | PWM outputs | `HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT` | 2 | index i is PWM_OUTPUT channel i |
 | PWM inputs | `HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT` | 2 | index i is PWM_INPUT channel i |
+| CAN | `HIL_APPLICATION_CAN_CHANNEL_COUNT` | 2 | index i is CAN channel i |
+| SPI | `HIL_APPLICATION_SPI_CHANNEL_COUNT` | 2 | index i is SPI channel i |
+| UART | `HIL_APPLICATION_UART_CHANNEL_COUNT` | 2 | index i is UART channel i |
+| I2C | `HIL_APPLICATION_I2C_CHANNEL_COUNT` | 2 | index i is I2C channel i |
 
 These are external logical channels, not MCU pins or peripheral registers.
-Firmware owns hardware mapping. Fixed arrays contain values only and are always
-complete: there are no sparse entries, duplicates, omitted-channel defaults, or
-implicit retention from the previous tick. Variable UART/SPI/I2C/CAN payloads
-remain separate declaration and byte-span messages.
+Firmware owns hardware mapping. Test Configuration uses the same fixed index
+identity: records contain no peripheral or channel identifier. Fixed arrays are
+always complete, with no sparse entries, duplicates, omitted-channel defaults,
+or implicit retention from a prior configuration. Variable UART/SPI/I2C/CAN
+payload messages remain deferred and are separate from these configuration
+records.
 
 Each fixed result contains exactly one analogue input element per physical
 analogue input channel. For a configured channel, that element is its one sample
@@ -189,7 +195,7 @@ independent analogue sampling rate or multiple samples per tick. For any fixed
 input channel whose capture is disabled or not configured, firmware encodes
 deterministic zero and Python treats that element as semantically invalid.
 
-Encoded sizing uses the named fixed channel counts and fixed wire-width constants rather than native C structure or enum sizes. Detailed semantics for unfinished configuration and fixed-I/O validation remain deferred.
+Encoded sizing uses named fixed channel counts and fixed wire-width constants rather than native C structure or enum sizes. Test Configuration structural semantics are implemented by the codec; hardware capability and workflow semantics remain firmware-owned.
 
 ## System Information
 
@@ -243,32 +249,64 @@ configuration or execution after detecting incompatibility.
 - Direction: Python to firmware
 
 This is exactly one first test-specific message for each new upload. The Python
-host supplies a fresh random Test ID. The current
-`HIL_Application_Test_Configuration_T` contains:
+host supplies a fresh random Test ID. `HIL_Application_Test_Configuration_T`
+contains the global tick settings, ten fixed configuration arrays, and a
+length-delimited extension byte span. Array index `i` is logical channel `i`; no
+fixed record carries a redundant channel or peripheral identifier.
 
-- `tick_duration_us.microseconds`;
-- authoritative `expected_tick_count` N, defining ticks 0 through N - 1;
-- reserved test-wide `flags`;
-- fixed Digital input/output configuration arrays;
-- fixed Analogue input/output configuration arrays;
-- fixed PWM input/output configuration arrays; and
-- reserved length-delimited `extension_data`.
+The arrays are encoded in this order: Digital Input, Digital Output, Analogue
+Input, Analogue Output, PWM Input, PWM Output, CAN, SPI, UART, then I2C. Their
+physical extents are 10, 10, 2, 6, 2, 2, 2, 2, 2, and 2 records respectively.
+The fixed payload, including the one-byte extension length, is 197 bytes. With
+the 23-byte common envelope an empty-extension configuration is 220 bytes; an
+extension of N bytes is `220 + N`, up to 475 bytes for N = 255. The one-byte
+wire field therefore permits at most 255 extension bytes, while each initialized
+codec context may impose a smaller local limit through
+`context->config.max_variable_data_size`. The exact record offsets and byte
+layouts are normative in
+[Application wire-format reference](application_wire_format.md#test-configuration).
 
-Analogue configuration currently contains a channel ID and a voltage-level enum;
-it does not carry a signed microvolt range. Communication-family configuration
-fields remain reserved for later work and are not part of the current Test
-Configuration body.
+Every record begins with one-byte `enabled`: `0` is disabled, `1` is enabled,
+and other values are invalid. A disabled record is canonical only when every
+remaining field is zero. Protocol enums therefore reserve zero as INVALID for
+that disabled representation; valid values begin at one, with 255 reserved
+where a reserved sentinel is defined.
 
-The current foundation validates the supported tick-duration set of `10000`,
-`1000`, `100`, or `10` microseconds (100 Hz, 1 kHz, 10 kHz, or 100 kHz), enforces
-`expected_tick_count <= context->config.max_expected_tick_count`, and enforces
-the generic byte-span pointer invariant for `extension_data`. The initial
-protocol design reserves Test Configuration `flags` as zero and `extension_data`
-as an extension mechanism, but their detailed semantic acceptance rules are
-deliberately deferred here. The foundation therefore does not currently reject
-Test Configuration solely because `flags` is nonzero or `extension_data` is
-nonempty. Detailed Digital, Analogue, PWM, uniqueness, hardware-capability and
-unit/value semantics also remain deferred configuration work.
+The public records are:
+
+- Digital Input: enabled, voltage level.
+- Digital Output: enabled, voltage level, initial high/low state.
+- Analogue Input: enabled only.
+- Analogue Output: enabled only.
+- PWM Input: enabled, voltage level.
+- PWM Output: enabled, voltage level, initial period in nanoseconds, initial duty
+  cycle in permyriad.
+- CAN: enabled, bit rate, termination enabled, capture limit in bytes. This is
+  standard CAN only; CAN-FD and filter-bank/filter-ID/filter-mask details are not
+  protocol fields.
+- SPI: enabled, bit rate, master/slave role, 8/16-bit data width, bit order,
+  clock polarity, clock phase, capture limit in bytes.
+- UART: enabled, baud rate, electrical mode, word length, parity, stop bits, RX
+  enabled, TX enabled, capture limit in bytes.
+- I2C: enabled, bit rate, master/slave role, own 7-bit address, 3.3/5 V voltage
+  level, pull-up selection, capture limit in bytes.
+
+The codec validates the supported tick-duration set of `10000`, `1000`, `100`,
+or `10` microseconds; nonzero `expected_tick_count` within the configured limit;
+zero test-wide flags; the extension pointer/length invariant and extension
+length against `context->config.max_variable_data_size`; Booleans; canonical
+disabled records; recognized enums; PWM duty/period combinations; nonzero rates
+for enabled communications; communication capture limits against the same
+configured variable-data limit; UART RX/TX constraints; and I2C
+role/address constraints. Analogue input/output deliberately have no
+protocol-selectable electrical parameters in this version.
+
+Those are structural protocol rules only. Firmware later decides whether a
+channel exists, an exact rate is supported, rails and hardware are safe, MCU
+timing is achievable, drivers conflict, complete-test storage is available, or
+the current workflow state permits the configuration. The stateless codec does
+not make those decisions. Communication configuration is implemented here, but
+variable communication instruction/result messages remain deferred.
 
 A configuration-scoped `ACCEPTED` Response creates the active upload
 transaction. `REJECTED` or `FAILED` creates no transaction; instructions for
@@ -596,11 +634,11 @@ checks:
 - the existing validation implemented for supported fixed message families.
 
 The following feature-specific rules remain later work and must not be inferred
-from this foundation codec: detailed Digital/Analogue/PWM configuration
-semantics, UART/SPI/I2C/CAN configuration fields, analogue unit conversion,
-fixed Test Instruction or Test Result value validation, variable-data
-declarations/correlation, Response and Error semantic combinations, reserved
-configuration-field policy, and hardware-capability validation. Families whose
+from this codec: analogue unit conversion, fixed Test Instruction or Test Result
+value validation, variable-data declarations/correlation, Response and Error
+semantic combinations, hardware-capability validation, and workflow state. Test
+Configuration structural validation, including communication configuration and
+reserved-zero test-wide flags, is implemented. Families whose
 required validation is unfinished return `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED`
 rather than accepting guessed semantics.
 

@@ -233,7 +233,8 @@ jobs:
           cmake --build build-msvc --config Release
           --target hil_rig_protocol_python_native hil_rig_protocol_python_adapter_tests
           hil_rig_protocol_unit_tests hil_rig_protocol_integration_tests
-          hil_rig_protocol_c_api_compile_test --verbose
+          hil_rig_protocol_application_tests hil_rig_protocol_c_api_compile_test
+          hil_rig_protocol_application_public_c_compile_test --verbose
 
       - name: Run adapter and native C tests
         shell: pwsh

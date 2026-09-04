@@ -37,10 +37,10 @@ extern "C"
 #endif
 
 /**
- * @name Fixed signal-channel counts
+ * @name Fixed channel counts
  *
  * @details These extents deliberately describe the current physical HIL-RIG
- * protocol profile. For every fixed signal array, index i maps to external
+ * protocol profile. For every fixed signal or communication array, index i maps to external
  * logical channel i. They do not expose MCU pins or peripheral instances.
  * Changing an extent changes every affected typed and future encoded message
  * and therefore requires protocol-version and compatibility review.
@@ -64,9 +64,16 @@ extern "C"
 /** Number of physical HIL-RIG PWM-input channels in every result. */
 #define HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT ( 2u )
 
+/** Number of physical HIL-RIG CAN channels in every fixed configuration array. */
 #define HIL_APPLICATION_CAN_CHANNEL_COUNT ( 2u )
+
+/** Number of physical HIL-RIG UART channels in every fixed configuration array. */
 #define HIL_APPLICATION_UART_CHANNEL_COUNT ( 2u )
+
+/** Number of physical HIL-RIG SPI channels in every fixed configuration array. */
 #define HIL_APPLICATION_SPI_CHANNEL_COUNT ( 2u )
+
+/** Number of physical HIL-RIG I2C channels in every fixed configuration array. */
 #define HIL_APPLICATION_I2C_CHANNEL_COUNT ( 2u )
 /** @} */
 
@@ -254,10 +261,12 @@ typedef struct
 /**
  * @brief Declared variable-data transfer associated with one fixed tick.
  *
- * @details byte_length must be nonzero; a channel with no variable data is
+ * @details data.size must be nonzero; a channel with no variable data is
  * omitted from the declaration array. Within one fixed instruction or result,
  * each (peripheral, channel) pair may be declared at most once. The future
- * codec validates those rules from the complete fixed message.
+ * codec validates those rules from the complete fixed message. The declaration
+ * representation and its fixed-message integration remain future work in the
+ * current façade.
  *
  * Under the initial transaction contract, each declaration has exactly one
  * matching variable instruction/result message. A duplicate variable message
@@ -323,17 +332,14 @@ typedef struct
      */
     size_t max_encoded_message_size;
 
-    /** Largest byte span in one variable instruction/result/error field. */
-    size_t max_variable_data_size;
-
     /**
-     * Reserved configuration-family structural bound.
+     * Largest permitted variable byte span.
      *
-     * The current Test Configuration uses fixed Digital, Analogue and PWM
-     * arrays, so this bound is retained for later configuration work and does
-     * not resize or limit those fixed arrays in this foundation.
+     * This bounds Test Configuration extension_data and enabled communication
+     * capture limits. The one-byte span wire format imposes an absolute 255-byte
+     * maximum even when this configured policy limit is lower.
      */
-    size_t max_peripheral_config_count;
+    size_t max_variable_data_size;
 
     /** Maximum variable-data declarations in one typed tick body. */
     size_t max_variable_transfers_per_tick;

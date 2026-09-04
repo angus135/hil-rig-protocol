@@ -13,6 +13,7 @@
 #include "application_decoding.h"
 #include "application_encoding.h"
 #include "application_internal.h"
+#include "application_test_config_internal.h"
 #include "application_size.h"
 #include "application_validation.h"
 
@@ -255,9 +256,8 @@ HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_
     {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
-    config->max_encoded_message_size    = HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE;
-    config->max_variable_data_size      = HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE;
-    config->max_peripheral_config_count = HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT;
+    config->max_encoded_message_size = HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE;
+    config->max_variable_data_size   = HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE;
     config->max_variable_transfers_per_tick =
         HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK;
     config->max_expected_tick_count = HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT;
@@ -267,11 +267,23 @@ HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_
 HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      context,
                                                const HIL_Application_Config_T* config )
 {
+    HIL_Application_Config_T config_copy = { 0 };
+
     if ( context == NULL )
     {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
-    /* Clear publication state first so every failed Init leaves a deterministic context. */
+
+    /*
+     * Snapshot caller input before clearing the destination so the supported
+     * HIL_APPLICATION_Init( &context, &context.config ) form is alias-safe.
+     */
+    if ( config != NULL )
+    {
+        config_copy = *config;
+    }
+
+    /* Every failed Init leaves a deterministic, unpublished context. */
     context->initialized = 0u;
     memset( &context->config, 0, sizeof( context->config ) );
     if ( config == NULL )
@@ -279,27 +291,26 @@ HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      c
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
 
-    if ( config->max_encoded_message_size < HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE )
+    if ( config_copy.max_encoded_message_size < HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    if ( config->max_encoded_message_size > HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE )
+    if ( config_copy.max_encoded_message_size > HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE )
     {
         return HIL_APPLICATION_STATUS_INVALID_LENGTH;
     }
-    if ( config->max_variable_data_size > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE
-         || config->max_peripheral_config_count > HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT
-         || config->max_variable_transfers_per_tick
+    if ( config_copy.max_variable_data_size > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE
+         || config_copy.max_variable_transfers_per_tick
                 > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
     {
         return HIL_APPLICATION_STATUS_INVALID_COUNT;
     }
-    if ( config->max_expected_tick_count > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT )
+    if ( config_copy.max_expected_tick_count > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT )
     {
         return HIL_APPLICATION_STATUS_INVALID_LENGTH;
     }
 
-    context->config      = *config;
+    context->config      = config_copy;
     context->initialized = 1u;
     return HIL_APPLICATION_STATUS_OK;
 }
@@ -490,8 +501,33 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
             /* Share exact fixed-body width validation with normal body decoding. */
             return HIL_APPLICATION_Fixed_Body_Validate_Size( envelope.type, payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION: {
+            size_t  required_payload_size = 0u;
+            uint8_t extension_size;
+            if ( payload_size < HIL_APPLICATION_TEST_CONFIG_FIXED_PAYLOAD_SIZE )
+            {
+                return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+            }
+            extension_size = encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES
+                                             + HIL_APPLICATION_TEST_CONFIG_EXTENSION_LENGTH_OFFSET];
+            if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_TEST_CONFIG_FIXED_PAYLOAD_SIZE,
+                                                    ( size_t )extension_size,
+                                                    &required_payload_size ) )
+            {
+                return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+            }
+            if ( payload_size != required_payload_size )
+            {
+                return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+            }
+            if ( ( size_t )extension_size > context->config.max_variable_data_size )
+            {
+                return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+            }
+            *required_storage_size = ( size_t )extension_size;
+            return HIL_APPLICATION_STATUS_OK;
+        }
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
-        case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
@@ -607,19 +643,26 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
     }
 }
 
-static HIL_Application_Status_T
-HIL_APPLICATION_Validate_Decoded_Envelope( const HIL_Application_Context_T* context,
-                                           const uint8_t*                   encoded_message,
-                                           size_t                           encoded_message_size )
+static HIL_Application_Status_T HIL_APPLICATION_Validate_Decoded_Envelope(
+    const HIL_Application_Context_T* context, const uint8_t* encoded_message,
+    size_t encoded_message_size, size_t required_decode_storage )
 {
     HIL_Application_Message_T message;
+    uint8_t                   decoded_storage[HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE];
     size_t                    used_storage = 0u;
 
-    /* Full typed validation currently requires one temporary public message on the stack. */
+    if ( required_decode_storage > HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    /* Typed validation uses bounded local span storage; the storage query remains allocation-free.
+     */
     memset( &message, 0, sizeof( message ) );
     message.type = HIL_APPLICATION_MESSAGE_TYPE_INVALID;
     return HIL_APPLICATION_Decode_Internal( context, encoded_message, encoded_message_size,
-                                            &message, NULL, 0u, &used_storage );
+                                            &message,
+                                            required_decode_storage == 0u ? NULL : decoded_storage,
+                                            required_decode_storage, &used_storage );
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
@@ -653,8 +696,8 @@ HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
         return status;
     }
 
-    status =
-        HIL_APPLICATION_Validate_Decoded_Envelope( context, encoded_message, encoded_message_size );
+    status = HIL_APPLICATION_Validate_Decoded_Envelope(
+        context, encoded_message, encoded_message_size, *required_decode_storage );
     if ( status != HIL_APPLICATION_STATUS_OK )
     {
         *required_decode_storage = 0u;
