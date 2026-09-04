@@ -584,7 +584,8 @@ HIL_APPLICATION_Decode_Message( const HIL_Application_Context_T* context,
     {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
-    if ( max_encoded_message_size < HIL_APPLICATION_HEADER_SIZE_BYTES + 1 )  // +1 for the payload end flag
+    if ( max_encoded_message_size
+         < HIL_APPLICATION_HEADER_SIZE_BYTES + 1 )  // +1 for the payload end flag
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
