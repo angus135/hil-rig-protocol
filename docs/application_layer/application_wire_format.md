@@ -67,8 +67,10 @@ encoded_message_size == declared_total -> body decoding may proceed
 ```
 
 A malformed fixed body or malformed length-delimited byte span is also `MALFORMED_MESSAGE`.
-`BUFFER_TOO_SMALL` is reserved for insufficient caller-provided encode capacity or decoded-data
-storage.
+A correctly shaped Test Configuration whose extension exceeds the initialized
+`max_variable_data_size` is instead `VALIDATION_FAILED`; its shape is valid but it violates a local
+structural policy bound. `BUFFER_TOO_SMALL` is reserved for insufficient caller-provided encode
+capacity or decoded-data storage.
 
 ## Fixed-width wire primitives
 
@@ -169,77 +171,186 @@ of their member order in the public C structure.
 
 ## Test Configuration
 
-The current fixed Test Configuration body is encoded and decoded, while detailed Digital, Analogue,
-PWM, communication-family, extension, and test-wide flag semantics remain deliberately deferred.
-The message requires a Test ID.
+Test Configuration is fully supported by the stateless codec. It requires a
+Test ID. The public C records are typed convenience structures only: their
+padding, native enum widths, and native alignment never define this wire layout.
+Every enum and Boolean occupies exactly one wire byte and every multi-byte
+integer is little-endian.
 
-The tick duration unit is **microseconds**. PWM periods remain **nanoseconds**. These units are separate
-protocol fields and must not be interchanged.
+The tick duration unit is **microseconds**. PWM periods use **nanoseconds** and
+PWM duty uses **permyriad** (`0..10000`).
 
-Current payload layout:
-
-```text
-payload offsets
-   0        4        8       12        52       92       100      124      144      164    165
-   +--------+--------+--------+---------+--------+--------+--------+--------+--------+------+---------+
-   |tick us |ticks   | flags  |digital  |digital |analog  |analog  | PWM    | PWM    | ext  |ext data |
-   | u32LE  | u32LE  | u32LE  | in x10  |out x10 | in x2  |out x6  | in x2  |out x2  | len  |  N B    |
-   +--------+--------+--------+---------+--------+--------+--------+--------+--------+------+---------+
-                              40 B      40 B      8 B      24 B     20 B     20 B      1 B
-```
+### Payload layout
 
 | Payload offset | Width | Field |
 | ---: | ---: | --- |
-| 0 | 4 | tick duration in microseconds, `uint32_t` LE |
-| 4 | 4 | `expected_tick_count`, `uint32_t` LE |
-| 8 | 4 | reserved Test Configuration `flags`, `uint32_t` LE |
-| 12 | 40 | 10 Digital Input configuration records |
-| 52 | 40 | 10 Digital Output configuration records |
-| 92 | 8 | 2 Analogue Input configuration records |
-| 100 | 24 | 6 Analogue Output configuration records |
-| 124 | 20 | 2 PWM Input configuration records |
-| 144 | 20 | 2 PWM Output configuration records |
-| 164 | 1 | extension-data length |
-| 165 | N | extension-data bytes |
+| 0 | 12 | global fields: tick duration `uint32_t`, expected tick count `uint32_t`, flags `uint32_t` |
+| 12 | 20 | 10 Digital Input records, 2 bytes each |
+| 32 | 30 | 10 Digital Output records, 3 bytes each |
+| 62 | 2 | 2 Analogue Input records, 1 byte each |
+| 64 | 6 | 6 Analogue Output records, 1 byte each |
+| 70 | 4 | 2 PWM Input records, 2 bytes each |
+| 74 | 16 | 2 PWM Output records, 8 bytes each |
+| 90 | 20 | 2 CAN records, 10 bytes each |
+| 110 | 28 | 2 SPI records, 14 bytes each |
+| 138 | 30 | 2 UART records, 15 bytes each |
+| 168 | 28 | 2 I2C records, 14 bytes each |
+| 196 | 1 | extension length, `uint8_t` |
+| 197 | N | exactly N extension bytes |
 
-The fixed portion including the extension length byte is 165 bytes.
+The fixed payload, through and including the extension-length byte, is exactly
+**197 bytes**. An empty-extension complete message is therefore `23 + 197 =
+220` bytes. Extension length N produces `220 + N` complete bytes. The maximum
+255-byte extension produces a 452-byte payload and a **475-byte complete
+message**, which fits the 512-byte default `max_encoded_message_size`. The
+one-byte extension field sets the absolute wire maximum at 255 data bytes, but
+encoding, decoding, decode-storage queries, and encoded-message validation also
+enforce the initialized context's `max_variable_data_size`. A context may
+therefore accept a smaller maximum without changing the wire layout.
 
-Supported tick-duration values are:
+The three global fields are encoded at payload offsets 0, 4, and 8. Supported
+tick durations are 10000, 1000, 100, and 10 microseconds (100 Hz, 1 kHz, 10 kHz,
+and 100 kHz respectively). Test-wide flags are reserved and must be zero.
 
-| Tick rate | Wire value |
-| --- | ---: |
-| 100 Hz | `10000 us` |
-| 1 kHz | `1000 us` |
-| 10 kHz | `100 us` |
-| 100 kHz | `10 us` |
+### Fixed-array identity and disabled form
 
-For example, a 1 ms tick is encoded as the literal four bytes `E8 03 00 00`, representing decimal
-`1000` microseconds.
+Every family is a fixed array whose extent is defined by its public physical
+channel constant. Array element `i` configures logical channel `i`. No fixed
+configuration record contains or encodes a peripheral identifier or channel ID.
 
-### Configuration subrecords
+Every record begins with one-byte `enabled`. `0x00` means disabled and `0x01`
+means enabled; any other value is invalid. A disabled record is canonical only
+when every remaining byte/field is zero. Enum value zero is therefore the
+INVALID/canonical-disabled representation. Reserved enum sentinels use 255
+where defined and are never valid enabled settings.
 
-Digital and Analogue configuration records are both four bytes:
+### Record layouts
 
-```text
-+------------+-------------+---------------+
-| peripheral | channel     | voltage level |
-| u8         | u16 LE      | u8 enum       |
-+------------+-------------+---------------+
-       <--- 3-byte channel ID --->
-```
+Digital Input, 2 bytes:
 
-PWM configuration records are ten bytes:
+| Record offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 1 | enabled |
+| 1 | 1 | voltage level |
 
-```text
-+------------+-------------+-----------------+----------------+---------------+
-| peripheral | channel     | period          | initial duty   | voltage level |
-| u8         | u16 LE      | u32 LE, ns      | u16 LE         | u8 enum       |
-+------------+-------------+-----------------+----------------+---------------+
-       <--- channel ID --->
-```
+Digital Output, 3 bytes:
 
-Communication-family configuration wire fields remain `NOT_IMPLEMENTED` and are not part of the
-current fixed Test Configuration payload.
+| Record offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 1 | enabled |
+| 1 | 1 | voltage level |
+| 2 | 1 | initial high state, Boolean |
+
+Analogue Input and Analogue Output are each one byte: only `enabled`. There are
+no protocol-selectable analogue electrical parameters in this version.
+
+PWM Input, 2 bytes:
+
+| Record offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 1 | enabled |
+| 1 | 1 | voltage level |
+
+PWM Output, 8 bytes:
+
+| Record offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 1 | enabled |
+| 1 | 1 | voltage level |
+| 2 | 4 | initial period in nanoseconds, `uint32_t` LE |
+| 6 | 2 | initial duty cycle in permyriad, `uint16_t` LE |
+
+CAN, 10 bytes:
+
+| Record offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 1 | enabled |
+| 1 | 4 | bit rate, `uint32_t` LE |
+| 5 | 1 | termination enabled, Boolean |
+| 6 | 4 | capture limit in bytes, `uint32_t` LE |
+
+This is standard CAN only. CAN-FD options and implementation-specific filter
+banks, filter IDs, filter masks, prescalers, and driver values are not protocol
+fields.
+
+SPI, 14 bytes:
+
+| Record offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 1 | enabled |
+| 1 | 4 | bit rate, `uint32_t` LE |
+| 5 | 1 | master/slave role |
+| 6 | 1 | data width |
+| 7 | 1 | bit order |
+| 8 | 1 | clock polarity |
+| 9 | 1 | clock phase |
+| 10 | 4 | capture limit in bytes, `uint32_t` LE |
+
+UART, 15 bytes:
+
+| Record offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 1 | enabled |
+| 1 | 4 | baud rate, `uint32_t` LE |
+| 5 | 1 | electrical mode |
+| 6 | 1 | word length |
+| 7 | 1 | parity |
+| 8 | 1 | stop bits |
+| 9 | 1 | RX enabled, Boolean |
+| 10 | 1 | TX enabled, Boolean |
+| 11 | 4 | capture limit in bytes, `uint32_t` LE |
+
+I2C, 14 bytes:
+
+| Record offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 1 | enabled |
+| 1 | 4 | bit rate, `uint32_t` LE |
+| 5 | 1 | master/slave role |
+| 6 | 2 | own 7-bit address stored in `uint16_t`, LE |
+| 8 | 1 | voltage level |
+| 9 | 1 | pull-up selection |
+| 10 | 4 | capture limit in bytes, `uint32_t` LE |
+
+### Enum assignments
+
+All values below are one byte on the wire. `INVALID == 0` is also the zero value
+required in a canonical disabled record. Each enum also defines `RESERVED ==
+255`.
+
+| Enum | Numeric assignments |
+| --- | --- |
+| Digital/PWM voltage | 1 = 3.3 V, 2 = 5 V, 3 = 12 V, 4 = 24 V |
+| Bus role | 1 = master, 2 = slave |
+| SPI data width | 1 = 8 bits, 2 = 16 bits |
+| SPI bit order | 1 = MSB first, 2 = LSB first |
+| SPI clock polarity | 1 = idle low, 2 = idle high |
+| SPI clock phase | 1 = first edge, 2 = second edge |
+| UART electrical mode | 1 = TTL 3.3 V, 2 = TTL 5 V, 3 = RS-232 |
+| UART word length | 1 = 8 bits, 2 = 9 bits |
+| UART parity | 1 = none, 2 = even, 3 = odd |
+| UART stop bits | 1 = 1 stop bit, 2 = 2 stop bits |
+| I2C voltage | 1 = 3.3 V, 2 = 5 V |
+| I2C pull-up | 1 = 1 kΩ, 2 = 2.2 kΩ, 3 = 4.7 kΩ, 4 = 10 kΩ |
+
+### Structural validation boundary
+
+The codec validates the fixed wire shape and typed protocol rules: valid
+Booleans/enums, canonical disabled records, a nonzero expected tick count within
+the configured limit, supported tick duration, zero flags, extension length no
+greater than `max_variable_data_size`, PWM duty no greater than 10000, zero duty
+when period is zero, nonzero rates for enabled communications, capture limits no
+greater than `max_variable_data_size`, CAN
+termination Boolean, UART RX/TX availability and RX/capture consistency, and
+I2C role/address rules. I2C masters use own address zero; I2C slaves use a
+nonzero 7-bit address `1..127`.
+
+The codec deliberately does not validate physical-channel availability, exact
+supported rates, power-rail state, MCU timer/DMA/filter settings, complete-test
+storage capacity, cross-driver conflicts, or workflow state. Those decisions
+belong to firmware integration. Variable communication instruction/result
+messages remain deferred even though communication Test Configuration is now
+implemented.
 
 ## Test Instruction fixed body
 
@@ -299,8 +410,8 @@ The wire contract is paired with deterministic public output rules:
 ## Current support boundary
 
 The presence of a documented identifier or public C structure does not mean all façade operations are
-complete. In particular, variable instruction/result bodies, Response/Error semantics, most
-message-specific encoded-size functions, communication configuration, and detailed fixed-I/O
-semantics remain deliberately deferred. See the support table in
+complete. In particular, variable instruction/result bodies, Response/Error semantics, and
+other unfinished message-specific encoded-size/validation paths remain deliberately deferred. Test
+Configuration, including fixed I/O and communication configuration, is supported. See the support table in
 [Application Layer codec and transaction design](application_layer.md#current-message-family-implementation-status)
 before treating a payload family as fully operational.

@@ -33,10 +33,6 @@ extern "C"
 #define HIL_APPLICATION_SYSTEM_INFO_RESPONSE_FIXED_ENCODE_SIZE 14u
 #define HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE 3u
 
-HIL_Application_Status_T
-HIL_APPLICATION_Peripheral_Config_size( const HIL_Application_Peripheral_Config_T* data,
-                                        size_t*                                    size );
-
 /**
  * @brief Determine the encoded size of a system information request.
  *

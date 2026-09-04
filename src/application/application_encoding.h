@@ -77,10 +77,9 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
     size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
 /**
- * @brief Encode the current fixed Test Configuration payload.
- * @details Tick duration is encoded directly as little-endian microseconds.
- * Detailed configuration semantics and communication-family configuration are
- * deliberately outside this foundation.
+ * @brief Encode the complete Test Configuration payload.
+ * @details Encodes the 197-byte fixed portion, all fixed I/O and communication
+ * arrays, and the one-byte-length-prefixed extension using explicit wire widths.
  * @param[in]  context          Application context.
  * @param[in]  sub_type         Message subtype selected by the public envelope.
  * @param[in]  test_id          Envelope Test ID value.

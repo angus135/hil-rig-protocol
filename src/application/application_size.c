@@ -10,6 +10,7 @@
 
 #include "application_size.h"
 #include "application_internal.h"
+#include "application_test_config_internal.h"
 #include "application_encoding.h"
 #include "hil_rig_protocol/application/application_control.h"
 #include "hil_rig_protocol/application/application_instruction.h"
@@ -50,57 +51,27 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_size(
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
-HIL_Application_Status_T
-HIL_APPLICATION_Peripheral_Config_size( const HIL_Application_Peripheral_Config_T* data,
-                                        size_t*                                    size )
-{
-    /**
-     * Current fixed configuration record widths are architecture-independent:
-     * the type tag is one byte, a channel ID is three bytes (one-byte
-     * peripheral plus little-endian uint16_t channel), and voltage-level enums
-     * are one byte. PWM additionally carries a little-endian uint32_t period
-     * and uint16_t duty cycle. Communication configuration sizing is deferred.
-     */
-    size_t size_local = HIL_APPLICATION_WIRE_ENUM_SIZE;
-    switch ( data->type )
-    {
-        case HIL_APPLICATION_PERIPHERAL_CONFIG_INVALID:
-            return HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE;
-        case HIL_APPLICATION_PERIPHERAL_CONFIG_DIGITAL:
-            size_local += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-            size_local += HIL_APPLICATION_WIRE_ENUM_SIZE;
-            break;
-        case HIL_APPLICATION_PERIPHERAL_CONFIG_ANALOG:
-            size_local += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-            size_local += HIL_APPLICATION_WIRE_ENUM_SIZE;
-            break;
-        case HIL_APPLICATION_PERIPHERAL_CONFIG_PWM:
-            size_local += HIL_APPLICATION_CHANNEL_ID_ENCODE_SIZE;
-            size_local += HIL_APPLICATION_WIRE_U32_SIZE;
-            size_local += HIL_APPLICATION_WIRE_U16_SIZE;
-            size_local += HIL_APPLICATION_WIRE_ENUM_SIZE;
-            break;
-        /* Communication configuration wire sizing is deliberately deferred. */
-        case HIL_APPLICATION_PERIPHERAL_CONFIG_RESERVED:
-            return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-        default:
-            return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
-    }
-    *size = size_local;
-    return HIL_APPLICATION_STATUS_OK;
-}
-
 HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_size(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Configuration_T* data,
     size_t* encoded_size )
 {
+    size_t total_size = 0u;
     ( void )context;
     ( void )sub_type;
     ( void )test_id;
-    ( void )data;
-    ( void )encoded_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+
+    if ( data == NULL || encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_TEST_CONFIG_FIXED_PAYLOAD_SIZE,
+                                            ( size_t )data->extension_data.size, &total_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    *encoded_size = total_size;
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_size(

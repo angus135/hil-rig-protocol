@@ -149,91 +149,13 @@ void PrintMessage( const HIL_Application_Message_T& message )
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION: {
             const auto& data = message.body.test_configuration;
-
             std::cout << "  Test Configuration\n";
-
             std::cout << "    tick_duration_us.microseconds: " << data.tick_duration_us.microseconds
                       << "\n";
-
             std::cout << "    expected_tick_count: " << data.expected_tick_count << "\n";
-
             std::cout << "    flags: " << data.flags << "\n";
-
-            for ( std::size_t i = 0u; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; ++i )
-            {
-                std::cout << "    digital input [" << i << "]\n";
-                std::cout << "      channel: "
-                          << static_cast<unsigned>( data.digital_in[i].channel.channel ) << "\n";
-                std::cout << "      peripheral: "
-                          << static_cast<unsigned>( data.digital_in[i].channel.peripheral ) << "\n";
-                std::cout << "      voltage level: "
-                          << static_cast<unsigned>( data.digital_in[i].voltage_level ) << "\n";
-            }
-            for ( std::size_t i = 0u; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; ++i )
-            {
-                std::cout << "    digital output [" << i << "]\n";
-                std::cout << "      channel: "
-                          << static_cast<unsigned>( data.digital_out[i].channel.channel ) << "\n";
-                std::cout << "      peripheral: "
-                          << static_cast<unsigned>( data.digital_out[i].channel.peripheral )
-                          << "\n";
-                std::cout << "      voltage level: "
-                          << static_cast<unsigned>( data.digital_out[i].voltage_level ) << "\n";
-            }
-            for ( std::size_t i = 0u; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; ++i )
-            {
-                std::cout << "    analog input [" << i << "]\n";
-                std::cout << "      channel: "
-                          << static_cast<unsigned>( data.analog_in[i].channel.channel ) << "\n";
-                std::cout << "      peripheral: "
-                          << static_cast<unsigned>( data.analog_in[i].channel.peripheral ) << "\n";
-                std::cout << "      voltage level: "
-                          << static_cast<unsigned>( data.analog_in[i].voltage_level ) << "\n";
-            }
-            for ( std::size_t i = 0u; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; ++i )
-            {
-                std::cout << "    analog output [" << i << "]\n";
-                std::cout << "      channel: "
-                          << static_cast<unsigned>( data.analog_out[i].channel.channel ) << "\n";
-                std::cout << "      peripheral: "
-                          << static_cast<unsigned>( data.analog_out[i].channel.peripheral ) << "\n";
-                std::cout << "      voltage level: "
-                          << static_cast<unsigned>( data.analog_out[i].voltage_level ) << "\n";
-            }
-            for ( std::size_t i = 0u; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; ++i )
-            {
-                std::cout << "    pwm input [" << i << "]\n";
-                std::cout << "      channel: "
-                          << static_cast<unsigned>( data.pwm_in[i].channel.channel ) << "\n";
-                std::cout << "      peripheral: "
-                          << static_cast<unsigned>( data.pwm_in[i].channel.peripheral ) << "\n";
-                std::cout << "      voltage level: "
-                          << static_cast<unsigned>( data.pwm_in[i].voltage_level ) << "\n";
-                std::cout << "      period ns: "
-                          << static_cast<unsigned>( data.pwm_in[i].period_nanoseconds ) << "\n";
-                std::cout << "      duty: "
-                          << static_cast<unsigned>( data.pwm_in[i].initial_duty_cycle_permyriad )
-                          << "\n";
-            }
-            for ( std::size_t i = 0u; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; ++i )
-            {
-                std::cout << "    pwm input [" << i << "]\n";
-                std::cout << "      channel: "
-                          << static_cast<unsigned>( data.pwm_out[i].channel.channel ) << "\n";
-                std::cout << "      peripheral: "
-                          << static_cast<unsigned>( data.pwm_out[i].channel.peripheral ) << "\n";
-                std::cout << "      voltage level: "
-                          << static_cast<unsigned>( data.pwm_out[i].voltage_level ) << "\n";
-                std::cout << "      period ns: "
-                          << static_cast<unsigned>( data.pwm_out[i].period_nanoseconds ) << "\n";
-                std::cout << "      duty: "
-                          << static_cast<unsigned>( data.pwm_out[i].initial_duty_cycle_permyriad )
-                          << "\n";
-            }
-
             std::cout << "    extension_data:\n";
             PrintByteSpan( data.extension_data );
-
             break;
         }
 
@@ -535,73 +457,116 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
 
             for ( std::size_t i = 0u; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; ++i )
             {
-
-                EXPECT_EQ( std::memcmp( &expected.body.test_configuration.digital_in[i],
-                                        &actual.body.test_configuration.digital_in[i],
-                                        sizeof( expected.body.test_configuration.digital_in[i] ) ),
-                           0 );
+                EXPECT_EQ( expected.body.test_configuration.digital_in[i].enabled,
+                           actual.body.test_configuration.digital_in[i].enabled );
+                EXPECT_EQ( expected.body.test_configuration.digital_in[i].voltage_level,
+                           actual.body.test_configuration.digital_in[i].voltage_level );
             }
-
             for ( std::size_t i = 0u; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; ++i )
             {
-
-                EXPECT_EQ( std::memcmp( &expected.body.test_configuration.digital_out[i],
-                                        &actual.body.test_configuration.digital_out[i],
-                                        sizeof( expected.body.test_configuration.digital_out[i] ) ),
-                           0 );
+                EXPECT_EQ( expected.body.test_configuration.digital_out[i].enabled,
+                           actual.body.test_configuration.digital_out[i].enabled );
+                EXPECT_EQ( expected.body.test_configuration.digital_out[i].voltage_level,
+                           actual.body.test_configuration.digital_out[i].voltage_level );
+                EXPECT_EQ( expected.body.test_configuration.digital_out[i].initial_high,
+                           actual.body.test_configuration.digital_out[i].initial_high );
             }
-
             for ( std::size_t i = 0u; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; ++i )
             {
-
-                EXPECT_EQ( std::memcmp( &expected.body.test_configuration.analog_in[i],
-                                        &actual.body.test_configuration.analog_in[i],
-                                        sizeof( expected.body.test_configuration.analog_in[i] ) ),
-                           0 );
+                EXPECT_EQ( expected.body.test_configuration.analog_in[i].enabled,
+                           actual.body.test_configuration.analog_in[i].enabled );
             }
-
             for ( std::size_t i = 0u; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; ++i )
             {
-
-                EXPECT_EQ( std::memcmp( &expected.body.test_configuration.analog_out[i],
-                                        &actual.body.test_configuration.analog_out[i],
-                                        sizeof( expected.body.test_configuration.analog_out[i] ) ),
-                           0 );
+                EXPECT_EQ( expected.body.test_configuration.analog_out[i].enabled,
+                           actual.body.test_configuration.analog_out[i].enabled );
             }
-
             for ( std::size_t i = 0u; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; ++i )
             {
-
-                EXPECT_EQ( std::memcmp( &expected.body.test_configuration.pwm_in[i],
-                                        &actual.body.test_configuration.pwm_in[i],
-                                        sizeof( expected.body.test_configuration.pwm_in[i] ) ),
-                           0 );
+                EXPECT_EQ( expected.body.test_configuration.pwm_in[i].enabled,
+                           actual.body.test_configuration.pwm_in[i].enabled );
+                EXPECT_EQ( expected.body.test_configuration.pwm_in[i].voltage_level,
+                           actual.body.test_configuration.pwm_in[i].voltage_level );
             }
-
             for ( std::size_t i = 0u; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; ++i )
             {
-
-                EXPECT_EQ( std::memcmp( &expected.body.test_configuration.pwm_out[i],
-                                        &actual.body.test_configuration.pwm_out[i],
-                                        sizeof( expected.body.test_configuration.pwm_out[i] ) ),
-                           0 );
+                EXPECT_EQ( expected.body.test_configuration.pwm_out[i].enabled,
+                           actual.body.test_configuration.pwm_out[i].enabled );
+                EXPECT_EQ( expected.body.test_configuration.pwm_out[i].voltage_level,
+                           actual.body.test_configuration.pwm_out[i].voltage_level );
+                EXPECT_EQ( expected.body.test_configuration.pwm_out[i].initial_period_nanoseconds,
+                           actual.body.test_configuration.pwm_out[i].initial_period_nanoseconds );
+                EXPECT_EQ( expected.body.test_configuration.pwm_out[i].initial_duty_cycle_permyriad,
+                           actual.body.test_configuration.pwm_out[i].initial_duty_cycle_permyriad );
             }
-
-            // for ( std::size_t i = 0u; i < expected.body.test_configuration.peripheral_count; ++i
-            // )
-            // {
-            //     std::cout << "Peripheral Count: " << static_cast<unsigned>( i ) << "\n";
-            //     EXPECT_EQ( expected.body.test_configuration.peripherals[i].type,
-            //                actual.body.test_configuration.peripherals[i].type );
-
-            //     EXPECT_EQ(
-            //         std::memcmp( &expected.body.test_configuration.peripherals[i].value,
-            //                      &actual.body.test_configuration.peripherals[i].value,
-            //                      sizeof( expected.body.test_configuration.peripherals[i].value )
-            //                      ),
-            //         0 );
-            // }
-
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_CAN_CHANNEL_COUNT; ++i )
+            {
+                EXPECT_EQ( expected.body.test_configuration.can[i].enabled,
+                           actual.body.test_configuration.can[i].enabled );
+                EXPECT_EQ( expected.body.test_configuration.can[i].bit_rate,
+                           actual.body.test_configuration.can[i].bit_rate );
+                EXPECT_EQ( expected.body.test_configuration.can[i].termination_enabled,
+                           actual.body.test_configuration.can[i].termination_enabled );
+                EXPECT_EQ( expected.body.test_configuration.can[i].capture_limit_bytes,
+                           actual.body.test_configuration.can[i].capture_limit_bytes );
+            }
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_SPI_CHANNEL_COUNT; ++i )
+            {
+                EXPECT_EQ( expected.body.test_configuration.spi[i].enabled,
+                           actual.body.test_configuration.spi[i].enabled );
+                EXPECT_EQ( expected.body.test_configuration.spi[i].bit_rate,
+                           actual.body.test_configuration.spi[i].bit_rate );
+                EXPECT_EQ( expected.body.test_configuration.spi[i].role,
+                           actual.body.test_configuration.spi[i].role );
+                EXPECT_EQ( expected.body.test_configuration.spi[i].data_width,
+                           actual.body.test_configuration.spi[i].data_width );
+                EXPECT_EQ( expected.body.test_configuration.spi[i].bit_order,
+                           actual.body.test_configuration.spi[i].bit_order );
+                EXPECT_EQ( expected.body.test_configuration.spi[i].clock_polarity,
+                           actual.body.test_configuration.spi[i].clock_polarity );
+                EXPECT_EQ( expected.body.test_configuration.spi[i].clock_phase,
+                           actual.body.test_configuration.spi[i].clock_phase );
+                EXPECT_EQ( expected.body.test_configuration.spi[i].capture_limit_bytes,
+                           actual.body.test_configuration.spi[i].capture_limit_bytes );
+            }
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_UART_CHANNEL_COUNT; ++i )
+            {
+                EXPECT_EQ( expected.body.test_configuration.uart[i].enabled,
+                           actual.body.test_configuration.uart[i].enabled );
+                EXPECT_EQ( expected.body.test_configuration.uart[i].baud_rate,
+                           actual.body.test_configuration.uart[i].baud_rate );
+                EXPECT_EQ( expected.body.test_configuration.uart[i].electrical_mode,
+                           actual.body.test_configuration.uart[i].electrical_mode );
+                EXPECT_EQ( expected.body.test_configuration.uart[i].word_length,
+                           actual.body.test_configuration.uart[i].word_length );
+                EXPECT_EQ( expected.body.test_configuration.uart[i].parity,
+                           actual.body.test_configuration.uart[i].parity );
+                EXPECT_EQ( expected.body.test_configuration.uart[i].stop_bits,
+                           actual.body.test_configuration.uart[i].stop_bits );
+                EXPECT_EQ( expected.body.test_configuration.uart[i].rx_enabled,
+                           actual.body.test_configuration.uart[i].rx_enabled );
+                EXPECT_EQ( expected.body.test_configuration.uart[i].tx_enabled,
+                           actual.body.test_configuration.uart[i].tx_enabled );
+                EXPECT_EQ( expected.body.test_configuration.uart[i].capture_limit_bytes,
+                           actual.body.test_configuration.uart[i].capture_limit_bytes );
+            }
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_I2C_CHANNEL_COUNT; ++i )
+            {
+                EXPECT_EQ( expected.body.test_configuration.i2c[i].enabled,
+                           actual.body.test_configuration.i2c[i].enabled );
+                EXPECT_EQ( expected.body.test_configuration.i2c[i].bit_rate,
+                           actual.body.test_configuration.i2c[i].bit_rate );
+                EXPECT_EQ( expected.body.test_configuration.i2c[i].role,
+                           actual.body.test_configuration.i2c[i].role );
+                EXPECT_EQ( expected.body.test_configuration.i2c[i].own_address_7bit,
+                           actual.body.test_configuration.i2c[i].own_address_7bit );
+                EXPECT_EQ( expected.body.test_configuration.i2c[i].voltage_level,
+                           actual.body.test_configuration.i2c[i].voltage_level );
+                EXPECT_EQ( expected.body.test_configuration.i2c[i].pull_up,
+                           actual.body.test_configuration.i2c[i].pull_up );
+                EXPECT_EQ( expected.body.test_configuration.i2c[i].capture_limit_bytes,
+                           actual.body.test_configuration.i2c[i].capture_limit_bytes );
+            }
             ExpectByteSpanEqual( expected.body.test_configuration.extension_data,
                                  actual.body.test_configuration.extension_data );
             break;
@@ -611,20 +576,23 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             EXPECT_EQ( expected.body.test_instruction.tick_number,
                        actual.body.test_instruction.tick_number );
 
-            EXPECT_EQ( std::memcmp( expected.body.test_instruction.digital_outputs,
-                                    actual.body.test_instruction.digital_outputs,
-                                    sizeof( expected.body.test_instruction.digital_outputs ) ),
-                       0 );
-
-            EXPECT_EQ( std::memcmp( expected.body.test_instruction.analog_outputs,
-                                    actual.body.test_instruction.analog_outputs,
-                                    sizeof( expected.body.test_instruction.analog_outputs ) ),
-                       0 );
-
-            EXPECT_EQ( std::memcmp( expected.body.test_instruction.pwm_outputs,
-                                    actual.body.test_instruction.pwm_outputs,
-                                    sizeof( expected.body.test_instruction.pwm_outputs ) ),
-                       0 );
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; ++i )
+            {
+                EXPECT_EQ( expected.body.test_instruction.digital_outputs[i].high,
+                           actual.body.test_instruction.digital_outputs[i].high );
+            }
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; ++i )
+            {
+                EXPECT_EQ( expected.body.test_instruction.analog_outputs[i].microvolts,
+                           actual.body.test_instruction.analog_outputs[i].microvolts );
+            }
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; ++i )
+            {
+                EXPECT_EQ( expected.body.test_instruction.pwm_outputs[i].period_nanoseconds,
+                           actual.body.test_instruction.pwm_outputs[i].period_nanoseconds );
+                EXPECT_EQ( expected.body.test_instruction.pwm_outputs[i].duty_cycle_permyriad,
+                           actual.body.test_instruction.pwm_outputs[i].duty_cycle_permyriad );
+            }
 
             // ExpectDataDeclarationsEqual( expected.body.test_instruction.variable_data,
             //                              expected.body.test_instruction.variable_data_count,
@@ -661,20 +629,23 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             std::cout << "testing test result..." << "\n";
             EXPECT_EQ( expected.body.test_result.tick_number, actual.body.test_result.tick_number );
 
-            EXPECT_EQ( std::memcmp( expected.body.test_result.digital_inputs,
-                                    actual.body.test_result.digital_inputs,
-                                    sizeof( expected.body.test_result.digital_inputs ) ),
-                       0 );
-
-            EXPECT_EQ( std::memcmp( expected.body.test_result.analog_inputs,
-                                    actual.body.test_result.analog_inputs,
-                                    sizeof( expected.body.test_result.analog_inputs ) ),
-                       0 );
-
-            EXPECT_EQ( std::memcmp( expected.body.test_result.pwm_inputs,
-                                    actual.body.test_result.pwm_inputs,
-                                    sizeof( expected.body.test_result.pwm_inputs ) ),
-                       0 );
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; ++i )
+            {
+                EXPECT_EQ( expected.body.test_result.digital_inputs[i].high,
+                           actual.body.test_result.digital_inputs[i].high );
+            }
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; ++i )
+            {
+                EXPECT_EQ( expected.body.test_result.analog_inputs[i].microvolts,
+                           actual.body.test_result.analog_inputs[i].microvolts );
+            }
+            for ( std::size_t i = 0u; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; ++i )
+            {
+                EXPECT_EQ( expected.body.test_result.pwm_inputs[i].period_nanoseconds,
+                           actual.body.test_result.pwm_inputs[i].period_nanoseconds );
+                EXPECT_EQ( expected.body.test_result.pwm_inputs[i].duty_cycle_permyriad,
+                           actual.body.test_result.pwm_inputs[i].duty_cycle_permyriad );
+            }
 
             EXPECT_EQ( expected.body.test_result.condition, actual.body.test_result.condition );
 
@@ -741,266 +712,6 @@ std::array<HIL_Application_Message_T, 11u> ConstructCodecMessages()
 
     static const std::array<std::uint8_t, 2u> error_bytes{ 0xaau, 0x55u };
 
-    static const std::array<HIL_Application_Digital_Config_T,
-                            HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT>
-        digital_out_config{
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
-                peripheral.channel.channel    = 1u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
-                peripheral.channel.channel    = 2u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
-                peripheral.channel.channel    = 3u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
-                peripheral.channel.channel    = 4u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
-                peripheral.channel.channel    = 5u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_24V;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
-                peripheral.channel.channel    = 6u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
-                peripheral.channel.channel    = 7u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
-                peripheral.channel.channel    = 8u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_12V;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
-                peripheral.channel.channel    = 9u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
-                peripheral.channel.channel    = 10u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-        };
-
-    static const std::array<HIL_Application_Digital_Config_T,
-                            HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT>
-        digital_in_config{
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
-                peripheral.channel.channel    = 1u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
-                peripheral.channel.channel    = 2u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
-                peripheral.channel.channel    = 3u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
-                peripheral.channel.channel    = 4u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
-                peripheral.channel.channel    = 5u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_24V;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
-                peripheral.channel.channel    = 6u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
-                peripheral.channel.channel    = 7u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
-                peripheral.channel.channel    = 8u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_12V;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
-                peripheral.channel.channel    = 9u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Digital_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
-                peripheral.channel.channel    = 10u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-        };
-
-    static const std::array<HIL_Application_Analog_Config_T,
-                            HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT>
-        analog_out_config{
-            [] {
-                HIL_Application_Analog_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT;
-                peripheral.channel.channel    = 1u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_24V;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Analog_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT;
-                peripheral.channel.channel    = 2u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Analog_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT;
-                peripheral.channel.channel    = 3u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_12V;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Analog_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT;
-                peripheral.channel.channel    = 4u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Analog_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT;
-                peripheral.channel.channel    = 5u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Analog_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT;
-                peripheral.channel.channel    = 6u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-        };
-
-    static const std::array<HIL_Application_Analog_Config_T,
-                            HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT>
-        analog_in_config{
-            [] {
-                HIL_Application_Analog_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT;
-                peripheral.channel.channel    = 1u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Analog_Config_T peripheral{};
-                peripheral.channel.peripheral = HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT;
-                peripheral.channel.channel    = 2u;
-                peripheral.voltage_level      = HIL_APPLICATION_PERIPHERAL_CONFIG_3V3;
-                return peripheral;
-            }(),
-        };
-
-    static const std::array<HIL_Application_Pwm_Config_T, HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT>
-        pwm_out_config{
-            [] {
-                HIL_Application_Pwm_Config_T peripheral{};
-                peripheral.channel.peripheral           = HIL_APPLICATION_PERIPHERAL_PWM_OUTPUT;
-                peripheral.channel.channel              = 1u;
-                peripheral.voltage_level                = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
-                peripheral.initial_duty_cycle_permyriad = 60u;
-                peripheral.period_nanoseconds           = 10000u;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Pwm_Config_T peripheral{};
-                peripheral.channel.peripheral           = HIL_APPLICATION_PERIPHERAL_PWM_OUTPUT;
-                peripheral.channel.channel              = 1u;
-                peripheral.voltage_level                = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
-                peripheral.initial_duty_cycle_permyriad = 60u;
-                peripheral.period_nanoseconds           = 10000u;
-                return peripheral;
-            }(),
-        };
-
-    static const std::array<HIL_Application_Pwm_Config_T, HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT>
-        pwm_in_config{
-            [] {
-                HIL_Application_Pwm_Config_T peripheral{};
-                peripheral.channel.peripheral           = HIL_APPLICATION_PERIPHERAL_PWM_INPUT;
-                peripheral.channel.channel              = 1u;
-                peripheral.voltage_level                = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
-                peripheral.initial_duty_cycle_permyriad = 60u;
-                peripheral.period_nanoseconds           = 10000u;
-                return peripheral;
-            }(),
-            [] {
-                HIL_Application_Pwm_Config_T peripheral{};
-                peripheral.channel.peripheral           = HIL_APPLICATION_PERIPHERAL_PWM_INPUT;
-                peripheral.channel.channel              = 1u;
-                peripheral.voltage_level                = HIL_APPLICATION_PERIPHERAL_CONFIG_5V;
-                peripheral.initial_duty_cycle_permyriad = 60u;
-                peripheral.period_nanoseconds           = 10000u;
-                return peripheral;
-            }(),
-        };
-
     // static const std::array<HIL_Application_Data_Declaration_T, 1u> instruction_data{
     //     HIL_Application_Data_Declaration_T{
     //         HIL_Application_Channel_Id_T{ HIL_APPLICATION_PERIPHERAL_UART, 0u },
@@ -1043,30 +754,6 @@ std::array<HIL_Application_Message_T, 11u> ConstructCodecMessages()
     messages[2].body.test_configuration.tick_duration_us.microseconds = 1000u;
     messages[2].body.test_configuration.expected_tick_count           = 100u;
     messages[2].body.test_configuration.flags                         = 0u;
-    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
-    {
-        messages[2].body.test_configuration.digital_in[i] = digital_in_config.data()[i];
-    }
-    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
-    {
-        messages[2].body.test_configuration.digital_out[i] = digital_out_config.data()[i];
-    }
-    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; i++ )
-    {
-        messages[2].body.test_configuration.analog_in[i] = analog_in_config.data()[i];
-    }
-    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; i++ )
-    {
-        messages[2].body.test_configuration.analog_out[i] = analog_out_config.data()[i];
-    }
-    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; i++ )
-    {
-        messages[2].body.test_configuration.pwm_in[i] = pwm_in_config.data()[i];
-    }
-    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; i++ )
-    {
-        messages[2].body.test_configuration.pwm_out[i] = pwm_out_config.data()[i];
-    }
     messages[2].body.test_configuration.extension_data = HIL_Application_Byte_Span_T{ nullptr, 0u };
 
     messages[3].type                              = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
@@ -1147,8 +834,8 @@ std::array<HIL_Application_Message_T, 11u> ConstructCodecMessages()
     messages[10].body.error.recoverable     = 1u;
     messages[10].body.error.has_tick_number = 1u;
     messages[10].body.error.tick_number     = 0u;
-    messages[10].body.error.diagnostic_data =
-        HIL_Application_Byte_Span_T{ error_bytes.data(), error_bytes.size() };
+    messages[10].body.error.diagnostic_data = HIL_Application_Byte_Span_T{
+        error_bytes.data(), static_cast<std::uint8_t>( error_bytes.size() ) };
 
     return messages;
 }
@@ -1190,7 +877,6 @@ void CompileCodecFacadeUsage()
     ( void )HIL_APPLICATION_Default_Config( &config );
     config.max_encoded_message_size        = encoded_message.size();
     config.max_variable_data_size          = 512u;
-    config.max_peripheral_config_count     = 16u;
     config.max_variable_transfers_per_tick = 8u;
     config.max_expected_tick_count         = 1000u;
     ( void )HIL_APPLICATION_Init( &context, &config );
@@ -1704,8 +1390,6 @@ TEST( ApplicationDefaultConfig, ProducesDefaultOperationalConfiguration )
 
     EXPECT_EQ( config.max_variable_data_size, HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE );
 
-    EXPECT_EQ( config.max_peripheral_config_count, HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT );
-
     EXPECT_EQ( config.max_variable_transfers_per_tick,
                HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK );
 
@@ -1742,8 +1426,6 @@ TEST( ApplicationInit, AcceptsDefaultConfiguration )
     EXPECT_EQ( context.config.max_encoded_message_size, config.max_encoded_message_size );
 
     EXPECT_EQ( context.config.max_variable_data_size, config.max_variable_data_size );
-
-    EXPECT_EQ( context.config.max_peripheral_config_count, config.max_peripheral_config_count );
 
     EXPECT_EQ( context.config.max_variable_transfers_per_tick,
                config.max_variable_transfers_per_tick );
@@ -1808,18 +1490,6 @@ TEST( ApplicationInit, RejectsExcessiveVariableDataSize )
     ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
 
     config.max_variable_data_size = HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE + 1u;
-
-    EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_INVALID_COUNT );
-}
-
-TEST( ApplicationInit, RejectsExcessivePeripheralCount )
-{
-    HIL_Application_Config_T  config{};
-    HIL_Application_Context_T context{};
-
-    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
-
-    config.max_peripheral_config_count = HIL_APPLICATION_ABSOLUTE_MAX_PERIPHERAL_COUNT + 1u;
 
     EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_INVALID_COUNT );
 }
@@ -1958,39 +1628,6 @@ TEST( ApplicationEncodeDecode, TestConfigurationRoundTrips )
 
     ExpectMessagesEqual( original, decoded );
 }
-
-// TEST( ApplicationEncodeDecode, VariableInstructionDataRoundTrips )
-// {
-//     const auto  messages = ConstructCodecMessages();
-//     const auto& original = messages[4];
-
-//     HIL_Application_Context_T context = MakeContext();
-
-//     std::array<std::uint8_t, 4096u> encoded{};
-//     std::size_t                     encoded_size = 0u;
-
-//     ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &original, encoded.data(),
-//     encoded.size(),
-//                                                &encoded_size ),
-//                HIL_APPLICATION_STATUS_OK );
-
-//     HIL_Application_Message_T                             decoded{};
-//     std::array<std::uint8_t, 2048u>                       decode_storage{};
-//     std::array<HIL_Application_Peripheral_Config_T, 255u> decoded_peripherals{};
-//     std::size_t                                           used_decoded_size{};
-//     std::array<HIL_Application_Data_Declaration_T, 255u>  decoded_variable{};
-//     std::size_t                                           used_variable_size{};
-
-//     ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded,
-//                                                decode_storage.data(), decode_storage.size(),
-//                                                &used_decoded_size, decoded_peripherals.data(),
-//                                                decoded_peripherals.size(),
-//                                                decoded_variable.data(), decoded_variable.size(),
-//                                                &used_variable_size ),
-//                HIL_APPLICATION_STATUS_OK );
-
-//     ExpectMessagesEqual( original, decoded );
-// }
 
 TEST( ApplicationEncodeDecode, TestInstructionWithFixedAndVariableDataRoundTrips )
 {

@@ -514,6 +514,57 @@ TEST( ApplicationCodecContext, DefaultAndReducedBoundsInitializeAndInvalidBounds
     EXPECT_EQ( context.initialized, 0u );
 }
 
+TEST( ApplicationCodecContext, AliasedDefaultConfigurationInitializesAndPreservesFields )
+{
+    HIL_Application_Context_T context{};
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &context.config ), HIL_APPLICATION_STATUS_OK );
+    const HIL_Application_Config_T expected = context.config;
+
+    ASSERT_EQ( HIL_APPLICATION_Init( &context, &context.config ), HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( context.initialized, 1u );
+    EXPECT_EQ( context.config.max_encoded_message_size, expected.max_encoded_message_size );
+    EXPECT_EQ( context.config.max_variable_data_size, expected.max_variable_data_size );
+    EXPECT_EQ( context.config.max_variable_transfers_per_tick,
+               expected.max_variable_transfers_per_tick );
+    EXPECT_EQ( context.config.max_expected_tick_count, expected.max_expected_tick_count );
+}
+
+TEST( ApplicationCodecContext, InvalidAliasedConfigurationFailsAndClearsContext )
+{
+    HIL_Application_Context_T context{};
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &context.config ), HIL_APPLICATION_STATUS_OK );
+    context.config.max_variable_data_size = HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE + 1u;
+    context.initialized                   = 1u;
+
+    EXPECT_EQ( HIL_APPLICATION_Init( &context, &context.config ),
+               HIL_APPLICATION_STATUS_INVALID_COUNT );
+    EXPECT_EQ( context.initialized, 0u );
+    EXPECT_EQ( context.config.max_encoded_message_size, 0u );
+    EXPECT_EQ( context.config.max_variable_data_size, 0u );
+    EXPECT_EQ( context.config.max_variable_transfers_per_tick, 0u );
+    EXPECT_EQ( context.config.max_expected_tick_count, 0u );
+}
+
+TEST( ApplicationCodecContext, NonAliasedConfigurationIsStillCopiedOnSuccessfulInitialization )
+{
+    HIL_Application_Config_T  config{};
+    HIL_Application_Context_T context{};
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+    config.max_encoded_message_size        = 400u;
+    config.max_variable_data_size          = 32u;
+    config.max_variable_transfers_per_tick = 3u;
+    config.max_expected_tick_count         = 123u;
+
+    ASSERT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_OK );
+    config = HIL_Application_Config_T{};
+
+    EXPECT_EQ( context.initialized, 1u );
+    EXPECT_EQ( context.config.max_encoded_message_size, 400u );
+    EXPECT_EQ( context.config.max_variable_data_size, 32u );
+    EXPECT_EQ( context.config.max_variable_transfers_per_tick, 3u );
+    EXPECT_EQ( context.config.max_expected_tick_count, 123u );
+}
+
 TEST( ApplicationCodecContext,
       NullConfigurationLeavesExistingContextDeterministicallyUninitialized )
 {

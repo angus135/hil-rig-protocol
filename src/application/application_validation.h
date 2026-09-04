@@ -5,8 +5,8 @@
  * @details These helpers validate the currently implemented structural rules for
  * one typed body. Common envelope rules, including type/subtype and Test-ID
  * presence, are handled separately by HIL_APPLICATION_Validate_Common_Message_Fields().
- * Detailed configuration, fixed-I/O, transaction, and hardware semantics remain
- * outside this foundation and must not be inferred from these helpers.
+ * Test Configuration structural rules are implemented here. Stateful transaction,
+ * hardware-capability, and deferred-family semantics remain outside these helpers.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_VALIDATION_INTERNAL_H
 #define HIL_RIG_PROTOCOL_APPLICATION_VALIDATION_INTERNAL_H
@@ -48,10 +48,11 @@ HIL_APPLICATION_System_Info_Response_validate( const HIL_Application_Context_T* 
                                                const HIL_Application_System_Info_Response_T* data );
 
 /**
- * @brief Validate the implemented Test Configuration foundation rules.
- * @details Checks the supported tick duration, configured expected-tick limit,
- * and extension byte-span structure. Detailed fixed-I/O and reserved-field
- * semantics remain deliberately deferred.
+ * @brief Validate Test Configuration structural protocol rules.
+ * @details Checks global fields, the extension span, fixed-array Booleans and
+ * enums, canonical disabled records, PWM constraints, communication rates and
+ * capture limits, UART directions, and I2C role/address combinations. Hardware
+ * capability and workflow state remain integration-owned.
  * @param[in] context Initialized Application context.
  * @param[in] data    Typed Test Configuration body.
  * @return Application status.

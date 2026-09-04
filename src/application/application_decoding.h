@@ -89,9 +89,9 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     size_t max_decoded_data_size, size_t* used_decoded_size );
 
 /**
- * @brief Decode the current fixed Test Configuration payload and extension span.
- * @details Tick duration is decoded directly as little-endian microseconds.
- * Detailed configuration semantics are validated separately and remain partial.
+ * @brief Decode the complete Test Configuration payload and extension span.
+ * @details Decodes all fixed configuration arrays from explicit wire fields.
+ * Structural configuration semantics are validated by the existing façade after decoding.
  * @param[in]  context               Application context.
  * @param[in]  sub_type              Parsed message subtype.
  * @param[in]  test_id               Parsed Test ID value.

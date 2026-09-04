@@ -25,24 +25,15 @@ extern "C"
  * There are no channel IDs, element counts, sparse entries, duplicates, omitted
  * channels, or implicit "retain the previous value" semantics.
  *
- * Every variable_data declaration has a nonzero byte_length and requires one
- * HIL_Application_Variable_Instruction_Data_T message with matching test ID,
- * tick, peripheral, channel, and byte count. Channels with no variable data are
- * omitted, and each (peripheral, channel) pair may appear at most once in the
- * declaration array. Duplicate matching variable messages are invalid. The
- * fixed tick is complete only after all declarations are satisfied and
- * integration accepts responsibility for retaining it. Retention
- * may use NAND, RAM, or an accepted storage-manager queue; it is not required to
- * be a completed NAND write. The codec can validate the fixed values and
- * declaration structure, but only integration with the active Test
- * Configuration can verify tick order and tick_number < expected_tick_count.
- * Under the initial stop-and-wait transaction contract, the fixed message and
- * all of its associated variable messages collectively form the only tick
- * awaiting semantic acceptance. Python must not submit tick T + 1 until it
- * receives Tick T ACCEPTED. Rejection or failure of the fixed tick or any
- * associated variable data invalidates the upload and requires restart from
- * Test Configuration. This ordering is Application integration policy, not
- * codec, Transport, or execution-manager state.
+ * @par Future variable-data declaration design
+ * A future version may add variable_data declarations that associate nonzero
+ * data.size values with variable instruction-data messages for the same test
+ * tick and logical communication channel. Such declarations, their uniqueness
+ * rules, completion semantics, ordering, and integration acceptance policy are
+ * not represented by HIL_Application_Test_Instruction_T and are not encoded or
+ * validated by the current implementation. The commented declaration members
+ * below are retained only as design notes and must not be treated as part of the
+ * current public wire contract.
  */
 typedef struct
 {
@@ -56,21 +47,20 @@ typedef struct
         analog_outputs[HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT];
     /** Complete PWM-output state; element i is PWM_OUTPUT channel i. */
     HIL_Application_Pwm_Output_Value_T pwm_outputs[HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT];
-    // /** Unique, nonzero UART/SPI/I2C/CAN transfers for this tick. */
+    // /** Future design only: variable-data declarations are not currently encoded. */
     // const HIL_Application_Data_Declaration_T* variable_data;
     // /** Number of declarations at variable_data. */
     // uint8_t variable_data_count;
 } HIL_Application_Test_Instruction_T;
 
 /**
- * @brief Variable communication bytes associated with one test tick.
+ * @brief Future variable communication bytes associated with one test tick.
  *
- * @details The enclosing message envelope supplies the test ID. tick_number,
- * channel, and data.size provide Application correlation without a separate
- * sequence number. Encoding borrows data during the call; decoding copies it
- * into caller-provided storage and points data there. data.size must be
- * nonzero because channels without variable data are omitted rather than sent
- * as empty variable-data messages. Its encoded message is carried in one MVP Transport frame.
+ * @details This structure is retained for future variable-message design. The
+ * current Application implementation does not encode or decode variable
+ * instruction-data messages, and Test Instruction bodies do not contain
+ * declarations that reference them. Future correlation is expected to use the
+ * enclosing test ID together with tick_number, channel, and data.size.
  */
 typedef struct
 {
