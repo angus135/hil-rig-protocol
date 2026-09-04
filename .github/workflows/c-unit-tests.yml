@@ -37,7 +37,7 @@ jobs:
 
       - name: Build unit tests
         run: |
-          cmake --build build --target hil_rig_protocol_unit_tests --verbose
+          cmake --build build --target hil_rig_protocol_unit_tests hil_rig_protocol_application_tests --verbose
 
       - name: Run unit tests
         run: |
