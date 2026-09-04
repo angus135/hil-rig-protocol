@@ -37,6 +37,7 @@ HIL_Application_Status_T HIL_APPLICATION_Byte_Span_encode( const HIL_Application
  * @param[in]  data             System information request data.
  * @param[in]  max_payload_size Maximum available payload size in bytes.
  * @param[out] payload          Destination payload buffer.
+ * @param[out] used_size       the number of bytes written to the payload buffer
  *
  * @return Application status.
  */
@@ -54,6 +55,7 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_encode(
  * @param[in]  data             System information response data.
  * @param[in]  max_payload_size Maximum available payload size in bytes.
  * @param[out] payload          Destination payload buffer.
+ * @param[out] used_size       the number of bytes written to the payload buffer
  *
  * @return Application status.
  */
@@ -71,6 +73,7 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
  * @param[in]  data             Test configuration data.
  * @param[in]  max_payload_size Maximum available payload size in bytes.
  * @param[out] payload          Destination payload buffer.
+ * @param[out] used_size       the number of bytes written to the payload buffer
  *
  * @return Application status.
  */
@@ -88,6 +91,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
  * @param[in]  data             Test instruction data.
  * @param[in]  max_payload_size Maximum available payload size in bytes.
  * @param[out] payload          Destination payload buffer.
+ * @param[out] used_size       the number of bytes written to the payload buffer
  *
  * @return Application status.
  */
@@ -105,6 +109,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
  * @param[in]  data             Variable instruction data.
  * @param[in]  max_payload_size Maximum available payload size in bytes.
  * @param[out] payload          Destination payload buffer.
+ * @param[out] used_size       the number of bytes written to the payload buffer
  *
  * @return Application status.
  */
@@ -123,6 +128,7 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_encode(
  * @param[in]  data             Execution control data.
  * @param[in]  max_payload_size Maximum available payload size in bytes.
  * @param[out] payload          Destination payload buffer.
+ * @param[out] used_size       the number of bytes written to the payload buffer
  *
  * @return Application status.
  */
@@ -140,6 +146,7 @@ HIL_Application_Status_T HIL_APPLICATION_Execution_Control_encode(
  * @param[in]  data             Global control data.
  * @param[in]  max_payload_size Maximum available payload size in bytes.
  * @param[out] payload          Destination payload buffer.
+ * @param[out] used_size       the number of bytes written to the payload buffer
  *
  * @return Application status.
  */
@@ -157,6 +164,7 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_encode(
  * @param[in]  data             Test result data.
  * @param[in]  max_payload_size Maximum available payload size in bytes.
  * @param[out] payload          Destination payload buffer.
+ * @param[out] used_size       the number of bytes written to the payload buffer
  *
  * @return Application status.
  */
@@ -174,6 +182,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
  * @param[in]  data             Variable result data.
  * @param[in]  max_payload_size Maximum available payload size in bytes.
  * @param[out] payload           Destination payload buffer.
+ * @param[out] used_size       the number of bytes written to the payload buffer
  *
  * @return Application status.
  */
@@ -191,6 +200,7 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_encode(
  * @param[in]  data             Response data.
  * @param[in]  max_payload_size Maximum available payload size in bytes.
  * @param[out] payload          Destination payload buffer.
+ * @param[out] used_size       the number of bytes written to the payload buffer
  *
  * @return Application status.
  */
@@ -199,6 +209,19 @@ HIL_Application_Status_T HIL_APPLICATION_Response_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Response_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
+    /**
+ * @brief Encode an error.
+ *
+ * @param[in]  context          Application context.
+ * @param[in]  sub_type         Message subtype.
+ * @param[in]  test_id          Test ID.
+ * @param[in]  data             Response data.
+ * @param[in]  max_payload_size Maximum available payload size in bytes.
+ * @param[out] payload          Destination payload buffer.
+  * @param[out] used_size       the number of bytes written to the payload buffe
+ *
+ * @return Application status.
+ */
 HIL_Application_Status_T HIL_APPLICATION_Error_encode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Error_T* data,
