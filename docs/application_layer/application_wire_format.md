@@ -354,16 +354,23 @@ implemented.
 
 ## Test Instruction fixed body
 
-The current fixed body is 50 bytes. Variable instruction declarations/data remain deliberately
-deferred and are not encoded by this fixed body.
+Test Instruction is a fully supported fixed codec family. It requires subtype `NONE` and a Test ID.
+The payload is exactly 50 bytes and the complete message is exactly 73 bytes. Variable instruction
+declarations/data remain deliberately deferred and are not represented or encoded by this fixed body.
 
-```text
-+----------------+----------------------+----------------------+----------------------+
-| tick number    | digital outputs x10  | analogue outputs x6  | PWM outputs x2       |
-| u32 LE         | u8 each              | u32 LE each, uV      | u32LE ns + u16LE duty|
-+----------------+----------------------+----------------------+----------------------+
-      4 B                 10 B                   24 B                   12 B
-```
+| Payload offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 4 | `tick_number`, `uint32_t` little-endian |
+| 4 | 10 | Digital Output channels 0..9, one `uint8_t` each |
+| 14 | 24 | Analogue Output channels 0..5, one `uint32_t` little-endian microvolt value each |
+| 38 | 6 | PWM Output channel 0: `uint32_t` period ns + `uint16_t` duty permyriad, little-endian |
+| 44 | 6 | PWM Output channel 1: same record |
+
+The codec accepts only Digital values 0 and 1. PWM duty is valid from 0 through 10000, and a zero
+period requires zero duty. `tick_number` must be less than `context->config.max_expected_tick_count`.
+Analogue range and hardware-specific PWM feasibility are not validated. The codec retains no active
+Test Configuration, so comparing the tick against that test's actual `expected_tick_count`, enabled
+channels, or ordering is an integration responsibility.
 
 ## Execution Control and Global Control
 
@@ -382,16 +389,26 @@ forbids one.
 
 ## Test Result fixed body
 
-The current fixed result body is 39 bytes. Variable result declarations/data remain deliberately
-deferred and are not encoded by this fixed body.
+Test Result is a fully supported fixed codec family. It requires subtype `NONE` and a Test ID. The
+payload is exactly 39 bytes and the complete message is exactly 62 bytes. Variable result
+declarations/data remain deliberately deferred and are not represented or encoded by this fixed body.
 
-```text
-+-----------+--------------------+--------------------+------------------+-----------+---------------+
-| tick      | digital inputs x10 | analogue inputs x2 | PWM inputs x2    | condition | problem detail|
-| u32 LE    | u8 each            | u32 LE each, uV    | u32LE ns+u16 duty| u8 enum   | u32 LE        |
-+-----------+--------------------+--------------------+------------------+-----------+---------------+
-    4 B              10 B                 8 B                12 B            1 B          4 B
-```
+| Payload offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 4 | `tick_number`, `uint32_t` little-endian |
+| 4 | 10 | Digital Input channels 0..9, one `uint8_t` each |
+| 14 | 8 | Analogue Input channels 0..1, one `uint32_t` little-endian microvolt value each |
+| 22 | 6 | PWM Input channel 0: `uint32_t` period ns + `uint16_t` duty permyriad, little-endian |
+| 28 | 6 | PWM Input channel 1: same record |
+| 34 | 1 | result condition |
+| 35 | 4 | `problem_detail`, `uint32_t` little-endian |
+
+The codec accepts only Digital values 0 and 1. PWM duty is valid from 0 through 10000, and a zero
+period requires zero duty. `tick_number` must be less than `context->config.max_expected_tick_count`.
+The only structurally valid conditions are `OK`, `PARTIAL`, and `EXECUTION_PROBLEM`; unknown and
+reserved values are rejected. `PARTIAL` is representable even though variable result-data support is
+deferred. Analogue values and `problem_detail` have no additional codec range rule. Active-test tick
+comparison, enabled-channel semantics, result ordering, and hardware feasibility are integration-owned.
 
 ## Public API publication rules
 
@@ -412,6 +429,7 @@ The wire contract is paired with deterministic public output rules:
 The presence of a documented identifier or public C structure does not mean all façade operations are
 complete. In particular, variable instruction/result bodies, Response/Error semantics, and
 other unfinished message-specific encoded-size/validation paths remain deliberately deferred. Test
-Configuration, including fixed I/O and communication configuration, is supported. See the support table in
+Configuration plus the fixed Test Instruction and Test Result families are supported. See the support
+table in
 [Application Layer codec and transaction design](application_layer.md#current-message-family-implementation-status)
 before treating a payload family as fully operational.

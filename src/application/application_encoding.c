@@ -500,59 +500,46 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Instruction_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size )
 {
+    size_t running_total = 0u;
     ( void )context;
     ( void )sub_type;
     ( void )test_id;
-    /**
-     * Current fixed Test Instruction payload = tick number {4}, 10 digital
-     * outputs {10}, 6 analogue outputs {24}, and 2 PWM outputs {12}: 50 bytes.
-     * Variable instruction declarations/data remain deliberately deferred and
-     * are not encoded in this fixed body.
-     */
 
-    // variable data count validation
-    // if ( data->variable_data_count > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
-    // {
-    //     return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
-    // }
-
-    // size calculation
-    size_t payload_size =
-        HIL_APPLICATION_WIRE_U32_SIZE
-        + HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT * HIL_APPLICATION_WIRE_U8_SIZE
-        + HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT * HIL_APPLICATION_WIRE_U32_SIZE
-        + HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT
-              * ( HIL_APPLICATION_WIRE_U32_SIZE + HIL_APPLICATION_WIRE_U16_SIZE );
-    /* Variable instruction declaration sizing remains deliberately deferred. */
-    if ( max_payload_size < payload_size )
+    if ( used_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *used_size = 0u;
+    if ( data == NULL || payload == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( max_payload_size < HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
 
-    // Encoding
-    // tick number
-    size_t running_total = 0;
-    HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ), data->tick_number, &running_total );
-    //  digital out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; i++ )
+    HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->tick_number, &running_total );
+    for ( size_t i = 0u; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; ++i )
     {
         payload[running_total++] = data->digital_outputs[i].high;
     }
-    // Analog out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( size_t i = 0u; i < HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT; ++i )
     {
-        HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ),
-                                       data->analog_outputs[i].microvolts, &running_total );
+        HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->analog_outputs[i].microvolts,
+                                       &running_total );
     }
-    // pwm out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; i++ )
+    for ( size_t i = 0u; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; ++i )
     {
-        HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ),
+        HIL_APPLICATION_Encode_U32_Le( &payload[running_total],
                                        data->pwm_outputs[i].period_nanoseconds, &running_total );
-        HIL_APPLICATION_Encode_U16_Le( &( payload[running_total] ),
+        HIL_APPLICATION_Encode_U16_Le( &payload[running_total],
                                        data->pwm_outputs[i].duty_cycle_permyriad, &running_total );
     }
-    /* Variable instruction declaration encoding remains deliberately deferred. */
+    if ( running_total != HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
     *used_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }
@@ -633,61 +620,53 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Result_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size )
 {
+    size_t  running_total  = 0u;
+    uint8_t wire_condition = 0u;
     ( void )context;
     ( void )sub_type;
     ( void )test_id;
-    /**
-     * Current fixed Test Result payload = tick number {4}, 10 digital inputs
-     * {10}, 2 analogue inputs {8}, 2 PWM inputs {12}, condition {1}, and
-     * problem detail {4}: 39 bytes. Variable result declarations/data remain
-     * deliberately deferred and are not encoded in this fixed body.
-     */
-    // size calculation
-    size_t payload_size = HIL_APPLICATION_WIRE_U32_SIZE + HIL_APPLICATION_WIRE_ENUM_SIZE
-                          + HIL_APPLICATION_WIRE_U32_SIZE;
-    payload_size += HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT * HIL_APPLICATION_WIRE_U8_SIZE;
-    payload_size += HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT * HIL_APPLICATION_WIRE_U32_SIZE;
-    payload_size += HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT
-                    * ( HIL_APPLICATION_WIRE_U32_SIZE + HIL_APPLICATION_WIRE_U16_SIZE );
-    /* Variable result declaration sizing remains deliberately deferred. */
-    if ( max_payload_size < payload_size )
+
+    if ( used_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *used_size = 0u;
+    if ( data == NULL || payload == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( max_payload_size < HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-
-    // encoding
-    // tick number
-    size_t running_total = 0;
-    HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ), data->tick_number, &running_total );
-    //  digital out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; i++ )
-    {
-        payload[running_total++] = data->digital_inputs[i].high;
-    }
-    // Analog out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; i++ )
-    {
-        HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ),
-                                       data->analog_inputs[i].microvolts, &running_total );
-    }
-    // pwm out
-    for ( uint8_t i = 0; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; i++ )
-    {
-        HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ),
-                                       data->pwm_inputs[i].period_nanoseconds, &running_total );
-        HIL_APPLICATION_Encode_U16_Le( &( payload[running_total] ),
-                                       data->pwm_inputs[i].duty_cycle_permyriad, &running_total );
-    }
-    /* Variable result declaration encoding remains deliberately deferred. */
-    // Condition and problem
-    uint8_t wire_condition = 0u;
     if ( !HIL_APPLICATION_Enum_To_U8( ( int )data->condition, &wire_condition ) )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
+
+    HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->tick_number, &running_total );
+    for ( size_t i = 0u; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; ++i )
+    {
+        payload[running_total++] = data->digital_inputs[i].high;
+    }
+    for ( size_t i = 0u; i < HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT; ++i )
+    {
+        HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->analog_inputs[i].microvolts,
+                                       &running_total );
+    }
+    for ( size_t i = 0u; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; ++i )
+    {
+        HIL_APPLICATION_Encode_U32_Le( &payload[running_total],
+                                       data->pwm_inputs[i].period_nanoseconds, &running_total );
+        HIL_APPLICATION_Encode_U16_Le( &payload[running_total],
+                                       data->pwm_inputs[i].duty_cycle_permyriad, &running_total );
+    }
     payload[running_total++] = wire_condition;
-    HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ), data->problem_detail,
-                                   &running_total );
+    HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->problem_detail, &running_total );
+    if ( running_total != HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
     *used_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }

@@ -1629,7 +1629,7 @@ TEST( ApplicationEncodeDecode, TestConfigurationRoundTrips )
     ExpectMessagesEqual( original, decoded );
 }
 
-TEST( ApplicationEncodeDecode, TestInstructionWithFixedAndVariableDataRoundTrips )
+TEST( ApplicationEncodeDecode, TestInstructionFixedBodyRoundTrips )
 {
     const auto  messages = ConstructCodecMessages();
     const auto& original = messages[3];
@@ -1655,7 +1655,7 @@ TEST( ApplicationEncodeDecode, TestInstructionWithFixedAndVariableDataRoundTrips
     ExpectMessagesEqual( original, decoded );
 }
 
-TEST( ApplicationEncodeDecode, TestResultWithFixedAndVariableDataRoundTrips )
+TEST( ApplicationEncodeDecode, TestResultFixedBodyRoundTrips )
 {
     const auto  messages = ConstructCodecMessages();
     const auto& original = messages[7];

@@ -95,7 +95,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
     size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
 /**
- * @brief Encode the current 50-byte fixed Test Instruction payload.
+ * @brief Encode the exact 50-byte fixed Test Instruction payload.
  * @details Variable instruction declarations/data remain deliberately deferred.
  * @param[in]  context          Application context.
  * @param[in]  sub_type         Message subtype selected by the public envelope.
@@ -161,7 +161,7 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_encode(
     size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
 /**
- * @brief Encode the current 39-byte fixed Test Result payload.
+ * @brief Encode the exact 39-byte fixed Test Result payload.
  * @details Variable result declarations/data remain deliberately deferred.
  * @param[in]  context          Application context.
  * @param[in]  sub_type         Message subtype selected by the public envelope.

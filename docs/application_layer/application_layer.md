@@ -89,16 +89,16 @@ This foundation deliberately does not complete every message family. The current
 | System Information Request | Encode, decode, validate and encoded-size calculation implemented. |
 | System Information Response | Existing encode/decode body retained; typed validation requires the canonical compiled protocol version and structurally valid byte spans. Message-specific encoded-size and decode-storage sizing remain unfinished. |
 | Test Configuration | Fully supported by the codec: typed validation, body sizing, encode/decode, decode-storage scanning, fixed Digital/Analogue/PWM/CAN/SPI/UART/I2C arrays, and the length-delimited extension are implemented. The extension has a 255-byte wire maximum and is additionally bounded by `context->config.max_variable_data_size`. |
-| Test Instruction | Existing fixed-body encode/decode retained; fixed-value semantics and message-specific encoded-size calculation remain unfinished. |
+| Test Instruction | Fully supported fixed codec family: 50-byte payload / 73-byte complete message, fixed sizing, encode/decode, zero decode storage, Digital/PWM/tick structural validation, and encoded-message validation are implemented. Variable declarations/data remain deferred. |
 | Execution Control | Existing encode/decode/validation retained, including zero reserved flags; message-specific encoded-size calculation remains unfinished. |
 | Global Control | Existing encode/decode/validation retained, including zero reserved flags; message-specific encoded-size calculation remains unfinished. |
-| Test Result | Existing fixed-body encode/decode/validation retained; fixed-value semantics and message-specific encoded-size calculation remain unfinished. |
+| Test Result | Fully supported fixed codec family: 39-byte payload / 62-byte complete message, fixed sizing, encode/decode, zero decode storage, Digital/PWM/tick/condition structural validation, and encoded-message validation are implemented. Variable declarations/data remain deferred. |
 | Variable Instruction Data | Reserved structures and identifiers retained; body/storage workflow remains `NOT_IMPLEMENTED`. |
 | Variable Result Data | Reserved structures and identifiers retained; body/storage workflow remains `NOT_IMPLEMENTED`. |
 | Application Response | Existing structures/body code retained; public validation and message-specific sizing remain `NOT_IMPLEMENTED`. |
 | Application Error | Existing structures/body code retained; public validation/sizing and variable diagnostic-storage sizing remain `NOT_IMPLEMENTED`. |
 
-`HIL_APPLICATION_Encoded_Size` propagates a message-specific `NOT_IMPLEMENTED` result for the unfinished families rather than guessing body sizes. Test Configuration is no longer one of those families. Fixed instruction/result value semantics, analogue conversion, variable-data correlation and endpoint transaction state remain later work.
+`HIL_APPLICATION_Encoded_Size` propagates a message-specific `NOT_IMPLEMENTED` result for unfinished families rather than guessing body sizes. Test Configuration, fixed Test Instruction, and fixed Test Result are supported. Analogue range/hardware feasibility, variable-data correlation, active-Test-Configuration tick comparison, and endpoint transaction state remain later integration or protocol work.
 
 ## Common wire version and envelope
 
@@ -153,7 +153,7 @@ logically read-only with respect to the context.
 - maximum complete encoded Application message size;
 - maximum variable byte-span size;
 - maximum variable-data declarations in one typed tick; and
-- maximum permitted `expected_tick_count` field value.
+- maximum permitted `expected_tick_count` field value and exclusive structural ceiling for fixed instruction/result `tick_number`.
 
 These are local structural limits or reserved local policy bounds.
 `max_encoded_message_size` is an operational bound, not a requirement to
@@ -266,9 +266,9 @@ no Application Response merely because Transport rejected it.
 
 The current foundation checks the common structural boundary: exact repository-wide major/minor version, one-byte message type/subtype representation, Boolean Test-ID presence and its zero-fill rule, configured complete-message bounds, checked header-plus-payload arithmetic, declared payload extent, exact complete-message consumption, and the existing typed validation implemented for each supported fixed family.
 
-Feature-specific semantic validation remains deliberately deferred where the corresponding family is unfinished. Test Configuration is structurally complete in the codec, including Digital/Analogue/PWM and CAN/SPI/UART/I2C records. Fixed instruction/result value rules, variable-data declaration/correlation rules, hardware capability checks, and stateful transaction ordering remain outside this codec.
+Feature-specific semantic validation remains deliberately deferred where the corresponding family is unfinished. Test Configuration is structurally complete in the codec, including Digital/Analogue/PWM and CAN/SPI/UART/I2C records. Fixed Test Instruction and Test Result validation is also implemented: ticks must be below `context->config.max_expected_tick_count`, Digital values are Boolean, PWM duty is `0..10000` with zero duty required for a zero period, and Test Result conditions are limited to `OK`, `PARTIAL`, and `EXECUTION_PROBLEM`. Analogue ranges, hardware capability checks, variable-data declaration/correlation rules, comparison with an active Test Configuration's actual `expected_tick_count`, and stateful transaction ordering remain outside this codec.
 
-Failures are local `HIL_Application_Status_T` values. They are not serialized as Application Responses or Errors. The codec has no active Test Configuration and cannot compare a later Test ID/tick against an active transaction.
+Failures are local `HIL_Application_Status_T` values. They are not serialized as Application Responses or Errors. The codec has no active Test Configuration and cannot compare a later Test ID/tick against an active transaction. Its fixed tick check is only the configured structural ceiling, not the uploaded test's actual tick count.
 
 ### 3. Structurally valid but semantically unacceptable data
 

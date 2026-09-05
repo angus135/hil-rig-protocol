@@ -26,6 +26,35 @@
 #define HIL_APPLICATION_BYTE_SPAN_LENGTH_SIZE 1u
 /** @} */
 
+/** Fixed Test Instruction payload width derived from the published wire fields. */
+#define HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE                                        \
+    ( HIL_APPLICATION_WIRE_U32_SIZE                                                                \
+      + HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT * HIL_APPLICATION_WIRE_U8_SIZE                \
+      + HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT * HIL_APPLICATION_WIRE_U32_SIZE                \
+      + HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT                                                   \
+            * ( HIL_APPLICATION_WIRE_U32_SIZE + HIL_APPLICATION_WIRE_U16_SIZE ) )
+
+/** Fixed Test Result payload width derived from the published wire fields. */
+#define HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE                                             \
+    ( HIL_APPLICATION_WIRE_U32_SIZE                                                                \
+      + HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT * HIL_APPLICATION_WIRE_U8_SIZE                 \
+      + HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT * HIL_APPLICATION_WIRE_U32_SIZE                 \
+      + HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT                                                    \
+            * ( HIL_APPLICATION_WIRE_U32_SIZE + HIL_APPLICATION_WIRE_U16_SIZE )                    \
+      + HIL_APPLICATION_WIRE_ENUM_SIZE + HIL_APPLICATION_WIRE_U32_SIZE )
+
+#if defined( __cplusplus )
+static_assert( HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE == 50u,
+               "Test Instruction fixed payload wire width changed" );
+static_assert( HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE == 39u,
+               "Test Result fixed payload wire width changed" );
+#else
+_Static_assert( HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE == 50u,
+                "Test Instruction fixed payload wire width changed" );
+_Static_assert( HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE == 39u,
+                "Test Result fixed payload wire width changed" );
+#endif
+
 /**
  * @brief Lightweight result of bounded common-envelope parsing.
  *

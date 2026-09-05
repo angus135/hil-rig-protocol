@@ -339,6 +339,25 @@ exactly one tick and contain only:
 - all 6 analogue output values in channel-index order; and
 - both PWM output settings in channel-index order.
 
+The fixed payload is exactly 50 bytes, so the complete encoded message is
+73 bytes including the 23-byte common envelope:
+
+| Payload offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 4 | `tick_number`, little-endian `uint32_t` |
+| 4 | 10 | 10 Digital Output bytes, channel indexes 0 through 9 |
+| 14 | 24 | 6 Analogue Output values, each little-endian `uint32_t` microvolts |
+| 38 | 12 | 2 PWM Output records, each little-endian `uint32_t` period nanoseconds followed by little-endian `uint16_t` duty permyriad |
+
+The codec requires `tick_number < context->config.max_expected_tick_count`,
+each Digital Output value to be `0` or `1`, each PWM duty to be at most
+`10000`, and a zero PWM period to have zero duty. The tick limit is only a
+stateless structural ceiling. Integration remains responsible for comparing a
+tick with the active Test Configuration's actual `expected_tick_count` and for
+enforcing tick ordering. The codec does not impose an Analogue Output range or
+hardware-specific PWM feasibility limits, and it does not validate values
+against enabled or disabled Test Configuration channels.
+
 Variable-data declarations are a **future design**, not part of the current C
 structure or fixed Test Instruction wire body. The declaration representation,
 including how a declared byte length will be represented, has not been approved
@@ -465,6 +484,28 @@ The current `HIL_Application_Test_Result_T` and fixed wire body contain:
 - result `condition`: `OK`, `PARTIAL`, or `EXECUTION_PROBLEM`; and
 - integration-defined `problem_detail`.
 
+The fixed payload is exactly 39 bytes, so the complete encoded message is
+62 bytes including the 23-byte common envelope:
+
+| Payload offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 4 | `tick_number`, little-endian `uint32_t` |
+| 4 | 10 | 10 Digital Input bytes, channel indexes 0 through 9 |
+| 14 | 8 | 2 Analogue Input values, each little-endian `uint32_t` microvolts |
+| 22 | 12 | 2 PWM Input records, each little-endian `uint32_t` period nanoseconds followed by little-endian `uint16_t` duty permyriad |
+| 34 | 1 | result `condition` |
+| 35 | 4 | `problem_detail`, little-endian `uint32_t` |
+
+The codec requires `tick_number < context->config.max_expected_tick_count`,
+each Digital Input value to be `0` or `1`, each PWM duty to be at most `10000`,
+and a zero PWM period to have zero duty. Only `OK`, `PARTIAL`, and
+`EXECUTION_PROBLEM` are valid result conditions; unknown and reserved values
+are rejected. `problem_detail` and Analogue Input values are structurally
+unconstrained. The codec does not validate fixed values against enabled or
+disabled Test Configuration channels, and integration remains responsible for
+the active configuration's actual tick range, tick ordering, and hardware
+feasibility.
+
 Variable-result declarations are a **future design** and are not members of the
 current Test Result structure or fixed wire body. Their representation and
 correlation with Variable Result Data messages remain deliberately deferred.
@@ -474,7 +515,10 @@ fixed-result condition records that tick's result quality. An Error may be sent
 when a problem is detected, but it never replaces or reorders the complete fixed
 result set.
 
-The MVP conditions have exact meanings:
+The MVP conditions have exact endpoint meanings. All three values are
+structurally representable by the fixed codec. `PARTIAL` remains valid even
+though the variable-result declarations and Variable Result Data required for
+its normal fixed-plus-variable use are still future work:
 
 - `OK`: every configured fixed capture represented by the result is valid;
   every variable declaration identifies valid variable data that follows.
@@ -634,13 +678,19 @@ checks:
 - the existing validation implemented for supported fixed message families.
 
 The following feature-specific rules remain later work and must not be inferred
-from this codec: analogue unit conversion, fixed Test Instruction or Test Result
-value validation, variable-data declarations/correlation, Response and Error
-semantic combinations, hardware-capability validation, and workflow state. Test
-Configuration structural validation, including communication configuration and
-reserved-zero test-wide flags, is implemented. Families whose
-required validation is unfinished return `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED`
-rather than accepting guessed semantics.
+from this codec: analogue range/unit conversion beyond the defined microvolt
+wire representation, hardware-specific PWM feasibility, variable-data
+declarations/correlation, Response and Error semantic combinations, comparison
+with an active Test Configuration's actual `expected_tick_count`, and workflow
+state. Test Configuration structural validation, including communication
+configuration and reserved-zero test-wide flags, is implemented. Fixed Test
+Instruction and Test Result structural value validation is also implemented:
+ticks use the configured structural ceiling, Digital values are Boolean, PWM
+duty is `0..10000` with zero duty required for a zero period, and Test Result
+conditions are limited to `OK`, `PARTIAL`, and `EXECUTION_PROBLEM`. Families
+whose required validation is unfinished return
+`HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` rather than accepting guessed
+semantics.
 
 Firmware/Python integration separately owns active-Test-ID checks, tick range
 and stop-and-wait order, cross-message declaration matching/completeness,

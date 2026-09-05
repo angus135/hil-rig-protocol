@@ -1,6 +1,6 @@
 /**
  * @file application_instruction.h
- * @brief Python-to-firmware fixed and variable instruction bodies.
+ * @brief Python-to-firmware fixed Test Instruction and future variable-data types.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_INSTRUCTION_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_INSTRUCTION_H
@@ -25,6 +25,22 @@ extern "C"
  * There are no channel IDs, element counts, sparse entries, duplicates, omitted
  * channels, or implicit "retain the previous value" semantics.
  *
+ * @par Fixed wire layout
+ * The fixed payload is exactly 50 bytes: tick_number at offset 0 as uint32_t
+ * little-endian, 10 Digital Output bytes at offset 4, 6 Analogue Output
+ * uint32_t microvolt values at offset 14, then 2 PWM Output records at offset
+ * 38. Each PWM record is a uint32_t little-endian nanosecond period followed by
+ * a uint16_t little-endian permyriad duty cycle. With the 23-byte common
+ * envelope, the complete message is 73 bytes.
+ *
+ * Structural validation requires tick_number to be less than the initialized
+ * context's max_expected_tick_count, every Digital Output value to be 0 or 1,
+ * PWM duty to be at most 10000, and PWM duty to be zero when period is zero.
+ * The codec imposes no Analogue Output range or hardware-specific PWM limits.
+ * Comparing tick_number with an active Test Configuration's actual
+ * expected_tick_count, tick ordering, enabled-channel policy, and hardware
+ * feasibility are integration responsibilities.
+ *
  * @par Future variable-data declaration design
  * A future version may add variable_data declarations that associate nonzero
  * data.size values with variable instruction-data messages for the same test
@@ -37,7 +53,7 @@ extern "C"
  */
 typedef struct
 {
-    /** Zero-based tick identity; integration requires 0 <= value < configured N. */
+    /** Zero-based tick identity; codec requires value < context max_expected_tick_count. */
     uint32_t tick_number;
     /** Complete digital-output state; element i is DIGITAL_OUTPUT channel i. */
     HIL_Application_Digital_Output_Value_T
