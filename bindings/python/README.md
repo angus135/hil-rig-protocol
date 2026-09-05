@@ -1,4 +1,4 @@
-# Python Transport binding support
+# Python native binding support
 
 This directory contains binding-private support for the HIL-RIG Python package. It is not part of the installed firmware-facing C API and does not add a second Transport implementation or protocol abstraction.
 
@@ -10,20 +10,49 @@ All stateful adapter functions perform only the opaque-handle null check before 
 
 ## CFFI boundary
 
-`cdef.py` is the deliberately small declaration surface for the out-of-line CFFI API-mode module. It contains only public Transport value types and the adapter API. The generated C source includes `hil_rig_protocol_ffi.h`, allowing the C compiler to verify enum values, structure layout, field types, and function signatures against the real headers.
+`cdef.py` is the deliberately small declaration surface for the out-of-line CFFI API-mode module. It contains public Transport value types, the Transport ownership adapter API, and the public Application types and functions. The generated C source includes `hil_rig_protocol_ffi.h`, allowing the C compiler to verify enum values, structure layout, field types, and function signatures against the real headers.
 
-`build_ffi.py` only emits generated C source. CMake compiles and links that source into `hil_rig_protocol._native` together with the PR 1 adapter and the existing static C core. Generated C is written into the CMake build tree and must not be committed.
+`build_ffi.py` only emits generated C source. CMake compiles and links that source into `hil_rig_protocol._native` together with the Transport adapter and the existing static C core. Generated C is written into the CMake build tree and must not be committed.
 
 The installed Python package has two private binding details:
 
-- `hil_rig_protocol._native`: compiled CFFI extension containing the adapter and C Transport core.
+- `hil_rig_protocol._native`: compiled CFFI extension containing the adapter and shared C Transport/Application core.
 - `hil_rig_protocol._binding`: the only handwritten package module that imports `_native`; later Python modules should depend on this internal access point instead of importing `_native` directly.
 
-Neither module is a supported public Transport API. Public Python code should import the supported value and lifetime layer from `hil_rig_protocol`; `_native` and `_binding` remain private implementation details. Future Application declarations should extend this same `_native` module so the C core is not compiled into a second Python extension.
+Neither module is a supported public Transport API. Public Python code should import the supported value and lifetime layer from `hil_rig_protocol`; `_native` and `_binding` remain private implementation details. Transport and Application share this one `_native` module and one linked protocol core.
+
+## Private Application foundation
+
+Application calls the eight public `HIL_APPLICATION_*` codec functions directly.
+Its lightweight public context needs no dynamic workspace or ownership adapter.
+CFFI verifies value layouts against the C compiler; context and outer message
+layouts are partial. CFFI 1.17 cannot nest partial value structs in the public
+unnamed body union, so those records declare complete fields and checked array
+extents without explicit padding. All encoding, decoding and validation remain
+in C.
+
+This surface is private native infrastructure for Test Configuration and fixed
+Digital, Analogue and PWM Test Instruction/Result messages. Public Python codec
+objects and integration with the Transport wrapper are deferred to the next PR.
+The public package exports are unchanged.
+
+Decoded spans borrow caller-owned decode storage and must not outlive it. Query
+`HIL_APPLICATION_Decode_Storage_Size`, use NULL for zero bytes, otherwise allocate
+enough `max_align_t` elements and cast the allocation to `uint8_t *`. Pass the
+exact requested byte capacity, retaining the allocation owner while accessing
+spans. The native tests verify its alignment against
+`HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT`, including on Windows/MSVC.
+MSVC's C headers omit `max_align_t`, although the public Application alignment
+macro names it. The shared private header supplies an MSVC-C-only `long double`
+typedef for this allocation owner (8-byte alignment, matching MSVC's C++
+`max_align_t` and the existing Transport fallback). This isolates the public
+macro's C portability limitation without changing the core headers or codec.
+Encoding borrows source spans only during the call; decoded spans never borrow
+wire input.
 
 ## Public Transport facade
 
-The package exposes the public Transport enums, immutable configuration/result value types, Transport exceptions, and the complete caller-driven `Transport` facade. The Python layer forwards the existing C Transport contract; it does not add protocol scheduling, external I/O, retries, output caching, or Application decoding. Application bindings remain separate later work.
+The package exposes the public Transport enums, immutable configuration/result value types, Transport exceptions, and the complete caller-driven `Transport` facade. The Python layer forwards the existing C Transport contract; it does not add protocol scheduling, external I/O, retries, output caching, or Application decoding. Public Application objects and Transport integration are deferred to the next PR.
 
 `TransportConfig.session_seed` is role-aware at construction time. A HOST with `session_seed=None` receives a cryptographically secure seed in the inclusive range `1..UINT64_MAX-1`; explicit valid HOST seeds are preserved for deterministic tests. A RIG resolves `None` to zero, accepts explicit zero, and rejects every nonzero seed. The resolved immutable configuration is available through `transport.config`.
 
