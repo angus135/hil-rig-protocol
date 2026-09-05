@@ -37,7 +37,8 @@ extern "C"
  *
  * @details This structural check is shared by Decode_Storage_Size() and the
  * fixed body decoders so malformed undersized or oversized payloads cannot be
- * classified differently by the two public decode paths.
+ * classified differently by the two public decode paths. Test Instruction and
+ * Test Result widths come from the shared private 50-byte and 39-byte constants.
  *
  * @param[in] type         Parsed Application message type.
  * @param[in] payload_size Declared payload extent in bytes.
@@ -111,9 +112,10 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
     size_t max_decoded_data_size, size_t* used_decoded_size );
 
 /**
- * @brief Decode the current 50-byte fixed Test Instruction payload.
- * @details Variable instruction declarations/data are deliberately not part of
- * this fixed decoder yet.
+ * @brief Decode the exact 50-byte fixed Test Instruction payload.
+ * @details The exact width is checked before any field is read and payload_size
+ * is published only after all 50 bytes have been consumed. Variable instruction
+ * declarations/data remain deliberately outside this fixed decoder.
  * @param[in]  context          Application context.
  * @param[in]  sub_type         Parsed message subtype.
  * @param[in]  test_id          Parsed Test ID value.
@@ -190,9 +192,10 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_decode(
     size_t max_decoded_data_size, size_t* used_decoded_size );
 
 /**
- * @brief Decode the current 39-byte fixed Test Result payload.
- * @details Variable result declarations/data are deliberately not part of this
- * fixed decoder yet.
+ * @brief Decode the exact 39-byte fixed Test Result payload.
+ * @details The exact width is checked before any field is read and payload_size
+ * is published only after all 39 bytes have been consumed. Variable result
+ * declarations/data remain deliberately outside this fixed decoder.
  * @param[in]  context          Application context.
  * @param[in]  sub_type         Parsed message subtype.
  * @param[in]  test_id          Parsed Test ID value.

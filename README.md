@@ -61,11 +61,13 @@ Comprehensive public two-endpoint C and Python integration suites cover normal,
 backpressure, reliability, corruption, reset, recovery, and ownership behavior.
 
 The Application layer now has a fixed 23-byte architecture-independent common
-envelope, bounded encode/decode paths, structural validation, and working fixed
-body codecs for the currently supported families. Deliberately deferred sizing,
-variable-data, Response/Error, communication-configuration, and detailed fixed-I/O
-semantics continue to return `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` where
-appropriate. The MVP Transport wire path is implemented: versioned little-endian
+envelope, bounded encode/decode paths, structural validation, and complete fixed
+codec support for Test Configuration, Test Instruction, and Test Result. Fixed
+Instruction/Result payloads are 50/39 bytes respectively, with Boolean Digital,
+PWM, configured tick-ceiling, and result-condition validation. Variable-data
+families and Response/Error work remain deliberately `NOT_IMPLEMENTED`; analogue
+hardware ranges and stateful test workflow remain integration responsibilities.
+The MVP Transport wire path is implemented: versioned little-endian
 frames use CRC-32/ISO-HDLC for accidental-corruption detection,
 standard COBS encoding, and a trailing `0x00` stream delimiter. Workspace
 sizing, initialization, and the bounded stream parser are also implemented.

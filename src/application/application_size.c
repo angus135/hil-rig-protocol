@@ -83,8 +83,12 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_size(
     ( void )sub_type;
     ( void )test_id;
     ( void )data;
-    ( void )encoded_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    if ( encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *encoded_size = HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE;
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_size(
@@ -136,8 +140,12 @@ HIL_APPLICATION_Test_Result_size( const HIL_Application_Context_T*         conte
     ( void )sub_type;
     ( void )test_id;
     ( void )data;
-    ( void )encoded_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    if ( encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *encoded_size = HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE;
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_size(

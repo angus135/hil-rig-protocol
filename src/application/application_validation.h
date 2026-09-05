@@ -62,7 +62,9 @@ HIL_APPLICATION_Test_Configuration_validate( const HIL_Application_Context_T*   
                                              const HIL_Application_Test_Configuration_T* data );
 
 /**
- * @brief Validate the currently implemented fixed Test Instruction rules.
+ * @brief Validate fixed Test Instruction structural value rules.
+ * @details Enforces the configured tick ceiling, Boolean Digital Outputs, and
+ * PWM duty/zero-period rules without active-Test-Configuration or hardware state.
  * @param[in] context Initialized Application context.
  * @param[in] data    Typed fixed instruction body.
  * @return Application status.
@@ -106,7 +108,10 @@ HIL_APPLICATION_Global_Control_validate( const HIL_Application_Context_T*       
                                          const HIL_Application_Global_Control_T* data );
 
 /**
- * @brief Validate the currently implemented fixed Test Result rules.
+ * @brief Validate fixed Test Result structural value rules.
+ * @details Enforces the configured tick ceiling, Boolean Digital Inputs, PWM
+ * duty/zero-period rules, and the three defined result conditions. Analogue
+ * values and problem_detail are intentionally not range-limited here.
  * @param[in] context Initialized Application context.
  * @param[in] data    Typed fixed result body.
  * @return Application status.

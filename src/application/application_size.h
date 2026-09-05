@@ -82,7 +82,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_size(
     size_t* encoded_size );
 
 /**
- * @brief Determine the encoded size of test instructions.
+ * @brief Publish the fixed 50-byte Test Instruction payload size.
  *
  * @param[in]  context       Application context.
  * @param[in]  sub_type      Message subtype.
@@ -146,7 +146,7 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_size(
     size_t* encoded_size );
 
 /**
- * @brief Determine the encoded size of a test result.
+ * @brief Publish the fixed 39-byte Test Result payload size.
  *
  * @param[in]  context       Application context.
  * @param[in]  sub_type      Message subtype.

@@ -2,6 +2,7 @@ add_executable(hil_rig_protocol_application_tests
     test_application_api.cpp
     test_application_workflow.cpp
     test_application_codec.cpp
+    test_application_fixed_io.cpp
     test_application_test_configuration.cpp
 )
 
