@@ -100,6 +100,30 @@ This foundation deliberately does not complete every message family. The current
 
 `HIL_APPLICATION_Encoded_Size` propagates a message-specific `NOT_IMPLEMENTED` result for unfinished families rather than guessing body sizes. Test Configuration, fixed Test Instruction, and fixed Test Result are supported. Analogue range/hardware feasibility, variable-data correlation, active-Test-Configuration tick comparison, and endpoint transaction state remain later integration or protocol work.
 
+## Public C Application-to-Transport integration coverage
+
+The public C integration suite now carries the currently supported fixed
+Application subset through the existing Transport pair harness. Complete Test
+Configuration messages are 220 through 475 bytes for extension lengths 0 through
+255, fixed Test Instructions are 73 bytes, and fixed Test Results are 62 bytes.
+The default maximum complete Application message and default Transport maximum
+Application-message payload are both 512 bytes.
+
+The integration tests include only public Application and Transport headers and
+exercise exact opaque-byte preservation, the 475-byte capacity boundary,
+byte-stream chunking, reliable retry, Transport-valid malformed/invalid
+Application input, and Transport corruption before Application exposure. The
+Application codec remains stateless and direction-neutral. Any configuration,
+tick, complete-test, or execution-completed checkpoint in an ordered scenario is
+test-owned orchestration only, not an encoded Application Response or retained
+codec state. A Transport `DELIVERY_CONFIRMED` event confirms Transport delivery
+only and is not Application semantic acceptance.
+
+The ordered scenario is therefore a fixed-subset message-path test, not a
+complete response-gated Application transaction. Full response-gated transaction
+coverage remains incomplete until Application Responses and the remaining
+control-family sizing are implemented.
+
 ## Common wire version and envelope
 
 The codec uses the repository-wide `HIL_RIG_PROTOCOL_VERSION_MAJOR` and `HIL_RIG_PROTOCOL_VERSION_MINOR` values from `hil_rig_protocol/version.h`. There is no independent Application version constant. The common envelope is summarized below; the normative byte diagrams and payload layouts are in the
@@ -574,21 +598,23 @@ in this PR.
 
 ## Remaining conformance work
 
-Compile-level API-design tests in this PR construct messages for the documented
-success, rejection, control, reset, result, and session-loss scenarios. They do
-do not execute endpoint transactions because the codec is intentionally stateless and several feature-specific families remain unfinished.
+Public C integration now executes the supported fixed Configuration,
+Instruction, Result, and existing Execution Control START paths through
+Transport. The ordered fixed-subset scenario uses test-owned semantic checkpoints
+rather than Responses and does not represent a complete production transaction.
 
-Before the protocol is considered implemented, future work must add:
+Future conformance work still includes:
 
-- an approved binary envelope/body layout, fixed widths, and byte order;
-- codec implementation and structural-validation unit tests;
-- golden wire vectors shared by C and Python;
-- executable firmware/Python conformance tests for every transaction scenario;
-- malformed-message and boundary testing;
-- detailed diagnostic/error schemas and capability discovery;
-- production codec bounds; and
-- integration implementations for firmware handling, retention, execution,
-  Python workflow, and recovery.
+- Variable Instruction Data and Variable Result Data, including their deferred
+  declarations and storage workflows;
+- Application Response and Application Error, plus completion of System
+  Information Response support;
+- typed sizing for Execution Control and Global Control;
+- golden wire vectors shared with future language bindings;
+- production firmware and Python endpoint integration for Test-ID correlation,
+  tick ordering, semantic acceptance, retention, execution, and recovery; and
+- expanded executable conformance coverage as deferred message families become
+  implemented.
 
 Advanced upload/result resumption, range requests, and Application-level
 retransmission remain intentionally deferred. Multi-version encoding,

@@ -67,6 +67,14 @@ Instruction/Result payloads are 50/39 bytes respectively, with Boolean Digital,
 PWM, configured tick-ceiling, and result-condition validation. Variable-data
 families and Response/Error work remain deliberately `NOT_IMPLEMENTED`; analogue
 hardware ranges and stateful test workflow remain integration responsibilities.
+
+Public C Application-to-Transport integration now exercises representative and
+maximum Test Configuration messages, fixed Test Instructions and Test Results in
+both directions, exact opaque-byte preservation, capacity boundaries, reliable
+retry, and separation of Transport corruption from Application malformed or
+validation failures. These tests use public APIs only; Transport delivery
+confirmation is not treated as Application semantic acceptance.
+
 The MVP Transport wire path is implemented: versioned little-endian
 frames use CRC-32/ISO-HDLC for accidental-corruption detection,
 standard COBS encoding, and a trailing `0x00` stream delimiter. Workspace
