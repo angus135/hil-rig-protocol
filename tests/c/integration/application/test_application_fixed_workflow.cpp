@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include "support/application_test_codec.hpp"
+#include "support/application_delivery_assertions.hpp"
 #include "support/transport_pair_harness.hpp"
 
 namespace {
@@ -15,6 +16,7 @@ using hil_rig_protocol::test::ApplicationInstructionsEqual;
 using hil_rig_protocol::test::ApplicationResultsEqual;
 using hil_rig_protocol::test::ApplicationTestCodec;
 using hil_rig_protocol::test::ApplicationTestIdsEqual;
+using hil_rig_protocol::test::DeliverApplicationAndConfirm;
 using hil_rig_protocol::test::kApplicationExecutionControlCompleteSize;
 using hil_rig_protocol::test::kApplicationInstructionCompleteSize;
 using hil_rig_protocol::test::kApplicationResultCompleteSize;
@@ -24,7 +26,6 @@ using hil_rig_protocol::test::MakeApplicationResultMessage;
 using hil_rig_protocol::test::MakeApplicationStartMessage;
 using hil_rig_protocol::test::TransportPairHarness;
 using hil_rig_protocol::test::TransportTestDirection;
-using hil_rig_protocol::test::TransportTestEndpoint;
 using hil_rig_protocol::test::TransportTestEndpointConfig;
 using hil_rig_protocol::test::TransportTestHarnessStatus;
 
@@ -63,58 +64,14 @@ void InitializeAndEstablish( TransportPairHarness& pair )
     ASSERT_EQ( pair.Rig().DrainEvents().terminal_status, HIL_TRANSPORT_STATUS_NOT_READY );
 }
 
-void TransferOutputExpectOk( TransportPairHarness& pair, const TransportTestDirection direction )
-{
-    const auto transfer = pair.TransferOneOutput( direction );
-    ASSERT_EQ( transfer.harness_status, TransportTestHarnessStatus::Ok );
-    ASSERT_TRUE( transfer.accept.transport_status.has_value() );
-    ASSERT_TRUE( transfer.delivery.transport_status.has_value() );
-    ASSERT_EQ( *transfer.accept.transport_status, HIL_TRANSPORT_STATUS_OK );
-    ASSERT_EQ( *transfer.delivery.transport_status, HIL_TRANSPORT_STATUS_OK );
-}
-
-void ExpectDeliveryConfirmed( TransportTestEndpoint& sender )
-{
-    const auto confirmed = sender.ReadEvent();
-    ASSERT_EQ( confirmed.status, HIL_TRANSPORT_STATUS_OK );
-    EXPECT_EQ( confirmed.event.type, HIL_TRANSPORT_EVENT_DELIVERY_CONFIRMED );
-    EXPECT_EQ( confirmed.event.status, HIL_TRANSPORT_STATUS_OK );
-    EXPECT_EQ( confirmed.event.failure, HIL_TRANSPORT_FAILURE_NONE );
-    EXPECT_EQ( sender.ReadEvent().status, HIL_TRANSPORT_STATUS_NOT_READY );
-}
-
-std::vector<std::uint8_t>
-DeliverApplicationAndConfirm( TransportPairHarness& pair, const TransportTestDirection direction,
-                              const std::vector<std::uint8_t>& application_bytes )
-{
-    TransportTestEndpoint& sender =
-        direction == TransportTestDirection::HostToRig ? pair.Host() : pair.Rig();
-    TransportTestEndpoint& receiver =
-        direction == TransportTestDirection::HostToRig ? pair.Rig() : pair.Host();
-    const auto ack_direction = direction == TransportTestDirection::HostToRig
-                                   ? TransportTestDirection::RigToHost
-                                   : TransportTestDirection::HostToRig;
-
-    EXPECT_EQ( sender.SubmitApplication( application_bytes ), HIL_TRANSPORT_STATUS_OK );
-    TransferOutputExpectOk( pair, direction );
-
-    const auto received = receiver.ReadApplication();
-    EXPECT_EQ( received.status, HIL_TRANSPORT_STATUS_OK );
-    EXPECT_EQ( received.bytes, application_bytes );
-
-    TransferOutputExpectOk( pair, ack_direction );
-    ExpectDeliveryConfirmed( sender );
-    return received.bytes;
-}
-
 void ExpectSuccessfulFixedDecode( const hil_rig_protocol::test::ApplicationDecodeResult& decode )
 {
-    EXPECT_EQ( decode.storage_status, HIL_APPLICATION_STATUS_OK );
-    EXPECT_EQ( decode.encoded_validation_status, HIL_APPLICATION_STATUS_OK );
-    EXPECT_EQ( decode.decode_status, HIL_APPLICATION_STATUS_OK );
-    EXPECT_EQ( decode.required_storage_size, 0u );
-    EXPECT_EQ( decode.validation_storage_size, 0u );
-    EXPECT_EQ( decode.used_storage_size, 0u );
+    ASSERT_EQ( decode.storage_status, HIL_APPLICATION_STATUS_OK );
+    ASSERT_EQ( decode.encoded_validation_status, HIL_APPLICATION_STATUS_OK );
+    ASSERT_EQ( decode.decode_status, HIL_APPLICATION_STATUS_OK );
+    ASSERT_EQ( decode.required_storage_size, 0u );
+    ASSERT_EQ( decode.validation_storage_size, 0u );
+    ASSERT_EQ( decode.used_storage_size, 0u );
 }
 
 }  // namespace
@@ -124,11 +81,11 @@ TEST( ApplicationFixedSubsetMessagePath,
 {
     ApplicationTestCodec host_codec{};
     ApplicationTestCodec rig_codec{};
-    InitializeApplicationCodec( host_codec );
-    InitializeApplicationCodec( rig_codec );
+    ASSERT_NO_FATAL_FAILURE( InitializeApplicationCodec( host_codec ) );
+    ASSERT_NO_FATAL_FAILURE( InitializeApplicationCodec( rig_codec ) );
 
     TransportPairHarness pair{};
-    InitializeAndEstablish( pair );
+    ASSERT_NO_FATAL_FAILURE( InitializeAndEstablish( pair ) );
 
     TestOwnedSemanticCheckpoints checkpoints{};
 
@@ -139,8 +96,10 @@ TEST( ApplicationFixedSubsetMessagePath,
     ASSERT_EQ( encoded_configuration.validation_status, HIL_APPLICATION_STATUS_OK );
     ASSERT_EQ( encoded_configuration.sizing_status, HIL_APPLICATION_STATUS_OK );
     ASSERT_EQ( encoded_configuration.encoding_status, HIL_APPLICATION_STATUS_OK );
-    const auto delivered_configuration = DeliverApplicationAndConfirm(
-        pair, TransportTestDirection::HostToRig, encoded_configuration.bytes );
+    std::vector<std::uint8_t> delivered_configuration;
+    ASSERT_NO_FATAL_FAILURE( DeliverApplicationAndConfirm( pair, TransportTestDirection::HostToRig,
+                                                           encoded_configuration.bytes,
+                                                           delivered_configuration ) );
     const auto decoded_configuration = rig_codec.DecodeMessage( delivered_configuration );
     ASSERT_EQ( decoded_configuration.storage_status, HIL_APPLICATION_STATUS_OK );
     ASSERT_EQ( decoded_configuration.encoded_validation_status, HIL_APPLICATION_STATUS_OK );
@@ -162,10 +121,12 @@ TEST( ApplicationFixedSubsetMessagePath,
         ASSERT_EQ( encoded_instruction.encoding_status, HIL_APPLICATION_STATUS_OK );
         ASSERT_EQ( encoded_instruction.bytes.size(), kApplicationInstructionCompleteSize );
 
-        const auto delivered_instruction = DeliverApplicationAndConfirm(
-            pair, TransportTestDirection::HostToRig, encoded_instruction.bytes );
+        std::vector<std::uint8_t> delivered_instruction;
+        ASSERT_NO_FATAL_FAILURE(
+            DeliverApplicationAndConfirm( pair, TransportTestDirection::HostToRig,
+                                          encoded_instruction.bytes, delivered_instruction ) );
         const auto decoded_instruction = rig_codec.DecodeMessage( delivered_instruction );
-        ExpectSuccessfulFixedDecode( decoded_instruction );
+        ASSERT_NO_FATAL_FAILURE( ExpectSuccessfulFixedDecode( decoded_instruction ) );
         ASSERT_TRUE( ApplicationInstructionsEqual( instruction, rig_codec.DecodedMessage() ) );
 
         // The endpoint-integration layer will eventually own this decision. The
@@ -189,10 +150,11 @@ TEST( ApplicationFixedSubsetMessagePath,
     ASSERT_EQ( encoded_start.output_size, kApplicationExecutionControlCompleteSize );
     ASSERT_EQ( encoded_start.bytes.size(), kApplicationExecutionControlCompleteSize );
 
-    const auto delivered_start = DeliverApplicationAndConfirm(
-        pair, TransportTestDirection::HostToRig, encoded_start.bytes );
+    std::vector<std::uint8_t> delivered_start;
+    ASSERT_NO_FATAL_FAILURE( DeliverApplicationAndConfirm( pair, TransportTestDirection::HostToRig,
+                                                           encoded_start.bytes, delivered_start ) );
     const auto decoded_start = rig_codec.DecodeMessage( delivered_start );
-    ExpectSuccessfulFixedDecode( decoded_start );
+    ASSERT_NO_FATAL_FAILURE( ExpectSuccessfulFixedDecode( decoded_start ) );
     ASSERT_EQ( rig_codec.DecodedMessage().type, HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL );
     EXPECT_TRUE( ApplicationTestIdsEqual( start.test_id, rig_codec.DecodedMessage().test_id ) );
     EXPECT_EQ( rig_codec.DecodedMessage().body.execution_control.command,
@@ -213,10 +175,11 @@ TEST( ApplicationFixedSubsetMessagePath,
         ASSERT_EQ( encoded_result.encoding_status, HIL_APPLICATION_STATUS_OK );
         ASSERT_EQ( encoded_result.bytes.size(), kApplicationResultCompleteSize );
 
-        const auto delivered_result = DeliverApplicationAndConfirm(
-            pair, TransportTestDirection::RigToHost, encoded_result.bytes );
+        std::vector<std::uint8_t> delivered_result;
+        ASSERT_NO_FATAL_FAILURE( DeliverApplicationAndConfirm(
+            pair, TransportTestDirection::RigToHost, encoded_result.bytes, delivered_result ) );
         const auto decoded_result = host_codec.DecodeMessage( delivered_result );
-        ExpectSuccessfulFixedDecode( decoded_result );
+        ASSERT_NO_FATAL_FAILURE( ExpectSuccessfulFixedDecode( decoded_result ) );
         ASSERT_TRUE( ApplicationResultsEqual( result, host_codec.DecodedMessage() ) );
     }
 

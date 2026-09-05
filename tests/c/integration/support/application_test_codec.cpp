@@ -101,6 +101,12 @@ ApplicationTestCodec::DecodeMessage( const std::vector<std::uint8_t>& encoded_me
             ? *storage_capacity
             : ( result.storage_status == HIL_APPLICATION_STATUS_OK ? result.required_storage_size
                                                                    : 0u );
+    if ( result.supplied_storage_size > decode_storage_.size() )
+    {
+        result.storage_capacity_valid = false;
+        decoded_message_.type         = HIL_APPLICATION_MESSAGE_TYPE_INVALID;
+        return result;
+    }
     std::uint8_t* const storage =
         result.supplied_storage_size == 0u ? nullptr : decode_storage_.data();
     result.decode_status = HIL_APPLICATION_Decode_Message(
