@@ -52,11 +52,12 @@ struct ApplicationDecodeResult
 {
     HIL_Application_Status_T storage_status            = HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     HIL_Application_Status_T encoded_validation_status = HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
-    HIL_Application_Status_T decode_status             = HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
-    std::size_t              required_storage_size     = 0u;
-    std::size_t              validation_storage_size   = 0u;
-    std::size_t              used_storage_size         = 0u;
-    std::size_t              supplied_storage_size     = 0u;
+    std::optional<HIL_Application_Status_T> decode_status{};
+    bool                                    storage_capacity_valid  = true;
+    std::size_t                             required_storage_size   = 0u;
+    std::size_t                             validation_storage_size = 0u;
+    std::size_t                             used_storage_size       = 0u;
+    std::size_t                             supplied_storage_size   = 0u;
 };
 
 /**
@@ -65,11 +66,18 @@ struct ApplicationDecodeResult
  * @details Decode storage is aligned to HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT
  * and has capacity for the absolute 255-byte variable span. The last decoded
  * message and its backing storage remain owned together by this object, keeping
- * decoded Test Configuration extension pointers valid until the next decode.
+ * decoded Test Configuration extension pointers valid until the next decode or initialization of
+ * this object.
  */
 class ApplicationTestCodec
 {
 public:
+    ApplicationTestCodec()                                         = default;
+    ApplicationTestCodec( const ApplicationTestCodec& )            = delete;
+    ApplicationTestCodec& operator=( const ApplicationTestCodec& ) = delete;
+    ApplicationTestCodec( ApplicationTestCodec&& )                 = delete;
+    ApplicationTestCodec& operator=( ApplicationTestCodec&& )      = delete;
+
     /** @brief Initialize from an explicit public Application configuration. */
     HIL_Application_Status_T Initialize( const HIL_Application_Config_T& config );
 
@@ -98,6 +106,10 @@ public:
      * @param encoded_message Complete Application bytes.
      * @param storage_capacity Optional caller-selected decode capacity. When omitted,
      *        exactly the successfully reported required storage size is supplied.
+     * @details Capacity must not exceed the owned decode array (255 bytes).
+     * Oversized capacity is rejected without calling the decoder: storage_capacity_valid
+     * is false and decode_status is absent. Sizing and encoded validation still report
+     * their actual public statuses. The previous decoded message is invalidated.
      */
     ApplicationDecodeResult
     DecodeMessage( const std::vector<std::uint8_t>& encoded_message,

@@ -69,8 +69,8 @@ families and Response/Error work remain deliberately `NOT_IMPLEMENTED`; analogue
 hardware ranges and stateful test workflow remain integration responsibilities.
 
 Public C Application-to-Transport integration now exercises representative and
-maximum Test Configuration messages, fixed Test Instructions and Test Results in
-both directions, exact opaque-byte preservation, capacity boundaries, reliable
+maximum Test Configuration messages, fixed Test Instructions from host to rig and Test Results
+from rig to host, exact opaque-byte preservation, capacity boundaries, reliable
 retry, and separation of Transport corruption from Application malformed or
 validation failures. These tests use public APIs only; Transport delivery
 confirmation is not treated as Application semantic acceptance.
