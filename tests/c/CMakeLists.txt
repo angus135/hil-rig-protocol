@@ -27,6 +27,7 @@ set(HIL_RIG_PROTOCOL_UNIT_TEST_SOURCES
 )
 
 set(HIL_RIG_PROTOCOL_INTEGRATION_SUPPORT_SOURCES
+    integration/support/application_test_codec.cpp
     integration/support/transport_pair_harness.cpp
     integration/support/transport_test_endpoint.cpp
     integration/support/transport_test_link.cpp
@@ -36,6 +37,8 @@ set(HIL_RIG_PROTOCOL_INTEGRATION_SUPPORT_SOURCES
 # implementation separate so future error/capacity suites can reuse the same
 # public-API-only endpoint, byte-link, and deterministic pair harness.
 set(HIL_RIG_PROTOCOL_INTEGRATION_TEST_SOURCES
+    integration/application/test_application_transport.cpp
+    integration/application/test_application_fixed_workflow.cpp
     integration/test_transport_facade.cpp
     integration/pipeline/test_transport_pipeline.cpp
     integration/pipeline/test_transport_session.cpp
