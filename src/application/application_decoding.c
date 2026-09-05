@@ -37,25 +37,14 @@ HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_Application_Message_Type_T type, s
             expected_size = HIL_APPLICATION_SYSTEM_INFO_REQUEST_FIXED_ENCODE_SIZE;
             break;
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
-            expected_size =
-                HIL_APPLICATION_WIRE_U32_SIZE
-                + HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT * HIL_APPLICATION_WIRE_U8_SIZE
-                + HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT * HIL_APPLICATION_WIRE_U32_SIZE
-                + HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT
-                      * ( HIL_APPLICATION_WIRE_U32_SIZE + HIL_APPLICATION_WIRE_U16_SIZE );
+            expected_size = HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE;
             break;
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
             expected_size = HIL_APPLICATION_WIRE_ENUM_SIZE + HIL_APPLICATION_WIRE_U32_SIZE;
             break;
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
-            expected_size =
-                HIL_APPLICATION_WIRE_U32_SIZE
-                + HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT * HIL_APPLICATION_WIRE_U8_SIZE
-                + HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT * HIL_APPLICATION_WIRE_U32_SIZE
-                + HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT
-                      * ( HIL_APPLICATION_WIRE_U32_SIZE + HIL_APPLICATION_WIRE_U16_SIZE )
-                + HIL_APPLICATION_WIRE_ENUM_SIZE + HIL_APPLICATION_WIRE_U32_SIZE;
+            expected_size = HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE;
             break;
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
             expected_size =
@@ -473,12 +462,22 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
     ( void )sub_type;
     ( void )test_id;
 
+    if ( payload_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *payload_size = 0u;
+    if ( data == NULL || payload == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
     status = HIL_APPLICATION_Fixed_Body_Validate_Size(
         HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION, max_payload_size );
     if ( status != HIL_APPLICATION_STATUS_OK )
     {
         return status;
     }
+
     HIL_APPLICATION_Decode_U32_Le( &data->tick_number, &payload[running_total], &running_total );
     for ( size_t i = 0u; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; ++i )
     {
@@ -495,6 +494,10 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
                                        &payload[running_total], &running_total );
         HIL_APPLICATION_Decode_U16_Le( &data->pwm_outputs[i].duty_cycle_permyriad,
                                        &payload[running_total], &running_total );
+    }
+    if ( running_total != HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
     }
     *payload_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
@@ -584,12 +587,22 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     ( void )sub_type;
     ( void )test_id;
 
+    if ( payload_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *payload_size = 0u;
+    if ( data == NULL || payload == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
     status = HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT,
                                                        max_payload_size );
     if ( status != HIL_APPLICATION_STATUS_OK )
     {
         return status;
     }
+
     HIL_APPLICATION_Decode_U32_Le( &data->tick_number, &payload[running_total], &running_total );
     for ( size_t i = 0u; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; ++i )
     {
@@ -609,6 +622,10 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     }
     data->condition = ( HIL_Application_Result_Condition_T )payload[running_total++];
     HIL_APPLICATION_Decode_U32_Le( &data->problem_detail, &payload[running_total], &running_total );
+    if ( running_total != HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
     *payload_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }

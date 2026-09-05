@@ -3,8 +3,8 @@
  * @brief Structural validation for typed Application message bodies.
  *
  * @details This file implements only rules owned by the stateless codec.
- * Stateful transaction ordering, hardware capability checks, and unfinished
- * instruction/result/variable/Response/Error semantics remain deferred.
+ * Stateful transaction ordering, hardware capability checks, variable-data
+ * declaration/correlation rules, and Response/Error semantics remain deferred.
  */
 
 #include "hil_rig_protocol/application/application_message.h"
@@ -44,6 +44,13 @@ HIL_APPLICATION_Byte_Span_validate( const HIL_Application_Byte_Span_T* span,
 static int HIL_APPLICATION_Boolean_Is_Valid( uint8_t value )
 {
     return value <= 1u;
+}
+
+static int HIL_APPLICATION_Pwm_Value_Is_Valid( uint32_t period_nanoseconds,
+                                               uint16_t duty_cycle_permyriad )
+{
+    return duty_cycle_permyriad <= 10000u
+           && ( period_nanoseconds != 0u || duty_cycle_permyriad == 0u );
 }
 
 static int
@@ -447,15 +454,33 @@ HIL_Application_Status_T
 HIL_APPLICATION_Test_Instructions_validate( const HIL_Application_Context_T*          context,
                                             const HIL_Application_Test_Instruction_T* data )
 {
-    if ( context->initialized == 0 )
+    if ( context == NULL || data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( context->initialized == 0u )
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
     }
-    if ( data->tick_number > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT )
+    if ( data->tick_number >= context->config.max_expected_tick_count )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
-    /* Variable declaration count/channel semantics are deliberately deferred. */
+    for ( size_t i = 0u; i < HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT; ++i )
+    {
+        if ( !HIL_APPLICATION_Boolean_Is_Valid( data->digital_outputs[i].high ) )
+        {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+    }
+    for ( size_t i = 0u; i < HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT; ++i )
+    {
+        if ( !HIL_APPLICATION_Pwm_Value_Is_Valid( data->pwm_outputs[i].period_nanoseconds,
+                                                  data->pwm_outputs[i].duty_cycle_permyriad ) )
+        {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+    }
     return HIL_APPLICATION_STATUS_OK;
 }
 
@@ -516,13 +541,32 @@ HIL_Application_Status_T
 HIL_APPLICATION_Test_Result_validate( const HIL_Application_Context_T*     context,
                                       const HIL_Application_Test_Result_T* data )
 {
-    if ( context->initialized == 0 )
+    if ( context == NULL || data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( context->initialized == 0u )
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
     }
-    if ( data->tick_number > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT )
+    if ( data->tick_number >= context->config.max_expected_tick_count )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    for ( size_t i = 0u; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; ++i )
+    {
+        if ( !HIL_APPLICATION_Boolean_Is_Valid( data->digital_inputs[i].high ) )
+        {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+    }
+    for ( size_t i = 0u; i < HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT; ++i )
+    {
+        if ( !HIL_APPLICATION_Pwm_Value_Is_Valid( data->pwm_inputs[i].period_nanoseconds,
+                                                  data->pwm_inputs[i].duty_cycle_permyriad ) )
+        {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
     }
     if ( data->condition != HIL_APPLICATION_RESULT_CONDITION_OK
          && data->condition != HIL_APPLICATION_RESULT_CONDITION_PARTIAL
@@ -530,7 +574,6 @@ HIL_APPLICATION_Test_Result_validate( const HIL_Application_Context_T*     conte
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
-    /* Variable declaration count/channel semantics are deliberately deferred. */
     return HIL_APPLICATION_STATUS_OK;
 }
 

@@ -1,6 +1,6 @@
 /**
  * @file application_result.h
- * @brief Firmware-to-Python fixed and variable result message bodies.
+ * @brief Firmware-to-Python fixed Test Result and future variable-data types.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_RESULT_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_RESULT_H
@@ -68,6 +68,25 @@ typedef enum
  * The analogue array has exactly one value slot per physical analogue input;
  * each configured input contributes one sample in this fixed result at the test
  * tick rate. Multi-sample/higher-rate analogue capture is deferred.
+ *
+ * @par Fixed wire layout
+ * The fixed payload is exactly 39 bytes: tick_number at offset 0 as uint32_t
+ * little-endian, 10 Digital Input bytes at offset 4, 2 Analogue Input uint32_t
+ * microvolt values at offset 14, 2 PWM Input records at offset 22, the one-byte
+ * condition at offset 34, and problem_detail at offset 35 as uint32_t
+ * little-endian. Each PWM record is a uint32_t little-endian nanosecond period
+ * followed by a uint16_t little-endian permyriad duty cycle. With the 23-byte
+ * common envelope, the complete message is 62 bytes.
+ *
+ * Structural validation requires tick_number to be less than the initialized
+ * context's max_expected_tick_count, every Digital Input value to be 0 or 1,
+ * PWM duty to be at most 10000, and PWM duty to be zero when period is zero.
+ * condition must be OK, PARTIAL, or EXECUTION_PROBLEM. The codec deliberately
+ * leaves Analogue Input values and problem_detail unconstrained. Comparing the
+ * tick with an active Test Configuration, result ordering, enabled-channel
+ * policy, and hardware feasibility are integration responsibilities. PARTIAL
+ * remains structurally representable even though variable result-data support
+ * is still deferred.
  *
  * Firmware encodes deterministic zero values for fixed capture channels that
  * are disabled or not configured, and Python ignores those elements. Their

@@ -313,9 +313,13 @@ typedef struct
  * bounds, not final wire maxima and not reservations for an uploaded test.
  *
  * In particular, max_expected_tick_count limits whether the value carried by a
- * Test Configuration is structurally acceptable. The codec never allocates
- * storage for that many ticks, remembers received ticks, or decides that an
- * upload is complete. Firmware and host Application logic own those tasks.
+ * Test Configuration is structurally acceptable and is the exclusive upper
+ * bound for fixed Test Instruction and Test Result tick_number values. The
+ * codec does not retain an active Test Configuration, so it cannot compare a
+ * later tick against that test's actual expected_tick_count or enforce ordering.
+ * It never allocates storage for that many ticks, remembers received ticks, or
+ * decides that an upload/result sequence is complete. Firmware and host
+ * Application logic own those tasks.
  *
  * HIL_APPLICATION_Default_Config() supplies the initial operational profile;
  * callers may reduce valid limits before initialization. Configuration does not
@@ -345,7 +349,8 @@ typedef struct
     size_t max_variable_transfers_per_tick;
 
     /**
-     * Largest expected_tick_count value accepted structurally.
+     * Exclusive structural upper bound for fixed-message tick_number values and
+     * largest expected_tick_count value accepted in Test Configuration.
      *
      * This is not retained upload capacity and causes no per-tick allocation.
      */
