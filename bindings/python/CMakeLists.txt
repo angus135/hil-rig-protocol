@@ -72,6 +72,17 @@ set(HIL_RIG_PROTOCOL_CFFI_DEPENDENCIES
     "${CMAKE_CURRENT_SOURCE_DIR}/hil_rig_protocol_ffi.h"
     "${PROJECT_SOURCE_DIR}/include/hil_rig_protocol/transport/transport.h"
     "${PROJECT_SOURCE_DIR}/include/hil_rig_protocol/transport/transport_types.h"
+    "${PROJECT_SOURCE_DIR}/include/hil_rig_protocol/application/application.h"
+    "${PROJECT_SOURCE_DIR}/include/hil_rig_protocol/application/application_control.h"
+    "${PROJECT_SOURCE_DIR}/include/hil_rig_protocol/application/application_error.h"
+    "${PROJECT_SOURCE_DIR}/include/hil_rig_protocol/application/application_instruction.h"
+    "${PROJECT_SOURCE_DIR}/include/hil_rig_protocol/application/application_message.h"
+    "${PROJECT_SOURCE_DIR}/include/hil_rig_protocol/application/application_response.h"
+    "${PROJECT_SOURCE_DIR}/include/hil_rig_protocol/application/application_result.h"
+    "${PROJECT_SOURCE_DIR}/include/hil_rig_protocol/application/application_status.h"
+    "${PROJECT_SOURCE_DIR}/include/hil_rig_protocol/application/application_system_info.h"
+    "${PROJECT_SOURCE_DIR}/include/hil_rig_protocol/application/application_test_config.h"
+    "${PROJECT_SOURCE_DIR}/include/hil_rig_protocol/application/application_types.h"
 )
 
 add_custom_command(

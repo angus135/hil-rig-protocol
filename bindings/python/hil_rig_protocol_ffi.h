@@ -1,11 +1,12 @@
 /**
  * @file hil_rig_protocol_ffi.h
- * @brief Binding-private host adapter for the HIL-RIG Transport facade.
+ * @brief Shared private CFFI boundary for HIL-RIG Transport and Application.
  *
- * @details This header belongs to the future Python CFFI integration. It is not
+ * @details This header belongs to the Python CFFI integration. It is not
  * installed and is not part of the firmware-facing public C API. The adapter
  * owns one public Transport context and the workspace required by that context,
  * while forwarding protocol operations to the existing public Transport facade.
+ * Application uses its public context and functions directly, without an adapter.
  */
 #ifndef HIL_RIG_PROTOCOL_BINDINGS_PYTHON_HIL_RIG_PROTOCOL_FFI_H
 #define HIL_RIG_PROTOCOL_BINDINGS_PYTHON_HIL_RIG_PROTOCOL_FFI_H
@@ -13,6 +14,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* MSVC provides max_align_t in C++ but not C. Its most-aligned fundamental
+ * scalar is double (also the representation of long double). Keep this storage
+ * owner fallback private to the binding; no Application operation is wrapped.
+ */
+#if defined( _MSC_VER ) && !defined( __cplusplus )
+typedef long double max_align_t;
+#endif
+
+#include "hil_rig_protocol/application/application.h"
 #include "hil_rig_protocol/transport/transport.h"
 
 #ifdef __cplusplus

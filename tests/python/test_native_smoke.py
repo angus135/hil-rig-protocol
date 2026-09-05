@@ -1,4 +1,4 @@
-"""Smoke tests for the private CFFI Transport binding."""
+"""Smoke tests for the private shared CFFI binding."""
 
 from __future__ import annotations
 
@@ -74,3 +74,17 @@ def test_create_and_destroy_rig_transport() -> None:
         transport = _create_transport(_binding.lib.HIL_TRANSPORT_ROLE_RIG)
     finally:
         _binding.lib.HIL_PY_TRANSPORT_Destroy(transport)
+
+
+def test_complete_application_surface_is_declared() -> None:
+    for name in (
+        "HIL_APPLICATION_Default_Config",
+        "HIL_APPLICATION_Init",
+        "HIL_APPLICATION_Encoded_Size",
+        "HIL_APPLICATION_Encode_Message",
+        "HIL_APPLICATION_Decode_Storage_Size",
+        "HIL_APPLICATION_Decode_Message",
+        "HIL_APPLICATION_Validate_Message",
+        "HIL_APPLICATION_Validate_Encoded_Message",
+    ):
+        assert callable(getattr(_binding.lib, name))
