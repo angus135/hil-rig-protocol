@@ -84,10 +84,18 @@ def configuration(extension: bytes = b"") -> p.TestConfiguration:
         ),
         can=(
             p.CANConfig(
-                enabled=True, bit_rate=125000, termination_enabled=False, capture_limit_bytes=71
+                enabled=True,
+                bit_rate=125000,
+                capture_limit_bytes=71,
+                filter_id=0x123,
+                filter_mask=0x7F0,
             ),
             p.CANConfig(
-                enabled=True, bit_rate=250000, termination_enabled=True, capture_limit_bytes=72
+                enabled=True,
+                bit_rate=250000,
+                capture_limit_bytes=72,
+                filter_id=0x456,
+                filter_mask=0x700,
             ),
         ),
         spi=(

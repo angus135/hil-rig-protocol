@@ -348,14 +348,16 @@ class CANConfig:
 
     enabled: bool = False
     bit_rate: int = 0
-    termination_enabled: bool = False
     capture_limit_bytes: int = 0
+    filter_id: int = 0
+    filter_mask: int = 0
 
     def __post_init__(self) -> None:
         _exact("enabled", self.enabled, bool)
         _validate_integer("bit_rate", self.bit_rate, 0, _UINT32_MAX)
-        _exact("termination_enabled", self.termination_enabled, bool)
         _validate_integer("capture_limit_bytes", self.capture_limit_bytes, 0, _UINT32_MAX)
+        _validate_integer("filter_id", self.filter_id, 0, _UINT16_MAX)
+        _validate_integer("filter_mask", self.filter_mask, 0, _UINT16_MAX)
 
 
 @dataclass(frozen=True, slots=True)

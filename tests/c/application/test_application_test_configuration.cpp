@@ -11,8 +11,8 @@
 
 namespace {
 constexpr std::size_t kHeaderSize            = 23u;
-constexpr std::size_t kFixedPayloadSize      = 197u;
-constexpr std::size_t kEmptyCompleteSize     = 220u;
+constexpr std::size_t kFixedPayloadSize      = 203u;
+constexpr std::size_t kEmptyCompleteSize     = 226u;
 constexpr std::size_t kDigitalInputOffset    = 12u;
 constexpr std::size_t kDigitalOutputOffset   = 32u;
 constexpr std::size_t kAnalogInputOffset     = 62u;
@@ -20,11 +20,11 @@ constexpr std::size_t kAnalogOutputOffset    = 64u;
 constexpr std::size_t kPwmInputOffset        = 70u;
 constexpr std::size_t kPwmOutputOffset       = 74u;
 constexpr std::size_t kCanOffset             = 90u;
-constexpr std::size_t kSpiOffset             = 110u;
-constexpr std::size_t kUartOffset            = 138u;
-constexpr std::size_t kI2cOffset             = 168u;
-constexpr std::size_t kExtensionLengthOffset = 196u;
-constexpr std::size_t kExtensionDataOffset   = 197u;
+constexpr std::size_t kSpiOffset             = 116u;
+constexpr std::size_t kUartOffset            = 144u;
+constexpr std::size_t kI2cOffset             = 174u;
+constexpr std::size_t kExtensionLengthOffset = 202u;
+constexpr std::size_t kExtensionDataOffset   = 203u;
 constexpr std::size_t kPayloadLengthOffset   = 21u;
 
 void PutU16Le( std::vector<std::uint8_t>& bytes, std::size_t offset, std::uint16_t value )
@@ -103,8 +103,9 @@ RepresentativeConfiguration( const std::uint8_t* extension_data = nullptr,
 
     config.can[1].enabled             = 1u;
     config.can[1].bit_rate            = 500000u;
-    config.can[1].termination_enabled = 1u;
     config.can[1].capture_limit_bytes = 0x5au;
+    config.can[1].filter_id           = 0x0321u;
+    config.can[1].filter_mask         = 0x07f0u;
 
     config.spi[0].enabled             = 1u;
     config.spi[0].bit_rate            = 0x01020304u;
@@ -175,8 +176,9 @@ HIL_Application_Test_Configuration_T AllChannelsEnabledConfiguration()
     {
         config.can[i].enabled             = 1u;
         config.can[i].bit_rate            = UINT32_MAX;
-        config.can[i].termination_enabled = static_cast<std::uint8_t>( i & 1u );
         config.can[i].capture_limit_bytes = 255u;
+        config.can[i].filter_id           = i == 0u ? 0x000u : 0x07ffu;
+        config.can[i].filter_mask         = i == 0u ? 0x000u : 0x07ffu;
     }
     for ( std::size_t i = 0u; i < HIL_APPLICATION_SPI_CHANNEL_COUNT; ++i )
     {
@@ -261,7 +263,7 @@ std::vector<std::uint8_t> EmptyGolden()
         expected[3u + i] = static_cast<std::uint8_t>( 0xa0u + i );
     expected[19] = 0x10u;
     expected[20] = 0x00u;
-    expected[21] = 0xc5u;
+    expected[21] = 0xcbu;
     expected[22] = 0x00u;
     PutU32Le( expected, kHeaderSize + 0u, 1000u );
     PutU32Le( expected, kHeaderSize + 4u, 1u );
@@ -295,11 +297,12 @@ std::vector<std::uint8_t> RepresentativeGolden( const std::array<std::uint8_t, 3
     PutU32Le( expected, pwm + 2u, 0x11223344u );
     PutU16Le( expected, pwm + 6u, 10000u );
 
-    const std::size_t can = p + kCanOffset + 10u;
+    const std::size_t can = p + kCanOffset + 13u;
     expected[can + 0u]    = 1u;
     PutU32Le( expected, can + 1u, 500000u );
-    expected[can + 5u] = 1u;
-    PutU32Le( expected, can + 6u, 0x5au );
+    PutU32Le( expected, can + 5u, 0x5au );
+    PutU16Le( expected, can + 9u, 0x0321u );
+    PutU16Le( expected, can + 11u, 0x07f0u );
 
     const std::size_t                   spi = p + kSpiOffset;
     const std::array<std::uint8_t, 14u> spi_bytes{ 1u, 4u, 3u, 2u,    1u, 2u, 2u,
@@ -364,8 +367,9 @@ void ExpectConfigurationEqual( const HIL_Application_Test_Configuration_T& expec
     {
         EXPECT_EQ( actual.can[i].enabled, expected.can[i].enabled );
         EXPECT_EQ( actual.can[i].bit_rate, expected.can[i].bit_rate );
-        EXPECT_EQ( actual.can[i].termination_enabled, expected.can[i].termination_enabled );
         EXPECT_EQ( actual.can[i].capture_limit_bytes, expected.can[i].capture_limit_bytes );
+        EXPECT_EQ( actual.can[i].filter_id, expected.can[i].filter_id );
+        EXPECT_EQ( actual.can[i].filter_mask, expected.can[i].filter_mask );
     }
     for ( std::size_t i = 0u; i < HIL_APPLICATION_SPI_CHANNEL_COUNT; ++i )
     {
@@ -484,11 +488,75 @@ TEST( ApplicationTestConfigurationGolden, RepresentativeEnabledRecordsHaveExactO
     EXPECT_EQ( actual[p + kAnalogOutputOffset + 5u], 1u );
     EXPECT_EQ( actual[p + kPwmInputOffset + 2u], 1u );
     EXPECT_EQ( actual[p + kPwmOutputOffset], 1u );
-    EXPECT_EQ( actual[p + kCanOffset + 10u], 1u );
+    EXPECT_EQ( actual[p + kCanOffset + 13u], 1u );
     EXPECT_EQ( actual[p + kSpiOffset], 1u );
     EXPECT_EQ( actual[p + kUartOffset + 15u], 1u );
     EXPECT_EQ( actual[p + kI2cOffset], 1u );
     EXPECT_EQ( actual[p + kExtensionLengthOffset], extension.size() );
+}
+
+TEST( ApplicationTestConfigurationCan,
+      ExactRecordLayoutUsesLittleEndianFiltersAndNoTerminationByte )
+{
+    const auto context                = MakeContext();
+    auto       config                 = CanonicalConfiguration();
+    config.can[0].enabled             = 1u;
+    config.can[0].bit_rate            = 0x11223344u;
+    config.can[0].capture_limit_bytes = 0x88u;
+    config.can[0].filter_id           = 0x0321u;
+    config.can[0].filter_mask         = 0x07f0u;
+    config.can[1].enabled             = 1u;
+    config.can[1].bit_rate            = 500000u;
+    config.can[1].capture_limit_bytes = 0x5au;
+    config.can[1].filter_id           = 0x0456u;
+    config.can[1].filter_mask         = 0x0700u;
+
+    const auto                          actual = EncodeConfiguration( context, config );
+    const std::size_t                   first  = kHeaderSize + kCanOffset;
+    const std::array<std::uint8_t, 13u> expected_first{
+        0x01u, 0x44u, 0x33u, 0x22u, 0x11u, 0x88u, 0x00u, 0x00u, 0x00u, 0x21u, 0x03u, 0xf0u, 0x07u };
+    EXPECT_TRUE(
+        std::equal( expected_first.begin(), expected_first.end(), actual.begin() + first ) );
+
+    const std::size_t second = first + 13u;
+    EXPECT_EQ( actual[second], 1u );
+    EXPECT_EQ( actual[second + 9u], 0x56u );
+    EXPECT_EQ( actual[second + 10u], 0x04u );
+    EXPECT_EQ( actual[second + 11u], 0x00u );
+    EXPECT_EQ( actual[second + 12u], 0x07u );
+    EXPECT_EQ( actual[kHeaderSize + kSpiOffset], 0u );
+    ExpectRoundTrip( context, config );
+}
+
+TEST( ApplicationTestConfigurationCan, ValidatesStandardIdentifierFilterBoundariesAndZeroMask )
+{
+    const auto context = MakeContext();
+
+    auto config               = CanonicalConfiguration();
+    config.can[0].enabled     = 1u;
+    config.can[0].bit_rate    = 500000u;
+    config.can[0].filter_id   = 0x000u;
+    config.can[0].filter_mask = 0x000u;
+    auto message              = ConfigurationMessage( config );
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
+
+    config.can[0].filter_id   = 0x07ffu;
+    config.can[0].filter_mask = 0x07ffu;
+    message                   = ConfigurationMessage( config );
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
+
+    config.can[0].filter_id   = 0x0321u;
+    config.can[0].filter_mask = 0u;
+    message                   = ConfigurationMessage( config );
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
+
+    config.can[0].filter_id = 0x0800u;
+    ExpectValidationFailure( context, config );
+    config                    = CanonicalConfiguration();
+    config.can[0].enabled     = 1u;
+    config.can[0].bit_rate    = 500000u;
+    config.can[0].filter_mask = 0x0800u;
+    ExpectValidationFailure( context, config );
 }
 
 TEST( ApplicationTestConfigurationSize, EmptyNonemptyAndMaximumExtensionsHaveExactCompleteSizes )
@@ -718,9 +786,9 @@ TEST( ApplicationTestConfigurationExtensionLimit, Maximum255ByteExtensionWorksEn
     std::size_t encoded_size = 99u;
     ASSERT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &encoded_size ),
                HIL_APPLICATION_STATUS_OK );
-    ASSERT_EQ( encoded_size, 475u );
+    ASSERT_EQ( encoded_size, 481u );
 
-    std::array<std::uint8_t, 475u> encoded{};
+    std::array<std::uint8_t, 481u> encoded{};
     ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, encoded.data(), encoded.size(),
                                                &encoded_size ),
                HIL_APPLICATION_STATUS_OK );
@@ -784,8 +852,9 @@ TEST( ApplicationTestConfigurationValidation, RejectsInvalidEnableAndNoncanonica
     reject( []( auto& c ) { c.pwm_out[0].initial_duty_cycle_permyriad = 1u; } );
 
     reject( []( auto& c ) { c.can[0].bit_rate = 1u; } );
-    reject( []( auto& c ) { c.can[0].termination_enabled = 1u; } );
     reject( []( auto& c ) { c.can[0].capture_limit_bytes = 1u; } );
+    reject( []( auto& c ) { c.can[0].filter_id = 1u; } );
+    reject( []( auto& c ) { c.can[0].filter_mask = 1u; } );
 
     reject( []( auto& c ) { c.spi[0].bit_rate = 1u; } );
     reject( []( auto& c ) { c.spi[0].role = HIL_APPLICATION_BUS_ROLE_MASTER; } );
@@ -927,9 +996,6 @@ TEST( ApplicationTestConfigurationValidation,
     config.can[1].bit_rate = 0u;
     ExpectValidationFailure( context, config );
     config                            = RepresentativeConfiguration();
-    config.can[1].termination_enabled = 2u;
-    ExpectValidationFailure( context, config );
-    config                            = RepresentativeConfiguration();
     config.can[1].capture_limit_bytes = 91u;
     ExpectValidationFailure( context, config );
     config                 = RepresentativeConfiguration();
@@ -995,7 +1061,7 @@ TEST( ApplicationTestConfigurationMalformed, TruncationAtMajorFamilyBoundariesIs
     const auto context  = MakeContext();
     const auto complete = EncodeConfiguration( context, CanonicalConfiguration() );
     const std::array<std::size_t, 11u> boundaries{ 12u, 32u,  62u,  64u,  70u, 74u,
-                                                   90u, 110u, 138u, 168u, 196u };
+                                                   90u, 116u, 144u, 174u, 202u };
     for ( const auto payload_length : boundaries )
     {
         SCOPED_TRACE( payload_length );

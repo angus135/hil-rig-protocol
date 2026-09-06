@@ -182,8 +182,9 @@ MakeApplicationConfigurationMessage( const std::uint8_t* const extension_data,
 
     config.can[0].enabled             = 1u;
     config.can[0].bit_rate            = 500000u;
-    config.can[0].termination_enabled = 1u;
     config.can[0].capture_limit_bytes = 64u;
+    config.can[0].filter_id           = 0x0123u;
+    config.can[0].filter_mask         = 0x07f0u;
 
     config.spi[1].enabled             = 1u;
     config.spi[1].bit_rate            = 1000000u;
@@ -391,8 +392,9 @@ bool ApplicationConfigurationsEqual( const HIL_Application_Message_T& expected,
     for ( std::size_t i = 0u; i < HIL_APPLICATION_CAN_CHANNEL_COUNT; ++i )
     {
         if ( lhs.can[i].enabled != rhs.can[i].enabled || lhs.can[i].bit_rate != rhs.can[i].bit_rate
-             || lhs.can[i].termination_enabled != rhs.can[i].termination_enabled
-             || lhs.can[i].capture_limit_bytes != rhs.can[i].capture_limit_bytes )
+             || lhs.can[i].capture_limit_bytes != rhs.can[i].capture_limit_bytes
+             || lhs.can[i].filter_id != rhs.can[i].filter_id
+             || lhs.can[i].filter_mask != rhs.can[i].filter_mask )
         {
             return false;
         }

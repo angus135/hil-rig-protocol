@@ -505,10 +505,12 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
                            actual.body.test_configuration.can[i].enabled );
                 EXPECT_EQ( expected.body.test_configuration.can[i].bit_rate,
                            actual.body.test_configuration.can[i].bit_rate );
-                EXPECT_EQ( expected.body.test_configuration.can[i].termination_enabled,
-                           actual.body.test_configuration.can[i].termination_enabled );
                 EXPECT_EQ( expected.body.test_configuration.can[i].capture_limit_bytes,
                            actual.body.test_configuration.can[i].capture_limit_bytes );
+                EXPECT_EQ( expected.body.test_configuration.can[i].filter_id,
+                           actual.body.test_configuration.can[i].filter_id );
+                EXPECT_EQ( expected.body.test_configuration.can[i].filter_mask,
+                           actual.body.test_configuration.can[i].filter_mask );
             }
             for ( std::size_t i = 0u; i < HIL_APPLICATION_SPI_CHANNEL_COUNT; ++i )
             {

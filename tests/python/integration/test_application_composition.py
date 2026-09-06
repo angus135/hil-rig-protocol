@@ -40,7 +40,7 @@ def test_complete_configuration_instruction_result_exchange(established_pair, ex
         received = deliver(pair, pair.host, pair.rig, forward, reverse, encoded)
         assert rig_codec.decode(received) == public
         if type(public) is p.TestConfiguration:
-            assert len(encoded) == 220 + len(extension)
+            assert len(encoded) == 226 + len(extension)
     public = result()
     encoded = rig_codec.encode(public)
     received = deliver(pair, pair.rig, pair.host, reverse, forward, encoded)

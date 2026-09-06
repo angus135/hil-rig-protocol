@@ -287,9 +287,10 @@ HIL_APPLICATION_Can_Config_encode( const HIL_Application_Can_Config_T* data, uin
     size_t running_total     = 0u;
     payload[running_total++] = data->enabled;
     HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->bit_rate, &running_total );
-    payload[running_total++] = data->termination_enabled;
     HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->capture_limit_bytes,
                                    &running_total );
+    HIL_APPLICATION_Encode_U16_Le( &payload[running_total], data->filter_id, &running_total );
+    HIL_APPLICATION_Encode_U16_Le( &payload[running_total], data->filter_mask, &running_total );
     if ( running_total != HIL_APPLICATION_TEST_CONFIG_CAN_RECORD_SIZE )
     {
         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;

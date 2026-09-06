@@ -191,17 +191,17 @@ PWM duty uses **permyriad** (`0..10000`).
 | 64 | 6 | 6 Analogue Output records, 1 byte each |
 | 70 | 4 | 2 PWM Input records, 2 bytes each |
 | 74 | 16 | 2 PWM Output records, 8 bytes each |
-| 90 | 20 | 2 CAN records, 10 bytes each |
-| 110 | 28 | 2 SPI records, 14 bytes each |
-| 138 | 30 | 2 UART records, 15 bytes each |
-| 168 | 28 | 2 I2C records, 14 bytes each |
-| 196 | 1 | extension length, `uint8_t` |
-| 197 | N | exactly N extension bytes |
+| 90 | 26 | 2 CAN records, 13 bytes each |
+| 116 | 28 | 2 SPI records, 14 bytes each |
+| 144 | 30 | 2 UART records, 15 bytes each |
+| 174 | 28 | 2 I2C records, 14 bytes each |
+| 202 | 1 | extension length, `uint8_t` |
+| 203 | N | exactly N extension bytes |
 
 The fixed payload, through and including the extension-length byte, is exactly
-**197 bytes**. An empty-extension complete message is therefore `23 + 197 =
-220` bytes. Extension length N produces `220 + N` complete bytes. The maximum
-255-byte extension produces a 452-byte payload and a **475-byte complete
+**203 bytes**. An empty-extension complete message is therefore `23 + 203 =
+226` bytes. Extension length N produces `226 + N` complete bytes. The maximum
+255-byte extension produces a 458-byte payload and a **481-byte complete
 message**, which fits the 512-byte default `max_encoded_message_size`. The
 one-byte extension field sets the absolute wire maximum at 255 data bytes, but
 encoding, decoding, decode-storage queries, and encoded-message validation also
@@ -260,18 +260,25 @@ PWM Output, 8 bytes:
 | 2 | 4 | initial period in nanoseconds, `uint32_t` LE |
 | 6 | 2 | initial duty cycle in permyriad, `uint16_t` LE |
 
-CAN, 10 bytes:
+CAN, 13 bytes:
 
 | Record offset | Width | Field |
 | ---: | ---: | --- |
 | 0 | 1 | enabled |
 | 1 | 4 | bit rate, `uint32_t` LE |
-| 5 | 1 | termination enabled, Boolean |
-| 6 | 4 | capture limit in bytes, `uint32_t` LE |
+| 5 | 4 | capture limit in bytes, `uint32_t` LE |
+| 9 | 2 | standard receive filter ID, `uint16_t` LE |
+| 11 | 2 | standard receive filter mask, `uint16_t` LE |
 
-This is standard CAN only. CAN-FD options and implementation-specific filter
-banks, filter IDs, filter masks, prescalers, and driver values are not protocol
-fields.
+Only 11-bit standard CAN identifiers are supported. A received frame matches when
+`(received_standard_id & filter_mask) == (filter_id & filter_mask)`. A zero mask
+accepts every standard identifier, including when `filter_id` is nonzero. Both
+filter fields are host-selected protocol fields in the range `0x000..0x7FF`.
+Filter-bank allocation remains firmware-internal. CAN-FD options, extended
+identifiers, timing-register values, peripheral instances, and filter-bank
+selection are not protocol fields. CAN termination is not software-configurable
+through the Application protocol; physical termination must be fixed or handled
+outside Application configuration.
 
 SPI, 14 bytes:
 
@@ -340,14 +347,17 @@ Booleans/enums, canonical disabled records, a nonzero expected tick count within
 the configured limit, supported tick duration, zero flags, extension length no
 greater than `max_variable_data_size`, PWM duty no greater than 10000, zero duty
 when period is zero, nonzero rates for enabled communications, capture limits no
-greater than `max_variable_data_size`, CAN
-termination Boolean, UART RX/TX availability and RX/capture consistency, and
-I2C role/address rules. I2C masters use own address zero; I2C slaves use a
+greater than `max_variable_data_size`, 11-bit CAN filter ID/mask bounds, UART
+RX/TX availability and RX/capture consistency, and I2C role/address rules. I2C masters use own address zero; I2C slaves use a
 nonzero 7-bit address `1..127`.
 
 The codec deliberately does not validate physical-channel availability, exact
-supported rates, power-rail state, MCU timer/DMA/filter settings, complete-test
-storage capacity, cross-driver conflicts, or workflow state. Those decisions
+supported rates, power-rail state, MCU timer/DMA/filter-bank settings,
+complete-test storage capacity, cross-driver conflicts, or workflow state.
+Analogue-input sampling frequency, analogue-output DAC/reference selection, and
+hardware-specific rate/timing choices remain firmware policies. Unsupported
+hardware configurations must be rejected by integration rather than silently
+substituted. Those decisions
 belong to firmware integration. Variable communication instruction/result
 messages remain deferred even though communication Test Configuration is now
 implemented.

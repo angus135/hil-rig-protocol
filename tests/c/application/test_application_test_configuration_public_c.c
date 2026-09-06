@@ -55,6 +55,11 @@ int main( void )
     ( void )analog_output;
     ( void )pwm_input;
     ( void )pwm_output;
+    can.enabled             = 1u;
+    can.bit_rate            = 500000u;
+    can.capture_limit_bytes = 64u;
+    can.filter_id           = 0x123u;
+    can.filter_mask         = 0x7f0u;
     ( void )can;
     ( void )spi;
     ( void )uart;

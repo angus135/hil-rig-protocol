@@ -25,7 +25,7 @@ def codec():
 @pytest.mark.parametrize(
     "factory,family,size",
     [
-        (configuration, "configuration", 220),
+        (configuration, "configuration", 226),
         (instruction, "instruction", 73),
         (result, "result", 62),
     ],
@@ -45,12 +45,58 @@ def test_populated_round_trip_matches_independent_native_fixture(codec, factory,
 def test_configuration_extension_round_trip(codec, size):
     public = configuration(bytes(range(size)))
     encoded = codec.encode(public)
-    assert len(encoded) == 220 + size
+    assert len(encoded) == 226 + size
     assert codec.decode(encoded) == public
     native, owner = message("configuration", public.extension_data)
     wire, count = encode(context(), native)
     assert encoded == bytes(ffi.buffer(wire, count))
     assert (owner == ffi.NULL) == (size == 0)
+
+
+def test_can_filters_round_trip_and_application_version(codec):
+    public = configuration()
+    assert public.can[0].filter_id != public.can[1].filter_id
+    assert public.can[0].filter_mask != public.can[1].filter_mask
+    encoded = codec.encode(public)
+    assert encoded[:2] == bytes((0, 1))
+    assert codec.decode(encoded).can == public.can
+
+
+def test_can_filter_python_representation_is_uint16_not_protocol_width():
+    value = p.CANConfig(enabled=True, bit_rate=500000, filter_id=0xFFFF, filter_mask=0xFFFF)
+    assert value.filter_id == 0xFFFF
+    assert value.filter_mask == 0xFFFF
+    with pytest.raises(ValueError):
+        p.CANConfig(filter_id=0x10000)
+    with pytest.raises(ValueError):
+        p.CANConfig(filter_mask=0x10000)
+
+
+def test_native_rejects_eleven_bit_can_filter_overflow(codec):
+    for field in ("filter_id", "filter_mask"):
+        invalid_can = replace(configuration().can[0], **{field: 0x800})
+        invalid = replace(configuration(), can=(invalid_can, configuration().can[1]))
+        with pytest.raises(p.ApplicationEncodeError) as caught:
+            codec.encode(invalid)
+        assert caught.value.status is p.ApplicationStatus.VALIDATION_FAILED
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("bit_rate", 1), ("capture_limit_bytes", 1), ("filter_id", 1), ("filter_mask", 1)],
+)
+def test_disabled_can_requires_all_remaining_fields_zero(codec, field, value):
+    disabled = p.CANConfig(**{field: value})
+    invalid = replace(configuration(), can=(disabled, configuration().can[1]))
+    with pytest.raises(p.ApplicationEncodeError) as caught:
+        codec.encode(invalid)
+    assert caught.value.status is p.ApplicationStatus.VALIDATION_FAILED
+
+
+def test_nonzero_can_filter_id_with_zero_mask_is_valid(codec):
+    channel = p.CANConfig(enabled=True, bit_rate=500000, filter_id=0x321, filter_mask=0)
+    public = replace(configuration(), can=(channel, configuration().can[1]))
+    assert codec.decode(codec.encode(public)) == public
 
 
 @pytest.mark.parametrize("condition", list(p.ResultCondition))
@@ -140,6 +186,8 @@ def change(value, path, replacement):
         ("pwm_out.1.initial_duty_cycle_permyriad", 10001),
         ("can.1.bit_rate", 0),
         ("can.1.capture_limit_bytes", 256),
+        ("can.1.filter_id", 0x800),
+        ("can.1.filter_mask", 0x800),
         ("spi.1.role", p.BusRole.RESERVED),
         ("spi.1.data_width", p.SPIDataWidth.RESERVED),
         ("spi.1.bit_order", p.SPIBitOrder.RESERVED),
@@ -504,7 +552,7 @@ def test_fixed_decode_cannot_publish_extension_storage(codec, monkeypatch):
 
 
 def test_contiguous_typed_buffer_snapshot(codec):
-    expected = configuration()
+    expected = configuration(b"\x00\x00")
     # Buffer means raw nbytes, not a sequence of coerced integer elements.
     view = memoryview(bytearray(codec.encode(expected))).cast("I")
     assert codec.decode(view) == expected

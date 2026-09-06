@@ -167,20 +167,20 @@ static HIL_Application_Status_T
 HIL_APPLICATION_Can_Config_validate( const HIL_Application_Context_T*    context,
                                      const HIL_Application_Can_Config_T* data )
 {
-    if ( !HIL_APPLICATION_Boolean_Is_Valid( data->enabled )
-         || !HIL_APPLICATION_Boolean_Is_Valid( data->termination_enabled ) )
+    if ( !HIL_APPLICATION_Boolean_Is_Valid( data->enabled ) )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
     if ( data->enabled == 0u )
     {
-        return data->bit_rate == 0u && data->termination_enabled == 0u
-                       && data->capture_limit_bytes == 0u
+        return data->bit_rate == 0u && data->capture_limit_bytes == 0u && data->filter_id == 0u
+                       && data->filter_mask == 0u
                    ? HIL_APPLICATION_STATUS_OK
                    : HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
     if ( data->bit_rate == 0u
-         || data->capture_limit_bytes > ( uint32_t )context->config.max_variable_data_size )
+         || data->capture_limit_bytes > ( uint32_t )context->config.max_variable_data_size
+         || data->filter_id > 0x07ffu || data->filter_mask > 0x07ffu )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }

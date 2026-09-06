@@ -163,8 +163,9 @@ def _read_can_config(native: Any) -> CANConfig:
     return CANConfig(
         enabled=_read_bool(native.enabled),
         bit_rate=int(native.bit_rate),
-        termination_enabled=_read_bool(native.termination_enabled),
         capture_limit_bytes=int(native.capture_limit_bytes),
+        filter_id=int(native.filter_id),
+        filter_mask=int(native.filter_mask),
     )
 
 
