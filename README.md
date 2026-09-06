@@ -225,7 +225,9 @@ Detailed setup and workflow examples live in the layer documentation and
 compile-level tests rather than this repository overview.
 
 Python callers should start with the
-[Python Transport caller guide](docs/python/transport.md) and the tested
+[Python Application codec guide](docs/python/application.md), the
+[Application example](examples/python/application_codec.py), and the
+[Python Transport caller guide](docs/python/transport.md) with its tested
 [caller-owned I/O example](examples/python/transport_servicing.py).
 
 ## Licence

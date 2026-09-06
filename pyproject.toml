@@ -72,7 +72,7 @@ sdist.include = [
     "bindings/python/*.py",
     "bindings/python/CMakeLists.txt",
     "bindings/python/README.md",
-    "docs/python/transport.md",
+    "docs/python/*.md",
     "examples/CMakeLists.txt",
     "examples/README.md",
     "examples/python/*.py",

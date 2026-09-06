@@ -117,7 +117,9 @@ shows this state explicitly.
 
 Call `read_event()` until it returns `None`; unread events occupy bounded
 capacity. Call `read_application_data()` explicitly for each complete opaque
-Application message. Transport does not decode Application messages.
+Application message. Transport does not decode Application messages. Compose
+explicitly with the [public Application codec](application.md) to encode and decode
+complete Test Configuration and fixed Test Instruction/Result messages.
 
 `EventType.DELIVERY_CONFIRMED` means the peer Transport accepted the bytes. It
 does not mean the peer Application layer decoded, validated, or semantically

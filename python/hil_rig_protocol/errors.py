@@ -1,7 +1,8 @@
-"""Public exception hierarchy for the HIL-RIG Transport binding."""
+"""Public exception hierarchy for the HIL-RIG protocol bindings."""
 
 from __future__ import annotations
 
+from .application_types import ApplicationStatus
 from .transport_types import TransportStatus
 
 
@@ -60,7 +61,46 @@ class TransportInternalError(TransportError):
         self.bytes_consumed: int | None = bytes_consumed
 
 
+class ApplicationError(ProtocolError):
+    """Application failure with the exact native status, when one exists."""
+
+    def __init__(self, message: str, *, status: ApplicationStatus | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+class ApplicationConfigurationError(ApplicationError, ValueError):
+    """Native initialization rejected the requested codec configuration."""
+
+
+class ApplicationEncodeError(ApplicationError):
+    """Native validation or encoding rejected a represented message."""
+
+
+class ApplicationDecodeError(ApplicationError):
+    """Encoded data is invalid or outside the supported Python subset."""
+
+
+class ApplicationBindingError(ApplicationError):
+    """The private binding returned an unknown status or inconsistent result."""
+
+
+class ApplicationOwnershipError(ApplicationError):
+    """The codec was accessed from a thread other than its creating thread."""
+
+
+class ApplicationInternalError(ApplicationError):
+    """Native Application code reported an internal invariant failure."""
+
+
 __all__ = [
+    "ApplicationError",
+    "ApplicationConfigurationError",
+    "ApplicationEncodeError",
+    "ApplicationDecodeError",
+    "ApplicationBindingError",
+    "ApplicationOwnershipError",
+    "ApplicationInternalError",
     "ProtocolError",
     "TransportError",
     "TransportConfigurationError",
