@@ -42,7 +42,7 @@ jobs:
             bindings/python/build_ffi.py bindings/python/cdef.py \
             scripts/check_version.py scripts/verify_distribution.py \
             scripts/run_installed_tests.py \
-            examples/python/transport_servicing.py
+            examples/python/*.py
 
       - name: Validator tests
         run: python -m pytest tests/packaging tests/examples

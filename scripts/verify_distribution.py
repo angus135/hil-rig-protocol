@@ -19,6 +19,9 @@ else:  # Direct execution sets sys.path[0] to scripts/.
 PACKAGE_MODULES = {
     "hil_rig_protocol/__init__.py",
     "hil_rig_protocol/_binding.py",
+    "hil_rig_protocol/_application_conversion.py",
+    "hil_rig_protocol/application.py",
+    "hil_rig_protocol/application_types.py",
     "hil_rig_protocol/errors.py",
     "hil_rig_protocol/transport.py",
     "hil_rig_protocol/transport_types.py",
@@ -26,6 +29,8 @@ PACKAGE_MODULES = {
 }
 
 SDIST_REQUIRED = {
+    "docs/python/application.md",
+    "examples/python/application_codec.py",
     "VERSION",
     "CMakeLists.txt",
     "pyproject.toml",

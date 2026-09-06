@@ -21,9 +21,13 @@ The installed Python package has two private binding details:
 
 Neither module is a supported public Transport API. Public Python code should import the supported value and lifetime layer from `hil_rig_protocol`; `_native` and `_binding` remain private implementation details. Transport and Application share this one `_native` module and one linked protocol core.
 
-## Private Application foundation
+## Application codec binding
 
-Application calls the eight public `HIL_APPLICATION_*` codec functions directly.
+The private CFFI surface exposes all eight public `HIL_APPLICATION_*` codec functions.
+`ApplicationCodec` directly uses initialization, encoded-size, encode,
+decode-storage-size and decode for its public `encode()` and `decode()` operations.
+Validation remains authoritative in C; the standalone native validation functions
+are not separately exposed through the current public Python facade.
 Its lightweight public context needs no dynamic workspace or ownership adapter.
 CFFI verifies value layouts against the C compiler; context and outer message
 layouts are partial. CFFI 1.17 cannot nest partial value structs in the public
@@ -31,10 +35,14 @@ unnamed body union, so those records declare complete fields and checked array
 extents without explicit padding. All encoding, decoding and validation remain
 in C.
 
-This surface is private native infrastructure for Test Configuration and fixed
-Digital, Analogue and PWM Test Instruction/Result messages. Public Python codec
-objects and integration with the Transport wrapper are deferred to the next PR.
-The public package exports are unchanged.
+The supported public `ApplicationCodec` uses this private native surface for
+complete Test Configuration and fixed Digital, Analog and PWM Test Instruction/Result
+messages. Its frozen, slotted records contain only Python-owned values. The codec
+snapshots input, uses aligned decode storage and copies decoded spans into bytes.
+It enforces creating-thread ownership and translates native statuses into public
+Application exceptions. All other message families remain outside the Python subset.
+See the [Application guide](../../docs/python/application.md) and runnable
+[codec example](../../examples/python/application_codec.py).
 
 Decoded spans borrow caller-owned decode storage and must not outlive it. Query
 `HIL_APPLICATION_Decode_Storage_Size`, use NULL for zero bytes, otherwise allocate
@@ -52,7 +60,7 @@ wire input.
 
 ## Public Transport facade
 
-The package exposes the public Transport enums, immutable configuration/result value types, Transport exceptions, and the complete caller-driven `Transport` facade. The Python layer forwards the existing C Transport contract; it does not add protocol scheduling, external I/O, retries, output caching, or Application decoding. Public Application objects and Transport integration are deferred to the next PR.
+The package exposes the public Transport enums, immutable configuration/result value types, Transport exceptions, and the complete caller-driven `Transport` facade. The Python layer forwards the existing C Transport contract; it does not add protocol scheduling, external I/O, retries, output caching, or Application decoding. `ApplicationCodec` composes explicitly through `submit_application_data()` and `read_application_data()`; Transport continues treating those bytes as opaque.
 
 `TransportConfig.session_seed` is role-aware at construction time. A HOST with `session_seed=None` receives a cryptographically secure seed in the inclusive range `1..UINT64_MAX-1`; explicit valid HOST seeds are preserved for deterministic tests. A RIG resolves `None` to zero, accepts explicit zero, and rejects every nonzero seed. The resolved immutable configuration is available through `transport.config`.
 
