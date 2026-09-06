@@ -126,7 +126,8 @@ codec returns the complete values without filtering them.
 | `baud_rate` | unsigned 32-bit symbols per second |
 | `capture_limit_bytes` | unsigned 32-bit bytes |
 | `own_address_7bit` | unsigned 16-bit container; native C checks the address rules |
-| `enabled`, `high`, `initial_high`, `termination_enabled`, `rx_enabled`, `tx_enabled` | exact `bool` |
+| `filter_id`, `filter_mask` | unsigned 16-bit containers; native C checks the standard 11-bit `0x000..0x7FF` protocol range |
+| `enabled`, `high`, `initial_high`, `rx_enabled`, `tx_enabled` | exact `bool` |
 
 | Family | Configuration field / count | Fixed message field / count |
 | --- | --- | --- |
@@ -147,7 +148,7 @@ The ten configuration record types preserve all native fields:
 | `AnalogInputConfig`, `AnalogOutputConfig` | none |
 | `PWMInputConfig` | `voltage_level` |
 | `PWMOutputConfig` | `voltage_level`, `initial_period_nanoseconds`, `initial_duty_cycle_permyriad` |
-| `CANConfig` | `bit_rate`, `termination_enabled`, `capture_limit_bytes` |
+| `CANConfig` | `bit_rate`, `capture_limit_bytes`, `filter_id`, `filter_mask` |
 | `SPIConfig` | `bit_rate`, `role`, `data_width`, `bit_order`, `clock_polarity`, `clock_phase`, `capture_limit_bytes` |
 | `UARTConfig` | `baud_rate`, `electrical_mode`, `word_length`, `parity`, `stop_bits`, `rx_enabled`, `tx_enabled`, `capture_limit_bytes` |
 | `I2CConfig` | `bit_rate`, `role`, `own_address_7bit`, `voltage_level`, `pull_up`, `capture_limit_bytes` |
@@ -158,11 +159,16 @@ Use the exact `PeripheralVoltage`, `BusRole`, `SPIDataWidth`, `SPIBitOrder`,
 For example, `SPIDataWidth.BITS_8`, `UARTStopBits.BITS_1`,
 `I2CVoltage.V_3V3` and `I2CPullUp.OHM_4K7`. Each enum exposes native invalid and
 reserved sentinels as well as usable selections. Disabled records default to
-zero/`False`/`INVALID`.
+zero/`False`/`INVALID`. CAN uses standard 11-bit identifiers only. A receive
+filter matches when `(received_standard_id & filter_mask) == (filter_id &
+filter_mask)`; mask zero accepts every standard identifier. Filter-bank allocation
+is firmware-internal. CAN termination is not software-configurable through this
+protocol, so physical termination must be fixed or managed outside Application
+configuration.
 
 Extensions are immutable `bytes` of length 0 through 255, subject to native policy.
-Complete encoded sizes are 220 bytes for a configuration without extensions,
-475 with a 255-byte extension, 73 for an instruction and 62 for a result.
+Complete encoded sizes are 226 bytes for a configuration without extensions,
+481 with a 255-byte extension, 73 for an instruction and 62 for a result.
 
 ## Validation and errors
 
@@ -175,8 +181,14 @@ raise `TypeError`; unrepresentable lengths/ranges raise `ValueError`.
 Native C validates protocol semantics during initialization/encoding/decoding.
 For example, `TickDuration(999)` and `PWMOutputValue(0, 65535)` are representable
 Python values but fail native message encoding. Python does not duplicate tick
-duration rules, disabled-record canonical values, PWM relationships, UART
-direction rules, I2C address/role rules or cross-field limits.
+duration rules, disabled-record canonical values, the CAN 11-bit filter bound,
+PWM relationships, UART direction rules, I2C address/role rules or cross-field
+limits. `CANConfig.filter_id` and `filter_mask` therefore accept Python integers
+through `0xFFFF`; native encoding rejects values above `0x7FF`. Hardware-only
+choices such as CAN filter-bank allocation, analogue-input sampling frequency,
+analogue-output reference selection, peripheral instances, and timer/register
+settings are not Python fields. Firmware integration must reject unsupported
+hardware configurations instead of silently substituting alternatives.
 
 ```python
 from hil_rig_protocol import ApplicationDecodeError, ApplicationEncodeError
@@ -230,7 +242,7 @@ if encoded is not None:
 ```
 
 Configure Transport to accept the Application sizes you intend to exchange. A
-maximum 475-byte configuration fits the default 512-byte Transport configuration.
+maximum 481-byte configuration fits the default 512-byte Transport configuration.
 Neither codec inspects the other's configuration. Transport delivers opaque bytes
 unchanged, and `DELIVERY_CONFIRMED` acknowledges byte delivery only. A malformed
 Application payload can be delivered and acknowledged normally, then rejected by

@@ -302,6 +302,21 @@ def test_configuration_defaults_match_compiled_native():
         assert getattr(config, field.name) == getattr(native, field.name)
 
 
+def test_can_config_public_shape_and_uint16_filter_representation():
+    can = p.CANConfig(
+        enabled=True, bit_rate=500000, capture_limit_bytes=64, filter_id=0xFFFF, filter_mask=0xFFFF
+    )
+    assert [field.name for field in fields(can)] == [
+        "enabled",
+        "bit_rate",
+        "capture_limit_bytes",
+        "filter_id",
+        "filter_mask",
+    ]
+    assert can.filter_id == 0xFFFF
+    assert can.filter_mask == 0xFFFF
+
+
 def test_semantically_invalid_values_can_be_represented():
     assert p.TickDuration(999).microseconds == 999
     assert p.PWMOutputValue(0, 65535).duty_cycle_permyriad == 65535

@@ -292,8 +292,9 @@ static void HIL_APPLICATION_Can_Config_decode( HIL_Application_Can_Config_T* dat
     size_t offset = 0u;
     data->enabled = payload[offset++];
     HIL_APPLICATION_Decode_U32_Le( &data->bit_rate, &payload[offset], &offset );
-    data->termination_enabled = payload[offset++];
     HIL_APPLICATION_Decode_U32_Le( &data->capture_limit_bytes, &payload[offset], &offset );
+    HIL_APPLICATION_Decode_U16_Le( &data->filter_id, &payload[offset], &offset );
+    HIL_APPLICATION_Decode_U16_Le( &data->filter_mask, &payload[offset], &offset );
     *size = HIL_APPLICATION_TEST_CONFIG_CAN_RECORD_SIZE;
 }
 

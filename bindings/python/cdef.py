@@ -476,8 +476,9 @@ typedef struct
 {
     uint8_t enabled;
     uint32_t bit_rate;
-    uint8_t termination_enabled;
     uint32_t capture_limit_bytes;
+    uint16_t filter_id;
+    uint16_t filter_mask;
 } HIL_Application_Can_Config_T;
 
 typedef struct

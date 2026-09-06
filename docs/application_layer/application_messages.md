@@ -257,9 +257,9 @@ fixed record carries a redundant channel or peripheral identifier.
 The arrays are encoded in this order: Digital Input, Digital Output, Analogue
 Input, Analogue Output, PWM Input, PWM Output, CAN, SPI, UART, then I2C. Their
 physical extents are 10, 10, 2, 6, 2, 2, 2, 2, 2, and 2 records respectively.
-The fixed payload, including the one-byte extension length, is 197 bytes. With
-the 23-byte common envelope an empty-extension configuration is 220 bytes; an
-extension of N bytes is `220 + N`, up to 475 bytes for N = 255. The one-byte
+The fixed payload, including the one-byte extension length, is 203 bytes. With
+the 23-byte common envelope an empty-extension configuration is 226 bytes; an
+extension of N bytes is `226 + N`, up to 481 bytes for N = 255. The one-byte
 wire field therefore permits at most 255 extension bytes, while each initialized
 codec context may impose a smaller local limit through
 `context->config.max_variable_data_size`. The exact record offsets and byte
@@ -281,9 +281,12 @@ The public records are:
 - PWM Input: enabled, voltage level.
 - PWM Output: enabled, voltage level, initial period in nanoseconds, initial duty
   cycle in permyriad.
-- CAN: enabled, bit rate, termination enabled, capture limit in bytes. This is
-  standard CAN only; CAN-FD and filter-bank/filter-ID/filter-mask details are not
-  protocol fields.
+- CAN: enabled, bit rate, capture limit in bytes, standard receive filter ID,
+  and standard receive filter mask. Only 11-bit standard identifiers are
+  supported. A zero mask accepts all standard identifiers; filter-bank allocation
+  remains firmware-internal. CAN termination is not software-configurable through
+  the protocol and physical termination must be fixed or handled outside the
+  Application configuration.
 - SPI: enabled, bit rate, master/slave role, 8/16-bit data width, bit order,
   clock polarity, clock phase, capture limit in bytes.
 - UART: enabled, baud rate, electrical mode, word length, parity, stop bits, RX
@@ -298,15 +301,20 @@ length against `context->config.max_variable_data_size`; Booleans; canonical
 disabled records; recognized enums; PWM duty/period combinations; nonzero rates
 for enabled communications; communication capture limits against the same
 configured variable-data limit; UART RX/TX constraints; and I2C
-role/address constraints. Analogue input/output deliberately have no
-protocol-selectable electrical parameters in this version.
+role/address constraints, plus 11-bit CAN filter ID/mask bounds. Analogue
+input/output deliberately have no protocol-selectable electrical parameters in
+this version.
 
 Those are structural protocol rules only. Firmware later decides whether a
 channel exists, an exact rate is supported, rails and hardware are safe, MCU
 timing is achievable, drivers conflict, complete-test storage is available, or
 the current workflow state permits the configuration. The stateless codec does
-not make those decisions. Communication configuration is implemented here, but
-variable communication instruction/result messages remain deferred.
+not make those decisions. Filter-bank allocation, analogue-input sampling
+frequency, analogue-output reference selection, and hardware-specific rate/timing
+choices remain firmware policies. Unsupported hardware configurations must be
+rejected rather than silently substituted. Communication configuration is
+implemented here, but variable communication instruction/result messages remain
+deferred.
 
 A configuration-scoped `ACCEPTED` Response creates the active upload
 transaction. `REJECTED` or `FAILED` creates no transaction; instructions for

@@ -57,8 +57,9 @@ def message(family, extension=b"", condition=None):
         for i, channel in enumerate(body.can):
             channel.enabled = 1
             channel.bit_rate = 125000 * (i + 1)
-            channel.termination_enabled = i % 2
             channel.capture_limit_bytes = 71 + i
+            channel.filter_id = (0x123, 0x456)[i]
+            channel.filter_mask = (0x7F0, 0x700)[i]
         for i, channel in enumerate(body.spi):
             channel.enabled = 1
             channel.bit_rate = 234567 * (i + 1)
@@ -221,9 +222,9 @@ def test_configuration_round_trip(extension_size):
     extension = bytes((i * 37 + 11) % 256 for i in range(extension_size))
     msg, source_owner = message("configuration", extension)
     wire, size = encode(ctx, msg)
-    assert size == 220 + extension_size
+    assert size == 226 + extension_size
     if extension_size == 255:
-        assert size == 475
+        assert size == 481
     decoded, owner, used = decode(ctx, wire, size)
     assert used == extension_size
     assert_message_equal(msg, decoded, "configuration")
@@ -481,7 +482,8 @@ def assert_typed_failure(ctx, msg, status):
         ("pwm_out.1.initial_period_nanoseconds", 0),
         ("pwm_out.1.initial_duty_cycle_permyriad", 10001),
         ("can.1.bit_rate", 0),
-        ("can.1.termination_enabled", 2),
+        ("can.1.filter_id", 0x800),
+        ("can.1.filter_mask", 0x800),
         ("can.1.capture_limit_bytes", 256),
         ("spi.1.bit_rate", 0),
         ("spi.1.role", 255),

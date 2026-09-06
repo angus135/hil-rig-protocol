@@ -209,8 +209,13 @@ typedef struct
 /**
  * @brief Fixed standard-CAN configuration.
  *
- * @details CAN-FD and implementation-specific filters are not exposed. When
- * disabled, bit_rate, termination_enabled and capture_limit_bytes must all be zero.
+ * @details Only 11-bit standard CAN identifiers are supported. The receive filter
+ * accepts a frame when `(received_standard_id & filter_mask) ==
+ * (filter_id & filter_mask)`. A zero mask accepts every standard identifier.
+ * Filter-bank allocation is firmware-internal and CAN-FD is not exposed. CAN bus
+ * termination is not software-configurable through the Application protocol.
+ * When disabled, bit_rate, capture_limit_bytes, filter_id and filter_mask must all
+ * be zero.
  */
 typedef struct
 {
@@ -218,11 +223,13 @@ typedef struct
     uint8_t enabled;
     /** Standard-CAN nominal bit rate in bits per second; nonzero when enabled. */
     uint32_t bit_rate;
-    /** Bus termination request: exactly 0 (disabled) or 1 (enabled); zero when record disabled. */
-    uint8_t termination_enabled;
     /** Maximum captured receive bytes; bounded by context max_variable_data_size; zero when
      * disabled. */
     uint32_t capture_limit_bytes;
+    /** Host-selected standard CAN receive filter identifier, 0x000..0x7FF. */
+    uint16_t filter_id;
+    /** Host-selected standard CAN receive filter mask, 0x000..0x7FF; zero accepts all IDs. */
+    uint16_t filter_mask;
 } HIL_Application_Can_Config_T;
 
 /**
@@ -318,7 +325,7 @@ typedef struct
  *
  * The wire order is global fields, Digital Input, Digital Output, Analogue Input,
  * Analogue Output, PWM Input, PWM Output, CAN, SPI, UART, I2C, then a one-byte
- * extension length and extension bytes. The fixed payload is 197 bytes.
+ * extension length and extension bytes. The fixed payload is 203 bytes.
  */
 typedef struct
 {

@@ -20,7 +20,7 @@
 
 namespace hil_rig_protocol::test {
 
-constexpr std::size_t kApplicationConfigurationBaseCompleteSize = 220u;
+constexpr std::size_t kApplicationConfigurationBaseCompleteSize = 226u;
 constexpr std::size_t kApplicationInstructionCompleteSize       = 73u;
 constexpr std::size_t kApplicationResultCompleteSize            = 62u;
 constexpr std::size_t kApplicationExecutionControlCompleteSize  = 28u;

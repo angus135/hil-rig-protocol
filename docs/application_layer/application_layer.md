@@ -104,13 +104,13 @@ This foundation deliberately does not complete every message family. The current
 
 The public C integration suite now carries the currently supported fixed
 Application subset through the existing Transport pair harness. Complete Test
-Configuration messages are 220 through 475 bytes for extension lengths 0 through
+Configuration messages are 226 through 481 bytes for extension lengths 0 through
 255, fixed Test Instructions are 73 bytes, and fixed Test Results are 62 bytes.
 The default maximum complete Application message and default Transport maximum
 Application-message payload are both 512 bytes.
 
 The integration tests include only public Application and Transport headers and
-exercise exact opaque-byte preservation, the 475-byte capacity boundary,
+exercise exact opaque-byte preservation, the 481-byte capacity boundary,
 byte-stream chunking, reliable retry, Transport-valid malformed/invalid
 Application input, and Transport corruption before Application exposure. The
 Application codec remains stateless and direction-neutral. Any configuration,
@@ -210,10 +210,16 @@ Test Configuration validation enforces a nonzero `expected_tick_count` not
 greater than `context->config.max_expected_tick_count`, the supported tick
 durations, zero test-wide flags, canonical disabled records, valid protocol
 enums/Booleans, PWM structural limits, communication rate/capture constraints,
-and the UART/I2C structural combinations defined by the wire protocol. It does
-not validate hardware availability, exact supported rates, power state, MCU
-timing, cross-driver conflicts, complete-test retention capacity, or workflow
-state.
+11-bit standard CAN filter ID/mask bounds, and the UART/I2C structural
+combinations defined by the wire protocol. CAN receive filters are host-selected
+protocol fields; mask zero accepts every standard identifier. CAN termination is
+not software-configurable through the Application protocol, and filter-bank
+allocation remains firmware-internal. It does not validate hardware availability,
+exact supported rates, power state, MCU timing, cross-driver conflicts,
+complete-test retention capacity, or workflow state. Analogue-input sampling
+frequency and analogue-output reference selection remain firmware policies, and
+unsupported hardware configurations must be rejected rather than silently
+substituted.
 
 All fixed configuration arrays are protocol-sized rather than caller-configured.
 Their named channel counts and deterministic index mappings are described in
