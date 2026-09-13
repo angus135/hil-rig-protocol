@@ -12,6 +12,7 @@
 #include "application_internal.h"
 #include "application_test_config_internal.h"
 #include "application_encoding.h"
+#include "application_validation.h"
 #include "hil_rig_protocol/application/application_control.h"
 #include "hil_rig_protocol/application/application_instruction.h"
 #include "hil_rig_protocol/application/application_response.h"
@@ -20,18 +21,34 @@
 #include "hil_rig_protocol/application/application_system_info.h"
 #include "hil_rig_protocol/application/application_test_config.h"
 #include "hil_rig_protocol/application/application_types.h"
+#include "hil_rig_protocol/version.h"
 
 HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_size(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Request_T* data,
     size_t* encoded_size )
 {
-    ( void )context;
     ( void )sub_type;
     ( void )test_id;
-    ( void )data;
-    ( void )encoded_size;
-    // System Information Request payload: one flag byte plus one query byte.
+    if ( context == NULL || data == NULL || encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( data->application_protocol_major != HIL_RIG_PROTOCOL_VERSION_MAJOR
+         || data->application_protocol_minor != HIL_RIG_PROTOCOL_VERSION_MINOR
+         || data->application_protocol_patch != HIL_RIG_PROTOCOL_VERSION_PATCH )
+    {
+        return HIL_APPLICATION_STATUS_VERSION_MISMATCH;
+    }
+    {
+        const HIL_Application_Status_T status =
+            HIL_APPLICATION_System_Info_Request_validate( context, data );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    /* Request flag, query and an exact protocol version triplet. */
     *encoded_size = HIL_APPLICATION_SYSTEM_INFO_REQUEST_FIXED_ENCODE_SIZE;
     return HIL_APPLICATION_STATUS_OK;
 }
@@ -41,14 +58,34 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_size(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_System_Info_Response_T* data,
     size_t* encoded_size )
 {
-    ( void )context;
     ( void )sub_type;
     ( void )test_id;
-    ( void )data;
-    ( void )encoded_size;
-    *encoded_size = HIL_APPLICATION_SYSTEM_INFO_RESPONSE_FIXED_ENCODE_SIZE
-                    + data->firmware_git_hash.size + data->diagnostic_data.size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    if ( context == NULL || data == NULL || encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( data->application_protocol_major != HIL_RIG_PROTOCOL_VERSION_MAJOR
+         || data->application_protocol_minor != HIL_RIG_PROTOCOL_VERSION_MINOR
+         || data->application_protocol_patch != HIL_RIG_PROTOCOL_VERSION_PATCH )
+    {
+        return HIL_APPLICATION_STATUS_VERSION_MISMATCH;
+    }
+    {
+        const HIL_Application_Status_T status =
+            HIL_APPLICATION_System_Info_Response_validate( context, data );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_SYSTEM_INFO_RESPONSE_FIXED_ENCODE_SIZE,
+                                            ( size_t )data->firmware_git_hash.size
+                                                + ( size_t )data->diagnostic_data.size,
+                                            encoded_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_size(
@@ -109,12 +146,22 @@ HIL_Application_Status_T HIL_APPLICATION_Execution_Control_size(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Execution_Control_T* data,
     size_t* encoded_size )
 {
-    ( void )context;
     ( void )sub_type;
     ( void )test_id;
-    ( void )data;
-    ( void )encoded_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    if ( data == NULL || encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    {
+        const HIL_Application_Status_T status =
+            HIL_APPLICATION_Execution_Control_validate( context, data );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    *encoded_size = HIL_APPLICATION_CONTROL_FIXED_ENCODE_SIZE;
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Global_Control_size(
@@ -122,12 +169,22 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_size(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Global_Control_T* data,
     size_t* encoded_size )
 {
-    ( void )context;
     ( void )sub_type;
     ( void )test_id;
-    ( void )data;
-    ( void )encoded_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    if ( data == NULL || encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    {
+        const HIL_Application_Status_T status =
+            HIL_APPLICATION_Global_Control_validate( context, data );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    *encoded_size = HIL_APPLICATION_CONTROL_FIXED_ENCODE_SIZE;
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T

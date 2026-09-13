@@ -41,7 +41,7 @@ HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_Application_Message_Type_T type, s
             break;
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
-            expected_size = HIL_APPLICATION_WIRE_ENUM_SIZE + HIL_APPLICATION_WIRE_U32_SIZE;
+            expected_size = HIL_APPLICATION_CONTROL_FIXED_ENCODE_SIZE;
             break;
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
             expected_size = HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE;
@@ -67,6 +67,57 @@ HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_Application_Message_Type_T type, s
 
     return payload_size == expected_size ? HIL_APPLICATION_STATUS_OK
                                          : HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_System_Info_Response_Scan( const HIL_Application_Context_T* context,
+                                           const uint8_t* payload, size_t payload_size,
+                                           size_t* decoded_storage_size )
+{
+    const size_t fixed_numeric_size = 6u * HIL_APPLICATION_WIRE_U16_SIZE;
+    size_t       offset             = fixed_numeric_size;
+    size_t       total_storage      = 0u;
+    uint8_t      diagnostic_size;
+    uint8_t      git_hash_size;
+
+    if ( context == NULL || payload == NULL || decoded_storage_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *decoded_storage_size = 0u;
+    if ( payload_size < fixed_numeric_size + 2u * HIL_APPLICATION_BYTE_SPAN_LENGTH_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    diagnostic_size = payload[offset++];
+    if ( diagnostic_size > context->config.max_variable_data_size
+         || payload_size - offset < diagnostic_size )
+    {
+        return diagnostic_size > context->config.max_variable_data_size
+                   ? HIL_APPLICATION_STATUS_VALIDATION_FAILED
+                   : HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    offset += diagnostic_size;
+    if ( payload_size - offset < HIL_APPLICATION_BYTE_SPAN_LENGTH_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    git_hash_size = payload[offset++];
+    if ( git_hash_size > context->config.max_variable_data_size
+         || payload_size - offset < git_hash_size )
+    {
+        return git_hash_size > context->config.max_variable_data_size
+                   ? HIL_APPLICATION_STATUS_VALIDATION_FAILED
+                   : HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    offset += git_hash_size;
+    if ( offset != payload_size
+         || !HIL_APPLICATION_Checked_Add_Size( diagnostic_size, git_hash_size, &total_storage ) )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    *decoded_storage_size = total_storage;
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 void HIL_APPLICATION_Decode_U16_Le( uint16_t* dest, const uint8_t* src, size_t* running_total )
@@ -168,9 +219,12 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_decode(
         return status;
     }
     data->request_firmware_git_hash = payload[0];
-    data->query   = ( HIL_Application_System_Info_Query_T )payload[HIL_APPLICATION_WIRE_U8_SIZE];
-    *payload_size = HIL_APPLICATION_SYSTEM_INFO_REQUEST_FIXED_ENCODE_SIZE;
-    *used_decoded_size = 0u;
+    data->query = ( HIL_Application_System_Info_Query_T )payload[HIL_APPLICATION_WIRE_U8_SIZE];
+    data->application_protocol_major = HIL_APPLICATION_Read_U16_Le( &payload[2] );
+    data->application_protocol_minor = HIL_APPLICATION_Read_U16_Le( &payload[4] );
+    data->application_protocol_patch = HIL_APPLICATION_Read_U16_Le( &payload[6] );
+    *payload_size                    = HIL_APPLICATION_SYSTEM_INFO_REQUEST_FIXED_ENCODE_SIZE;
+    *used_decoded_size               = 0u;
     return HIL_APPLICATION_STATUS_OK;
 }
 
@@ -180,19 +234,22 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
     const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
     size_t max_decoded_data_size, size_t* used_decoded_size )
 {
-    const size_t             fixed_numeric_size = 6u * HIL_APPLICATION_WIRE_U16_SIZE;
-    size_t                   running_total      = 0u;
-    size_t                   decoded_total      = 0u;
-    size_t                   encoded_span_used  = 0u;
-    size_t                   decoded_span_used  = 0u;
+    size_t                   running_total     = 0u;
+    size_t                   decoded_total     = 0u;
+    size_t                   encoded_span_used = 0u;
+    size_t                   decoded_span_used = 0u;
     HIL_Application_Status_T status;
-    ( void )context;
     ( void )sub_type;
     ( void )test_id;
-
-    if ( max_payload_size < fixed_numeric_size + 2u * HIL_APPLICATION_BYTE_SPAN_LENGTH_SIZE )
+    status = HIL_APPLICATION_System_Info_Response_Scan( context, payload, max_payload_size,
+                                                        &decoded_total );
+    if ( status != HIL_APPLICATION_STATUS_OK )
     {
-        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+        return status;
+    }
+    if ( decoded_total > max_decoded_data_size )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
     HIL_APPLICATION_Decode_U16_Le( &data->application_protocol_major, &payload[running_total],
                                    &running_total );
@@ -215,7 +272,7 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_decode(
         return status;
     }
     running_total += encoded_span_used;
-    decoded_total += decoded_span_used;
+    decoded_total = decoded_span_used;
 
     status = HIL_APPLICATION_Byte_Span_decode(
         &data->firmware_git_hash, &payload[running_total], max_payload_size - running_total,

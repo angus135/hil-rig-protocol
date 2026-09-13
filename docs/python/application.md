@@ -1,7 +1,8 @@
 # Python Application codec
 
-`ApplicationCodec` encodes and decodes complete Test Configuration messages and
-fixed Digital, Analog and PWM Test Instruction and Test Result messages. All wire
+`ApplicationCodec` encodes and decodes complete BASIC System Information,
+Execution Control, Global Control, Test Configuration, and fixed Digital, Analog
+and PWM Test Instruction and Test Result messages. All wire
 encoding, decoding and protocol validation execute the shared native C Application
 implementation. Import the supported API from `hil_rig_protocol`; CFFI objects and
 conversion helpers are private.
@@ -102,11 +103,48 @@ for message in (configuration, instruction, result):
     assert application_codec.decode(encoded) == message
 ```
 
-`ApplicationMessage` is the type alias for exactly these three message classes.
+`ApplicationMessage` includes those fixed test messages plus `SystemInfoRequest`,
+`SystemInfoResponse`, `ExecutionControl`, and `GlobalControl`.
 `TestId.bytes` is exactly 16 immutable bytes; zero bytes are valid, and the codec
 does not generate identifiers. `tick_number`, `expected_tick_count`, `flags` and
 `problem_detail` are unsigned 32-bit integers. Flags are reserved and native C
 currently requires zero. Problem detail is an integration-defined diagnostic.
+
+## Discovery and controls
+
+`PROTOCOL_VERSION` is the native library's `ProtocolVersion(major, minor, patch)`.
+`SystemInfoRequest()` defaults to that triplet. Decode can return a structurally
+valid foreign discovery message so the endpoint can inspect it; it does not make
+the peer compatible. Call `check_protocol_version()` and block test messages
+until it succeeds. It requires exact patch equality as well as envelope major and
+minor equality, and must be repeated after every new Transport session. A peer
+without usable discovery is unconfirmed.
+
+```python
+from hil_rig_protocol import (
+    ControlCommand,
+    ExecutionControl,
+    GlobalControl,
+    GlobalControlCommand,
+    SystemInfoRequest,
+    check_protocol_version,
+)
+
+request = SystemInfoRequest(request_firmware_git_hash=True)
+peer_request = application_codec.decode(application_codec.encode(request))
+assert isinstance(peer_request, SystemInfoRequest)
+check_protocol_version(peer_request.protocol_version)
+
+start = ExecutionControl(test_id, ControlCommand.START)
+abort = ExecutionControl(test_id, ControlCommand.ABORT)
+reset = GlobalControl(GlobalControlCommand.RESET_APPLICATION)
+```
+
+`ApplicationVersionMismatchError` exposes `local_version`, `peer_version`, and
+the `VERSION_MISMATCH` status. START requires an accepted complete test, ABORT
+abandons that operation, and RESET_APPLICATION clears Application state while
+preserving Transport. The codec only represents these controls; endpoint
+lifecycle enforcement and Application Responses are pending work.
 
 `ResultCondition` includes `OK`, `PARTIAL`, `EXECUTION_PROBLEM` and `RESERVED`.
 Native C accepts the first three, including `PARTIAL` even though variable data is
@@ -256,9 +294,8 @@ for caller-owned byte-stream servicing.
 ## Deferred scope
 
 Variable-length instruction/result data and variable-data declarations are not
-supported. Response, Error, Execution Control, Global Control and all System
-Information messages are also outside the public Python subset, even when native
-C implements some of them. No test lifecycle, active-test state, role enforcement,
-tick sequencing, every-tick/state-change translation, hardware I/O or consuming
+supported. Response and Error remain outside the public Python subset. No test
+lifecycle, active-test state, role enforcement, tick sequencing,
+every-tick/state-change translation, hardware I/O or consuming
 Python API/MCU integration is provided. These require separate future work; no
 typed Application methods are added to `Transport`.

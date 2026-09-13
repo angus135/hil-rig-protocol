@@ -82,6 +82,12 @@ std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
     messages[0].has_test_id                    = 0u;
     messages[0].body.system_info_request.query = HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC;
     messages[0].body.system_info_request.request_firmware_git_hash = 1u;
+    messages[0].body.system_info_request.application_protocol_major =
+        HIL_RIG_PROTOCOL_VERSION_MAJOR;
+    messages[0].body.system_info_request.application_protocol_minor =
+        HIL_RIG_PROTOCOL_VERSION_MINOR;
+    messages[0].body.system_info_request.application_protocol_patch =
+        HIL_RIG_PROTOCOL_VERSION_PATCH;
 
     messages[1].type        = HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE;
     messages[1].subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;

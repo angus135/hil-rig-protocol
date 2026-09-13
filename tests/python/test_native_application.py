@@ -655,6 +655,7 @@ def test_null_storage_with_nonzero_capacity():
         ("HIL_APPLICATION_STATUS_VALIDATION_FAILED", 14),
         ("HIL_APPLICATION_STATUS_NOT_IMPLEMENTED", 15),
         ("HIL_APPLICATION_STATUS_INTERNAL_ERROR", 16),
+        ("HIL_APPLICATION_STATUS_VERSION_MISMATCH", 17),
         ("HIL_APPLICATION_PERIPHERAL_CONFIG_VOLTAGE_INVALID", 0),
         ("HIL_APPLICATION_PERIPHERAL_CONFIG_3V3", 1),
         ("HIL_APPLICATION_PERIPHERAL_CONFIG_5V", 2),
@@ -754,7 +755,7 @@ def test_enum_values(name, value):
         ("HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES", 2),
         ("HIL_APPLICATION_HEADER_SIZE_BYTES", 23),
         ("HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE", 65558),
-        ("HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE", 25),
+        ("HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE", 28),
     ],
 )
 def test_public_constants(name, value):
@@ -766,6 +767,13 @@ def test_public_constants(name, value):
     [
         "max_align_t",
         "HIL_Application_Status_T",
+        "HIL_Application_System_Info_Query_T",
+        "HIL_Application_System_Info_Request_T",
+        "HIL_Application_System_Info_Response_T",
+        "HIL_Application_Control_Command_T",
+        "HIL_Application_Execution_Control_T",
+        "HIL_Application_Global_Control_Command_T",
+        "HIL_Application_Global_Control_T",
         "HIL_Application_Test_Id_T",
         "HIL_Application_Byte_Span_T",
         "HIL_Application_Peripheral_Type_T",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .application_types import ApplicationStatus
+from .application_types import ApplicationStatus, ProtocolVersion
 from .transport_types import TransportStatus
 
 
@@ -93,6 +93,20 @@ class ApplicationInternalError(ApplicationError):
     """Native Application code reported an internal invariant failure."""
 
 
+class ApplicationVersionMismatchError(ApplicationError):
+    """A peer discovery version is structurally valid but not exactly compatible."""
+
+    def __init__(self, local_version: ProtocolVersion, peer_version: ProtocolVersion) -> None:
+        self.local_version = local_version
+        self.peer_version = peer_version
+        super().__init__(
+            "Application protocol version mismatch: "
+            f"local {local_version.major}.{local_version.minor}.{local_version.patch}, "
+            f"peer {peer_version.major}.{peer_version.minor}.{peer_version.patch}",
+            status=ApplicationStatus.VERSION_MISMATCH,
+        )
+
+
 __all__ = [
     "ApplicationError",
     "ApplicationConfigurationError",
@@ -101,6 +115,7 @@ __all__ = [
     "ApplicationBindingError",
     "ApplicationOwnershipError",
     "ApplicationInternalError",
+    "ApplicationVersionMismatchError",
     "ProtocolError",
     "TransportError",
     "TransportConfigurationError",

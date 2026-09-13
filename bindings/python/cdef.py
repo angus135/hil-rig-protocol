@@ -210,6 +210,7 @@ typedef enum
     HIL_APPLICATION_STATUS_VALIDATION_FAILED,
     HIL_APPLICATION_STATUS_NOT_IMPLEMENTED,
     HIL_APPLICATION_STATUS_INTERNAL_ERROR,
+    HIL_APPLICATION_STATUS_VERSION_MISMATCH,
     ...
 } HIL_Application_Status_T;
 
@@ -566,6 +567,68 @@ typedef struct
     uint32_t problem_detail;
 } HIL_Application_Test_Result_T;
 
+/* application_system_info.h */
+
+typedef enum
+{
+    HIL_APPLICATION_SYSTEM_INFO_QUERY_INVALID,
+    HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC,
+    HIL_APPLICATION_SYSTEM_INFO_QUERY_RESERVED,
+    ...
+} HIL_Application_System_Info_Query_T;
+
+typedef struct
+{
+    uint8_t request_firmware_git_hash;
+    HIL_Application_System_Info_Query_T query;
+    uint16_t application_protocol_major;
+    uint16_t application_protocol_minor;
+    uint16_t application_protocol_patch;
+} HIL_Application_System_Info_Request_T;
+
+typedef struct
+{
+    uint16_t application_protocol_major;
+    uint16_t application_protocol_minor;
+    uint16_t application_protocol_patch;
+    uint16_t firmware_version_major;
+    uint16_t firmware_version_minor;
+    uint16_t firmware_version_patch;
+    HIL_Application_Byte_Span_T firmware_git_hash;
+    HIL_Application_Byte_Span_T diagnostic_data;
+} HIL_Application_System_Info_Response_T;
+
+/* application_control.h */
+
+typedef enum
+{
+    HIL_APPLICATION_CONTROL_INVALID,
+    HIL_APPLICATION_CONTROL_START,
+    HIL_APPLICATION_CONTROL_ABORT,
+    HIL_APPLICATION_CONTROL_RESERVED,
+    ...
+} HIL_Application_Control_Command_T;
+
+typedef struct
+{
+    HIL_Application_Control_Command_T command;
+    uint32_t flags;
+} HIL_Application_Execution_Control_T;
+
+typedef enum
+{
+    HIL_APPLICATION_GLOBAL_CONTROL_INVALID,
+    HIL_APPLICATION_GLOBAL_CONTROL_RESET_APPLICATION,
+    HIL_APPLICATION_GLOBAL_CONTROL_RESERVED,
+    ...
+} HIL_Application_Global_Control_Command_T;
+
+typedef struct
+{
+    HIL_Application_Global_Control_Command_T command;
+    uint32_t flags;
+} HIL_Application_Global_Control_T;
+
 /* application_message.h */
 
 typedef enum
@@ -601,8 +664,12 @@ typedef struct
     uint8_t has_test_id;
     HIL_Application_Test_Id_T test_id;
     union {
+        HIL_Application_System_Info_Request_T system_info_request;
+        HIL_Application_System_Info_Response_T system_info_response;
         HIL_Application_Test_Configuration_T test_configuration;
         HIL_Application_Test_Instruction_T test_instruction;
+        HIL_Application_Execution_Control_T execution_control;
+        HIL_Application_Global_Control_T global_control;
         HIL_Application_Test_Result_T test_result;
     } body;
     ...;
@@ -622,6 +689,12 @@ typedef struct
 #define HIL_APPLICATION_HEADER_SIZE_BYTES ...
 #define HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE ...
 #define HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE ...
+
+/* version.h */
+
+#define HIL_RIG_PROTOCOL_VERSION_MAJOR ...
+#define HIL_RIG_PROTOCOL_VERSION_MINOR ...
+#define HIL_RIG_PROTOCOL_VERSION_PATCH ...
 
 /* Direct public Application entry points; no binding forwarding codec. */
 
@@ -668,4 +741,9 @@ HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
     const uint8_t* encoded_message,
     size_t encoded_message_size,
     size_t* required_decode_storage);
+
+HIL_Application_Status_T HIL_APPLICATION_Check_Protocol_Version(
+    uint16_t major,
+    uint16_t minor,
+    uint16_t patch);
 """

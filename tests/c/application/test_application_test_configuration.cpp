@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include "hil_rig_protocol/application/application.h"
+#include "hil_rig_protocol/version.h"
 
 namespace {
 constexpr std::size_t kHeaderSize            = 23u;
@@ -256,8 +257,8 @@ std::vector<std::uint8_t> EncodeConfiguration( const HIL_Application_Context_T& 
 std::vector<std::uint8_t> EmptyGolden()
 {
     std::vector<std::uint8_t> expected( kEmptyCompleteSize, 0u );
-    expected[0] = 0u;
-    expected[1] = 1u;
+    expected[0] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MAJOR );
+    expected[1] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MINOR );
     expected[2] = 1u;
     for ( std::size_t i = 0u; i < 16u; ++i )
         expected[3u + i] = static_cast<std::uint8_t>( 0xa0u + i );

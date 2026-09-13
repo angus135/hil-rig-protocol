@@ -36,11 +36,13 @@ extents without explicit padding. All encoding, decoding and validation remain
 in C.
 
 The supported public `ApplicationCodec` uses this private native surface for
-complete Test Configuration and fixed Digital, Analog and PWM Test Instruction/Result
-messages. Its frozen, slotted records contain only Python-owned values. The codec
-snapshots input, uses aligned decode storage and copies decoded spans into bytes.
-It enforces creating-thread ownership and translates native statuses into public
-Application exceptions. All other message families remain outside the Python subset.
+BASIC System Information, Execution Control, Global Control, complete Test
+Configuration, and fixed Digital, Analog and PWM Test Instruction/Result messages.
+Its frozen, slotted records contain only Python-owned values. The codec snapshots
+input, uses aligned decode storage and copies decoded spans into bytes. It enforces
+creating-thread ownership and translates native statuses into public Application
+exceptions. Variable instruction/result data and Application Response/Error remain
+outside the Python subset.
 See the [Application guide](../../docs/python/application.md) and runnable
 [codec example](../../examples/python/application_codec.py).
 

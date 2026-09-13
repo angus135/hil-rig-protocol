@@ -31,6 +31,32 @@ ENUMS = {
             "VALIDATION_FAILED": "HIL_APPLICATION_STATUS_VALIDATION_FAILED",
             "NOT_IMPLEMENTED": "HIL_APPLICATION_STATUS_NOT_IMPLEMENTED",
             "INTERNAL_ERROR": "HIL_APPLICATION_STATUS_INTERNAL_ERROR",
+            "VERSION_MISMATCH": "HIL_APPLICATION_STATUS_VERSION_MISMATCH",
+        },
+    ),
+    p.SystemInfoQuery: (
+        "HIL_Application_System_Info_Query_T",
+        {
+            "INVALID": "HIL_APPLICATION_SYSTEM_INFO_QUERY_INVALID",
+            "BASIC": "HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC",
+            "RESERVED": "HIL_APPLICATION_SYSTEM_INFO_QUERY_RESERVED",
+        },
+    ),
+    p.ControlCommand: (
+        "HIL_Application_Control_Command_T",
+        {
+            "INVALID": "HIL_APPLICATION_CONTROL_INVALID",
+            "START": "HIL_APPLICATION_CONTROL_START",
+            "ABORT": "HIL_APPLICATION_CONTROL_ABORT",
+            "RESERVED": "HIL_APPLICATION_CONTROL_RESERVED",
+        },
+    ),
+    p.GlobalControlCommand: (
+        "HIL_Application_Global_Control_Command_T",
+        {
+            "INVALID": "HIL_APPLICATION_GLOBAL_CONTROL_INVALID",
+            "RESET_APPLICATION": "HIL_APPLICATION_GLOBAL_CONTROL_RESET_APPLICATION",
+            "RESERVED": "HIL_APPLICATION_GLOBAL_CONTROL_RESERVED",
         },
     ),
     p.PeripheralVoltage: (
@@ -300,6 +326,39 @@ def test_configuration_defaults_match_compiled_native():
     config = p.ApplicationConfig()
     for field in fields(config):
         assert getattr(config, field.name) == getattr(native, field.name)
+
+
+def test_discovery_and_control_values_are_frozen_and_representable():
+    assert (
+        p.ProtocolVersion(
+            int(_binding.lib.HIL_RIG_PROTOCOL_VERSION_MAJOR),
+            int(_binding.lib.HIL_RIG_PROTOCOL_VERSION_MINOR),
+            int(_binding.lib.HIL_RIG_PROTOCOL_VERSION_PATCH),
+        )
+        == p.PROTOCOL_VERSION
+    )
+    request = p.SystemInfoRequest()
+    response = p.SystemInfoResponse(p.PROTOCOL_VERSION, p.ProtocolVersion(1, 2, 3), b"d", b"g")
+    execution = p.ExecutionControl(p.TestId(bytes(16)), p.ControlCommand.START)
+    global_control = p.GlobalControl(p.GlobalControlCommand.RESET_APPLICATION)
+    for value in (p.PROTOCOL_VERSION, request, response, execution, global_control):
+        assert not hasattr(value, "__dict__")
+        field = fields(value)[0]
+        with pytest.raises(FrozenInstanceError):
+            setattr(value, field.name, getattr(value, field.name))
+
+    with pytest.raises(ValueError):
+        p.ProtocolVersion(0, 0, 65536)
+    with pytest.raises(TypeError):
+        p.ProtocolVersion(True, 0, 0)
+    with pytest.raises(TypeError):
+        p.SystemInfoRequest(query=p.SystemInfoQuery.BASIC.value)
+    with pytest.raises(ValueError):
+        p.SystemInfoResponse(p.PROTOCOL_VERSION, p.PROTOCOL_VERSION, b"x" * 256)
+    with pytest.raises(TypeError):
+        p.ExecutionControl(p.TestId(bytes(16)), p.ControlCommand.START.value)
+    with pytest.raises(TypeError):
+        p.GlobalControl(p.GlobalControlCommand.RESET_APPLICATION.value)
 
 
 def test_can_config_public_shape_and_uint16_filter_representation():

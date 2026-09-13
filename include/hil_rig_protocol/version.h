@@ -26,13 +26,13 @@ extern "C"
 #define HIL_RIG_PROTOCOL_VERSION_MAJOR 0u
 
 /** Minor component of the library's semantic version. */
-#define HIL_RIG_PROTOCOL_VERSION_MINOR 1u
+#define HIL_RIG_PROTOCOL_VERSION_MINOR 2u
 
 /** Patch component of the library's semantic version. */
 #define HIL_RIG_PROTOCOL_VERSION_PATCH 0u
 
 /** Complete dotted library version string. */
-#define HIL_RIG_PROTOCOL_VERSION_STRING "0.1.0"
+#define HIL_RIG_PROTOCOL_VERSION_STRING "0.2.0"
 
 /** Get the library major version. */
 uint32_t HIL_RIG_PROTOCOL_Version_Major( void );

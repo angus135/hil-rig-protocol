@@ -36,17 +36,29 @@ typedef enum
     HIL_APPLICATION_SYSTEM_INFO_QUERY_RESERVED = 255
 } HIL_Application_System_Info_Query_T;
 
-/** Python-to-firmware System Information request body. */
+/**
+ * @brief Python-to-firmware System Information request body.
+ *
+ * @details Structural validation accepts representable foreign discovery
+ * versions. Encoded sizing and encoding require the protocol triplet to equal
+ * this library's compiled version.
+ */
 typedef struct
 {
-    /** Requested diagnostic record; initially only BASIC is defined. */
-    HIL_Application_System_Info_Query_T query;
     /**
      * Nonzero requests an optional firmware Git hash when available.
      *
      * The peer may return an empty hash when firmware policy omits it.
      */
     uint8_t request_firmware_git_hash;
+    /** Requested diagnostic record; initially only BASIC is defined. */
+    HIL_Application_System_Info_Query_T query;
+    /** Application protocol major version used for exact compatibility confirmation. */
+    uint16_t application_protocol_major;
+    /** Application protocol minor version used for exact compatibility confirmation. */
+    uint16_t application_protocol_minor;
+    /** Application protocol patch version used for exact compatibility confirmation. */
+    uint16_t application_protocol_patch;
 } HIL_Application_System_Info_Request_T;
 
 /**
@@ -54,9 +66,12 @@ typedef struct
  *
  * @details Version fields are diagnostics rather than a compatibility
  * negotiation mechanism. For a typed message to be structurally valid, the
- * three application_protocol_* fields must exactly match the codec's compiled-in
- * repository-wide HIL-RIG protocol version. They do not select or change that
- * version. firmware_git_hash and diagnostic_data are borrowed during encoding
+ * application_protocol_major and application_protocol_minor fields must fit the
+ * discovery envelope bytes; patch is the full uint16_t value. They do not select
+ * or change that version. Encoded sizing and encoding require the protocol
+ * triplet to equal this library's compiled version. Endpoint integration compares
+ * decoded values exactly with its compiled version before accepting test traffic.
+ * firmware_git_hash and diagnostic_data are borrowed during encoding
  * and point into caller decode storage after successful
  * decoding.
  * Integration may expose firmware-specific runtime diagnostics in

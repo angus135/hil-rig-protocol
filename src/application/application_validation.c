@@ -18,8 +18,6 @@
 #include "hil_rig_protocol/application/application_system_info.h"
 #include "hil_rig_protocol/application/application_test_config.h"
 #include "hil_rig_protocol/application/application_types.h"
-#include "hil_rig_protocol/version.h"
-
 #include <string.h>
 
 static HIL_Application_Status_T
@@ -309,12 +307,18 @@ HIL_Application_Status_T
 HIL_APPLICATION_System_Info_Request_validate( const HIL_Application_Context_T*             context,
                                               const HIL_Application_System_Info_Request_T* data )
 {
+    if ( context == NULL || data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
     if ( context->initialized == 0 )
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
     }
     if ( data->request_firmware_git_hash > 1u
-         || data->query != HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC )
+         || data->query != HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC
+         || data->application_protocol_major > UINT8_MAX
+         || data->application_protocol_minor > UINT8_MAX )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
@@ -327,25 +331,27 @@ HIL_APPLICATION_System_Info_Response_validate( const HIL_Application_Context_T* 
 {
     HIL_Application_Status_T status;
 
+    if ( context == NULL || data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
     if ( context->initialized == 0 )
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
     }
-    /* Typed diagnostics must match the repository protocol version encoded by this codec. */
-    if ( data->application_protocol_major != HIL_RIG_PROTOCOL_VERSION_MAJOR
-         || data->application_protocol_minor != HIL_RIG_PROTOCOL_VERSION_MINOR
-         || data->application_protocol_patch != HIL_RIG_PROTOCOL_VERSION_PATCH )
+    if ( data->application_protocol_major > UINT8_MAX
+         || data->application_protocol_minor > UINT8_MAX )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
     status = HIL_APPLICATION_Byte_Span_validate( &data->firmware_git_hash,
-                                                 HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE );
+                                                 context->config.max_variable_data_size );
     if ( status != HIL_APPLICATION_STATUS_OK )
     {
         return status;
     }
     return HIL_APPLICATION_Byte_Span_validate( &data->diagnostic_data,
-                                               HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE );
+                                               context->config.max_variable_data_size );
 }
 
 HIL_Application_Status_T
