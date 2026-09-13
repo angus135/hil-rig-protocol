@@ -39,8 +39,10 @@ The exact envelope offsets are:
 | 23 | N bytes | Payload | exactly the declared number of bytes |
 
 There is no payload-end marker and no Application-specific version field. Patch version is not carried
-in the common envelope. The decoder currently requires an exact encoded major/minor match with the
-compiled repository version.
+in the common envelope. Ordinary messages require exact encoded major/minor equality with the compiled
+repository version. A structurally valid BASIC System Information Request or Response with no Test ID is
+accepted with foreign envelope major/minor only for discovery; its body major/minor must agree with the
+envelope. It does not establish compatibility by decoding.
 
 ### Test ID encoding
 
@@ -99,63 +101,74 @@ checked conversion before putting a local length into a fixed-width wire field.
 
 ## System Information Request
 
-This is the smallest currently supported complete Application message.
+This is the discovery request. The five-byte Execution Control and Global
+Control payloads form the smallest currently supported complete message at 28
+bytes; this request is 31 bytes.
 
 - message type: `SYSTEM_INFO_REQUEST == 0x01`
 - subtype: `BASIC == 0x01`
 - Test ID: absent
-- payload size: exactly 2 bytes
-- complete message size: exactly 25 bytes
+- payload size: exactly 8 bytes
+- complete message size: exactly 31 bytes
 
 Payload:
 
 ```text
 payload offset
-  0       1       2
-  +-------+-------+
-  | hash? | query |
-  | 1 B   | 1 B   |
-  +-------+-------+
+  0       1       2       4       6       8
+  +-------+-------+-------+-------+-------+
+  | hash? | query | major | minor | patch |
+  | 1 B   | 1 B   | u16LE | u16LE | u16LE |
+  +-------+-------+-------+-------+-------+
 ```
 
 | Payload offset | Width | Field | Initial valid values |
 | ---: | ---: | --- | --- |
 | 0 | 1 byte | `request_firmware_git_hash` | `0x00` or `0x01` |
 | 1 | 1 byte | `query` | `BASIC == 0x01` |
+| 2 | 2 bytes | application protocol major | little-endian `uint16_t` |
+| 4 | 2 bytes | application protocol minor | little-endian `uint16_t` |
+| 6 | 2 bytes | application protocol patch | little-endian `uint16_t` |
 
-For repository protocol version 0.1, a BASIC request asking for the Git hash has this literal complete
+For repository protocol version 0.2.0, a BASIC request asking for the Git hash has this literal complete
 wire vector:
 
 ```text
-00 01 00
+00 02 00
 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-01 01 02 00
-01 01
+01 01 08 00
+01 01 00 00 02 00 00 00
 ```
 
 Broken down:
 
 ```text
 00       protocol major = 0
-01       protocol minor = 1
+02       protocol minor = 2
 00       Test ID absent
 00..00   16 zero Test-ID bytes
 01       SYSTEM_INFO_REQUEST
 01       BASIC subtype
-02 00    payload length = 2
+08 00    payload length = 8
 01       request firmware Git hash
 01       BASIC query
+00 00    protocol major = 0
+02 00    protocol minor = 2
+00 00    protocol patch = 0
 ```
 
-The literal version bytes above are a golden example for protocol 0.1, not a rule that future protocol
-versions remain 0.1.
+The literal version bytes above are a golden example for protocol 0.2.0, not a rule that future protocol
+versions remain 0.2.0.
 
 ## System Information Response
 
-The existing response payload encoder/decoder uses the following wire layout. Public validation also
-requires the typed repository protocol version fields to match the compiled repository version.
-Message-specific encoded-size and decode-storage sizing remain deliberately unfinished, so this family
-is not yet fully supported by every public façade operation.
+The response payload uses the following wire layout. All six public codec paths support it. The response
+needs `D + G` caller decode-storage bytes, where D and G are diagnostic and Git-hash lengths. Each span
+is bounded by `max_variable_data_size` and 255 wire bytes. Both spans may be 255 bytes, requiring 510
+storage bytes and a 547-byte complete message when the configured complete-message limit permits it;
+the default 512-byte complete limit may reject that larger message. Encoded sizing and encoding require
+the response protocol triplet to equal the compiled library version; decode may accept a consistent
+foreign discovery triplet for the explicit compatibility check.
 
 ```text
 payload offset
@@ -395,7 +408,11 @@ Both current fixed control bodies are five bytes:
 ```
 
 The initial protocol requires `flags == 0`. Execution Control requires a Test ID; Global Control
-forbids one.
+forbids one. `EXECUTION_CONTROL` is type 19 with subtype NONE: START is 1 and ABORT is 2.
+`GLOBAL_CONTROL` is type 20 with subtype NONE: RESET_APPLICATION is 1. Every control complete message
+is 28 bytes. Decoding never performs a control. START requires an accepted complete test; ABORT abandons
+the identified operation; RESET_APPLICATION cleans Application state without resetting Transport. The
+actual lifecycle checks and Application Responses remain endpoint integration work.
 
 ## Test Result fixed body
 

@@ -32,29 +32,51 @@ HIL_Application_Message_T BasicSystemInfoRequest()
     message.has_test_id = 0u;
     message.body.system_info_request.request_firmware_git_hash = 1u;
     message.body.system_info_request.query = HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC;
+    message.body.system_info_request.application_protocol_major = HIL_RIG_PROTOCOL_VERSION_MAJOR;
+    message.body.system_info_request.application_protocol_minor = HIL_RIG_PROTOCOL_VERSION_MINOR;
+    message.body.system_info_request.application_protocol_patch = HIL_RIG_PROTOCOL_VERSION_PATCH;
     return message;
 }
 
-std::array<std::uint8_t, 25u> BasicSystemInfoGolden()
+std::array<std::uint8_t, 31u> BasicSystemInfoGolden()
 {
-    return { 0x00u, 0x01u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
-             0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
-             0x00u, 0x01u, 0x01u, 0x02u, 0x00u, 0x01u, 0x01u };
+    std::array<std::uint8_t, 31u> bytes{};
+    bytes[0]  = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MAJOR );
+    bytes[1]  = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MINOR );
+    bytes[19] = static_cast<std::uint8_t>( HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST );
+    bytes[20] = static_cast<std::uint8_t>( HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC );
+    bytes[21] = 8u;
+    bytes[23] = 1u;
+    bytes[24] = static_cast<std::uint8_t>( HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC );
+    bytes[25] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MAJOR );
+    bytes[27] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MINOR );
+    bytes[29] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_PATCH );
+    return bytes;
 }
 
 std::array<std::uint8_t, 28u> ExecutionControlGoldenWithTestId()
 {
-    return { 0x00u, 0x01u, 0x01u, 0x80u, 0x81u, 0x82u, 0x83u, 0x84u, 0x85u, 0x86u,
-             0x87u, 0x88u, 0x89u, 0x8au, 0x8bu, 0x8cu, 0x8du, 0x8eu, 0x8fu, 0x13u,
-             0x00u, 0x05u, 0x00u, 0x01u, 0x00u, 0x00u, 0x00u, 0x00u };
+    std::array<std::uint8_t, 28u> bytes{ 0x00u, 0x00u, 0x01u, 0x80u, 0x81u, 0x82u, 0x83u,
+                                         0x84u, 0x85u, 0x86u, 0x87u, 0x88u, 0x89u, 0x8au,
+                                         0x8bu, 0x8cu, 0x8du, 0x8eu, 0x8fu, 0x13u, 0x00u,
+                                         0x05u, 0x00u, 0x01u, 0x00u, 0x00u, 0x00u, 0x00u };
+    bytes[0] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MAJOR );
+    bytes[1] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MINOR );
+    return bytes;
 }
 
 std::array<std::uint8_t, 38u> SystemInfoResponseGoldenWithDiagnostic()
 {
-    return { 0x00u, 0x01u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
-             0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x02u,
-             0x01u, 0x0fu, 0x00u, 0x00u, 0x00u, 0x01u, 0x00u, 0x00u, 0x00u, 0x02u,
-             0x00u, 0x03u, 0x00u, 0x04u, 0x00u, 0x01u, 0xaau, 0x00u };
+    std::array<std::uint8_t, 38u> bytes{
+        0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+        0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x02u, 0x01u, 0x0fu, 0x00u, 0x00u, 0x00u, 0x00u,
+        0x00u, 0x00u, 0x00u, 0x02u, 0x00u, 0x03u, 0x00u, 0x04u, 0x00u, 0x01u, 0xaau, 0x00u };
+    bytes[0]  = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MAJOR );
+    bytes[1]  = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MINOR );
+    bytes[23] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MAJOR );
+    bytes[25] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MINOR );
+    bytes[27] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_PATCH );
+    return bytes;
 }
 
 std::vector<std::uint8_t> FixedBodyEnvelope( HIL_Application_Message_Type_T type,
@@ -69,6 +91,20 @@ std::vector<std::uint8_t> FixedBodyEnvelope( HIL_Application_Message_Type_T type
                                                : HIL_APPLICATION_MESSAGE_SUBTYPE_NONE );
     bytes[21] = static_cast<std::uint8_t>( payload_size & 0xffu );
     bytes[22] = static_cast<std::uint8_t>( ( payload_size >> 8u ) & 0xffu );
+    if ( type == HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION
+         || type == HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL
+         || type == HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT )
+    {
+        bytes[2] = 1u;
+    }
+    if ( type == HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST && payload_size >= 8u )
+    {
+        bytes[23] = 1u;
+        bytes[24] = static_cast<std::uint8_t>( HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC );
+        bytes[25] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MAJOR );
+        bytes[27] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MINOR );
+        bytes[29] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_PATCH );
+    }
     return bytes;
 }
 
@@ -79,7 +115,7 @@ struct FixedBodyWidthCase
 };
 
 constexpr std::array<FixedBodyWidthCase, 6u> kFixedBodyWidths = {
-    FixedBodyWidthCase{ HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST, 2u },
+    FixedBodyWidthCase{ HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST, 8u },
     FixedBodyWidthCase{ HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION, 50u },
     FixedBodyWidthCase{ HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL, 5u },
     FixedBodyWidthCase{ HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL, 5u },
@@ -112,9 +148,9 @@ void ExpectDecodeFailurePublishesNothing(
 
 static_assert( HIL_APPLICATION_HEADER_SIZE_BYTES == 23u );
 static_assert( HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE == 23u + UINT16_MAX );
-static_assert( HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE == 25u );
+static_assert( HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE == 28u );
 static_assert( HIL_RIG_PROTOCOL_VERSION_MAJOR == 0u );
-static_assert( HIL_RIG_PROTOCOL_VERSION_MINOR == 1u );
+static_assert( HIL_RIG_PROTOCOL_VERSION_MINOR == 2u );
 static_assert( HIL_RIG_PROTOCOL_VERSION_PATCH == 0u );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST == 1 );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL == 19 );
@@ -291,12 +327,21 @@ TEST( ApplicationCodecEnvelope, RejectsMalformedLiteralEnvelopeFields )
     bytes = golden;
     bytes[0] ^= 1u;
     ExpectDecodeFailurePublishesNothing( context, bytes.data(), bytes.size(),
-                                         HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE, true );
+                                         HIL_APPLICATION_STATUS_MALFORMED_MESSAGE, true );
 
     bytes = golden;
     bytes[1] ^= 1u;
     ExpectDecodeFailurePublishesNothing( context, bytes.data(), bytes.size(),
-                                         HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE, true );
+                                         HIL_APPLICATION_STATUS_MALFORMED_MESSAGE, true );
+
+    auto ordinary = ExecutionControlGoldenWithTestId();
+    ordinary[0] ^= 1u;
+    ExpectDecodeFailurePublishesNothing( context, ordinary.data(), ordinary.size(),
+                                         HIL_APPLICATION_STATUS_VERSION_MISMATCH, true );
+    ordinary = ExecutionControlGoldenWithTestId();
+    ordinary[1] ^= 1u;
+    ExpectDecodeFailurePublishesNothing( context, ordinary.data(), ordinary.size(),
+                                         HIL_APPLICATION_STATUS_VERSION_MISMATCH, true );
 
     bytes     = golden;
     bytes[20] = static_cast<std::uint8_t>( HIL_APPLICATION_MESSAGE_SUBTYPE_NONE );
@@ -351,7 +396,7 @@ TEST( ApplicationCodecDecode, DeclaredLengthAndTrailingByteRulesAreExact )
     const auto context = MakeCodecContext();
     auto       bytes   = BasicSystemInfoGolden();
 
-    bytes[kPayloadLengthOffset] = 3u;
+    bytes[kPayloadLengthOffset] = 9u;
     ExpectDecodeFailurePublishesNothing( context, bytes.data(), bytes.size(),
                                          HIL_APPLICATION_STATUS_TRUNCATED_MESSAGE, true );
     std::size_t required_storage = 99u;
@@ -365,10 +410,10 @@ TEST( ApplicationCodecDecode, DeclaredLengthAndTrailingByteRulesAreExact )
     ExpectDecodeFailurePublishesNothing( context, bytes.data(), bytes.size(),
                                          HIL_APPLICATION_STATUS_MALFORMED_MESSAGE, true );
 
-    std::array<std::uint8_t, 26u> trailing{};
+    std::array<std::uint8_t, 32u> trailing{};
     std::copy( bytes.begin(), bytes.end(), trailing.begin() );
-    trailing[kPayloadLengthOffset] = 2u;
-    trailing[25]                   = 0x55u;
+    trailing[kPayloadLengthOffset] = 8u;
+    trailing[31]                   = 0x55u;
     ExpectDecodeFailurePublishesNothing( context, trailing.data(), trailing.size(),
                                          HIL_APPLICATION_STATUS_MALFORMED_MESSAGE, true );
     required_storage = 99u;
@@ -395,7 +440,7 @@ TEST( ApplicationCodecDecode, RejectsInputAboveConfiguredMaximum )
 {
     const auto context = MakeCodecContext( HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE );
     const auto golden  = BasicSystemInfoGolden();
-    std::array<std::uint8_t, 26u> oversized{};
+    std::array<std::uint8_t, 32u> oversized{};
     std::copy( golden.begin(), golden.end(), oversized.begin() );
     oversized.back() = 0x55u;
     ExpectDecodeFailurePublishesNothing( context, oversized.data(), oversized.size(),
@@ -431,9 +476,12 @@ TEST( ApplicationCodecDecode, ByteSpanMalformedInputAndCallerStorageHaveDistinct
                HIL_APPLICATION_STATUS_OK );
     EXPECT_EQ( used, 1u );
     EXPECT_EQ( decoded.type, HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE );
-    EXPECT_EQ( decoded.body.system_info_response.application_protocol_major, 0u );
-    EXPECT_EQ( decoded.body.system_info_response.application_protocol_minor, 1u );
-    EXPECT_EQ( decoded.body.system_info_response.application_protocol_patch, 0u );
+    EXPECT_EQ( decoded.body.system_info_response.application_protocol_major,
+               HIL_RIG_PROTOCOL_VERSION_MAJOR );
+    EXPECT_EQ( decoded.body.system_info_response.application_protocol_minor,
+               HIL_RIG_PROTOCOL_VERSION_MINOR );
+    EXPECT_EQ( decoded.body.system_info_response.application_protocol_patch,
+               HIL_RIG_PROTOCOL_VERSION_PATCH );
     EXPECT_EQ( decoded.body.system_info_response.firmware_version_major, 2u );
     EXPECT_EQ( decoded.body.system_info_response.firmware_version_minor, 3u );
     EXPECT_EQ( decoded.body.system_info_response.firmware_version_patch, 4u );
@@ -464,7 +512,7 @@ TEST( ApplicationCodecEncode, CapacityBoundariesPublishSizeOnlyOnSuccess )
 {
     const auto                    context  = MakeCodecContext();
     const auto                    message  = BasicSystemInfoRequest();
-    constexpr std::size_t         complete = 25u;
+    constexpr std::size_t         complete = 31u;
     std::array<std::uint8_t, 64u> buffer{};
 
     for ( const auto capacity :
@@ -506,7 +554,7 @@ TEST( ApplicationCodecContext, DefaultAndReducedBoundsInitializeAndInvalidBounds
 
     config.max_encoded_message_size = HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE;
     ASSERT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_OK );
-    EXPECT_EQ( context.config.max_encoded_message_size, 25u );
+    EXPECT_EQ( context.config.max_encoded_message_size, 28u );
 
     config.max_encoded_message_size = HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE + 1u;
     context.initialized             = 1u;
@@ -609,9 +657,9 @@ TEST( ApplicationCodecValidation, NonEmptyTypedByteSpanRequiresDataPointer )
     message.type        = HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE;
     message.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
     message.has_test_id = 0u;
-    message.body.system_info_response.application_protocol_major = 0u;
-    message.body.system_info_response.application_protocol_minor = 1u;
-    message.body.system_info_response.application_protocol_patch = 0u;
+    message.body.system_info_response.application_protocol_major = HIL_RIG_PROTOCOL_VERSION_MAJOR;
+    message.body.system_info_response.application_protocol_minor = HIL_RIG_PROTOCOL_VERSION_MINOR;
+    message.body.system_info_response.application_protocol_patch = HIL_RIG_PROTOCOL_VERSION_PATCH;
     message.body.system_info_response.diagnostic_data.size       = 1u;
     message.body.system_info_response.diagnostic_data.data       = nullptr;
 
@@ -677,15 +725,18 @@ TEST( ApplicationCodecValidation, ReservedControlFlagsMustBeZero )
                                          HIL_APPLICATION_STATUS_VALIDATION_FAILED, true );
 
     std::array<std::uint8_t, 28u> encoded_global{
-        0x00u, 0x01u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+        0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
         0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x14u,
         0x00u, 0x05u, 0x00u, 0x01u, 0x01u, 0x00u, 0x00u, 0x00u,
     };
+    encoded_global[0] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MAJOR );
+    encoded_global[1] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MINOR );
     ExpectDecodeFailurePublishesNothing( context, encoded_global.data(), encoded_global.size(),
                                          HIL_APPLICATION_STATUS_VALIDATION_FAILED, true );
 }
 
-TEST( ApplicationCodecValidation, SystemInfoResponseVersionFieldsMustMatchCompiledProtocol )
+TEST( ApplicationCodecValidation,
+      SystemInfoResponseForeignVersionIsStructurallyValidButNotEncodable )
 {
     const auto                context = MakeCodecContext();
     HIL_Application_Message_T message{};
@@ -696,26 +747,25 @@ TEST( ApplicationCodecValidation, SystemInfoResponseVersionFieldsMustMatchCompil
     message.body.system_info_response.application_protocol_minor = 1u;
     message.body.system_info_response.application_protocol_patch = 1u;
 
-    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
-               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
 
     std::array<std::uint8_t, 64u> encoded{};
     std::size_t                   encoded_size = 99u;
     EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, encoded.data(), encoded.size(),
                                                &encoded_size ),
-               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+               HIL_APPLICATION_STATUS_VERSION_MISMATCH );
     EXPECT_EQ( encoded_size, 0u );
 
     const auto                    valid = SystemInfoResponseGoldenWithDiagnostic();
     std::array<std::uint8_t, 37u> mismatched_wire_version{};
     std::copy_n( valid.begin(), 35u, mismatched_wire_version.begin() );
     mismatched_wire_version[kPayloadLengthOffset] = 14u;
-    mismatched_wire_version[27]                   = 1u;
+    mismatched_wire_version[25]                   = 3u;
     mismatched_wire_version[35]                   = 0u;
     mismatched_wire_version[36]                   = 0u;
     ExpectDecodeFailurePublishesNothing( context, mismatched_wire_version.data(),
                                          mismatched_wire_version.size(),
-                                         HIL_APPLICATION_STATUS_VALIDATION_FAILED, true );
+                                         HIL_APPLICATION_STATUS_MALFORMED_MESSAGE, true );
 }
 
 TEST( ApplicationCodecDeferredFamilies, UnfinishedVariableInstructionRemainsCleanlyNotImplemented )
@@ -825,7 +875,7 @@ TEST( ApplicationCodecFacade, SizingStorageAndEncodedValidationUseCommonEnvelope
     std::size_t encoded_size = 999u;
     ASSERT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &encoded_size ),
                HIL_APPLICATION_STATUS_OK );
-    EXPECT_EQ( encoded_size, 25u );
+    EXPECT_EQ( encoded_size, 31u );
 
     const auto  golden  = BasicSystemInfoGolden();
     std::size_t storage = 99u;

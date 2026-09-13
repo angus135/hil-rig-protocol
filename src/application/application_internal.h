@@ -65,12 +65,17 @@ _Static_assert( HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE == 39u,
  */
 typedef struct
 {
+    uint8_t                           protocol_major;
+    uint8_t                           protocol_minor;
     uint8_t                           has_test_id;
     HIL_Application_Test_Id_T         test_id;
     HIL_Application_Message_Type_T    type;
     HIL_Application_Message_Subtype_T subtype;
     uint16_t                          payload_length;
 } HIL_Application_Envelope_T;
+
+/** Maximum temporary decode storage required by a supported body. */
+#define HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE ( 2u * HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE )
 
 /** Checked size_t addition. Returns zero without writing result on overflow/error. */
 static inline int HIL_APPLICATION_Checked_Add_Size( size_t lhs, size_t rhs, size_t* result )
@@ -137,6 +142,11 @@ HIL_Application_Status_T HIL_APPLICATION_Header_Encoding( const HIL_Application_
 HIL_Application_Status_T HIL_APPLICATION_Header_Decoding( HIL_Application_Envelope_T* envelope,
                                                           const uint8_t* encoded_message,
                                                           size_t         encoded_message_size );
+
+/** Verify that a decoded discovery body repeats the parsed envelope version. */
+HIL_Application_Status_T
+HIL_APPLICATION_Validate_Discovery_Envelope_Body( const HIL_Application_Envelope_T* envelope,
+                                                  const HIL_Application_Message_T*  message );
 
 /** Validate common typed envelope fields before family-specific validation/encoding. */
 HIL_Application_Status_T

@@ -102,16 +102,27 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_encode(
     ( void )sub_type;
     ( void )test_id;
     /**
-     * Payload = 2 bytes: request_firmware_git_hash {1}, query {1}.
+     * Payload = request_firmware_git_hash {1}, query {1}, and protocol
+     * major/minor/patch {6}.
      */
-    const size_t payload_size = 2u;
+    const size_t payload_size = HIL_APPLICATION_SYSTEM_INFO_REQUEST_FIXED_ENCODE_SIZE;
+    if ( context == NULL || data == NULL || payload == NULL || used_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *used_size = 0u;
+    if ( data->application_protocol_major != HIL_RIG_PROTOCOL_VERSION_MAJOR
+         || data->application_protocol_minor != HIL_RIG_PROTOCOL_VERSION_MINOR
+         || data->application_protocol_patch != HIL_RIG_PROTOCOL_VERSION_PATCH )
+    {
+        return HIL_APPLICATION_STATUS_VERSION_MISMATCH;
+    }
     if ( max_payload_size < payload_size )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
     if ( data->request_firmware_git_hash > 1u
-         || data->query < HIL_APPLICATION_SYSTEM_INFO_QUERY_INVALID
-         || data->query > HIL_APPLICATION_SYSTEM_INFO_QUERY_RESERVED )
+         || data->query != HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
@@ -122,6 +133,9 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Request_encode(
     }
     payload[0] = data->request_firmware_git_hash;
     payload[1] = wire_query;
+    HIL_APPLICATION_Write_U16_Le( &payload[2], data->application_protocol_major );
+    HIL_APPLICATION_Write_U16_Le( &payload[4], data->application_protocol_minor );
+    HIL_APPLICATION_Write_U16_Le( &payload[6], data->application_protocol_patch );
     *used_size = payload_size;
     return HIL_APPLICATION_STATUS_OK;
 }
@@ -139,7 +153,20 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
      * diagnostic_data as a one-byte length plus X bytes, then firmware_git_hash
      * as a one-byte length plus Y bytes. Total = 14 + X + Y bytes.
      */
-    size_t       running_total = 0u;
+    size_t                   running_total = 0u;
+    size_t                   span_size     = 0u;
+    HIL_Application_Status_T span_status;
+    if ( context == NULL || data == NULL || payload == NULL || used_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *used_size = 0u;
+    if ( data->application_protocol_major != HIL_RIG_PROTOCOL_VERSION_MAJOR
+         || data->application_protocol_minor != HIL_RIG_PROTOCOL_VERSION_MINOR
+         || data->application_protocol_patch != HIL_RIG_PROTOCOL_VERSION_PATCH )
+    {
+        return HIL_APPLICATION_STATUS_VERSION_MISMATCH;
+    }
     const size_t payload_size =
         6u * HIL_APPLICATION_WIRE_U16_SIZE + 2u * HIL_APPLICATION_BYTE_SPAN_LENGTH_SIZE
         + ( size_t )data->firmware_git_hash.size + ( size_t )data->diagnostic_data.size;
@@ -147,20 +174,18 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    uint16_t protocol_patch = HIL_RIG_PROTOCOL_VERSION_PATCH;
-    uint16_t protocol_major = HIL_RIG_PROTOCOL_VERSION_MAJOR;
-    uint16_t protocol_minor = HIL_RIG_PROTOCOL_VERSION_MINOR;
-    HIL_APPLICATION_Encode_U16_Le( payload, protocol_major, &running_total );
-    HIL_APPLICATION_Encode_U16_Le( &( payload[running_total] ), protocol_minor, &running_total );
-    HIL_APPLICATION_Encode_U16_Le( &( payload[running_total] ), protocol_patch, &running_total );
+    HIL_APPLICATION_Encode_U16_Le( payload, data->application_protocol_major, &running_total );
+    HIL_APPLICATION_Encode_U16_Le( &( payload[running_total] ), data->application_protocol_minor,
+                                   &running_total );
+    HIL_APPLICATION_Encode_U16_Le( &( payload[running_total] ), data->application_protocol_patch,
+                                   &running_total );
     HIL_APPLICATION_Encode_U16_Le( &( payload[running_total] ), data->firmware_version_major,
                                    &running_total );
     HIL_APPLICATION_Encode_U16_Le( &( payload[running_total] ), data->firmware_version_minor,
                                    &running_total );
     HIL_APPLICATION_Encode_U16_Le( &( payload[running_total] ), data->firmware_version_patch,
                                    &running_total );
-    size_t                   span_size = 0u;
-    HIL_Application_Status_T span_status =
+    span_status =
         HIL_APPLICATION_Byte_Span_encode( &( data->diagnostic_data ), &( payload[running_total] ),
                                           max_payload_size - running_total, &span_size );
     if ( span_status != HIL_APPLICATION_STATUS_OK )

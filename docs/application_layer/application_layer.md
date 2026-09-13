@@ -6,7 +6,7 @@
 
 ## Status and scope
 
-The C Application layer is a stateless message codec. This foundation implements the common architecture-independent envelope, bounded encode/decode behaviour, exact complete-message length checks, common Test-ID/type/subtype validation, and the existing supported message-specific body paths. It does not implement firmware state machines, test-upload tracking, hardware control, Transport behaviour or Python bindings.
+The C Application layer is a stateless message codec. This foundation implements the common architecture-independent envelope, bounded encode/decode behaviour, exact complete-message length checks, common Test-ID/type/subtype validation, exact-version discovery, and the supported message-specific body paths. It does not implement firmware state machines, test-upload tracking, hardware control, or Transport behaviour.
 
 Existing partially implemented message families remain in place and return `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` where their sizing, variable storage, validation or body semantics are deliberately deferred.
 
@@ -75,7 +75,7 @@ Firmware and bindings include:
 | `HIL_APPLICATION_Init` | Validate/copy local structural limits; reduced valid complete-message maxima are accepted, and `config` may alias `context->config`. |
 | `HIL_APPLICATION_Encoded_Size` | Clear output, validate the common envelope fields, dispatch existing body sizing, add the fixed header with checked arithmetic. |
 | `HIL_APPLICATION_Encode_Message` | Encode the bounded common header and selected existing body; publish a nonzero size only after complete success. |
-| `HIL_APPLICATION_Decode_Storage_Size` | Bounded-parse one complete message, validate the exact width of supported fixed bodies, enforce configured Test Configuration extension storage limits, and report required storage; unfinished variable-storage families return `NOT_IMPLEMENTED`. |
+| `HIL_APPLICATION_Decode_Storage_Size` | Bounded-parse one complete message, validate supported fixed bodies, scan bounded System Information spans and Test Configuration extension storage, and report required storage; unfinished variable-storage families return `NOT_IMPLEMENTED`. |
 | `HIL_APPLICATION_Decode_Message` | Decode exactly one complete message; body decoders see only the declared payload extent. |
 | `HIL_APPLICATION_Validate_Message` | Perform common typed validation and existing message-specific validation. |
 | `HIL_APPLICATION_Validate_Encoded_Message` | Reuse the bounded decode path without publishing caller output. |
@@ -86,19 +86,19 @@ This foundation deliberately does not complete every message family. The current
 
 | Family | Current status |
 | --- | --- |
-| System Information Request | Encode, decode, validate and encoded-size calculation implemented. |
-| System Information Response | Existing encode/decode body retained; typed validation requires the canonical compiled protocol version and structurally valid byte spans. Message-specific encoded-size and decode-storage sizing remain unfinished. |
+| System Information Request | Fully supported 8-byte discovery payload and exact outbound-version validation. Foreign structurally valid discovery decoding remains available for explicit compatibility checking. |
+| System Information Response | Fully supported; bounded diagnostic/Git spans need D + G decode storage and foreign structurally valid discovery decoding remains available for explicit compatibility checking. |
 | Test Configuration | Fully supported by the codec: typed validation, body sizing, encode/decode, decode-storage scanning, fixed Digital/Analogue/PWM/CAN/SPI/UART/I2C arrays, and the length-delimited extension are implemented. The extension has a 255-byte wire maximum and is additionally bounded by `context->config.max_variable_data_size`. |
 | Test Instruction | Fully supported fixed codec family: 50-byte payload / 73-byte complete message, fixed sizing, encode/decode, zero decode storage, Digital/PWM/tick structural validation, and encoded-message validation are implemented. Variable declarations/data remain deferred. |
-| Execution Control | Existing encode/decode/validation retained, including zero reserved flags; message-specific encoded-size calculation remains unfinished. |
-| Global Control | Existing encode/decode/validation retained, including zero reserved flags; message-specific encoded-size calculation remains unfinished. |
+| Execution Control | Fully supported fixed 5-byte START/ABORT body, including zero reserved flags and required Test ID. |
+| Global Control | Fully supported fixed 5-byte RESET_APPLICATION body, including zero reserved flags and forbidden Test ID. |
 | Test Result | Fully supported fixed codec family: 39-byte payload / 62-byte complete message, fixed sizing, encode/decode, zero decode storage, Digital/PWM/tick/condition structural validation, and encoded-message validation are implemented. Variable declarations/data remain deferred. |
 | Variable Instruction Data | Reserved structures and identifiers retained; body/storage workflow remains `NOT_IMPLEMENTED`. |
 | Variable Result Data | Reserved structures and identifiers retained; body/storage workflow remains `NOT_IMPLEMENTED`. |
 | Application Response | Existing structures/body code retained; public validation and message-specific sizing remain `NOT_IMPLEMENTED`. |
 | Application Error | Existing structures/body code retained; public validation/sizing and variable diagnostic-storage sizing remain `NOT_IMPLEMENTED`. |
 
-`HIL_APPLICATION_Encoded_Size` propagates a message-specific `NOT_IMPLEMENTED` result for unfinished families rather than guessing body sizes. Test Configuration, fixed Test Instruction, and fixed Test Result are supported. Analogue range/hardware feasibility, variable-data correlation, active-Test-Configuration tick comparison, and endpoint transaction state remain later integration or protocol work.
+`HIL_APPLICATION_Encoded_Size` propagates a message-specific `NOT_IMPLEMENTED` result for unfinished families rather than guessing body sizes. Discovery, controls, Test Configuration, fixed Test Instruction, and fixed Test Result are supported. Analogue range/hardware feasibility, variable-data correlation, active-Test-Configuration tick comparison, Responses/Errors, and endpoint transaction state remain later integration or protocol work.
 
 ## Public C Application-to-Transport integration coverage
 
@@ -140,7 +140,7 @@ The codec uses the repository-wide `HIL_RIG_PROTOCOL_VERSION_MAJOR` and `HIL_RIG
 | 21 | 2 | payload length, little-endian `uint16_t` |
 | 23 | N | payload |
 
-The decoder initially requires an exact major/minor match. A missing Test ID is flag zero followed by sixteen zero bytes; an all-zero Test ID remains valid when the flag is one. There is no payload-end marker. Native enum widths, native byte order, `size_t`, C padding and pointer representation never define this envelope.
+Ordinary messages require an exact major/minor match. BASIC System Information without a Test ID may carry a foreign envelope for discovery, but its body must repeat those values and endpoint integration must confirm the complete triplet. A missing Test ID is flag zero followed by sixteen zero bytes; an all-zero Test ID remains valid when the flag is one. There is no payload-end marker. Native enum widths, native byte order, `size_t`, C padding and pointer representation never define this envelope.
 
 ## Stateless context and single owner
 
@@ -190,8 +190,9 @@ separately decides whether retention and hardware capacity are available.
 
 `max_variable_data_size` bounds the Test Configuration extension byte span,
 each Test Configuration communication-capture limit, and the byte spans used by
-variable Application families. The extension still has an absolute 255-byte
-wire maximum because its encoded length is one byte.
+variable Application families and System Information Responses. The extension
+and each System Information span still have an absolute 255-byte wire maximum
+because each encoded length is one byte.
 `max_encoded_message_size` bounds each complete encoded Application message.
 They do not describe one monolithic test or tick package. Integration must
 configure Transport's maximum Application-message size to be at least the
@@ -201,8 +202,8 @@ change Transport configuration.
 `HIL_APPLICATION_Default_Config` uses a 512-byte complete-message profile and
 the existing structural maxima for the other fields.
 `HIL_APPLICATION_Init` accepts any complete-message maximum from
-`HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE` (25 bytes: the 23-byte envelope plus
-the two-byte System Information Request payload) through
+`HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE` (28 bytes: the 23-byte envelope plus
+the five-byte control payload) through
 `HIL_APPLICATION_HEADER_SIZE_BYTES + UINT16_MAX`, validates the other configured
 limits, and copies the configuration without allocation or pointer retention.
 
@@ -264,9 +265,11 @@ after decoding; the codec context contains no endpoint role.
 Encoding and decoding borrow all caller pointers only for the duration of a call. A successful encode publishes exactly header-plus-payload bytes. A failed encode leaves `output_size == 0`; the buffer contents are unspecified and are not cleared as a side effect.
 
 Decoding receives the actual byte count of one complete message. It requires a
-complete fixed header, validates repository-wide major/minor version bytes,
-checks header-plus-payload arithmetic before addition, and requires the supplied
-input length to equal the declared total. Input shorter than the envelope-declared
+complete fixed header and validates repository-wide major/minor version bytes
+for ordinary messages. BASIC System Information without a Test ID may carry a
+foreign major/minor discovery envelope; its body must repeat those fields. The
+decoder then checks header-plus-payload arithmetic before addition and requires
+the supplied input length to equal the declared total. Input shorter than the envelope-declared
 total is `TRUNCATED_MESSAGE`; trailing bytes are `MALFORMED_MESSAGE`. The selected
 body decoder receives exactly the declared payload length and must consume it
 exactly. A declared fixed body that is too short is `MALFORMED_MESSAGE`. On every
@@ -294,7 +297,7 @@ no Application Response merely because Transport rejected it.
 
 ### 2. Structurally invalid Application data
 
-The current foundation checks the common structural boundary: exact repository-wide major/minor version, one-byte message type/subtype representation, Boolean Test-ID presence and its zero-fill rule, configured complete-message bounds, checked header-plus-payload arithmetic, declared payload extent, exact complete-message consumption, and the existing typed validation implemented for each supported fixed family.
+The current foundation checks the common structural boundary: exact repository-wide major/minor version for ordinary messages; the narrowly scoped foreign-version BASIC System Information discovery exception with envelope/body agreement; one-byte message type/subtype representation; Boolean Test-ID presence and its zero-fill rule; configured complete-message bounds; checked header-plus-payload arithmetic; declared payload extent; exact complete-message consumption; and the existing typed validation implemented for each supported fixed family.
 
 Feature-specific semantic validation remains deliberately deferred where the corresponding family is unfinished. Test Configuration is structurally complete in the codec, including Digital/Analogue/PWM and CAN/SPI/UART/I2C records. Fixed Test Instruction and Test Result validation is also implemented: ticks must be below `context->config.max_expected_tick_count`, Digital values are Boolean, PWM duty is `0..10000` with zero duty required for a zero period, and Test Result conditions are limited to `OK`, `PARTIAL`, and `EXECUTION_PROBLEM`. Analogue ranges, hardware capability checks, variable-data declaration/correlation rules, comparison with an active Test Configuration's actual `expected_tick_count`, and stateful transaction ordering remain outside this codec.
 
@@ -604,8 +607,8 @@ in this PR.
 
 ## Remaining conformance work
 
-Public C integration now executes the supported fixed Configuration,
-Instruction, Result, and existing Execution Control START paths through
+Public C integration now executes the supported fixed discovery, control,
+Configuration, Instruction, and Result paths through
 Transport. The ordered fixed-subset scenario uses test-owned semantic checkpoints
 rather than Responses and does not represent a complete production transaction.
 
@@ -613,9 +616,7 @@ Future conformance work still includes:
 
 - Variable Instruction Data and Variable Result Data, including their deferred
   declarations and storage workflows;
-- Application Response and Application Error, plus completion of System
-  Information Response support;
-- typed sizing for Execution Control and Global Control;
+- Application Response and Application Error;
 - golden wire vectors shared with future language bindings;
 - production firmware and Python endpoint integration for Test-ID correlation,
   tick ordering, semantic acceptance, retention, execution, and recovery; and

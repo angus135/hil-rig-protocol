@@ -64,71 +64,105 @@ static int HIL_APPLICATION_Test_Id_Is_Zero( const HIL_Application_Test_Id_T* tes
     return 1;
 }
 
-HIL_Application_Status_T
-HIL_APPLICATION_Validate_Common_Message_Fields( const HIL_Application_Message_T* message )
+/** Validate type and subtype rules shared by typed and wire envelopes. */
+static HIL_Application_Status_T
+HIL_APPLICATION_Validate_Envelope_Syntax( HIL_Application_Message_Type_T    type,
+                                          HIL_Application_Message_Subtype_T subtype )
 {
-    uint8_t required_test_id = 0u;
-
-    if ( message == NULL )
-    {
-        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
-    }
-    if ( !HIL_APPLICATION_Message_Type_Is_Defined( message->type ) )
+    if ( !HIL_APPLICATION_Message_Type_Is_Defined( type ) )
     {
         return HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE;
     }
-    if ( !HIL_APPLICATION_Subtype_Is_Representable( message->subtype ) )
+    if ( !HIL_APPLICATION_Subtype_Is_Representable( subtype ) )
     {
         return HIL_APPLICATION_STATUS_INVALID_SUBTYPE;
     }
-    if ( message->has_test_id > 1u )
+    if ( type == HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST
+         || type == HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE )
     {
-        return HIL_APPLICATION_STATUS_INCONSISTENT_TEST_ID;
-    }
-
-    if ( message->type == HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST
-         || message->type == HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE )
-    {
-        if ( message->subtype != HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC )
+        if ( subtype != HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC )
         {
             return HIL_APPLICATION_STATUS_INVALID_SUBTYPE;
         }
+        return HIL_APPLICATION_STATUS_OK;
     }
-    else if ( message->subtype != HIL_APPLICATION_MESSAGE_SUBTYPE_NONE )
+    if ( subtype != HIL_APPLICATION_MESSAGE_SUBTYPE_NONE )
     {
         return HIL_APPLICATION_STATUS_INVALID_SUBTYPE;
     }
+    return HIL_APPLICATION_STATUS_OK;
+}
 
-    switch ( message->type )
+/** Validate Test-ID rules after shared envelope syntax has been accepted. */
+static HIL_Application_Status_T
+HIL_APPLICATION_Validate_Envelope_Fields( HIL_Application_Message_Type_T    type,
+                                          HIL_Application_Message_Subtype_T subtype,
+                                          uint8_t                           has_test_id )
+{
+    HIL_Application_Status_T status = HIL_APPLICATION_Validate_Envelope_Syntax( type, subtype );
+
+    if ( status != HIL_APPLICATION_STATUS_OK )
     {
-        case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
-        case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
-        case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
-            required_test_id = 0u;
-            break;
+        return status;
+    }
+    if ( has_test_id > 1u )
+    {
+        return HIL_APPLICATION_STATUS_INCONSISTENT_TEST_ID;
+    }
+    if ( type == HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST
+         || type == HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE
+         || type == HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL )
+    {
+        return has_test_id == 0u ? HIL_APPLICATION_STATUS_OK
+                                 : HIL_APPLICATION_STATUS_INCONSISTENT_TEST_ID;
+    }
+    switch ( type )
+    {
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
-            required_test_id = 1u;
-            break;
+            return has_test_id == 1u ? HIL_APPLICATION_STATUS_OK
+                                     : HIL_APPLICATION_STATUS_INCONSISTENT_TEST_ID;
+        default:
+            return HIL_APPLICATION_STATUS_OK;
+    }
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Validate_Common_Message_Fields( const HIL_Application_Message_T* message )
+{
+    HIL_Application_Status_T status;
+
+    if ( message == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    status = HIL_APPLICATION_Validate_Envelope_Fields( message->type, message->subtype,
+                                                       message->has_test_id );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+
+    switch ( message->type )
+    {
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
-            required_test_id = ( uint8_t )( message->body.response.scope
-                                                    == HIL_APPLICATION_RESPONSE_SCOPE_GLOBAL_CONTROL
-                                                ? 0u
-                                                : 1u );
-            break;
+            if ( message->has_test_id
+                 != ( uint8_t )( message->body.response.scope
+                                         == HIL_APPLICATION_RESPONSE_SCOPE_GLOBAL_CONTROL
+                                     ? 0u
+                                     : 1u ) )
+            {
+                return HIL_APPLICATION_STATUS_INCONSISTENT_TEST_ID;
+            }
+            return HIL_APPLICATION_STATUS_OK;
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
             return HIL_APPLICATION_STATUS_OK;
         default:
-            return HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE;
-    }
-
-    if ( message->has_test_id != required_test_id )
-    {
-        return HIL_APPLICATION_STATUS_INCONSISTENT_TEST_ID;
+            break;
     }
     return HIL_APPLICATION_STATUS_OK;
 }
@@ -199,11 +233,8 @@ HIL_Application_Status_T HIL_APPLICATION_Header_Decoding( HIL_Application_Envelo
     {
         return HIL_APPLICATION_STATUS_TRUNCATED_MESSAGE;
     }
-    if ( encoded_message[offset++] != ( uint8_t )HIL_RIG_PROTOCOL_VERSION_MAJOR
-         || encoded_message[offset++] != ( uint8_t )HIL_RIG_PROTOCOL_VERSION_MINOR )
-    {
-        return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
-    }
+    envelope->protocol_major = encoded_message[offset++];
+    envelope->protocol_minor = encoded_message[offset++];
 
     envelope->has_test_id = encoded_message[offset++];
     if ( envelope->has_test_id > 1u )
@@ -219,21 +250,56 @@ HIL_Application_Status_T HIL_APPLICATION_Header_Decoding( HIL_Application_Envelo
 
     wire_type      = encoded_message[offset++];
     envelope->type = ( HIL_Application_Message_Type_T )wire_type;
-    if ( !HIL_APPLICATION_Message_Type_Is_Defined( envelope->type ) )
-    {
-        envelope->type = HIL_APPLICATION_MESSAGE_TYPE_INVALID;
-        return HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE;
-    }
 
     wire_subtype      = encoded_message[offset++];
     envelope->subtype = ( HIL_Application_Message_Subtype_T )wire_subtype;
-    if ( !HIL_APPLICATION_Subtype_Is_Representable( envelope->subtype ) )
-    {
-        envelope->type = HIL_APPLICATION_MESSAGE_TYPE_INVALID;
-        return HIL_APPLICATION_STATUS_INVALID_SUBTYPE;
-    }
-
     /* Payload length is always a two-byte little-endian wire value. */
     envelope->payload_length = HIL_APPLICATION_Read_U16_Le( &encoded_message[offset] );
+    {
+        const HIL_Application_Status_T status = HIL_APPLICATION_Validate_Envelope_Fields(
+            envelope->type, envelope->subtype, envelope->has_test_id );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            envelope->type = HIL_APPLICATION_MESSAGE_TYPE_INVALID;
+            return status;
+        }
+    }
+    if ( ( envelope->type != HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST
+           && envelope->type != HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE )
+         && ( envelope->protocol_major != ( uint8_t )HIL_RIG_PROTOCOL_VERSION_MAJOR
+              || envelope->protocol_minor != ( uint8_t )HIL_RIG_PROTOCOL_VERSION_MINOR ) )
+    {
+        return HIL_APPLICATION_STATUS_VERSION_MISMATCH;
+    }
     return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Validate_Discovery_Envelope_Body( const HIL_Application_Envelope_T* envelope,
+                                                  const HIL_Application_Message_T*  message )
+{
+    uint16_t major;
+    uint16_t minor;
+
+    if ( envelope == NULL || message == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( message->type == HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST )
+    {
+        major = message->body.system_info_request.application_protocol_major;
+        minor = message->body.system_info_request.application_protocol_minor;
+    }
+    else if ( message->type == HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE )
+    {
+        major = message->body.system_info_response.application_protocol_major;
+        minor = message->body.system_info_response.application_protocol_minor;
+    }
+    else
+    {
+        return HIL_APPLICATION_STATUS_OK;
+    }
+    return major == envelope->protocol_major && minor == envelope->protocol_minor
+               ? HIL_APPLICATION_STATUS_OK
+               : HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
 }

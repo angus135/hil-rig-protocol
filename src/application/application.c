@@ -17,6 +17,8 @@
 #include "application_size.h"
 #include "application_validation.h"
 
+#include "hil_rig_protocol/version.h"
+
 #include <string.h>
 
 static HIL_Application_Status_T HIL_APPLICATION_Body_Size( const HIL_Application_Context_T* context,
@@ -247,7 +249,50 @@ HIL_APPLICATION_Decode_Internal( const HIL_Application_Context_T* context,
     {
         return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
     }
+    status = HIL_APPLICATION_Validate_Discovery_Envelope_Body( &envelope, out_message );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
     return HIL_APPLICATION_Validate_Message( context, out_message );
+}
+
+/** Validate discovery envelope/body agreement in the allocation-free storage query path. */
+static HIL_Application_Status_T
+HIL_APPLICATION_Validate_Discovery_Storage_Envelope( const HIL_Application_Envelope_T* envelope,
+                                                     const uint8_t* payload, size_t payload_size )
+{
+    HIL_Application_Message_T message = { 0 };
+
+    if ( envelope->type != HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST
+         && envelope->type != HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE )
+    {
+        return HIL_APPLICATION_STATUS_OK;
+    }
+    message.type = envelope->type;
+    if ( envelope->type == HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST )
+    {
+        if ( payload_size != HIL_APPLICATION_SYSTEM_INFO_REQUEST_FIXED_ENCODE_SIZE )
+        {
+            return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+        }
+        message.body.system_info_request.application_protocol_major =
+            HIL_APPLICATION_Read_U16_Le( &payload[2] );
+        message.body.system_info_request.application_protocol_minor =
+            HIL_APPLICATION_Read_U16_Le( &payload[4] );
+    }
+    else
+    {
+        if ( payload_size < 2u * HIL_APPLICATION_WIRE_U16_SIZE )
+        {
+            return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+        }
+        message.body.system_info_response.application_protocol_major =
+            HIL_APPLICATION_Read_U16_Le( &payload[0] );
+        message.body.system_info_response.application_protocol_minor =
+            HIL_APPLICATION_Read_U16_Le( &payload[2] );
+    }
+    return HIL_APPLICATION_Validate_Discovery_Envelope_Body( envelope, &message );
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_T* config )
@@ -494,6 +539,13 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
     switch ( envelope.type )
     {
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
+            status = HIL_APPLICATION_Fixed_Body_Validate_Size( envelope.type, payload_size );
+            if ( status != HIL_APPLICATION_STATUS_OK )
+            {
+                return status;
+            }
+            return HIL_APPLICATION_Validate_Discovery_Storage_Envelope(
+                &envelope, &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES], payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
@@ -528,6 +580,21 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
             return HIL_APPLICATION_STATUS_OK;
         }
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
+            status = HIL_APPLICATION_System_Info_Response_Scan(
+                context, &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES], payload_size,
+                required_storage_size );
+            if ( status != HIL_APPLICATION_STATUS_OK )
+            {
+                return status;
+            }
+            status = HIL_APPLICATION_Validate_Discovery_Storage_Envelope(
+                &envelope, &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES], payload_size );
+            if ( status != HIL_APPLICATION_STATUS_OK )
+            {
+                *required_storage_size = 0u;
+                return status;
+            }
+            return HIL_APPLICATION_STATUS_OK;
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
@@ -648,10 +715,10 @@ static HIL_Application_Status_T HIL_APPLICATION_Validate_Decoded_Envelope(
     size_t encoded_message_size, size_t required_decode_storage )
 {
     HIL_Application_Message_T message;
-    uint8_t                   decoded_storage[HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE];
+    uint8_t                   decoded_storage[HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE];
     size_t                    used_storage = 0u;
 
-    if ( required_decode_storage > HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE )
+    if ( required_decode_storage > HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE )
     {
         return HIL_APPLICATION_STATUS_INVALID_LENGTH;
     }
@@ -704,4 +771,13 @@ HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
         return status;
     }
     return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Check_Protocol_Version( uint16_t major, uint16_t minor,
+                                                                 uint16_t patch )
+{
+    return major == HIL_RIG_PROTOCOL_VERSION_MAJOR && minor == HIL_RIG_PROTOCOL_VERSION_MINOR
+                   && patch == HIL_RIG_PROTOCOL_VERSION_PATCH
+               ? HIL_APPLICATION_STATUS_OK
+               : HIL_APPLICATION_STATUS_VERSION_MISMATCH;
 }

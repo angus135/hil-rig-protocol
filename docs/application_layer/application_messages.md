@@ -5,7 +5,7 @@
 
 ## Status
 
-This document describes the public typed messages and the common wire envelope implemented by the stateless C codec. The public C structures are API representations, not packed wire structures: native enum width, `size_t`, padding, unions and pointer representation do not define encoded bytes. Several message-family bodies remain deliberately unfinished and return `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED`; their existing identifiers and structures are reserved in place.
+This document describes the public typed messages and the common wire envelope implemented by the stateless C codec. The public C structures are API representations, not packed wire structures: native enum width, `size_t`, padding, unions and pointer representation do not define encoded bytes. PR 1 implements discovery and control codecs, not Application Response/Error codecs or production endpoint conversation orchestration. Several message-family bodies remain deliberately unfinished and return `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED`; their existing identifiers and structures are reserved in place.
 
 ## Common envelope
 
@@ -26,7 +26,7 @@ is shown visually, together with current payload layouts, in the
 
 There is no payload-end marker. A decoder receives the actual length of one complete message and accepts it only when that length is exactly `23 + payload_length`. Missing bytes and trailing bytes are errors. Message type and subtype are explicit one-byte wire values. Every multi-byte integer in encoded bodies is little-endian. Local capacities and offsets remain `size_t`; only encoded fixed-width fields use their specified integer widths.
 
-The envelope version comes from `hil_rig_protocol/version.h`. Only the repository-wide major and minor bytes are carried in every envelope; patch is not part of the common envelope. The initial decoder requires an exact major/minor match and returns `HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE` for a mismatch. Callers cannot select another version through Application configuration.
+The envelope version comes from `hil_rig_protocol/version.h`. Only the repository-wide major and minor bytes are carried in every envelope; patch is not part of the common envelope. Ordinary messages require exact major/minor equality and return `HIL_APPLICATION_STATUS_VERSION_MISMATCH` otherwise. The BASIC System Information Request/Response pair is accepted with foreign major/minor only when it has no Test ID and its body repeats the envelope values. Integration then calls `HIL_APPLICATION_Check_Protocol_Version()` and gates all test traffic on exact major/minor/patch equality. There are no version ranges, fallback codecs, or negotiation; each new Transport session needs confirmation.
 
 For `has_test_id == 0`, the encoder writes sixteen zero Test-ID bytes and the decoder requires those bytes to be zero. For `has_test_id == 1`, all sixteen bytes are opaque and an all-zero Test ID is valid.
 
@@ -214,9 +214,14 @@ payload has this normative layout:
 | ---: | ---: | --- | --- |
 | 0 | 1 byte | `request_firmware_git_hash` | boolean, exactly `0x00` or `0x01` |
 | 1 | 1 byte | `query` | `BASIC == 0x01` |
+| 2 | 2 bytes | application protocol major | `uint16_t` little-endian |
+| 4 | 2 bytes | application protocol minor | `uint16_t` little-endian |
+| 6 | 2 bytes | application protocol patch | `uint16_t` little-endian |
 
-The complete System Information Request is therefore 25 bytes: the 23-byte
-common envelope followed by this two-byte payload.
+The complete System Information Request is therefore 31 bytes: the 23-byte
+common envelope followed by this eight-byte payload. Outbound request protocol
+fields must exactly equal the compiled library version. The decoded triplet is
+only a discovery observation until endpoint integration explicitly checks it.
 
 ### Response
 
@@ -674,7 +679,10 @@ This foundation implements the common structural boundary and preserves the
 message-specific validation that already exists. The common codec currently
 checks:
 
-- exact repository-wide HIL-RIG protocol major/minor version;
+- exact repository-wide HIL-RIG protocol major/minor version for ordinary
+  messages; BASIC System Information Request/Response without a Test ID may
+  instead carry foreign major/minor solely for discovery, while requiring its
+  body major/minor to repeat the envelope;
 - valid one-byte message type and subtype representations, rejecting invalid,
   reserved, and unknown values;
 - Boolean Test-ID presence and the type/scope-specific Test-ID rules already
@@ -909,11 +917,11 @@ abandoned START.
 ```text
 Envelope carries repository-wide HIL-RIG protocol major/minor bytes
 Received envelope major/minor does not exactly match the compiled version
-Codec reports HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE
+Ordinary-message codec reports HIL_APPLICATION_STATUS_VERSION_MISMATCH
 Endpoint integration does not proceed with configuration or execution
 ```
 
-The common envelope has no independent Application version and does not encode the repository patch version. System Information version diagnostics cannot select or negotiate a different encoding version.
+The common envelope has no independent Application version and does not encode the repository patch version. BASIC System Information is the sole foreign-envelope discovery exception; body and envelope major/minor must agree, and `HIL_APPLICATION_Check_Protocol_Version()` requires exact major/minor/patch equality. System Information cannot select or negotiate a different encoding version.
 
 ### Transport session loss during upload
 

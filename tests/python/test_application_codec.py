@@ -58,7 +58,7 @@ def test_can_filters_round_trip_and_application_version(codec):
     assert public.can[0].filter_id != public.can[1].filter_id
     assert public.can[0].filter_mask != public.can[1].filter_mask
     encoded = codec.encode(public)
-    assert encoded[:2] == bytes((0, 1))
+    assert encoded[:2] == bytes((p.PROTOCOL_VERSION.major, p.PROTOCOL_VERSION.minor))
     assert codec.decode(encoded).can == public.can
 
 
@@ -266,7 +266,7 @@ def test_all_truncated_prefixes_and_trailing_data(codec, factory):
         (20, 1, p.ApplicationStatus.INVALID_SUBTYPE),
         (20, 255, p.ApplicationStatus.INVALID_SUBTYPE),
         (2, 0, p.ApplicationStatus.INCONSISTENT_TEST_ID),
-        (0, 255, p.ApplicationStatus.UNSUPPORTED_MESSAGE),
+        (0, 255, p.ApplicationStatus.VERSION_MISMATCH),
     ],
 )
 def test_invalid_wire_envelope(codec, offset, value, status):
@@ -282,8 +282,6 @@ def test_invalid_wire_envelope(codec, offset, value, status):
     [
         "VARIABLE_INSTRUCTION_DATA",
         "VARIABLE_RESULT_DATA",
-        "EXECUTION_CONTROL",
-        "GLOBAL_CONTROL",
         "RESPONSE",
         "ERROR",
     ],
@@ -291,47 +289,138 @@ def test_invalid_wire_envelope(codec, offset, value, status):
 def test_deferred_families(codec, family):
     wire = bytearray(codec.encode(instruction()))
     wire[19] = getattr(lib, "HIL_APPLICATION_MESSAGE_TYPE_" + family)
-    # Match the authoritative fixed body widths so deferred validation is reached.
-    if family in ("EXECUTION_CONTROL", "GLOBAL_CONTROL", "RESPONSE"):
-        size = 13 if family == "RESPONSE" else 5
-        wire[21:23] = size.to_bytes(2, "little")
-        wire[23:] = bytes(size)
-        if family != "RESPONSE":
-            wire[23] = 1  # START or RESET_APPLICATION from application_control.h.
-    if family in ("GLOBAL_CONTROL", "ERROR"):
+    if family == "RESPONSE":
+        wire[21:23] = (13).to_bytes(2, "little")
+        wire[23:] = bytes(13)
+    if family == "ERROR":
         wire[2] = 0
         wire[3:19] = bytes(16)
     with pytest.raises(p.ApplicationDecodeError) as caught:
         codec.decode(wire)
-    expected = (
-        None
-        if family in ("EXECUTION_CONTROL", "GLOBAL_CONTROL")
-        else p.ApplicationStatus.NOT_IMPLEMENTED
-    )
-    assert caught.value.status is expected
+    assert caught.value.status is p.ApplicationStatus.NOT_IMPLEMENTED
 
 
 @pytest.mark.parametrize(
     "wire",
     [
         # Golden vectors from tests/c/application/test_application_codec.cpp.
-        bytes.fromhex("00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 01 02 00 01 01"),
+        bytes.fromhex(
+            "00 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 "
+            "01 08 00 01 01 00 00 02 00 00 00"
+        ),
         bytes.fromhex(
             "00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 "
             "01 0f 00 00 00 01 00 00 00 02 00 03 00 04 00 01 aa 00"
         ),
     ],
 )
-def test_native_system_info_is_deferred_in_python(codec, wire):
+def test_native_system_info_is_supported_in_python(codec, wire):
     required = ffi.new("size_t *")
-    expected = p.ApplicationStatus.OK if wire[19] == 1 else p.ApplicationStatus.NOT_IMPLEMENTED
     assert (
         lib.HIL_APPLICATION_Validate_Encoded_Message(context(), wire, len(wire), required)
-        == expected
+        == p.ApplicationStatus.OK
     )
-    with pytest.raises(p.ApplicationDecodeError) as caught:
-        codec.decode(wire)
-    assert caught.value.status is (None if expected is p.ApplicationStatus.OK else expected)
+    decoded = codec.decode(wire)
+    assert isinstance(decoded, (p.SystemInfoRequest, p.SystemInfoResponse))
+
+
+def test_discovery_controls_and_exact_version_gate(codec):
+    request = p.SystemInfoRequest(request_firmware_git_hash=True)
+    assert codec.decode(codec.encode(request)) == request
+
+    response = p.SystemInfoResponse(
+        protocol_version=p.PROTOCOL_VERSION,
+        firmware_version=p.ProtocolVersion(1, 2, 3),
+        diagnostic_data=b"diagnostic",
+        firmware_git_hash=b"deadbeef",
+    )
+    response_wire = codec.encode(response)
+    decoded_response = codec.decode(response_wire)
+    del response_wire
+    gc.collect()
+    assert decoded_response == response
+    assert decoded_response.diagnostic_data == b"diagnostic"
+    assert decoded_response.firmware_git_hash == b"deadbeef"
+
+    test_id = p.TestId(bytes(range(16)))
+    for control in (
+        p.ExecutionControl(test_id, p.ControlCommand.START),
+        p.ExecutionControl(test_id, p.ControlCommand.ABORT),
+        p.GlobalControl(p.GlobalControlCommand.RESET_APPLICATION),
+    ):
+        assert codec.decode(codec.encode(control)) == control
+
+    p.check_protocol_version(p.PROTOCOL_VERSION)
+    foreign = p.ProtocolVersion(p.PROTOCOL_VERSION.major, p.PROTOCOL_VERSION.minor, 1)
+    with pytest.raises(p.ApplicationVersionMismatchError) as caught:
+        p.check_protocol_version(foreign)
+    assert caught.value.local_version is p.PROTOCOL_VERSION
+    assert caught.value.peer_version == foreign
+    assert caught.value.status is p.ApplicationStatus.VERSION_MISMATCH
+
+    for invalid_control in (
+        p.ExecutionControl(test_id, p.ControlCommand.INVALID),
+        p.ExecutionControl(test_id, p.ControlCommand.RESERVED),
+        p.ExecutionControl(test_id, p.ControlCommand.START, flags=1),
+        p.GlobalControl(p.GlobalControlCommand.INVALID),
+        p.GlobalControl(p.GlobalControlCommand.RESERVED),
+        p.GlobalControl(p.GlobalControlCommand.RESET_APPLICATION, flags=1),
+    ):
+        with pytest.raises(p.ApplicationEncodeError) as invalid:
+            codec.encode(invalid_control)
+        assert invalid.value.status is p.ApplicationStatus.VALIDATION_FAILED
+
+
+@pytest.mark.parametrize("component", ["major", "minor", "patch"])
+@pytest.mark.parametrize("family", ["request", "response"])
+def test_outbound_discovery_requires_the_exact_compiled_version(codec, family, component):
+    values = {
+        "major": p.PROTOCOL_VERSION.major,
+        "minor": p.PROTOCOL_VERSION.minor,
+        "patch": p.PROTOCOL_VERSION.patch,
+    }
+    values[component] += 1
+    foreign = p.ProtocolVersion(**values)
+    value = (
+        p.SystemInfoRequest(protocol_version=foreign)
+        if family == "request"
+        else p.SystemInfoResponse(foreign, p.ProtocolVersion(1, 2, 3))
+    )
+    with pytest.raises(p.ApplicationEncodeError) as caught:
+        codec.encode(value)
+    assert caught.value.status is p.ApplicationStatus.VERSION_MISMATCH
+
+
+def test_maximum_discovery_response_owns_both_native_storage_spans():
+    codec = p.ApplicationCodec(p.ApplicationConfig(max_encoded_message_size=547))
+    response = p.SystemInfoResponse(
+        protocol_version=p.PROTOCOL_VERSION,
+        firmware_version=p.ProtocolVersion(65535, 65535, 65535),
+        diagnostic_data=bytes(range(255)),
+        firmware_git_hash=bytes(reversed(range(255))),
+    )
+    wire = codec.encode(response)
+    assert len(wire) == 547
+    decoded = codec.decode(wire)
+    del wire
+    gc.collect()
+    assert decoded == response
+
+    default_codec = p.ApplicationCodec(p.ApplicationConfig())
+    with pytest.raises(p.ApplicationEncodeError) as caught:
+        default_codec.encode(response)
+    assert caught.value.status is p.ApplicationStatus.BUFFER_TOO_SMALL
+
+
+def test_foreign_discovery_decodes_before_explicit_compatibility_failure(codec):
+    wire = bytearray(codec.encode(p.SystemInfoRequest()))
+    wire[1] = 3
+    wire[27] = 3
+    peer = codec.decode(wire)
+    assert isinstance(peer, p.SystemInfoRequest)
+    assert peer.protocol_version.minor == 3
+    with pytest.raises(p.ApplicationVersionMismatchError):
+        p.check_protocol_version(peer.protocol_version)
 
 
 def assert_python_owned(value):
@@ -509,6 +598,38 @@ def test_impossible_decoded_message(codec, monkeypatch, path, value):
     def inconsistent(*args):
         status = original(*args)
         set_field(args[3], path, value)
+        return status
+
+    monkeypatch.setattr(application, "_native_decode", inconsistent)
+    with pytest.raises(p.ApplicationBindingError):
+        codec.decode(wire)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["span_size", "diagnostic_offset", "hash_offset", "empty_pointer"],
+)
+def test_response_spans_are_verified_before_copy(codec, monkeypatch, mutation):
+    original = application._native_decode
+    response = p.SystemInfoResponse(
+        p.PROTOCOL_VERSION,
+        p.ProtocolVersion(1, 2, 3),
+        diagnostic_data=b"" if mutation == "empty_pointer" else b"d",
+        firmware_git_hash=b"" if mutation == "empty_pointer" else b"g",
+    )
+    wire = codec.encode(response)
+
+    def inconsistent(*args):
+        status = original(*args)
+        body = args[3].body.system_info_response
+        if mutation == "span_size":
+            body.diagnostic_data.size += 1
+        elif mutation == "diagnostic_offset":
+            body.diagnostic_data.data = args[4] + 1
+        elif mutation == "hash_offset":
+            body.firmware_git_hash.data = args[4]
+        else:
+            body.diagnostic_data.data = ffi.cast("uint8_t *", args[1])
         return status
 
     monkeypatch.setattr(application, "_native_decode", inconsistent)

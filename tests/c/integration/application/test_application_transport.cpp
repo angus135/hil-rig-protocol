@@ -9,6 +9,7 @@
 #include "support/application_test_codec.hpp"
 #include "support/application_delivery_assertions.hpp"
 #include "support/transport_pair_harness.hpp"
+#include "hil_rig_protocol/version.h"
 
 namespace {
 
@@ -129,6 +130,92 @@ TEST( ApplicationTransportIntegration, RepresentativeConfigurationEndToEndPreser
     EXPECT_EQ( pair.Host().ReadApplication().status, HIL_TRANSPORT_STATUS_NOT_READY );
 }
 
+TEST( ApplicationTransportIntegration, DiscoveryGatePermitsOnlyMatchingTestSubmission )
+{
+    HIL_Application_Config_T  application_config{};
+    HIL_Application_Context_T host_application{};
+    HIL_Application_Context_T rig_application{};
+    HIL_Application_Message_T discovery{};
+    HIL_Application_Message_T decoded{};
+    std::size_t               discovery_size = 0u;
+    std::size_t               used_storage   = 0u;
+
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &application_config ), HIL_APPLICATION_STATUS_OK );
+    ASSERT_EQ( HIL_APPLICATION_Init( &host_application, &application_config ),
+               HIL_APPLICATION_STATUS_OK );
+    ASSERT_EQ( HIL_APPLICATION_Init( &rig_application, &application_config ),
+               HIL_APPLICATION_STATUS_OK );
+    discovery.type                           = HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST;
+    discovery.subtype                        = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
+    discovery.body.system_info_request.query = HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC;
+    discovery.body.system_info_request.application_protocol_major = HIL_RIG_PROTOCOL_VERSION_MAJOR;
+    discovery.body.system_info_request.application_protocol_minor = HIL_RIG_PROTOCOL_VERSION_MINOR;
+    discovery.body.system_info_request.application_protocol_patch = HIL_RIG_PROTOCOL_VERSION_PATCH;
+    ASSERT_EQ( HIL_APPLICATION_Encoded_Size( &host_application, &discovery, &discovery_size ),
+               HIL_APPLICATION_STATUS_OK );
+    std::vector<std::uint8_t> discovery_wire( discovery_size );
+    ASSERT_EQ( HIL_APPLICATION_Encode_Message( &host_application, &discovery, discovery_wire.data(),
+                                               discovery_wire.size(), &discovery_size ),
+               HIL_APPLICATION_STATUS_OK );
+
+    TransportPairHarness pair{};
+    ASSERT_NO_FATAL_FAILURE( InitializeAndEstablish( pair ) );
+    std::vector<std::uint8_t> delivered;
+    ASSERT_NO_FATAL_FAILURE( DeliverApplicationAndConfirm( pair, TransportTestDirection::HostToRig,
+                                                           discovery_wire, delivered ) );
+    ASSERT_EQ( HIL_APPLICATION_Decode_Message( &rig_application, delivered.data(), delivered.size(),
+                                               &decoded, nullptr, 0u, &used_storage ),
+               HIL_APPLICATION_STATUS_OK );
+    const bool matching_discovery =
+        HIL_APPLICATION_Check_Protocol_Version(
+            decoded.body.system_info_request.application_protocol_major,
+            decoded.body.system_info_request.application_protocol_minor,
+            decoded.body.system_info_request.application_protocol_patch )
+        == HIL_APPLICATION_STATUS_OK;
+    ASSERT_TRUE( matching_discovery );
+
+    ApplicationTestCodec host_codec{};
+    ASSERT_NO_FATAL_FAILURE( InitializeApplicationCodec( host_codec ) );
+    const auto configuration =
+        host_codec.EncodeSupportedMessage( MakeApplicationConfigurationMessage( nullptr, 0u ) );
+    ASSERT_EQ( configuration.encoding_status, HIL_APPLICATION_STATUS_OK );
+    if ( matching_discovery )
+    {
+        std::vector<std::uint8_t> configuration_delivery;
+        ASSERT_NO_FATAL_FAILURE(
+            DeliverApplicationAndConfirm( pair, TransportTestDirection::HostToRig,
+                                          configuration.bytes, configuration_delivery ) );
+        EXPECT_EQ( configuration_delivery, configuration.bytes );
+    }
+
+    auto foreign_discovery = discovery_wire;
+    foreign_discovery[1]   = 3u;
+    foreign_discovery[27]  = 3u;
+    ASSERT_NO_FATAL_FAILURE( DeliverApplicationAndConfirm( pair, TransportTestDirection::HostToRig,
+                                                           foreign_discovery, delivered ) );
+    used_storage = 0u;
+    ASSERT_EQ( HIL_APPLICATION_Decode_Message( &rig_application, delivered.data(), delivered.size(),
+                                               &decoded, nullptr, 0u, &used_storage ),
+               HIL_APPLICATION_STATUS_OK );
+    const bool foreign_discovery_confirmed =
+        HIL_APPLICATION_Check_Protocol_Version(
+            decoded.body.system_info_request.application_protocol_major,
+            decoded.body.system_info_request.application_protocol_minor,
+            decoded.body.system_info_request.application_protocol_patch )
+        == HIL_APPLICATION_STATUS_OK;
+    EXPECT_FALSE( foreign_discovery_confirmed );
+    if ( !foreign_discovery_confirmed )
+    {
+        const auto submit_test_when_confirmed = [&pair, &configuration]( const bool confirmed ) {
+            return confirmed
+                   && pair.Host().SubmitApplication( configuration.bytes )
+                          == HIL_TRANSPORT_STATUS_OK;
+        };
+        EXPECT_FALSE( submit_test_when_confirmed( foreign_discovery_confirmed ) );
+        EXPECT_EQ( pair.Host().GetStatus().snapshot.output_pending, 0u );
+    }
+}
+
 TEST( ApplicationTransportIntegration, MaximumConfigurationUsesExactLimitsAndChunkedByteStream )
 {
     const auto extension = MakeMaximumApplicationConfigurationExtension();
@@ -196,14 +283,14 @@ TEST( ApplicationTransportIntegration, MaximumConfigurationUsesExactLimitsAndChu
     ASSERT_EQ( undersized.used_storage_size, 0u );
     ASSERT_EQ( rig_codec.DecodedMessage().type, HIL_APPLICATION_MESSAGE_TYPE_INVALID );
 
-    const auto oversized = rig_codec.DecodeMessage( received.bytes, 256u );
+    const auto oversized = rig_codec.DecodeMessage( received.bytes, 511u );
     ASSERT_FALSE( oversized.storage_capacity_valid );
     ASSERT_FALSE( oversized.decode_status.has_value() );
     ASSERT_EQ( oversized.storage_status, HIL_APPLICATION_STATUS_OK );
     ASSERT_EQ( oversized.required_storage_size, 255u );
     ASSERT_EQ( oversized.encoded_validation_status, HIL_APPLICATION_STATUS_OK );
     ASSERT_EQ( oversized.validation_storage_size, 255u );
-    ASSERT_EQ( oversized.supplied_storage_size, 256u );
+    ASSERT_EQ( oversized.supplied_storage_size, 511u );
     ASSERT_EQ( oversized.used_storage_size, 0u );
     ASSERT_EQ( rig_codec.DecodedMessage().type, HIL_APPLICATION_MESSAGE_TYPE_INVALID );
 

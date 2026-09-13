@@ -50,6 +50,18 @@ HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_Application_Message_Type_T type,
                                           size_t                         payload_size );
 
 /**
+ * @brief Scan a bounded System Information Response payload without allocating.
+ *
+ * @details The scanner validates six numeric fields and both length-prefixed
+ * spans, requires exact payload consumption, applies the configured per-span
+ * limit, and reports the combined decoded span storage requirement.
+ */
+HIL_Application_Status_T
+HIL_APPLICATION_System_Info_Response_Scan( const HIL_Application_Context_T* context,
+                                           const uint8_t* payload, size_t payload_size,
+                                           size_t* decoded_storage_size );
+
+/**
  * @brief Decode the fixed System Information Request payload.
  * @param[in]  context               Application context.
  * @param[in]  sub_type              Parsed message subtype.

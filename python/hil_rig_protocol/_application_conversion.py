@@ -15,14 +15,19 @@ from .application_types import (
     ApplicationConfig,
     BusRole,
     CANConfig,
+    ControlCommand,
     DigitalInputConfig,
     DigitalInputValue,
     DigitalOutputConfig,
     DigitalOutputValue,
+    ExecutionControl,
+    GlobalControl,
+    GlobalControlCommand,
     I2CConfig,
     I2CPullUp,
     I2CVoltage,
     PeripheralVoltage,
+    ProtocolVersion,
     PWMInputConfig,
     PWMInputValue,
     PWMOutputConfig,
@@ -33,6 +38,9 @@ from .application_types import (
     SPIClockPolarity,
     SPIConfig,
     SPIDataWidth,
+    SystemInfoQuery,
+    SystemInfoRequest,
+    SystemInfoResponse,
     TestConfiguration,
     TestId,
     TestInstruction,
@@ -76,6 +84,93 @@ def _build_native_config(config: ApplicationConfig) -> Any:
     native = _binding.ffi.new("HIL_Application_Config_T *")
     _write_record(config, native)
     return native
+
+
+def _write_system_info_request(value: SystemInfoRequest, native: Any) -> list[Any]:
+    """Populate a discovery request; its exact-version rule remains in C."""
+    native.request_firmware_git_hash = int(value.request_firmware_git_hash)
+    native.query = value.query
+    native.application_protocol_major = value.protocol_version.major
+    native.application_protocol_minor = value.protocol_version.minor
+    native.application_protocol_patch = value.protocol_version.patch
+    return []
+
+
+def _read_system_info_request(native: Any) -> SystemInfoRequest:
+    return SystemInfoRequest(
+        query=SystemInfoQuery(native.query),
+        request_firmware_git_hash=_read_bool(native.request_firmware_git_hash),
+        protocol_version=ProtocolVersion(
+            int(native.application_protocol_major),
+            int(native.application_protocol_minor),
+            int(native.application_protocol_patch),
+        ),
+    )
+
+
+def _write_system_info_response(value: SystemInfoResponse, native: Any) -> list[Any]:
+    """Populate a discovery response and retain borrowed spans for native encoding."""
+    owners: list[Any] = []
+    native.application_protocol_major = value.protocol_version.major
+    native.application_protocol_minor = value.protocol_version.minor
+    native.application_protocol_patch = value.protocol_version.patch
+    native.firmware_version_major = value.firmware_version.major
+    native.firmware_version_minor = value.firmware_version.minor
+    native.firmware_version_patch = value.firmware_version.patch
+    if value.diagnostic_data:
+        diagnostic_owner = _binding.ffi.new("uint8_t[]", value.diagnostic_data)
+        native.diagnostic_data.data = diagnostic_owner
+        owners.append(diagnostic_owner)
+    native.diagnostic_data.size = len(value.diagnostic_data)
+    if value.firmware_git_hash:
+        hash_owner = _binding.ffi.new("uint8_t[]", value.firmware_git_hash)
+        native.firmware_git_hash.data = hash_owner
+        owners.append(hash_owner)
+    native.firmware_git_hash.size = len(value.firmware_git_hash)
+    return owners
+
+
+def _read_system_info_response(
+    native: Any, diagnostic_data: bytes, firmware_git_hash: bytes
+) -> SystemInfoResponse:
+    return SystemInfoResponse(
+        protocol_version=ProtocolVersion(
+            int(native.application_protocol_major),
+            int(native.application_protocol_minor),
+            int(native.application_protocol_patch),
+        ),
+        firmware_version=ProtocolVersion(
+            int(native.firmware_version_major),
+            int(native.firmware_version_minor),
+            int(native.firmware_version_patch),
+        ),
+        diagnostic_data=diagnostic_data,
+        firmware_git_hash=firmware_git_hash,
+    )
+
+
+def _write_execution_control(value: ExecutionControl, native: Any) -> list[Any]:
+    native.command = value.command
+    native.flags = value.flags
+    return []
+
+
+def _read_execution_control(test_id: TestId, native: Any) -> ExecutionControl:
+    return ExecutionControl(
+        test_id=test_id,
+        command=ControlCommand(native.command),
+        flags=int(native.flags),
+    )
+
+
+def _write_global_control(value: GlobalControl, native: Any) -> list[Any]:
+    native.command = value.command
+    native.flags = value.flags
+    return []
+
+
+def _read_global_control(native: Any) -> GlobalControl:
+    return GlobalControl(command=GlobalControlCommand(native.command), flags=int(native.flags))
 
 
 def _read_digital_output_value(native: Any) -> DigitalOutputValue:

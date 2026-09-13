@@ -74,7 +74,10 @@ typedef enum
     HIL_APPLICATION_STATUS_NOT_IMPLEMENTED = 15,
 
     /** A library-private invariant failed without a more specific status. */
-    HIL_APPLICATION_STATUS_INTERNAL_ERROR = 16
+    HIL_APPLICATION_STATUS_INTERNAL_ERROR = 16,
+
+    /** A peer Application protocol version differs from this compiled library version. */
+    HIL_APPLICATION_STATUS_VERSION_MISMATCH = 17
 } HIL_Application_Status_T;
 
 #ifdef __cplusplus

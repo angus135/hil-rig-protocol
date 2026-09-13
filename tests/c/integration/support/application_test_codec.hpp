@@ -64,10 +64,13 @@ struct ApplicationDecodeResult
  * @brief Stateless public Application codec wrapper for black-box integration tests.
  *
  * @details Decode storage is aligned to HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT
- * and has capacity for the absolute 255-byte variable span. The last decoded
- * message and its backing storage remain owned together by this object, keeping
- * decoded Test Configuration extension pointers valid until the next decode or initialization of
- * this object.
+ * and has capacity for both absolute 255-byte System Information response spans. The last decoded
+
+ * * message and its backing storage remain owned together by this object, keeping
+ * decoded Test
+ * Configuration extension pointers valid until the next decode or initialization of
+ * this
+ * object.
  */
 class ApplicationTestCodec
 {
@@ -95,7 +98,8 @@ public:
 
     /**
      * @brief Validate and encode using caller-selected capacity without size calculation.
-     * @details This supports intentionally unsized families such as current Execution Control.
+     *
+     * @details This exercises the direct public encoding path in addition to normal sizing.
      */
     ApplicationDirectEncodeResult
     EncodeMessageWithCapacity( const HIL_Application_Message_T& message,
@@ -106,10 +110,13 @@ public:
      * @param encoded_message Complete Application bytes.
      * @param storage_capacity Optional caller-selected decode capacity. When omitted,
      *        exactly the successfully reported required storage size is supplied.
-     * @details Capacity must not exceed the owned decode array (255 bytes).
-     * Oversized capacity is rejected without calling the decoder: storage_capacity_valid
-     * is false and decode_status is absent. Sizing and encoded validation still report
-     * their actual public statuses. The previous decoded message is invalidated.
+     * @details Capacity must not exceed the owned decode array (510 bytes).
+     * Oversized
+     * capacity is rejected without calling the decoder: storage_capacity_valid
+     * is false and
+     * decode_status is absent. Sizing and encoded validation still report
+     * their actual
+     * public statuses. The previous decoded message is invalidated.
      */
     ApplicationDecodeResult
     DecodeMessage( const std::vector<std::uint8_t>& encoded_message,
@@ -124,8 +131,8 @@ public:
 private:
     HIL_Application_Context_T context_{};
     HIL_Application_Config_T  config_{};
-    alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT )
-        std::array<std::uint8_t, HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE> decode_storage_{};
+    alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ) std::array<
+        std::uint8_t, 2u * HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE> decode_storage_{};
     HIL_Application_Message_T decoded_message_{};
 };
 

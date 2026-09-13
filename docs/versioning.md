@@ -33,10 +33,15 @@ uses the existing diagnostic rejection path. It does not implement major/minor
 negotiation, compatibility ranges, or fallback.
 
 The Application common envelope carries the repository-wide compiled major and
-minor version as explicit one-byte fields. The encoder writes
-`HIL_RIG_PROTOCOL_VERSION_MAJOR` and `HIL_RIG_PROTOCOL_VERSION_MINOR`; the
-decoder currently requires an exact major/minor match and reports a mismatch as
-`HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE`. Patch is not carried in every
-Application envelope. System Information Response carries major, minor, and
-patch as diagnostic fields and validates them against the same compiled
-repository version; these fields do not negotiate or select a version.
+minor version as explicit one-byte fields. Ordinary Application messages require
+exact major/minor equality and report `HIL_APPLICATION_STATUS_VERSION_MISMATCH`.
+Patch is not carried in every envelope. BASIC System Information Request and
+Response are the one discovery exception: a structurally valid absent-ID BASIC
+message may carry foreign major/minor bytes so an endpoint can read its complete
+triplet. Its body major/minor must repeat the envelope values exactly.
+
+Endpoint integration must call `HIL_APPLICATION_Check_Protocol_Version()` on the
+received triplet and permit test traffic only after it returns `OK`. It requires
+exact major, minor, and patch equality; it does not negotiate, select a codec,
+accept ranges, or provide fallback. Confirmation is per Transport session.
+Firmware without usable discovery is unconfirmed, never assumed compatible.

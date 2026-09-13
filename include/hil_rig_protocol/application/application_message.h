@@ -68,10 +68,10 @@ extern "C"
 /**
  * Smallest complete message supported by the current codec.
  *
- * The System Information Request body is two bytes, so a usable context must
- * permit the 23-byte common envelope plus that body.
+ * Execution and Global Control bodies are five bytes, so a usable context must
+ * permit the 23-byte common envelope plus one control body.
  */
-#define HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE ( HIL_APPLICATION_HEADER_SIZE_BYTES + 2u )
+#define HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE ( HIL_APPLICATION_HEADER_SIZE_BYTES + 5u )
 
 /**
  * @brief Semantic family of one complete Application message.

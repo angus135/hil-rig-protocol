@@ -46,6 +46,26 @@ extern "C"
 HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_T* config );
 
 /**
+ * @brief Compare a received System Information protocol version with this library.
+ *
+ * @details This stateless helper accepts only exact major, minor, and patch
+ * equality. Endpoint integration must call it after a received BASIC System
+ * Information Request or Response and gate all test messages until it returns
+ * OK. Patch equality requires this explicit gate because ordinary Application
+ * envelopes contain only major and minor. A new Transport session requires a
+ * fresh confirmation; firmware without usable discovery remains unconfirmed.
+ *
+ * @param[in] major Received protocol major component.
+ * @param[in] minor Received protocol minor component.
+ * @param[in] patch Received protocol patch component.
+ *
+ * @retval HIL_APPLICATION_STATUS_OK The complete protocol triplet is equal.
+ * @retval HIL_APPLICATION_STATUS_VERSION_MISMATCH At least one component differs.
+ */
+HIL_Application_Status_T HIL_APPLICATION_Check_Protocol_Version( uint16_t major, uint16_t minor,
+                                                                 uint16_t patch );
+
+/**
  * @brief Initialize an Application codec context from caller configuration.
  *
  * @details max_encoded_message_size is an operational upper bound, not a

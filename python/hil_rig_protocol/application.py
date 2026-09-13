@@ -10,17 +10,31 @@ from typing import Any, NoReturn, SupportsIndex
 from . import _binding
 from ._application_conversion import (
     _build_native_config,
+    _read_execution_control,
+    _read_global_control,
+    _read_system_info_request,
+    _read_system_info_response,
     _read_test_configuration,
     _read_test_instruction,
     _read_test_result,
+    _write_execution_control,
+    _write_global_control,
+    _write_system_info_request,
+    _write_system_info_response,
     _write_test_configuration,
     _write_test_instruction,
     _write_test_result,
 )
 from .application_types import (
+    PROTOCOL_VERSION,
     ApplicationConfig,
     ApplicationMessage,
     ApplicationStatus,
+    ExecutionControl,
+    GlobalControl,
+    ProtocolVersion,
+    SystemInfoRequest,
+    SystemInfoResponse,
     TestConfiguration,
     TestId,
     TestInstruction,
@@ -34,6 +48,7 @@ from .errors import (
     ApplicationError,
     ApplicationInternalError,
     ApplicationOwnershipError,
+    ApplicationVersionMismatchError,
 )
 
 _native_init = _binding.lib.HIL_APPLICATION_Init
@@ -41,6 +56,7 @@ _native_encoded_size = _binding.lib.HIL_APPLICATION_Encoded_Size
 _native_encode = _binding.lib.HIL_APPLICATION_Encode_Message
 _native_storage_size = _binding.lib.HIL_APPLICATION_Decode_Storage_Size
 _native_decode = _binding.lib.HIL_APPLICATION_Decode_Message
+_native_check_protocol_version = _binding.lib.HIL_APPLICATION_Check_Protocol_Version
 
 
 @contextmanager
@@ -91,39 +107,114 @@ def _snapshot(data: Buffer) -> bytes:
         return view.tobytes()
 
 
+def check_protocol_version(peer_version: ProtocolVersion) -> None:
+    """Require exact equality between a received discovery version and this build."""
+    if type(peer_version) is not ProtocolVersion:
+        raise TypeError("peer_version must be a ProtocolVersion")
+    with _binding_boundary():
+        status = ApplicationStatus(
+            _native_check_protocol_version(
+                peer_version.major, peer_version.minor, peer_version.patch
+            )
+        )
+    if status is ApplicationStatus.OK:
+        return
+    if status is ApplicationStatus.VERSION_MISMATCH:
+        raise ApplicationVersionMismatchError(PROTOCOL_VERSION, peer_version)
+    raise ApplicationBindingError(
+        f"protocol-version check returned unexpected Application status {status.name}",
+        status=status,
+    )
+
+
 def _build_message(message: ApplicationMessage) -> tuple[Any, list[Any]]:
     native = _binding.ffi.new("HIL_Application_Message_T *")
-    native.has_test_id = 1
-    native.test_id.bytes[0:16] = message.test_id.bytes
-    native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
-    if type(message) is TestConfiguration:
+    if type(message) is SystemInfoRequest:
+        native.has_test_id = 0
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC
+        native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST
+        owners = _write_system_info_request(message, native.body.system_info_request)
+    elif type(message) is SystemInfoResponse:
+        native.has_test_id = 0
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC
+        native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE
+        owners = _write_system_info_response(message, native.body.system_info_response)
+    elif type(message) is GlobalControl:
+        native.has_test_id = 0
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
+        native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL
+        owners = _write_global_control(message, native.body.global_control)
+    elif type(message) is ExecutionControl:
+        native.has_test_id = 1
+        native.test_id.bytes[0:16] = message.test_id.bytes
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
+        native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL
+        owners = _write_execution_control(message, native.body.execution_control)
+    elif type(message) is TestConfiguration:
+        native.has_test_id = 1
+        native.test_id.bytes[0:16] = message.test_id.bytes
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
         native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION
         owners = _write_test_configuration(message, native.body.test_configuration)
     elif type(message) is TestInstruction:
+        native.has_test_id = 1
+        native.test_id.bytes[0:16] = message.test_id.bytes
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
         native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION
         owners = _write_test_instruction(message, native.body.test_instruction)
-    else:
-        assert type(message) is TestResult
+    elif type(message) is TestResult:
+        native.has_test_id = 1
+        native.test_id.bytes[0:16] = message.test_id.bytes
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
         native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT
         owners = _write_test_result(message, native.body.test_result)
+    else:
+        raise TypeError("message is not a supported Application message value")
     return native, owners
+
+
+def _copy_response_spans(native: Any, storage: Any, capacity: int) -> tuple[bytes, bytes]:
+    """Verify native response span ownership before making detached Python copies."""
+    diagnostic = native.body.system_info_response.diagnostic_data
+    git_hash = native.body.system_info_response.firmware_git_hash
+    diagnostic_size = int(diagnostic.size)
+    hash_size = int(git_hash.size)
+    if diagnostic_size + hash_size != capacity:
+        raise ApplicationBindingError("native response span sizes disagree with decode storage")
+    if diagnostic_size:
+        if diagnostic.data != storage:
+            raise ApplicationBindingError("native diagnostic span does not start at decode storage")
+    elif diagnostic.data != _binding.ffi.NULL:
+        raise ApplicationBindingError("native empty diagnostic span has a pointer")
+    if hash_size:
+        if git_hash.data != storage + diagnostic_size:
+            raise ApplicationBindingError(
+                "native Git-hash span has an invalid decode-storage offset"
+            )
+    elif git_hash.data != _binding.ffi.NULL:
+        raise ApplicationBindingError("native empty Git-hash span has a pointer")
+    diagnostic_bytes = (
+        bytes(_binding.ffi.buffer(diagnostic.data, diagnostic_size)) if diagnostic_size else b""
+    )
+    hash_bytes = bytes(_binding.ffi.buffer(git_hash.data, hash_size)) if hash_size else b""
+    return diagnostic_bytes, hash_bytes
 
 
 def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessage:
     lib = _binding.lib
     supported = (
+        lib.HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE,
         lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION,
         lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL,
         lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT,
     )
     if native.type not in supported:
         if native.type in (
-            lib.HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST,
-            lib.HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE,
             lib.HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA,
             lib.HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA,
-            lib.HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL,
-            lib.HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL,
             lib.HIL_APPLICATION_MESSAGE_TYPE_RESPONSE,
             lib.HIL_APPLICATION_MESSAGE_TYPE_ERROR,
         ):
@@ -131,9 +222,37 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
             # native failure occurred, so do not manufacture a failure status.
             raise ApplicationDecodeError("Application message family is not supported by Python")
         raise ApplicationBindingError("native decoder returned an impossible message type")
+    if native.type in (
+        lib.HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE,
+    ):
+        if native.has_test_id != 0 or native.subtype != lib.HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC:
+            raise ApplicationBindingError(
+                "native decoder returned an inconsistent discovery envelope"
+            )
+        if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
+            if capacity != 0:
+                raise ApplicationBindingError(
+                    "native fixed message unexpectedly used decode storage"
+                )
+            return _read_system_info_request(native.body.system_info_request)
+        diagnostic_data, firmware_git_hash = _copy_response_spans(native, storage, capacity)
+        return _read_system_info_response(
+            native.body.system_info_response, diagnostic_data, firmware_git_hash
+        )
+    if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
+        if native.has_test_id != 0 or native.subtype != lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE:
+            raise ApplicationBindingError("native decoder returned an inconsistent global envelope")
+        if capacity != 0:
+            raise ApplicationBindingError("native fixed message unexpectedly used decode storage")
+        return _read_global_control(native.body.global_control)
     if native.has_test_id != 1 or native.subtype != lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE:
         raise ApplicationBindingError("native decoder returned an inconsistent message envelope")
     test_id = TestId(bytes(_binding.ffi.buffer(native.test_id.bytes, 16)))
+    if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
+        if capacity != 0:
+            raise ApplicationBindingError("native fixed message unexpectedly used decode storage")
+        return _read_execution_control(test_id, native.body.execution_control)
     if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
         span = native.body.test_configuration.extension_data
         # Check ownership before dereferencing any native pointer. Configuration
@@ -187,8 +306,16 @@ class ApplicationCodec:
     def encode(self, message: ApplicationMessage) -> bytes:
         """Validate and encode one supported complete message through native C."""
         self._check_owner()
-        if type(message) not in (TestConfiguration, TestInstruction, TestResult):
-            raise TypeError("message must be a TestConfiguration, TestInstruction or TestResult")
+        if type(message) not in (
+            SystemInfoRequest,
+            SystemInfoResponse,
+            TestConfiguration,
+            TestInstruction,
+            ExecutionControl,
+            GlobalControl,
+            TestResult,
+        ):
+            raise TypeError("message is not a supported Application message value")
         with _binding_boundary():
             native, owners = _build_message(message)
             required = _binding.ffi.new("size_t *")
@@ -275,4 +402,4 @@ class ApplicationCodec:
         raise TypeError("ApplicationCodec instances cannot be pickled")
 
 
-__all__ = ["ApplicationCodec"]
+__all__ = ["ApplicationCodec", "check_protocol_version"]

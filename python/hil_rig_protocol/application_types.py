@@ -33,6 +33,83 @@ class ApplicationStatus(IntEnum):
     VALIDATION_FAILED = 14
     NOT_IMPLEMENTED = 15
     INTERNAL_ERROR = 16
+    VERSION_MISMATCH = 17
+
+
+@dataclass(frozen=True, slots=True)
+class ProtocolVersion:
+    """One exact unsigned 16-bit Application protocol version triplet."""
+
+    major: int
+    minor: int
+    patch: int
+
+    def __post_init__(self) -> None:
+        _validate_integer("major", self.major, 0, _UINT16_MAX)
+        _validate_integer("minor", self.minor, 0, _UINT16_MAX)
+        _validate_integer("patch", self.patch, 0, _UINT16_MAX)
+
+
+PROTOCOL_VERSION = ProtocolVersion(
+    int(_binding.lib.HIL_RIG_PROTOCOL_VERSION_MAJOR),
+    int(_binding.lib.HIL_RIG_PROTOCOL_VERSION_MINOR),
+    int(_binding.lib.HIL_RIG_PROTOCOL_VERSION_PATCH),
+)
+
+
+class SystemInfoQuery(IntEnum):
+    """Supported System Information query selectors."""
+
+    INVALID = 0
+    BASIC = 1
+    RESERVED = 255
+
+
+@dataclass(frozen=True, slots=True)
+class SystemInfoRequest:
+    """BASIC discovery request carrying the exact local protocol version."""
+
+    query: SystemInfoQuery = SystemInfoQuery.BASIC
+    request_firmware_git_hash: bool = False
+    protocol_version: ProtocolVersion = PROTOCOL_VERSION
+
+    def __post_init__(self) -> None:
+        _exact("query", self.query, SystemInfoQuery)
+        _exact("request_firmware_git_hash", self.request_firmware_git_hash, bool)
+        _exact("protocol_version", self.protocol_version, ProtocolVersion)
+
+
+@dataclass(frozen=True, slots=True)
+class SystemInfoResponse:
+    """BASIC discovery response with Python-owned diagnostic byte spans."""
+
+    protocol_version: ProtocolVersion
+    firmware_version: ProtocolVersion
+    diagnostic_data: bytes = b""
+    firmware_git_hash: bytes = b""
+
+    def __post_init__(self) -> None:
+        _exact("protocol_version", self.protocol_version, ProtocolVersion)
+        _exact("firmware_version", self.firmware_version, ProtocolVersion)
+        _bytes("diagnostic_data", self.diagnostic_data)
+        _bytes("firmware_git_hash", self.firmware_git_hash)
+
+
+class ControlCommand(IntEnum):
+    """Execution Control command values, including wire sentinels."""
+
+    INVALID = 0
+    START = 1
+    ABORT = 2
+    RESERVED = 255
+
+
+class GlobalControlCommand(IntEnum):
+    """Global Control command values, including wire sentinels."""
+
+    INVALID = 0
+    RESET_APPLICATION = 1
+    RESERVED = 255
 
 
 class PeripheralVoltage(IntEnum):
@@ -588,11 +665,52 @@ class TestResult:
         _validate_integer("problem_detail", self.problem_detail, 0, _UINT32_MAX)
 
 
-type ApplicationMessage = TestConfiguration | TestInstruction | TestResult
+@dataclass(frozen=True, slots=True)
+class ExecutionControl:
+    """A START or ABORT request scoped to one required test identifier."""
+
+    test_id: TestId
+    command: ControlCommand
+    flags: int = 0
+
+    def __post_init__(self) -> None:
+        _exact("test_id", self.test_id, TestId)
+        _exact("command", self.command, ControlCommand)
+        _validate_integer("flags", self.flags, 0, _UINT32_MAX)
+
+
+@dataclass(frozen=True, slots=True)
+class GlobalControl:
+    """A test-independent Application control request."""
+
+    command: GlobalControlCommand
+    flags: int = 0
+
+    def __post_init__(self) -> None:
+        _exact("command", self.command, GlobalControlCommand)
+        _validate_integer("flags", self.flags, 0, _UINT32_MAX)
+
+
+type ApplicationMessage = (
+    SystemInfoRequest
+    | SystemInfoResponse
+    | TestConfiguration
+    | TestInstruction
+    | ExecutionControl
+    | GlobalControl
+    | TestResult
+)
 
 
 __all__ = [
     "ApplicationStatus",
+    "ProtocolVersion",
+    "PROTOCOL_VERSION",
+    "SystemInfoQuery",
+    "SystemInfoRequest",
+    "SystemInfoResponse",
+    "ControlCommand",
+    "GlobalControlCommand",
     "PeripheralVoltage",
     "BusRole",
     "SPIDataWidth",
@@ -628,5 +746,7 @@ __all__ = [
     "TestConfiguration",
     "TestInstruction",
     "TestResult",
+    "ExecutionControl",
+    "GlobalControl",
     "ApplicationMessage",
 ]
