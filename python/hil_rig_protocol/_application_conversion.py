@@ -13,6 +13,8 @@ from .application_types import (
     AnalogOutputConfig,
     AnalogOutputValue,
     ApplicationConfig,
+    ApplicationErrorMessage,
+    ApplicationResponse,
     BusRole,
     CANConfig,
     ControlCommand,
@@ -20,6 +22,7 @@ from .application_types import (
     DigitalInputValue,
     DigitalOutputConfig,
     DigitalOutputValue,
+    ErrorCategory,
     ExecutionControl,
     GlobalControl,
     GlobalControlCommand,
@@ -32,6 +35,9 @@ from .application_types import (
     PWMInputValue,
     PWMOutputConfig,
     PWMOutputValue,
+    ResponseOutcome,
+    ResponseReason,
+    ResponseScope,
     ResultCondition,
     SPIBitOrder,
     SPIClockPhase,
@@ -171,6 +177,59 @@ def _write_global_control(value: GlobalControl, native: Any) -> list[Any]:
 
 def _read_global_control(native: Any) -> GlobalControl:
     return GlobalControl(command=GlobalControlCommand(native.command), flags=int(native.flags))
+
+
+def _write_response(value: ApplicationResponse, native: Any) -> list[Any]:
+    native.scope = value.scope
+    native.outcome = value.outcome
+    native.reason = value.reason
+    native.tick_number = value.tick_number
+    native.control_command = value.control_command
+    native.global_control_command = value.global_control_command
+    native.detail = value.detail
+    return []
+
+
+def _read_response(test_id: TestId | None, native: Any) -> ApplicationResponse:
+    return ApplicationResponse(
+        test_id=test_id,
+        scope=ResponseScope(native.scope),
+        outcome=ResponseOutcome(native.outcome),
+        reason=ResponseReason(native.reason),
+        tick_number=int(native.tick_number),
+        control_command=ControlCommand(native.control_command),
+        global_control_command=GlobalControlCommand(native.global_control_command),
+        detail=int(native.detail),
+    )
+
+
+def _write_error(value: ApplicationErrorMessage, native: Any) -> list[Any]:
+    owners: list[Any] = []
+    native.category = value.category
+    native.recoverable = int(value.recoverable)
+    native.has_tick_number = int(value.tick_number is not None)
+    native.tick_number = 0 if value.tick_number is None else value.tick_number
+    native.detail = value.detail
+    if value.diagnostic_data:
+        diagnostic_owner = _binding.ffi.new("uint8_t[]", value.diagnostic_data)
+        native.diagnostic_data.data = diagnostic_owner
+        owners.append(diagnostic_owner)
+    native.diagnostic_data.size = len(value.diagnostic_data)
+    return owners
+
+
+def _read_error(
+    test_id: TestId | None, native: Any, diagnostic_data: bytes
+) -> ApplicationErrorMessage:
+    tick_number = int(native.tick_number) if _read_bool(native.has_tick_number) else None
+    return ApplicationErrorMessage(
+        test_id=test_id,
+        category=ErrorCategory(native.category),
+        recoverable=_read_bool(native.recoverable),
+        tick_number=tick_number,
+        detail=int(native.detail),
+        diagnostic_data=diagnostic_data,
+    )
 
 
 def _read_digital_output_value(native: Any) -> DigitalOutputValue:

@@ -412,7 +412,7 @@ forbids one. `EXECUTION_CONTROL` is type 19 with subtype NONE: START is 1 and AB
 `GLOBAL_CONTROL` is type 20 with subtype NONE: RESET_APPLICATION is 1. Every control complete message
 is 28 bytes. Decoding never performs a control. START requires an accepted complete test; ABORT abandons
 the identified operation; RESET_APPLICATION cleans Application state without resetting Transport. The
-actual lifecycle checks and Application Responses remain endpoint integration work.
+actual lifecycle checks and decisions about Application Responses remain endpoint integration work.
 
 ## Test Result fixed body
 
@@ -437,6 +437,49 @@ reserved values are rejected. `PARTIAL` is representable even though variable re
 deferred. Analogue values and `problem_detail` have no additional codec range rule. Active-test tick
 comparison, enabled-channel semantics, result ordering, and hardware feasibility are integration-owned.
 
+## Application Response
+
+Application Response is supported in v0.2.0 as type 48, subtype `NONE`. Its body
+is exactly 13 bytes and requires no decode storage.
+
+| Payload offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 1 | scope enum |
+| 1 | 1 | outcome enum |
+| 2 | 1 | reason enum |
+| 3 | 4 | tick number, `uint32_t` little-endian |
+| 7 | 1 | execution control command enum |
+| 8 | 1 | global control command enum |
+| 9 | 4 | detail, `uint32_t` little-endian |
+
+The five defined scopes, four defined outcomes, reasons `NONE` through
+`INTERNAL_FAILURE`, execution commands `INVALID`/`START`/`ABORT`, and global
+commands `INVALID`/`RESET_APPLICATION` are structurally valid. Global Control
+scope forbids a Test ID; every other scope requires one. The codec does not
+apply a scope/outcome/reason/command/tick compatibility matrix.
+
+## Application Error
+
+Application Error is supported in v0.2.0 as type 49, subtype `NONE`. Its body is
+`12 + N` bytes.
+
+| Payload offset | Width | Field |
+| ---: | ---: | --- |
+| 0 | 1 | category enum |
+| 1 | 1 | recoverable, exactly 0 or 1 |
+| 2 | 1 | tick present, exactly 0 or 1 |
+| 3 | 4 | tick number, `uint32_t` little-endian |
+| 7 | 4 | detail, `uint32_t` little-endian |
+| 11 | 1 | diagnostic length N |
+| 12 | N | diagnostic bytes |
+
+Global Errors omit Test ID and tick; test-wide Errors include a Test ID and omit
+the tick; tick-specific Errors include both. An absent tick requires a zero tick
+field, and a present tick must be below `max_expected_tick_count`. The bounded
+scanner proves the complete declared diagnostic span and rejects trailing bytes
+before applying `max_variable_data_size`. Categories are not tied to Test-ID
+presence, recoverability, endpoint state, or recovery action.
+
 ## Public API publication rules
 
 The wire contract is paired with deterministic public output rules:
@@ -454,9 +497,8 @@ The wire contract is paired with deterministic public output rules:
 ## Current support boundary
 
 The presence of a documented identifier or public C structure does not mean all façade operations are
-complete. In particular, variable instruction/result bodies, Response/Error semantics, and
-other unfinished message-specific encoded-size/validation paths remain deliberately deferred. Test
-Configuration plus the fixed Test Instruction and Test Result families are supported. See the support
+complete. Variable instruction/result bodies remain deliberately deferred.
+Response and Error wire operations are supported; endpoint workflow semantics remain outside the codec. See the support
 table in
 [Application Layer codec and transaction design](application_layer.md#current-message-family-implementation-status)
 before treating a payload family as fully operational.

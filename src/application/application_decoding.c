@@ -47,8 +47,7 @@ HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_Application_Message_Type_T type, s
             expected_size = HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE;
             break;
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
-            expected_size =
-                5u * HIL_APPLICATION_WIRE_ENUM_SIZE + 2u * HIL_APPLICATION_WIRE_U32_SIZE;
+            expected_size = HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE;
             break;
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
             /* Test Configuration is variable-length because of its extension and is
@@ -67,6 +66,44 @@ HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_Application_Message_Type_T type, s
 
     return payload_size == expected_size ? HIL_APPLICATION_STATUS_OK
                                          : HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Error_Scan( const HIL_Application_Context_T* context,
+                                                     const uint8_t* payload, size_t payload_size,
+                                                     size_t* decoded_storage_size )
+{
+    size_t  complete_size   = 0u;
+    uint8_t diagnostic_size = 0u;
+
+    if ( context == NULL || payload == NULL || decoded_storage_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *decoded_storage_size = 0u;
+    if ( payload_size < HIL_APPLICATION_ERROR_FIXED_PAYLOAD_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    diagnostic_size = payload[HIL_APPLICATION_ERROR_DIAGNOSTIC_LENGTH_OFFSET];
+    if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_ERROR_FIXED_PAYLOAD_SIZE,
+                                            diagnostic_size, &complete_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    if ( payload_size < complete_size )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    if ( payload_size != complete_size )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    if ( diagnostic_size > context->config.max_variable_data_size )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    *decoded_storage_size = diagnostic_size;
+    return HIL_APPLICATION_STATUS_OK;
 }
 
 HIL_Application_Status_T
@@ -709,19 +746,14 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_decode(
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
-HIL_Application_Status_T HIL_APPLICATION_Response_decode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, HIL_Application_Response_T* data,
-    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
-    size_t max_decoded_data_size, size_t* used_decoded_size )
+HIL_Application_Status_T HIL_APPLICATION_Response_decode( HIL_Application_Response_T* data,
+                                                          const uint8_t*              payload,
+                                                          size_t  max_payload_size,
+                                                          size_t* payload_size,
+                                                          size_t* used_decoded_size )
 {
     HIL_Application_Status_T status;
-    size_t                   running_total = 0u;
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )decoded_data;
-    ( void )max_decoded_data_size;
+    size_t                   running_total = HIL_APPLICATION_RESPONSE_TICK_NUMBER_OFFSET;
 
     status = HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_APPLICATION_MESSAGE_TYPE_RESPONSE,
                                                        max_payload_size );
@@ -729,44 +761,63 @@ HIL_Application_Status_T HIL_APPLICATION_Response_decode(
     {
         return status;
     }
-    data->scope   = ( HIL_Application_Response_Scope_T )payload[running_total++];
-    data->outcome = ( HIL_Application_Response_Outcome_T )payload[running_total++];
-    data->reason  = ( HIL_Application_Response_Reason_T )payload[running_total++];
-    HIL_APPLICATION_Decode_U32_Le( &data->tick_number, &payload[running_total], &running_total );
-    data->control_command = ( HIL_Application_Control_Command_T )payload[running_total++];
-    data->global_control_command =
-        ( HIL_Application_Global_Control_Command_T )payload[running_total++];
-    HIL_APPLICATION_Decode_U32_Le( &data->detail, &payload[running_total], &running_total );
+    data->scope =
+        ( HIL_Application_Response_Scope_T )payload[HIL_APPLICATION_RESPONSE_SCOPE_OFFSET];
+    data->outcome =
+        ( HIL_Application_Response_Outcome_T )payload[HIL_APPLICATION_RESPONSE_OUTCOME_OFFSET];
+    data->reason =
+        ( HIL_Application_Response_Reason_T )payload[HIL_APPLICATION_RESPONSE_REASON_OFFSET];
+    HIL_APPLICATION_Decode_U32_Le(
+        &data->tick_number, &payload[HIL_APPLICATION_RESPONSE_TICK_NUMBER_OFFSET], &running_total );
+    data->control_command = ( HIL_Application_Control_Command_T )
+        payload[HIL_APPLICATION_RESPONSE_CONTROL_COMMAND_OFFSET];
+    data->global_control_command = ( HIL_Application_Global_Control_Command_T )
+        payload[HIL_APPLICATION_RESPONSE_GLOBAL_CONTROL_COMMAND_OFFSET];
+    running_total = HIL_APPLICATION_RESPONSE_DETAIL_OFFSET;
+    HIL_APPLICATION_Decode_U32_Le( &data->detail, &payload[HIL_APPLICATION_RESPONSE_DETAIL_OFFSET],
+                                   &running_total );
+    if ( running_total != HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
     *payload_size      = running_total;
     *used_decoded_size = 0u;
     return HIL_APPLICATION_STATUS_OK;
 }
 
-HIL_Application_Status_T HIL_APPLICATION_Error_decode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, HIL_Application_Error_T* data, const uint8_t* payload,
-    size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
-    size_t max_decoded_data_size, size_t* used_decoded_size )
+HIL_Application_Status_T
+HIL_APPLICATION_Error_decode( const HIL_Application_Context_T* context,
+                              HIL_Application_Error_T* data, const uint8_t* payload,
+                              size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
+                              size_t max_decoded_data_size, size_t* used_decoded_size )
 {
-    const size_t fixed_size = HIL_APPLICATION_WIRE_ENUM_SIZE + 2u * HIL_APPLICATION_WIRE_U8_SIZE
-                              + 2u * HIL_APPLICATION_WIRE_U32_SIZE;
-    size_t                   running_total = 0u;
-    size_t                   span_encoded  = 0u;
-    size_t                   span_decoded  = 0u;
+    size_t                   required_storage = 0u;
+    size_t                   running_total    = HIL_APPLICATION_ERROR_TICK_NUMBER_OFFSET;
+    size_t                   span_encoded     = 0u;
+    size_t                   span_decoded     = 0u;
     HIL_Application_Status_T status;
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
 
-    if ( max_payload_size < fixed_size + HIL_APPLICATION_BYTE_SPAN_LENGTH_SIZE )
+    status = HIL_APPLICATION_Error_Scan( context, payload, max_payload_size, &required_storage );
+    if ( status != HIL_APPLICATION_STATUS_OK )
     {
-        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+        return status;
     }
-    data->category        = ( HIL_Application_Error_Category_T )payload[running_total++];
-    data->recoverable     = payload[running_total++];
-    data->has_tick_number = payload[running_total++];
-    HIL_APPLICATION_Decode_U32_Le( &data->tick_number, &payload[running_total], &running_total );
-    HIL_APPLICATION_Decode_U32_Le( &data->detail, &payload[running_total], &running_total );
+    if ( required_storage > max_decoded_data_size )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+    data->category =
+        ( HIL_Application_Error_Category_T )payload[HIL_APPLICATION_ERROR_CATEGORY_OFFSET];
+    data->recoverable     = payload[HIL_APPLICATION_ERROR_RECOVERABLE_OFFSET];
+    data->has_tick_number = payload[HIL_APPLICATION_ERROR_HAS_TICK_NUMBER_OFFSET];
+    HIL_APPLICATION_Decode_U32_Le(
+        &data->tick_number, &payload[HIL_APPLICATION_ERROR_TICK_NUMBER_OFFSET], &running_total );
+    HIL_APPLICATION_Decode_U32_Le( &data->detail, &payload[HIL_APPLICATION_ERROR_DETAIL_OFFSET],
+                                   &running_total );
+    if ( running_total != HIL_APPLICATION_ERROR_DIAGNOSTIC_LENGTH_OFFSET )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
 
     status = HIL_APPLICATION_Byte_Span_decode(
         &data->diagnostic_data, &payload[running_total], max_payload_size - running_total,
@@ -775,8 +826,11 @@ HIL_Application_Status_T HIL_APPLICATION_Error_decode(
     {
         return status;
     }
-    running_total += span_encoded;
-    *payload_size      = running_total;
+    if ( running_total + span_encoded != max_payload_size )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
+    *payload_size      = max_payload_size;
     *used_decoded_size = span_decoded;
     return HIL_APPLICATION_STATUS_OK;
 }

@@ -12,7 +12,8 @@ The current design has two public layers:
   system information, test configuration, instructions, execution control,
   results, responses, and errors. Its stateless C codec converts between typed
   data and one complete, architecture-independent Application message. Several
-  message-family operations remain deliberately `NOT_IMPLEMENTED`.
+  variable instruction/result message-family operations remain deliberately
+  `NOT_IMPLEMENTED`.
 - **Transport Layer** — carries each complete, opaque Application message over
   a caller-owned byte stream. Its facade is designed to own framing, integrity,
   session establishment, ordered reliable delivery, and recovery without
@@ -63,11 +64,12 @@ backpressure, reliability, corruption, reset, recovery, and ownership behavior.
 The Application layer now has a fixed 23-byte architecture-independent common
 envelope, bounded encode/decode paths, structural validation, exact System
 Information discovery, and complete fixed codec support for Execution Control,
-Global Control, Test Configuration, Test Instruction, and Test Result. Fixed
+Global Control, Test Configuration, Test Instruction, Test Result, Application
+Response, and Application Error. Fixed
 Instruction/Result payloads are 50/39 bytes respectively, with Boolean Digital,
 PWM, configured tick-ceiling, and result-condition validation. Discovery uses an
 explicit exact-version gate before a test conversation. Variable-data families
-and Response/Error work remain deliberately `NOT_IMPLEMENTED`; analogue hardware
+remain deliberately `NOT_IMPLEMENTED`; analogue hardware
 ranges and stateful production conversation orchestration remain integration work.
 
 Public C Application-to-Transport integration now exercises representative and

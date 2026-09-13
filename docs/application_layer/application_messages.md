@@ -5,7 +5,7 @@
 
 ## Status
 
-This document describes the public typed messages and the common wire envelope implemented by the stateless C codec. The public C structures are API representations, not packed wire structures: native enum width, `size_t`, padding, unions and pointer representation do not define encoded bytes. PR 1 implements discovery and control codecs, not Application Response/Error codecs or production endpoint conversation orchestration. Several message-family bodies remain deliberately unfinished and return `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED`; their existing identifiers and structures are reserved in place.
+This document describes the public typed messages and the common wire envelope implemented by the stateless C codec. The public C structures are API representations, not packed wire structures: native enum width, `size_t`, padding, unions and pointer representation do not define encoded bytes. Response and Error wire operations are supported in v0.2.0. Variable instruction/result bodies remain deliberately unfinished and return `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED`; production endpoint conversation orchestration remains outside the codec.
 
 ## Common envelope
 
@@ -612,27 +612,30 @@ delivery require a versioned extension.
   Control;
 - `outcome`: Accepted, Rejected, Completed, or Failed;
 - expandable protocol-oriented `reason`;
-- `tick_number`, meaningful only for Tick scope;
-- `control_command`, meaningful only for Execution Control scope;
-- `global_control_command`, meaningful only for Global Control scope; and
+- `tick_number`, interpreted by endpoint workflow;
+- execution and global command correlation fields; and
 - integration-defined `detail`.
 
 Test-scoped Responses require the correlated Test ID. Global Control Responses
-forbid one. Irrelevant correlation fields use zero/INVALID.
+forbid one. Endpoint integrations normally use zero/INVALID for irrelevant
+correlation fields, but the codec preserves and accepts every defined command
+value without imposing that convention.
 
 Initial reasons cover unsupported input, operation not allowed, inconsistent
 Test ID, invalid tick, length mismatch, storage unavailable, validation failure,
 hardware not ready, and internal failure. Structurally malformed Application
 data produces a local codec status rather than an Application Response reason.
 
-Scope/outcome success combinations are:
+Endpoint workflow normally uses these success combinations:
 
 - Configuration, Tick, and Complete Test use `ACCEPTED`;
 - Execution Control and Global Control use `COMPLETED`.
 
 `REJECTED` means the requested semantic acceptance or operation did not occur.
 `FAILED` means processing began but could not complete. Transaction effects and
-required recovery follow the scope-specific rules above.
+required recovery follow the scope-specific rules above. The shared codec does
+not enforce this scope/outcome/reason/command/tick matrix; firmware and Python
+decide whether a decoded outcome is appropriate for their current workflow.
 
 Tick Responses implement mandatory stop-and-wait for the initial upload. Only
 the current fixed-plus-variable tick may await semantic acceptance. Later ticks
@@ -662,8 +665,10 @@ endpoint integration and adds no request tracking to the codec context.
 - Direction: firmware to Python
 
 Initial categories are Hardware, Execution, Timeout, Retained Data, Protocol,
-and Internal. A test-specific error carries the Test ID when known; a global
-hardware/power error may omit it. An Error is not a rejection of one request,
+and Internal. A global Error has no Test ID or tick, a test-wide Error has a Test
+ID and no tick, and a tick-specific Error has both. Categories do not determine
+Test-ID presence, recoverability, endpoint state, or a required recovery action.
+An Error is not a rejection of one request,
 not a local codec status, and not a Transport corruption/delivery failure.
 For a successfully started test, an execution Error does not replace any of the
 N required fixed results. Only session/communication loss or reset removes the

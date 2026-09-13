@@ -130,6 +130,62 @@ TEST( ApplicationTransportIntegration, RepresentativeConfigurationEndToEndPreser
     EXPECT_EQ( pair.Host().ReadApplication().status, HIL_TRANSPORT_STATUS_NOT_READY );
 }
 
+TEST( ApplicationTransportIntegration, ResponseAndErrorRoundTripStatelesslyOverTransport )
+{
+    constexpr std::array<std::uint8_t, 5u> diagnostic{ 0x45u, 0x52u, 0x52u, 0x21u, 0x00u };
+    constexpr std::uint8_t                 diagnostic_size = 5u;
+    HIL_Application_Message_T              response{};
+    response.type                          = HIL_APPLICATION_MESSAGE_TYPE_RESPONSE;
+    response.subtype                       = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    response.has_test_id                   = 1u;
+    response.test_id                       = hil_rig_protocol::test::ApplicationFixtureTestId();
+    response.body.response.scope           = HIL_APPLICATION_RESPONSE_SCOPE_EXECUTION_CONTROL;
+    response.body.response.outcome         = HIL_APPLICATION_RESPONSE_OUTCOME_COMPLETED;
+    response.body.response.reason          = HIL_APPLICATION_RESPONSE_REASON_NONE;
+    response.body.response.tick_number     = 42u;
+    response.body.response.control_command = HIL_APPLICATION_CONTROL_START;
+    response.body.response.global_control_command = HIL_APPLICATION_GLOBAL_CONTROL_INVALID;
+    response.body.response.detail                 = 0x10203040u;
+
+    HIL_Application_Message_T error{};
+    error.type                       = HIL_APPLICATION_MESSAGE_TYPE_ERROR;
+    error.subtype                    = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    error.has_test_id                = 1u;
+    error.test_id                    = response.test_id;
+    error.body.error.category        = HIL_APPLICATION_ERROR_CATEGORY_EXECUTION;
+    error.body.error.recoverable     = 1u;
+    error.body.error.has_tick_number = 1u;
+    error.body.error.tick_number     = 2u;
+    error.body.error.detail          = 0xaabbccddu;
+    error.body.error.diagnostic_data = { diagnostic.data(), diagnostic_size };
+
+    ApplicationTestCodec rig_codec{};
+    ApplicationTestCodec host_codec{};
+    ASSERT_NO_FATAL_FAILURE( InitializeApplicationCodec( rig_codec ) );
+    ASSERT_NO_FATAL_FAILURE( InitializeApplicationCodec( host_codec ) );
+    TransportPairHarness pair{};
+    ASSERT_NO_FATAL_FAILURE( InitializeAndEstablish( pair ) );
+
+    for ( const auto* message : { &response, &error } )
+    {
+        const auto encoded = rig_codec.EncodeSupportedMessage( *message );
+        ASSERT_EQ( encoded.validation_status, HIL_APPLICATION_STATUS_OK );
+        ASSERT_EQ( encoded.encoding_status, HIL_APPLICATION_STATUS_OK );
+        std::vector<std::uint8_t> delivered;
+        ASSERT_NO_FATAL_FAILURE( DeliverApplicationAndConfirm(
+            pair, TransportTestDirection::RigToHost, encoded.bytes, delivered ) );
+        const auto decoded = host_codec.DecodeMessage( delivered );
+        ASSERT_EQ( decoded.storage_status, HIL_APPLICATION_STATUS_OK );
+        ASSERT_EQ( decoded.encoded_validation_status, HIL_APPLICATION_STATUS_OK );
+        ASSERT_EQ( decoded.decode_status, HIL_APPLICATION_STATUS_OK );
+        EXPECT_EQ( host_codec.DecodedMessage().type, message->type );
+    }
+
+    EXPECT_EQ( host_codec.DecodedMessage().body.error.diagnostic_data.size, diagnostic_size );
+    EXPECT_TRUE( std::equal( diagnostic.begin(), diagnostic.end(),
+                             host_codec.DecodedMessage().body.error.diagnostic_data.data ) );
+}
+
 TEST( ApplicationTransportIntegration, DiscoveryGatePermitsOnlyMatchingTestSubmission )
 {
     HIL_Application_Config_T  application_config{};

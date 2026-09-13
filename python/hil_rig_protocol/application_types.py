@@ -112,6 +112,58 @@ class GlobalControlCommand(IntEnum):
     RESERVED = 255
 
 
+class ResponseScope(IntEnum):
+    """Operation family correlated by an Application Response."""
+
+    INVALID = 0
+    TEST_CONFIGURATION = 1
+    TICK = 2
+    COMPLETE_TEST = 3
+    EXECUTION_CONTROL = 4
+    GLOBAL_CONTROL = 5
+    RESERVED = 255
+
+
+class ResponseOutcome(IntEnum):
+    """Structural Application Response outcomes."""
+
+    INVALID = 0
+    ACCEPTED = 1
+    REJECTED = 2
+    COMPLETED = 3
+    FAILED = 4
+    RESERVED = 255
+
+
+class ResponseReason(IntEnum):
+    """Defined Application Response reasons, including NONE."""
+
+    NONE = 0
+    UNSUPPORTED = 1
+    OPERATION_NOT_ALLOWED = 2
+    INCONSISTENT_TEST_ID = 3
+    INVALID_TICK = 4
+    LENGTH_MISMATCH = 5
+    STORAGE_UNAVAILABLE = 6
+    VALIDATION_FAILED = 7
+    HARDWARE_NOT_READY = 8
+    INTERNAL_FAILURE = 9
+    RESERVED = 255
+
+
+class ErrorCategory(IntEnum):
+    """Defined Application Error categories, including wire sentinels."""
+
+    INVALID = 0
+    HARDWARE = 1
+    EXECUTION = 2
+    TIMEOUT = 3
+    RETAINED_DATA = 4
+    PROTOCOL = 5
+    INTERNAL = 6
+    RESERVED = 255
+
+
 class PeripheralVoltage(IntEnum):
     """Native Peripheral Config Voltage Level selections, including sentinels."""
 
@@ -691,6 +743,53 @@ class GlobalControl:
         _validate_integer("flags", self.flags, 0, _UINT32_MAX)
 
 
+@dataclass(frozen=True, slots=True)
+class ApplicationResponse:
+    """A direction-neutral, stateless Application Response wire value."""
+
+    test_id: TestId | None
+    scope: ResponseScope
+    outcome: ResponseOutcome
+    reason: ResponseReason
+    tick_number: int = 0
+    control_command: ControlCommand = ControlCommand.INVALID
+    global_control_command: GlobalControlCommand = GlobalControlCommand.INVALID
+    detail: int = 0
+
+    def __post_init__(self) -> None:
+        if self.test_id is not None:
+            _exact("test_id", self.test_id, TestId)
+        _exact("scope", self.scope, ResponseScope)
+        _exact("outcome", self.outcome, ResponseOutcome)
+        _exact("reason", self.reason, ResponseReason)
+        _validate_integer("tick_number", self.tick_number, 0, _UINT32_MAX)
+        _exact("control_command", self.control_command, ControlCommand)
+        _exact("global_control_command", self.global_control_command, GlobalControlCommand)
+        _validate_integer("detail", self.detail, 0, _UINT32_MAX)
+
+
+@dataclass(frozen=True, slots=True)
+class ApplicationErrorMessage:
+    """A broader Application fault with Python-owned diagnostic bytes."""
+
+    test_id: TestId | None
+    category: ErrorCategory
+    recoverable: bool
+    tick_number: int | None = None
+    detail: int = 0
+    diagnostic_data: bytes = b""
+
+    def __post_init__(self) -> None:
+        if self.test_id is not None:
+            _exact("test_id", self.test_id, TestId)
+        _exact("category", self.category, ErrorCategory)
+        _exact("recoverable", self.recoverable, bool)
+        if self.tick_number is not None:
+            _validate_integer("tick_number", self.tick_number, 0, _UINT32_MAX)
+        _validate_integer("detail", self.detail, 0, _UINT32_MAX)
+        _bytes("diagnostic_data", self.diagnostic_data)
+
+
 type ApplicationMessage = (
     SystemInfoRequest
     | SystemInfoResponse
@@ -699,6 +798,8 @@ type ApplicationMessage = (
     | ExecutionControl
     | GlobalControl
     | TestResult
+    | ApplicationResponse
+    | ApplicationErrorMessage
 )
 
 
@@ -711,6 +812,10 @@ __all__ = [
     "SystemInfoResponse",
     "ControlCommand",
     "GlobalControlCommand",
+    "ResponseScope",
+    "ResponseOutcome",
+    "ResponseReason",
+    "ErrorCategory",
     "PeripheralVoltage",
     "BusRole",
     "SPIDataWidth",
@@ -748,5 +853,7 @@ __all__ = [
     "TestResult",
     "ExecutionControl",
     "GlobalControl",
+    "ApplicationResponse",
+    "ApplicationErrorMessage",
     "ApplicationMessage",
 ]

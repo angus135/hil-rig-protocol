@@ -599,10 +599,75 @@ HIL_Application_Status_T
 HIL_APPLICATION_Response_validate( const HIL_Application_Context_T*  context,
                                    const HIL_Application_Response_T* data )
 {
-    if ( context->initialized == 0 )
+    if ( context == NULL || data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( context->initialized == 0u )
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
     }
-    ( void )data;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    if ( data->scope != HIL_APPLICATION_RESPONSE_SCOPE_TEST_CONFIGURATION
+         && data->scope != HIL_APPLICATION_RESPONSE_SCOPE_TICK
+         && data->scope != HIL_APPLICATION_RESPONSE_SCOPE_COMPLETE_TEST
+         && data->scope != HIL_APPLICATION_RESPONSE_SCOPE_EXECUTION_CONTROL
+         && data->scope != HIL_APPLICATION_RESPONSE_SCOPE_GLOBAL_CONTROL )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->outcome != HIL_APPLICATION_RESPONSE_OUTCOME_ACCEPTED
+         && data->outcome != HIL_APPLICATION_RESPONSE_OUTCOME_REJECTED
+         && data->outcome != HIL_APPLICATION_RESPONSE_OUTCOME_COMPLETED
+         && data->outcome != HIL_APPLICATION_RESPONSE_OUTCOME_FAILED )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->reason < HIL_APPLICATION_RESPONSE_REASON_NONE
+         || data->reason > HIL_APPLICATION_RESPONSE_REASON_INTERNAL_FAILURE )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->control_command != HIL_APPLICATION_CONTROL_INVALID
+         && data->control_command != HIL_APPLICATION_CONTROL_START
+         && data->control_command != HIL_APPLICATION_CONTROL_ABORT )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->global_control_command != HIL_APPLICATION_GLOBAL_CONTROL_INVALID
+         && data->global_control_command != HIL_APPLICATION_GLOBAL_CONTROL_RESET_APPLICATION )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Error_validate( const HIL_Application_Context_T* context,
+                                                         const HIL_Application_Error_T*   data )
+{
+    if ( context == NULL || data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( context->initialized == 0u )
+    {
+        return HIL_APPLICATION_STATUS_UNINITIALIZED;
+    }
+    if ( data->category < HIL_APPLICATION_ERROR_CATEGORY_HARDWARE
+         || data->category > HIL_APPLICATION_ERROR_CATEGORY_INTERNAL
+         || !HIL_APPLICATION_Boolean_Is_Valid( data->recoverable )
+         || !HIL_APPLICATION_Boolean_Is_Valid( data->has_tick_number ) )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->has_tick_number == 0u && data->tick_number != 0u )
+    {
+        return HIL_APPLICATION_STATUS_INCONSISTENT_TICK;
+    }
+    if ( data->has_tick_number == 1u
+         && data->tick_number >= context->config.max_expected_tick_count )
+    {
+        return HIL_APPLICATION_STATUS_INCONSISTENT_TICK;
+    }
+    return HIL_APPLICATION_Byte_Span_validate( &data->diagnostic_data,
+                                               context->config.max_variable_data_size );
 }

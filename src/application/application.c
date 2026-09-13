@@ -63,10 +63,9 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Size( const HIL_Application
                 context, &message->subtype, message->test_id, &message->body.variable_result_data,
                 payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
-            return HIL_APPLICATION_Response_size( context, &message->subtype, message->test_id,
-                                                  &message->body.response, payload_size );
+            return HIL_APPLICATION_Response_size( context, &message->body.response, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
-            return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+            return HIL_APPLICATION_Error_size( context, &message->body.error, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
         default:
@@ -118,13 +117,11 @@ HIL_APPLICATION_Body_Encode( const HIL_Application_Context_T* context,
                 context, &message->subtype, message->test_id, &message->body.variable_result_data,
                 payload_capacity, payload, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
-            return HIL_APPLICATION_Response_encode( context, &message->subtype, message->test_id,
-                                                    &message->body.response, payload_capacity,
-                                                    payload, payload_size );
+            return HIL_APPLICATION_Response_encode( context, &message->body.response,
+                                                    payload_capacity, payload, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
-            return HIL_APPLICATION_Error_encode( context, &message->subtype, message->test_id,
-                                                 &message->body.error, payload_capacity, payload,
-                                                 payload_size );
+            return HIL_APPLICATION_Error_encode( context, &message->body.error, payload_capacity,
+                                                 payload, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
         default:
@@ -183,14 +180,11 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Decode(
                 payload, payload_size, consumed_payload_size, decoded_data, max_decoded_data_size,
                 used_decoded_size );
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
-            return HIL_APPLICATION_Response_decode( context, &message->subtype, message->test_id,
-                                                    &message->body.response, payload, payload_size,
-                                                    consumed_payload_size, decoded_data,
-                                                    max_decoded_data_size, used_decoded_size );
+            return HIL_APPLICATION_Response_decode( &message->body.response, payload, payload_size,
+                                                    consumed_payload_size, used_decoded_size );
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
-            return HIL_APPLICATION_Error_decode( context, &message->subtype, message->test_id,
-                                                 &message->body.error, payload, payload_size,
-                                                 consumed_payload_size, decoded_data,
+            return HIL_APPLICATION_Error_decode( context, &message->body.error, payload,
+                                                 payload_size, consumed_payload_size, decoded_data,
                                                  max_decoded_data_size, used_decoded_size );
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
@@ -550,9 +544,24 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
-        case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
             /* Share exact fixed-body width validation with normal body decoding. */
             return HIL_APPLICATION_Fixed_Body_Validate_Size( envelope.type, payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
+            status = HIL_APPLICATION_Fixed_Body_Validate_Size( envelope.type, payload_size );
+            if ( status != HIL_APPLICATION_STATUS_OK )
+            {
+                return status;
+            }
+            if ( envelope.has_test_id
+                 != ( encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES
+                                      + HIL_APPLICATION_RESPONSE_SCOPE_OFFSET]
+                              == HIL_APPLICATION_RESPONSE_SCOPE_GLOBAL_CONTROL
+                          ? 0u
+                          : 1u ) )
+            {
+                return HIL_APPLICATION_STATUS_INCONSISTENT_TEST_ID;
+            }
+            return HIL_APPLICATION_STATUS_OK;
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION: {
             size_t  required_payload_size = 0u;
             uint8_t extension_size;
@@ -597,8 +606,11 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
             return HIL_APPLICATION_STATUS_OK;
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
-        case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
             return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+        case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
+            return HIL_APPLICATION_Error_Scan( context,
+                                               &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES],
+                                               payload_size, required_storage_size );
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
         default:
@@ -702,7 +714,7 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
             return HIL_APPLICATION_Response_validate( context, &message->body.response );
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
-            return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+            return HIL_APPLICATION_Error_validate( context, &message->body.error );
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
         default:

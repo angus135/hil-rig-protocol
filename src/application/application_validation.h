@@ -131,14 +131,18 @@ HIL_APPLICATION_Variable_Result_Data_validate( const HIL_Application_Context_T* 
                                                const HIL_Application_Variable_Result_Data_T* data );
 
 /**
- * @brief Preserve the reserved Application Response validation entry point.
+ * @brief Validate the structural fields of an Application Response body.
  * @param[in] context Initialized Application context.
  * @param[in] data    Typed response body.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Response semantics are deferred.
+ * @return Application status.
  */
 HIL_Application_Status_T
 HIL_APPLICATION_Response_validate( const HIL_Application_Context_T*  context,
                                    const HIL_Application_Response_T* data );
+
+/** Validate the structural fields of an Application Error body. */
+HIL_Application_Status_T HIL_APPLICATION_Error_validate( const HIL_Application_Context_T* context,
+                                                         const HIL_Application_Error_T*   data );
 
 #ifdef __cplusplus
 }

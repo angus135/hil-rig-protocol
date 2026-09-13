@@ -93,9 +93,14 @@ std::vector<std::uint8_t> FixedBodyEnvelope( HIL_Application_Message_Type_T type
     bytes[22] = static_cast<std::uint8_t>( ( payload_size >> 8u ) & 0xffu );
     if ( type == HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION
          || type == HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL
-         || type == HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT )
+         || type == HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT
+         || type == HIL_APPLICATION_MESSAGE_TYPE_RESPONSE )
     {
         bytes[2] = 1u;
+    }
+    if ( type == HIL_APPLICATION_MESSAGE_TYPE_RESPONSE && payload_size >= 13u )
+    {
+        bytes[23] = HIL_APPLICATION_RESPONSE_SCOPE_TICK;
     }
     if ( type == HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST && payload_size >= 8u )
     {

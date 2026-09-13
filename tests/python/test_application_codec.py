@@ -282,19 +282,11 @@ def test_invalid_wire_envelope(codec, offset, value, status):
     [
         "VARIABLE_INSTRUCTION_DATA",
         "VARIABLE_RESULT_DATA",
-        "RESPONSE",
-        "ERROR",
     ],
 )
 def test_deferred_families(codec, family):
     wire = bytearray(codec.encode(instruction()))
     wire[19] = getattr(lib, "HIL_APPLICATION_MESSAGE_TYPE_" + family)
-    if family == "RESPONSE":
-        wire[21:23] = (13).to_bytes(2, "little")
-        wire[23:] = bytes(13)
-    if family == "ERROR":
-        wire[2] = 0
-        wire[3:19] = bytes(16)
     with pytest.raises(p.ApplicationDecodeError) as caught:
         codec.decode(wire)
     assert caught.value.status is p.ApplicationStatus.NOT_IMPLEMENTED

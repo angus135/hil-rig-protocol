@@ -218,16 +218,48 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_size(
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
-HIL_Application_Status_T
-HIL_APPLICATION_Response_size( const HIL_Application_Context_T*         context,
-                               const HIL_Application_Message_Subtype_T* sub_type,
-                               const HIL_Application_Test_Id_T          test_id,
-                               const HIL_Application_Response_T* data, size_t* encoded_size )
+HIL_Application_Status_T HIL_APPLICATION_Response_size( const HIL_Application_Context_T*  context,
+                                                        const HIL_Application_Response_T* data,
+                                                        size_t* encoded_size )
 {
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )encoded_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+    if ( encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *encoded_size = 0u;
+    {
+        const HIL_Application_Status_T status = HIL_APPLICATION_Response_validate( context, data );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    *encoded_size = HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Error_size( const HIL_Application_Context_T* context,
+                                                     const HIL_Application_Error_T*   data,
+                                                     size_t*                          encoded_size )
+{
+    size_t total_size = 0u;
+    if ( encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *encoded_size = 0u;
+    {
+        const HIL_Application_Status_T status = HIL_APPLICATION_Error_validate( context, data );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_ERROR_FIXED_PAYLOAD_SIZE,
+                                            data->diagnostic_data.size, &total_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    *encoded_size = total_size;
+    return HIL_APPLICATION_STATUS_OK;
 }

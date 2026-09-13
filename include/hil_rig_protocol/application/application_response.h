@@ -126,10 +126,10 @@ typedef enum
  * @brief Body of one Application Response.
  *
  * @details The enclosing envelope contains a Test ID for every test-scoped
- * response and omits it for GLOBAL_CONTROL. tick_number is meaningful only for
- * TICK scope and must otherwise be zero. control_command is meaningful only for
- * EXECUTION_CONTROL scope, and global_control_command only for GLOBAL_CONTROL;
- * both must otherwise be INVALID.
+ * response and omits it for GLOBAL_CONTROL. The codec preserves the tick and
+ * command correlation fields for every scope without imposing a workflow
+ * compatibility matrix. Endpoint integration decides which values are
+ * appropriate for the operation being correlated.
  *
  * Upload uses Application-level stop-and-wait at tick granularity. The fixed
  * Test Instruction and all separately encoded variable messages for tick T
@@ -165,11 +165,11 @@ typedef struct
     HIL_Application_Response_Outcome_T outcome;
     /** Expandable reason; normally NONE for successful outcomes. */
     HIL_Application_Response_Reason_T reason;
-    /** Zero-based tick identity for TICK scope, otherwise zero. */
+    /** Tick correlation value interpreted by endpoint workflow. */
     uint32_t tick_number;
-    /** Referenced command for EXECUTION_CONTROL scope, otherwise INVALID. */
+    /** Execution-command correlation value, including INVALID. */
     HIL_Application_Control_Command_T control_command;
-    /** Referenced command for GLOBAL_CONTROL scope, otherwise INVALID. */
+    /** Global-command correlation value, including INVALID. */
     HIL_Application_Global_Control_Command_T global_control_command;
     /** Integration-defined diagnostic detail; zero when unused. */
     uint32_t detail;

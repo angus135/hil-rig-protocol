@@ -10,15 +10,19 @@ from typing import Any, NoReturn, SupportsIndex
 from . import _binding
 from ._application_conversion import (
     _build_native_config,
+    _read_error,
     _read_execution_control,
     _read_global_control,
+    _read_response,
     _read_system_info_request,
     _read_system_info_response,
     _read_test_configuration,
     _read_test_instruction,
     _read_test_result,
+    _write_error,
     _write_execution_control,
     _write_global_control,
+    _write_response,
     _write_system_info_request,
     _write_system_info_response,
     _write_test_configuration,
@@ -28,7 +32,9 @@ from ._application_conversion import (
 from .application_types import (
     PROTOCOL_VERSION,
     ApplicationConfig,
+    ApplicationErrorMessage,
     ApplicationMessage,
+    ApplicationResponse,
     ApplicationStatus,
     ExecutionControl,
     GlobalControl,
@@ -168,6 +174,20 @@ def _build_message(message: ApplicationMessage) -> tuple[Any, list[Any]]:
         native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
         native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT
         owners = _write_test_result(message, native.body.test_result)
+    elif type(message) is ApplicationResponse:
+        native.has_test_id = int(message.test_id is not None)
+        if message.test_id is not None:
+            native.test_id.bytes[0:16] = message.test_id.bytes
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
+        native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_RESPONSE
+        owners = _write_response(message, native.body.response)
+    elif type(message) is ApplicationErrorMessage:
+        native.has_test_id = int(message.test_id is not None)
+        if message.test_id is not None:
+            native.test_id.bytes[0:16] = message.test_id.bytes
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
+        native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_ERROR
+        owners = _write_error(message, native.body.error)
     else:
         raise TypeError("message is not a supported Application message value")
     return native, owners
@@ -210,13 +230,13 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
         lib.HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL,
         lib.HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL,
         lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_RESPONSE,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_ERROR,
     )
     if native.type not in supported:
         if native.type in (
             lib.HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA,
             lib.HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA,
-            lib.HIL_APPLICATION_MESSAGE_TYPE_RESPONSE,
-            lib.HIL_APPLICATION_MESSAGE_TYPE_ERROR,
         ):
             # C may support a family that this public Python subset defers. No
             # native failure occurred, so do not manufacture a failure status.
@@ -240,6 +260,38 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
         return _read_system_info_response(
             native.body.system_info_response, diagnostic_data, firmware_git_hash
         )
+    if native.type in (
+        lib.HIL_APPLICATION_MESSAGE_TYPE_RESPONSE,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_ERROR,
+    ):
+        if native.subtype != lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE:
+            raise ApplicationBindingError("native decoder returned an inconsistent envelope")
+        if native.has_test_id not in (0, 1):
+            raise ApplicationBindingError("native decoder returned invalid Test-ID presence")
+        test_id = (
+            TestId(bytes(_binding.ffi.buffer(native.test_id.bytes, 16)))
+            if native.has_test_id
+            else None
+        )
+        if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
+            if capacity != 0:
+                raise ApplicationBindingError(
+                    "native fixed message unexpectedly used decode storage"
+                )
+            return _read_response(test_id, native.body.response)
+        diagnostic = native.body.error.diagnostic_data
+        diagnostic_size = int(diagnostic.size)
+        if diagnostic_size != capacity:
+            raise ApplicationBindingError("native Error span size disagrees with decode storage")
+        if diagnostic_size:
+            if diagnostic.data != storage:
+                raise ApplicationBindingError("native Error span does not start at decode storage")
+            diagnostic_data = bytes(_binding.ffi.buffer(diagnostic.data, diagnostic_size))
+        else:
+            if diagnostic.data != _binding.ffi.NULL:
+                raise ApplicationBindingError("native empty Error span has a pointer")
+            diagnostic_data = b""
+        return _read_error(test_id, native.body.error, diagnostic_data)
     if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
         if native.has_test_id != 0 or native.subtype != lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE:
             raise ApplicationBindingError("native decoder returned an inconsistent global envelope")
@@ -314,6 +366,8 @@ class ApplicationCodec:
             ExecutionControl,
             GlobalControl,
             TestResult,
+            ApplicationResponse,
+            ApplicationErrorMessage,
         ):
             raise TypeError("message is not a supported Application message value")
         with _binding_boundary():
