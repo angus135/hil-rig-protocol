@@ -90,12 +90,13 @@ HIL_APPLICATION_System_Info_Response_Scan( const HIL_Application_Context_T* cont
         return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
     }
     diagnostic_size = payload[offset++];
-    if ( diagnostic_size > context->config.max_variable_data_size
-         || payload_size - offset < diagnostic_size )
+    if ( payload_size - offset < diagnostic_size )
     {
-        return diagnostic_size > context->config.max_variable_data_size
-                   ? HIL_APPLICATION_STATUS_VALIDATION_FAILED
-                   : HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    if ( diagnostic_size > context->config.max_variable_data_size )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
     offset += diagnostic_size;
     if ( payload_size - offset < HIL_APPLICATION_BYTE_SPAN_LENGTH_SIZE )
@@ -103,12 +104,13 @@ HIL_APPLICATION_System_Info_Response_Scan( const HIL_Application_Context_T* cont
         return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
     }
     git_hash_size = payload[offset++];
-    if ( git_hash_size > context->config.max_variable_data_size
-         || payload_size - offset < git_hash_size )
+    if ( payload_size - offset < git_hash_size )
     {
-        return git_hash_size > context->config.max_variable_data_size
-                   ? HIL_APPLICATION_STATUS_VALIDATION_FAILED
-                   : HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    if ( git_hash_size > context->config.max_variable_data_size )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
     offset += git_hash_size;
     if ( offset != payload_size

@@ -59,19 +59,20 @@ std::vector<std::uint8_t> MakeResponseWire( std::size_t payload_size )
     return wire;
 }
 
-void ExpectMalformedResponse( const HIL_Application_Context_T& context,
-                              const std::vector<std::uint8_t>& wire )
+void ExpectResponseFailure( const HIL_Application_Context_T& context,
+                            const std::vector<std::uint8_t>& wire,
+                            HIL_Application_Status_T         expected_status )
 {
     std::size_t storage_size = 99u;
     EXPECT_EQ(
         HIL_APPLICATION_Decode_Storage_Size( &context, wire.data(), wire.size(), &storage_size ),
-        HIL_APPLICATION_STATUS_MALFORMED_MESSAGE );
+        expected_status );
     EXPECT_EQ( storage_size, 0u );
 
     storage_size = 99u;
     EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &context, wire.data(), wire.size(),
                                                          &storage_size ),
-               HIL_APPLICATION_STATUS_MALFORMED_MESSAGE );
+               expected_status );
     EXPECT_EQ( storage_size, 0u );
 
     HIL_Application_Message_T decoded{};
@@ -79,9 +80,15 @@ void ExpectMalformedResponse( const HIL_Application_Context_T& context,
     std::size_t used_storage = 99u;
     EXPECT_EQ( HIL_APPLICATION_Decode_Message( &context, wire.data(), wire.size(), &decoded,
                                                nullptr, 0u, &used_storage ),
-               HIL_APPLICATION_STATUS_MALFORMED_MESSAGE );
+               expected_status );
     EXPECT_EQ( decoded.type, HIL_APPLICATION_MESSAGE_TYPE_INVALID );
     EXPECT_EQ( used_storage, 0u );
+}
+
+void ExpectMalformedResponse( const HIL_Application_Context_T& context,
+                              const std::vector<std::uint8_t>& wire )
+{
+    ExpectResponseFailure( context, wire, HIL_APPLICATION_STATUS_MALFORMED_MESSAGE );
 }
 }  // namespace
 
@@ -255,6 +262,51 @@ TEST( ApplicationDiscovery, ResponseScannerRejectsEveryMalformedSpanBoundary )
     trailing[36]  = 0u;
     trailing[37]  = 0xccu;
     ExpectMalformedResponse( context, trailing );
+}
+
+TEST( ApplicationDiscovery, TruncatedSpansTakePrecedenceOverConfiguredLimits )
+{
+    auto limited_config                   = MakeContext().config;
+    limited_config.max_variable_data_size = 2u;
+    HIL_Application_Context_T context{};
+    ASSERT_EQ( HIL_APPLICATION_Init( &context, &limited_config ), HIL_APPLICATION_STATUS_OK );
+
+    auto truncated_diagnostic = MakeResponseWire( 15u );
+    truncated_diagnostic[35]  = 4u;
+    truncated_diagnostic[36]  = 0xaau;
+    truncated_diagnostic[37]  = 0xbbu;
+    ExpectResponseFailure( context, truncated_diagnostic,
+                           HIL_APPLICATION_STATUS_MALFORMED_MESSAGE );
+
+    auto truncated_git = MakeResponseWire( 15u );
+    truncated_git[35]  = 0u;
+    truncated_git[36]  = 4u;
+    truncated_git[37]  = 0xccu;
+    ExpectResponseFailure( context, truncated_git, HIL_APPLICATION_STATUS_MALFORMED_MESSAGE );
+}
+
+TEST( ApplicationDiscovery, CompleteSpansOverConfiguredLimitsFailValidation )
+{
+    auto limited_config                   = MakeContext().config;
+    limited_config.max_variable_data_size = 2u;
+    HIL_Application_Context_T context{};
+    ASSERT_EQ( HIL_APPLICATION_Init( &context, &limited_config ), HIL_APPLICATION_STATUS_OK );
+
+    auto complete_diagnostic = MakeResponseWire( 17u );
+    complete_diagnostic[35]  = 3u;
+    complete_diagnostic[36]  = 0xaau;
+    complete_diagnostic[37]  = 0xbbu;
+    complete_diagnostic[38]  = 0xccu;
+    complete_diagnostic[39]  = 0u;
+    ExpectResponseFailure( context, complete_diagnostic, HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+
+    auto complete_git = MakeResponseWire( 17u );
+    complete_git[35]  = 0u;
+    complete_git[36]  = 3u;
+    complete_git[37]  = 0xddu;
+    complete_git[38]  = 0xeeu;
+    complete_git[39]  = 0xffu;
+    ExpectResponseFailure( context, complete_git, HIL_APPLICATION_STATUS_VALIDATION_FAILED );
 }
 
 TEST( ApplicationDiscovery, EmptyAndGitOnlyResponseSpansHaveExactStorageAndConfiguredLimits )
