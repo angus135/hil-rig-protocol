@@ -1752,13 +1752,13 @@ TEST( ApplicationEncode, RejectsReservedMessageType )
     EXPECT_EQ( output_size, 0u );
 }
 
-TEST( ApplicationEncode, DeliberatelyUnfinishedFamiliesRemainNotImplemented )
+TEST( ApplicationEncode, DeliberatelyUnfinishedVariableFamiliesRemainNotImplemented )
 {
     HIL_Application_Context_T       context  = MakeContext();
     const auto                      messages = ConstructCodecMessages();
     std::array<std::uint8_t, 4096u> buffer{};
 
-    for ( const auto index : std::array<std::size_t, 4u>{ 4u, 8u, 9u, 10u } )
+    for ( const auto index : std::array<std::size_t, 2u>{ 4u, 8u } )
     {
         std::size_t output_size = 123u;
         EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &messages[index], buffer.data(),

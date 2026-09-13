@@ -4,6 +4,7 @@ add_executable(hil_rig_protocol_application_tests
     test_application_codec.cpp
     test_application_discovery_controls.cpp
     test_application_fixed_io.cpp
+    test_application_response_error.cpp
     test_application_test_configuration.cpp
 )
 

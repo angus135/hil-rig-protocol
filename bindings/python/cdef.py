@@ -629,6 +629,83 @@ typedef struct
     uint32_t flags;
 } HIL_Application_Global_Control_T;
 
+/* application_response.h */
+
+typedef enum
+{
+    HIL_APPLICATION_RESPONSE_SCOPE_INVALID,
+    HIL_APPLICATION_RESPONSE_SCOPE_TEST_CONFIGURATION,
+    HIL_APPLICATION_RESPONSE_SCOPE_TICK,
+    HIL_APPLICATION_RESPONSE_SCOPE_COMPLETE_TEST,
+    HIL_APPLICATION_RESPONSE_SCOPE_EXECUTION_CONTROL,
+    HIL_APPLICATION_RESPONSE_SCOPE_GLOBAL_CONTROL,
+    HIL_APPLICATION_RESPONSE_SCOPE_RESERVED,
+    ...
+} HIL_Application_Response_Scope_T;
+
+typedef enum
+{
+    HIL_APPLICATION_RESPONSE_OUTCOME_INVALID,
+    HIL_APPLICATION_RESPONSE_OUTCOME_ACCEPTED,
+    HIL_APPLICATION_RESPONSE_OUTCOME_REJECTED,
+    HIL_APPLICATION_RESPONSE_OUTCOME_COMPLETED,
+    HIL_APPLICATION_RESPONSE_OUTCOME_FAILED,
+    HIL_APPLICATION_RESPONSE_OUTCOME_RESERVED,
+    ...
+} HIL_Application_Response_Outcome_T;
+
+typedef enum
+{
+    HIL_APPLICATION_RESPONSE_REASON_NONE,
+    HIL_APPLICATION_RESPONSE_REASON_UNSUPPORTED,
+    HIL_APPLICATION_RESPONSE_REASON_OPERATION_NOT_ALLOWED,
+    HIL_APPLICATION_RESPONSE_REASON_INCONSISTENT_TEST_ID,
+    HIL_APPLICATION_RESPONSE_REASON_INVALID_TICK,
+    HIL_APPLICATION_RESPONSE_REASON_LENGTH_MISMATCH,
+    HIL_APPLICATION_RESPONSE_REASON_STORAGE_UNAVAILABLE,
+    HIL_APPLICATION_RESPONSE_REASON_VALIDATION_FAILED,
+    HIL_APPLICATION_RESPONSE_REASON_HARDWARE_NOT_READY,
+    HIL_APPLICATION_RESPONSE_REASON_INTERNAL_FAILURE,
+    HIL_APPLICATION_RESPONSE_REASON_RESERVED,
+    ...
+} HIL_Application_Response_Reason_T;
+
+typedef struct
+{
+    HIL_Application_Response_Scope_T scope;
+    HIL_Application_Response_Outcome_T outcome;
+    HIL_Application_Response_Reason_T reason;
+    uint32_t tick_number;
+    HIL_Application_Control_Command_T control_command;
+    HIL_Application_Global_Control_Command_T global_control_command;
+    uint32_t detail;
+} HIL_Application_Response_T;
+
+/* application_error.h */
+
+typedef enum
+{
+    HIL_APPLICATION_ERROR_CATEGORY_INVALID,
+    HIL_APPLICATION_ERROR_CATEGORY_HARDWARE,
+    HIL_APPLICATION_ERROR_CATEGORY_EXECUTION,
+    HIL_APPLICATION_ERROR_CATEGORY_TIMEOUT,
+    HIL_APPLICATION_ERROR_CATEGORY_RETAINED_DATA,
+    HIL_APPLICATION_ERROR_CATEGORY_PROTOCOL,
+    HIL_APPLICATION_ERROR_CATEGORY_INTERNAL,
+    HIL_APPLICATION_ERROR_CATEGORY_RESERVED,
+    ...
+} HIL_Application_Error_Category_T;
+
+typedef struct
+{
+    HIL_Application_Error_Category_T category;
+    uint8_t recoverable;
+    uint8_t has_tick_number;
+    uint32_t tick_number;
+    uint32_t detail;
+    HIL_Application_Byte_Span_T diagnostic_data;
+} HIL_Application_Error_T;
+
 /* application_message.h */
 
 typedef enum
@@ -671,6 +748,8 @@ typedef struct
         HIL_Application_Execution_Control_T execution_control;
         HIL_Application_Global_Control_T global_control;
         HIL_Application_Test_Result_T test_result;
+        HIL_Application_Response_T response;
+        HIL_Application_Error_T error;
     } body;
     ...;
 } HIL_Application_Message_T;

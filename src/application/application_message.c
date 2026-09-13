@@ -160,6 +160,10 @@ HIL_APPLICATION_Validate_Common_Message_Fields( const HIL_Application_Message_T*
             }
             return HIL_APPLICATION_STATUS_OK;
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
+            if ( message->body.error.has_tick_number == 1u && message->has_test_id == 0u )
+            {
+                return HIL_APPLICATION_STATUS_INCONSISTENT_TEST_ID;
+            }
             return HIL_APPLICATION_STATUS_OK;
         default:
             break;

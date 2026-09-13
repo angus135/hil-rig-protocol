@@ -20,6 +20,7 @@
 #include "application_encoding.h"
 #include "application_internal.h"
 #include "application_test_config_internal.h"
+#include "application_validation.h"
 
 #include "hil_rig_protocol/version.h"
 
@@ -712,42 +713,38 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_encode(
     return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
-HIL_Application_Status_T HIL_APPLICATION_Response_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Response_T* data,
-    size_t max_payload_size, uint8_t* payload, size_t* used_size )
+HIL_Application_Status_T HIL_APPLICATION_Response_encode( const HIL_Application_Context_T*  context,
+                                                          const HIL_Application_Response_T* data,
+                                                          size_t max_payload_size, uint8_t* payload,
+                                                          size_t* used_size )
 {
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    /**
-    _______________________________________________________
-    |                         |                            |
-    |        scope {1}        |        outcome {1}         |
-    |_________________________|____________________________|
-    |                         |                            |
-    |        reason {1}       |      tick number {4}       |
-    |_________________________|____________________________|
-    |                         |                            |
-    |   control command {1}   | global control command {1} |
-    |_________________________|____________________________|
-    |                         |
-    |        detail {4}       |
-    |_________________________|
-
-    */
-    const size_t payload_size =
-        5u * HIL_APPLICATION_WIRE_ENUM_SIZE + 2u * HIL_APPLICATION_WIRE_U32_SIZE;
-    if ( max_payload_size < payload_size )
-    {
-        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
-    }
-    size_t  running_total               = 0u;
     uint8_t wire_scope                  = 0u;
     uint8_t wire_outcome                = 0u;
     uint8_t wire_reason                 = 0u;
     uint8_t wire_control_command        = 0u;
     uint8_t wire_global_control_command = 0u;
+    size_t  running_total               = HIL_APPLICATION_RESPONSE_TICK_NUMBER_OFFSET;
+
+    if ( used_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *used_size = 0u;
+    if ( data == NULL || payload == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    {
+        const HIL_Application_Status_T status = HIL_APPLICATION_Response_validate( context, data );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    if ( max_payload_size < HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
     if ( !HIL_APPLICATION_Enum_To_U8( ( int )data->scope, &wire_scope )
          || !HIL_APPLICATION_Enum_To_U8( ( int )data->outcome, &wire_outcome )
          || !HIL_APPLICATION_Enum_To_U8( ( int )data->reason, &wire_reason )
@@ -757,66 +754,91 @@ HIL_Application_Status_T HIL_APPLICATION_Response_encode(
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
-    payload[running_total++] = wire_scope;
-    payload[running_total++] = wire_outcome;
-    payload[running_total++] = wire_reason;
-    HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ), data->tick_number, &running_total );
-    payload[running_total++] = wire_control_command;
-    payload[running_total++] = wire_global_control_command;
-    HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ), data->detail, &running_total );
+    payload[HIL_APPLICATION_RESPONSE_SCOPE_OFFSET]   = wire_scope;
+    payload[HIL_APPLICATION_RESPONSE_OUTCOME_OFFSET] = wire_outcome;
+    payload[HIL_APPLICATION_RESPONSE_REASON_OFFSET]  = wire_reason;
+    HIL_APPLICATION_Encode_U32_Le( &payload[HIL_APPLICATION_RESPONSE_TICK_NUMBER_OFFSET],
+                                   data->tick_number, &running_total );
+    if ( running_total != HIL_APPLICATION_RESPONSE_CONTROL_COMMAND_OFFSET )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
+    payload[HIL_APPLICATION_RESPONSE_CONTROL_COMMAND_OFFSET]        = wire_control_command;
+    payload[HIL_APPLICATION_RESPONSE_GLOBAL_CONTROL_COMMAND_OFFSET] = wire_global_control_command;
+    running_total = HIL_APPLICATION_RESPONSE_DETAIL_OFFSET;
+    HIL_APPLICATION_Encode_U32_Le( &payload[HIL_APPLICATION_RESPONSE_DETAIL_OFFSET], data->detail,
+                                   &running_total );
+    if ( running_total != HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
     *used_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }
 
-HIL_Application_Status_T HIL_APPLICATION_Error_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Error_T* data,
-    size_t max_payload_size, uint8_t* payload, size_t* used_size )
+HIL_Application_Status_T HIL_APPLICATION_Error_encode( const HIL_Application_Context_T* context,
+                                                       const HIL_Application_Error_T*   data,
+                                                       size_t max_payload_size, uint8_t* payload,
+                                                       size_t* used_size )
 {
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    /**
-    _______________________________________________________
-    |                         |                            |
-    |    error category {1}    |      recoverable {1}       |
-    |_________________________|____________________________|
-    |                         |                            |
-    |   has tick number {1}   |       tick number {4}      |
-    |_________________________|____________________________|
-    |                         |                            |
-    |        detail {4}       |     diagnostic_data {X}    |
-    |_________________________|____________________________|
+    size_t  payload_size  = 0u;
+    size_t  span_size     = 0u;
+    size_t  running_total = HIL_APPLICATION_ERROR_TICK_NUMBER_OFFSET;
+    uint8_t wire_category = 0u;
 
-    */
-    size_t payload_size = HIL_APPLICATION_WIRE_ENUM_SIZE + 2u * HIL_APPLICATION_WIRE_U8_SIZE
-                          + 2u * HIL_APPLICATION_WIRE_U32_SIZE
-                          + HIL_APPLICATION_BYTE_SPAN_LENGTH_SIZE
-                          + ( size_t )data->diagnostic_data.size;
+    if ( used_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *used_size = 0u;
+    if ( data == NULL || payload == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    {
+        const HIL_Application_Status_T status = HIL_APPLICATION_Error_validate( context, data );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_ERROR_FIXED_PAYLOAD_SIZE,
+                                            data->diagnostic_data.size, &payload_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
     if ( max_payload_size < payload_size )
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    uint8_t wire_category = 0u;
     if ( !HIL_APPLICATION_Enum_To_U8( ( int )data->category, &wire_category ) )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
-    payload[0]               = wire_category;
-    size_t running_total     = HIL_APPLICATION_WIRE_ENUM_SIZE;
-    payload[running_total++] = data->recoverable;
-    payload[running_total++] = data->has_tick_number;
-    HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ), data->tick_number, &running_total );
-    HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ), data->detail, &running_total );
-    size_t                   span_size = 0u;
-    HIL_Application_Status_T span_status =
-        HIL_APPLICATION_Byte_Span_encode( &( data->diagnostic_data ), &( payload[running_total] ),
-                                          max_payload_size - running_total, &span_size );
-    if ( span_status != HIL_APPLICATION_STATUS_OK )
+    payload[HIL_APPLICATION_ERROR_CATEGORY_OFFSET]        = wire_category;
+    payload[HIL_APPLICATION_ERROR_RECOVERABLE_OFFSET]     = data->recoverable;
+    payload[HIL_APPLICATION_ERROR_HAS_TICK_NUMBER_OFFSET] = data->has_tick_number;
+    HIL_APPLICATION_Encode_U32_Le( &payload[HIL_APPLICATION_ERROR_TICK_NUMBER_OFFSET],
+                                   data->tick_number, &running_total );
+    HIL_APPLICATION_Encode_U32_Le( &payload[HIL_APPLICATION_ERROR_DETAIL_OFFSET], data->detail,
+                                   &running_total );
+    if ( running_total != HIL_APPLICATION_ERROR_DIAGNOSTIC_LENGTH_OFFSET )
     {
-        return span_status;
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
     }
-    running_total += span_size;
-    *used_size = running_total;
+    {
+        const HIL_Application_Status_T status =
+            HIL_APPLICATION_Byte_Span_encode( &data->diagnostic_data, &payload[running_total],
+                                              max_payload_size - running_total, &span_size );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    if ( running_total + span_size != payload_size )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
+    *used_size = payload_size;
     return HIL_APPLICATION_STATUS_OK;
 }

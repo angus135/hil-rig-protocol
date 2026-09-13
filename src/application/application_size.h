@@ -183,18 +183,19 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_size(
  * @brief Determine the encoded size of a response.
  *
  * @param[in]  context       Application context.
- * @param[in]  sub_type      Message subtype.
- * @param[in]  test_id       Test ID.
  * @param[in]  data          Response data.
  * @param[out] encoded_size  Encoded payload size in bytes, excluding the common envelope.
  *
  * @return Application status.
  */
-HIL_Application_Status_T
-HIL_APPLICATION_Response_size( const HIL_Application_Context_T*         context,
-                               const HIL_Application_Message_Subtype_T* sub_type,
-                               const HIL_Application_Test_Id_T          test_id,
-                               const HIL_Application_Response_T* data, size_t* encoded_size );
+HIL_Application_Status_T HIL_APPLICATION_Response_size( const HIL_Application_Context_T*  context,
+                                                        const HIL_Application_Response_T* data,
+                                                        size_t* encoded_size );
+
+/** Determine the encoded size of an Application Error payload. */
+HIL_Application_Status_T HIL_APPLICATION_Error_size( const HIL_Application_Context_T* context,
+                                                     const HIL_Application_Error_T*   data,
+                                                     size_t* encoded_size );
 
 #ifdef __cplusplus
 }

@@ -61,6 +61,11 @@ HIL_APPLICATION_System_Info_Response_Scan( const HIL_Application_Context_T* cont
                                            const uint8_t* payload, size_t payload_size,
                                            size_t* decoded_storage_size );
 
+/** Scan one Error body, proving its exact declared diagnostic extent before policy checks. */
+HIL_Application_Status_T HIL_APPLICATION_Error_Scan( const HIL_Application_Context_T* context,
+                                                     const uint8_t* payload, size_t payload_size,
+                                                     size_t* decoded_storage_size );
+
 /**
  * @brief Decode the fixed System Information Request payload.
  * @param[in]  context               Application context.
@@ -244,35 +249,24 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_decode(
     size_t max_decoded_data_size, size_t* used_decoded_size );
 
 /**
- * @brief Decode the existing fixed Application Response body representation.
- * @details Public typed Response validation remains deliberately NOT_IMPLEMENTED,
- * so successful body parsing does not make the family fully supported.
- * @param[in]  context               Application context.
- * @param[in]  sub_type              Parsed message subtype.
- * @param[in]  test_id               Parsed Test ID value.
+ * @brief Decode the fixed Application Response body representation.
+ * @details The body is fixed-width and uses no decode storage.
  * @param[out] data                  Typed body destination.
  * @param[in]  payload               First byte of the declared payload.
  * @param[in]  max_payload_size      Declared payload extent.
  * @param[out] payload_size          Payload bytes consumed on body-decode success.
- * @param[out] decoded_data          Unused by the current fixed body.
- * @param[in]  max_decoded_data_size Available decoded_data capacity.
  * @param[out] used_decoded_size     Zero for the current fixed body.
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Response_decode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, HIL_Application_Response_T* data,
-    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
-    size_t max_decoded_data_size, size_t* used_decoded_size );
+HIL_Application_Status_T HIL_APPLICATION_Response_decode( HIL_Application_Response_T* data,
+                                                          const uint8_t*              payload,
+                                                          size_t  max_payload_size,
+                                                          size_t* payload_size,
+                                                          size_t* used_decoded_size );
 
 /**
- * @brief Decode the existing Application Error body and diagnostic byte span.
- * @details Public Error validation/storage sizing remains deliberately
- * unfinished, so this body decoder is not a statement that the family is fully
- * supported.
+ * @brief Decode an Application Error body and diagnostic byte span.
  * @param[in]  context               Application context.
- * @param[in]  sub_type              Parsed message subtype.
- * @param[in]  test_id               Parsed Test ID value.
  * @param[out] data                  Typed body destination.
  * @param[in]  payload               First byte of the declared payload.
  * @param[in]  max_payload_size      Declared payload extent.
@@ -282,11 +276,11 @@ HIL_Application_Status_T HIL_APPLICATION_Response_decode(
  * @param[out] used_decoded_size     Diagnostic bytes stored on success.
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Error_decode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, HIL_Application_Error_T* data, const uint8_t* payload,
-    size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
-    size_t max_decoded_data_size, size_t* used_decoded_size );
+HIL_Application_Status_T
+HIL_APPLICATION_Error_decode( const HIL_Application_Context_T* context,
+                              HIL_Application_Error_T* data, const uint8_t* payload,
+                              size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
+                              size_t max_decoded_data_size, size_t* used_decoded_size );
 
 #ifdef __cplusplus
 }

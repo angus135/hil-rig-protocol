@@ -26,6 +26,30 @@
 #define HIL_APPLICATION_BYTE_SPAN_LENGTH_SIZE 1u
 /** @} */
 
+/** @name Application Response body offsets and fixed wire width */
+/** @{ */
+#define HIL_APPLICATION_RESPONSE_SCOPE_OFFSET 0u
+#define HIL_APPLICATION_RESPONSE_OUTCOME_OFFSET 1u
+#define HIL_APPLICATION_RESPONSE_REASON_OFFSET 2u
+#define HIL_APPLICATION_RESPONSE_TICK_NUMBER_OFFSET 3u
+#define HIL_APPLICATION_RESPONSE_CONTROL_COMMAND_OFFSET 7u
+#define HIL_APPLICATION_RESPONSE_GLOBAL_CONTROL_COMMAND_OFFSET 8u
+#define HIL_APPLICATION_RESPONSE_DETAIL_OFFSET 9u
+#define HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE 13u
+/** @} */
+
+/** @name Application Error body offsets and fixed wire width */
+/** @{ */
+#define HIL_APPLICATION_ERROR_CATEGORY_OFFSET 0u
+#define HIL_APPLICATION_ERROR_RECOVERABLE_OFFSET 1u
+#define HIL_APPLICATION_ERROR_HAS_TICK_NUMBER_OFFSET 2u
+#define HIL_APPLICATION_ERROR_TICK_NUMBER_OFFSET 3u
+#define HIL_APPLICATION_ERROR_DETAIL_OFFSET 7u
+#define HIL_APPLICATION_ERROR_DIAGNOSTIC_LENGTH_OFFSET 11u
+#define HIL_APPLICATION_ERROR_DIAGNOSTIC_DATA_OFFSET 12u
+#define HIL_APPLICATION_ERROR_FIXED_PAYLOAD_SIZE 12u
+/** @} */
+
 /** Fixed Test Instruction payload width derived from the published wire fields. */
 #define HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE                                        \
     ( HIL_APPLICATION_WIRE_U32_SIZE                                                                \
@@ -48,11 +72,19 @@ static_assert( HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE == 50u,
                "Test Instruction fixed payload wire width changed" );
 static_assert( HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE == 39u,
                "Test Result fixed payload wire width changed" );
+static_assert( HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE == 13u,
+               "Application Response fixed payload wire width changed" );
+static_assert( HIL_APPLICATION_ERROR_FIXED_PAYLOAD_SIZE == 12u,
+               "Application Error fixed payload wire width changed" );
 #else
 _Static_assert( HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE == 50u,
                 "Test Instruction fixed payload wire width changed" );
 _Static_assert( HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE == 39u,
                 "Test Result fixed payload wire width changed" );
+_Static_assert( HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE == 13u,
+                "Application Response fixed payload wire width changed" );
+_Static_assert( HIL_APPLICATION_ERROR_FIXED_PAYLOAD_SIZE == 12u,
+                "Application Error fixed payload wire width changed" );
 #endif
 
 /**

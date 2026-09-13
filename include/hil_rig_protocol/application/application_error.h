@@ -70,7 +70,7 @@ typedef struct
     uint8_t recoverable;
     /** Nonzero when tick_number identifies an affected test tick. */
     uint8_t has_tick_number;
-    /** Zero-based affected tick when present; integration validates its range. */
+    /** Zero-based affected tick when present; the codec validates its configured ceiling. */
     uint32_t tick_number;
     /** Integration-defined detail value; final classification remains TODO. */
     uint32_t detail;

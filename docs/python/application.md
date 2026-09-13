@@ -1,8 +1,9 @@
 # Python Application codec
 
 `ApplicationCodec` encodes and decodes complete BASIC System Information,
-Execution Control, Global Control, Test Configuration, and fixed Digital, Analog
-and PWM Test Instruction and Test Result messages. All wire
+Execution Control, Global Control, Test Configuration, fixed Digital, Analog
+and PWM Test Instruction and Test Result messages, Application Responses, and
+Application Errors. All wire
 encoding, decoding and protocol validation execute the shared native C Application
 implementation. Import the supported API from `hil_rig_protocol`; CFFI objects and
 conversion helpers are private.
@@ -144,7 +145,23 @@ reset = GlobalControl(GlobalControlCommand.RESET_APPLICATION)
 the `VERSION_MISMATCH` status. START requires an accepted complete test, ABORT
 abandons that operation, and RESET_APPLICATION clears Application state while
 preserving Transport. The codec only represents these controls; endpoint
-lifecycle enforcement and Application Responses are pending work.
+lifecycle enforcement remains consuming-application work.
+
+`ApplicationResponse` carries an optional `TestId`, `ResponseScope`,
+`ResponseOutcome`, `ResponseReason`, tick, command-correlation fields and detail.
+Global Control scope requires `test_id=None`; every other scope requires a Test
+ID. `ApplicationErrorMessage` carries an optional Test ID, `ErrorCategory`, exact
+Boolean recoverability, optional tick, detail, and diagnostic `bytes`. A global
+Error has neither Test ID nor tick, a test-wide Error has a Test ID and no tick,
+and a tick-specific Error has both. Decoded diagnostic data is copied into
+Python-owned `bytes`.
+
+The codec checks wire structure and correlation fields only. Firmware and Python
+interpret whether an outcome is appropriate for their current workflow. A
+Transport ACK confirms reliable delivery; an Application Response reports an
+Application-level semantic outcome. Test Results receive no Application
+acknowledgements. Variable CAN, SPI, UART, and I2C instruction/result messages
+remain deferred.
 
 `ResultCondition` includes `OK`, `PARTIAL`, `EXECUTION_PROBLEM` and `RESERVED`.
 Native C accepts the first three, including `PARTIAL` even though variable data is

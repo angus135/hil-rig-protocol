@@ -95,10 +95,10 @@ This foundation deliberately does not complete every message family. The current
 | Test Result | Fully supported fixed codec family: 39-byte payload / 62-byte complete message, fixed sizing, encode/decode, zero decode storage, Digital/PWM/tick/condition structural validation, and encoded-message validation are implemented. Variable declarations/data remain deferred. |
 | Variable Instruction Data | Reserved structures and identifiers retained; body/storage workflow remains `NOT_IMPLEMENTED`. |
 | Variable Result Data | Reserved structures and identifiers retained; body/storage workflow remains `NOT_IMPLEMENTED`. |
-| Application Response | Existing structures/body code retained; public validation and message-specific sizing remain `NOT_IMPLEMENTED`. |
-| Application Error | Existing structures/body code retained; public validation/sizing and variable diagnostic-storage sizing remain `NOT_IMPLEMENTED`. |
+| Application Response | Fully supported in v0.2.0: fixed 13-byte body, exact sizing/encoding/decoding, zero decode storage, structural enum and scope-dependent Test-ID validation. |
+| Application Error | Fully supported in v0.2.0: 12 + N-byte body, exact diagnostic scanner/storage sizing, all three Test-ID/tick forms, and structural validation. |
 
-`HIL_APPLICATION_Encoded_Size` propagates a message-specific `NOT_IMPLEMENTED` result for unfinished families rather than guessing body sizes. Discovery, controls, Test Configuration, fixed Test Instruction, and fixed Test Result are supported. Analogue range/hardware feasibility, variable-data correlation, active-Test-Configuration tick comparison, Responses/Errors, and endpoint transaction state remain later integration or protocol work.
+`HIL_APPLICATION_Encoded_Size` propagates `NOT_IMPLEMENTED` for unfinished variable instruction/result families rather than guessing body sizes. Response and Error validation is structural and correlation-focused only. Firmware and Python decide whether an outcome, reason, command, tick, category, or recovery choice is appropriate in the current workflow.
 
 ## Public C Application-to-Transport integration coverage
 
@@ -119,10 +119,9 @@ test-owned orchestration only, not an encoded Application Response or retained
 codec state. A Transport `DELIVERY_CONFIRMED` event confirms Transport delivery
 only and is not Application semantic acceptance.
 
-The ordered scenario is therefore a fixed-subset message-path test, not a
-complete response-gated Application transaction. Full response-gated transaction
-coverage remains incomplete until Application Responses and the remaining
-control-family sizing are implemented.
+The integration suite also carries representative Response and Error messages
+over Transport. It remains stateless and does not model a response-gated
+Application transaction.
 
 ## Common wire version and envelope
 
@@ -601,9 +600,8 @@ detecting an incompatible repository-wide protocol version and enter recovery wh
 operation's outcome becomes uncertain. It must not predict firmware hardware
 readiness or execution-manager state; firmware Responses are authoritative.
 
-The Python client, bindings, serial/USB integration, asynchronous behavior,
-exceptions, and transaction controller are future work and are not implemented
-in this PR.
+The Python codec binding is implemented. Serial/USB integration, asynchronous
+behavior, and a stateful transaction controller remain consuming-project work.
 
 ## Remaining conformance work
 
@@ -616,8 +614,6 @@ Future conformance work still includes:
 
 - Variable Instruction Data and Variable Result Data, including their deferred
   declarations and storage workflows;
-- Application Response and Application Error;
-- golden wire vectors shared with future language bindings;
 - production firmware and Python endpoint integration for Test-ID correlation,
   tick ordering, semantic acceptance, retention, execution, and recovery; and
 - expanded executable conformance coverage as deferred message families become

@@ -194,38 +194,32 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_encode(
     size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
 /**
- * @brief Encode the existing fixed Application Response body representation.
- * @details Public Response validation remains deliberately NOT_IMPLEMENTED.
+ * @brief Encode the fixed Application Response body representation.
  * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
- * @param[in]  test_id          Envelope Test ID value.
  * @param[in]  data             Typed Response body.
  * @param[in]  max_payload_size Available payload capacity after the common header.
  * @param[out] payload          Destination payload buffer.
  * @param[out] used_size        Payload bytes written on body-encode success.
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Response_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Response_T* data,
-    size_t max_payload_size, uint8_t* payload, size_t* used_size );
+HIL_Application_Status_T HIL_APPLICATION_Response_encode( const HIL_Application_Context_T*  context,
+                                                          const HIL_Application_Response_T* data,
+                                                          size_t max_payload_size, uint8_t* payload,
+                                                          size_t* used_size );
 
 /**
- * @brief Encode the existing Application Error body representation.
- * @details Public Error validation/sizing remains deliberately unfinished.
+ * @brief Encode the Application Error body representation.
  * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
- * @param[in]  test_id          Envelope Test ID value.
  * @param[in]  data             Typed Error body.
  * @param[in]  max_payload_size Available payload capacity after the common header.
  * @param[out] payload          Destination payload buffer.
  * @param[out] used_size        Payload bytes written on body-encode success.
  * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Error_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Error_T* data,
-    size_t max_payload_size, uint8_t* payload, size_t* used_size );
+HIL_Application_Status_T HIL_APPLICATION_Error_encode( const HIL_Application_Context_T* context,
+                                                       const HIL_Application_Error_T*   data,
+                                                       size_t max_payload_size, uint8_t* payload,
+                                                       size_t* used_size );
 
 #ifdef __cplusplus
 }
