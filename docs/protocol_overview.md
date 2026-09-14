@@ -12,10 +12,10 @@ encoding/decoding, structural validation, and a deliberately partial set of
 message-family bodies. The exact common envelope and currently encoded body
 layouts are summarized in the
 [Application wire-format reference](application_layer/application_wire_format.md).
-Functions returning `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` remain reserved
-for variable instruction/result data and Application Response/Error work. The
-Python codec directly uses the public C Application codec for discovery,
-controls, Test Configuration, and fixed instruction/result messages.
+Only variable instruction/result data messages remain
+`HIL_APPLICATION_STATUS_NOT_IMPLEMENTED`. The Python codec directly uses the
+public C Application codec for discovery, controls, Test Configuration, fixed
+instruction/result messages, Application Response, and Application Error.
 
 The MVP Transport path has broad deterministic verification at the public
 boundary. The repository includes C unit/integration suites, a Python wrapper
