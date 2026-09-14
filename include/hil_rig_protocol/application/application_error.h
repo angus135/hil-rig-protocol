@@ -66,9 +66,9 @@ typedef struct
 {
     /** Broad fault category. */
     HIL_Application_Error_Category_T category;
-    /** Nonzero when recovery might be possible without power-cycle/service. */
+    /** Exactly 0 or 1; 1 when recovery might be possible without power-cycle/service. */
     uint8_t recoverable;
-    /** Nonzero when tick_number identifies an affected test tick. */
+    /** Exactly 0 or 1; 1 when tick_number identifies an affected test tick. */
     uint8_t has_tick_number;
     /** Zero-based affected tick when present; the codec validates its configured ceiling. */
     uint32_t tick_number;
