@@ -395,6 +395,41 @@ Analogue range and hardware-specific PWM feasibility are not validated. The code
 Test Configuration, so comparing the tick against that test's actual `expected_tick_count`, enabled
 channels, or ordering is an integration responsibility.
 
+## Update Instruction body
+
+Update Instruction is a fully supported variable-length codec family (type 21). It requires subtype `NONE` and a Test ID. It carries sparse logical peripheral operations and streaming serial data for one zero-based tick.
+
+### Payload header (8 bytes)
+
+| Payload offset | Width | Field | Encoding rule |
+| ---: | ---: | --- | --- |
+| 0 | 4 | `tick_number` | little-endian `uint32_t`, must be `< max_expected_tick_count` |
+| 4 | 1 | `operation_count` | unsigned byte, valid range `1..255` |
+| 5 | 1 | `flags` | `0x00` (`COMPLETE_TICK`) or `0x01` (`HAS_MORE_CHUNKS`) |
+| 6 | 2 | `reserved` | little-endian `uint16_t`, must be zero |
+
+### Operation records (4-byte aligned TLV framing)
+
+The header is immediately followed by `operation_count` records. Each record has a 4-byte header, followed by its payload bytes, and padded to a 4-byte boundary:
+
+| Record offset | Width | Field | Encoding rule |
+| ---: | ---: | --- | --- |
+| 0 | 1 | `peripheral_type` | enum identifier (`DIGITAL_OUTPUT`, `ANALOG_OUTPUT`, `PWM_OUTPUT`, `UART`, `SPI`, `CAN`) |
+| 1 | 1 | `channel` | logical channel index within peripheral family |
+| 2 | 2 | `payload_length` | little-endian `uint16_t`, valid range `1..255` |
+| 4 | N | payload data | exactly `payload_length` bytes |
+| 4 + N | 0..3 | zero padding | `(4 - (N % 4)) % 4` zero bytes to align to a 4-byte boundary |
+
+Padding bytes must strictly be zero on the wire. No duplicate `(peripheral_type, channel)` pairs may appear in the same message.
+
+#### Supported peripheral operation payloads:
+- **`DIGITAL_OUTPUT`**: Channel must be 0 (bank 0). Payload length must be exactly 2 bytes (16-bit mask, bits 10..15 reserved zero).
+- **`ANALOG_OUTPUT`**: Channel must be `< 6`. Payload length must be exactly 4 bytes (`uint32_t` little-endian microvolts).
+- **`PWM_OUTPUT`**: Channel must be `< 2`. Payload length must be exactly 6 bytes (`uint32_t` period ns + `uint16_t` duty permyriad). Duty $\le 10000$, and zero period requires zero duty.
+- **`UART`**: Channel must be `< 2`. Payload length must be `1..255` bytes raw communication data.
+- **`SPI`**: Channel must be `< 2`. Payload framing: `num_packets (1B)` + `packet_sizes (P bytes)` + `data (M bytes)`, where each packet size $\ge 1$ and $\sum \text{sizes} == M$.
+- **`CAN`**: Channel must be `< 2`. Payload length must be a non-zero multiple of 12 bytes ($12 \times K$). Each frame is 2B `can_id` ($\le 0x7FF$) + 1B `dlc` ($\le 8$) + 8B data + 1B reserved zero.
+
 ## Execution Control and Global Control
 
 Both current fixed control bodies are five bytes:
@@ -436,6 +471,45 @@ The only structurally valid conditions are `OK`, `PARTIAL`, and `EXECUTION_PROBL
 reserved values are rejected. `PARTIAL` is representable even though variable result-data support is
 deferred. Analogue values and `problem_detail` have no additional codec range rule. Active-test tick
 comparison, enabled-channel semantics, result ordering, and hardware feasibility are integration-owned.
+
+## Variable Test Result body
+
+Variable Test Result is a fully supported variable-length codec family (type 34). It requires subtype `NONE` and a Test ID. It carries captured peripheral state and incoming communication buffers for one zero-based tick.
+
+### Payload header (12 bytes)
+
+| Payload offset | Width | Field | Encoding rule |
+| ---: | ---: | --- | --- |
+| 0 | 4 | `tick_number` | little-endian `uint32_t`, must be `< max_expected_tick_count` |
+| 4 | 1 | `record_count` | unsigned byte, valid range `0..255` |
+| 5 | 1 | `condition` | `OK` (0), `PARTIAL` (1), or `EXECUTION_PROBLEM` (2) |
+| 6 | 1 | `flags` | `0x00` (`COMPLETE_TICK`) or `0x01` (`HAS_MORE_CHUNKS`) |
+| 7 | 1 | `reserved` | unsigned byte, must be zero |
+| 8 | 4 | `problem_detail` | little-endian `uint32_t`, must be 0 when `condition == OK` |
+
+When `record_count == 0`, the payload is exactly 12 bytes.
+
+### Captured records (4-byte aligned TLV framing)
+
+When `record_count > 0`, the header is followed by `record_count` records using the identical 4-byte-aligned TLV layout:
+
+| Record offset | Width | Field | Encoding rule |
+| ---: | ---: | --- | --- |
+| 0 | 1 | `peripheral_type` | enum identifier (`DIGITAL_INPUT`, `ANALOG_INPUT`, `PWM_INPUT`, `UART`, `SPI`, `CAN`) |
+| 1 | 1 | `channel` | logical channel index within peripheral family |
+| 2 | 2 | `payload_length` | little-endian `uint16_t`, valid range `1..255` |
+| 4 | N | captured data | exactly `payload_length` bytes |
+| 4 + N | 0..3 | zero padding | `(4 - (N % 4)) % 4` zero bytes to align to a 4-byte boundary |
+
+Padding bytes must strictly be zero on the wire. No duplicate `(peripheral_type, channel)` pairs may appear in the same message.
+
+#### Supported captured record payloads:
+- **`DIGITAL_INPUT`**: Channel must be 0 (bank 0). Payload length must be exactly 2 bytes (16-bit mask, bits 10..15 reserved zero).
+- **`ANALOG_INPUT`**: Channel must be `< 2`. Payload length must be exactly 4 bytes (`uint32_t` little-endian microvolts).
+- **`PWM_INPUT`**: Channel must be `< 2`. Payload length must be exactly 6 bytes (`uint32_t` period ns + `uint16_t` duty permyriad). Duty $\le 10000$, zero period requires zero duty.
+- **`UART`**: Channel must be `< 2`. Payload length must be `1..255` bytes raw captured data.
+- **`SPI`**: Channel must be `< 2`. Payload length must be `1..255` bytes raw captured data.
+- **`CAN`**: Channel must be `< 2`. Payload length must be a non-zero multiple of 12 bytes ($12 \times K$). Each frame is 2B `can_id` ($\le 0x7FF$) + 1B `dlc` ($\le 8$) + 8B data + 1B reserved zero.
 
 ## Application Response
 

@@ -571,12 +571,24 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
     return HIL_APPLICATION_STATUS_OK;
 }
 
+/**
+ * @brief Encode one 4-byte-aligned TLV record into the payload buffer.
+ *
+ * @details Writes the one-byte peripheral identifier, one-byte channel, two-byte
+ * little-endian payload length, payload bytes, and zero padding bytes to reach a
+ * 4-byte boundary.
+ *
+ * @param[in]     peripheral_type Logical peripheral type.
+ * @param[in]     channel         Logical peripheral channel index.
+ * @param[in]     span            Payload byte span.
+ * @param[out]    payload         Destination payload buffer.
+ * @param[in,out] running_total   Accumulated payload bytes written.
+ * @return Application status.
+ */
 static HIL_Application_Status_T
 HIL_APPLICATION_Aligned_Record_encode( HIL_Application_Peripheral_Type_T peripheral_type,
-                                       uint8_t                           channel,
-                                       const HIL_Application_Byte_Span_T* span,
-                                       uint8_t*                          payload,
-                                       size_t*                           running_total )
+                                       uint8_t channel, const HIL_Application_Byte_Span_T* span,
+                                       uint8_t* payload, size_t* running_total )
 {
     uint8_t wire_periph = 0u;
 
@@ -793,8 +805,8 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_encode(
     size_t max_payload_size, uint8_t* payload, size_t* used_size )
 {
     HIL_Application_Status_T status;
-    size_t                   required_size = 0u;
-    size_t                   running_total = 0u;
+    size_t                   required_size  = 0u;
+    size_t                   running_total  = 0u;
     uint8_t                  wire_condition = 0u;
 
     if ( used_size == NULL )
