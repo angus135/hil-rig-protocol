@@ -128,6 +128,51 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_size(
     return HIL_APPLICATION_STATUS_OK;
 }
 
+HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Update_Instruction_T* data,
+    size_t* encoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+
+    if ( encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *encoded_size = 0u;
+    if ( data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( data->operation_count != 0u && data->operations == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+
+    size_t running_total = HIL_APPLICATION_UPDATE_INSTRUCTION_HEADER_SIZE;
+    for ( size_t i = 0u; i < ( size_t )data->operation_count; ++i )
+    {
+        const HIL_Application_Logical_Operation_T* op = &data->operations[i];
+        if ( op->payload.size != 0u && op->payload.data == NULL )
+        {
+            return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+        }
+        const size_t pad              = ( 4u - ( ( size_t )op->payload.size % 4u ) ) % 4u;
+        size_t       record_wire_size = 0u;
+        if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_OPERATION_RECORD_HEADER_SIZE,
+                                                ( size_t )op->payload.size, &record_wire_size )
+             || !HIL_APPLICATION_Checked_Add_Size( record_wire_size, pad, &record_wire_size )
+             || !HIL_APPLICATION_Checked_Add_Size( running_total, record_wire_size, &running_total ) )
+        {
+            return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+        }
+    }
+    *encoded_size = running_total;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
 HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_size(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T                    test_id,
@@ -202,6 +247,51 @@ HIL_APPLICATION_Test_Result_size( const HIL_Application_Context_T*         conte
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
     *encoded_size = HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Test_Result_T* data,
+    size_t* encoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+
+    if ( encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *encoded_size = 0u;
+    if ( data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( data->record_count != 0u && data->records == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+
+    size_t running_total = HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE;
+    for ( size_t i = 0u; i < ( size_t )data->record_count; ++i )
+    {
+        const HIL_Application_Captured_Record_T* rec = &data->records[i];
+        if ( rec->data.size != 0u && rec->data.data == NULL )
+        {
+            return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+        }
+        const size_t pad              = ( 4u - ( ( size_t )rec->data.size % 4u ) ) % 4u;
+        size_t       record_wire_size = 0u;
+        if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_CAPTURED_RECORD_HEADER_SIZE,
+                                                ( size_t )rec->data.size, &record_wire_size )
+             || !HIL_APPLICATION_Checked_Add_Size( record_wire_size, pad, &record_wire_size )
+             || !HIL_APPLICATION_Checked_Add_Size( running_total, record_wire_size, &running_total ) )
+        {
+            return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+        }
+    }
+    *encoded_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }
 
