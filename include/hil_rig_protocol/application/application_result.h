@@ -148,6 +148,55 @@ typedef struct
  */
 typedef HIL_Application_Peripheral_Data_T HIL_Application_Variable_Result_Data_T;
 
+/**
+ * @name Variable Test Result streaming control flags
+ * @{
+ */
+/** Streaming control flag: complete tick result. */
+#define HIL_APPLICATION_RESULT_FLAG_COMPLETE_TICK ( 0x00u )
+/** Streaming control flag: subsequent result chunk with the same tick follows. */
+#define HIL_APPLICATION_RESULT_FLAG_HAS_MORE_CHUNKS ( 0x01u )
+/** @} */
+
+/**
+ * @brief One captured peripheral event or measurement in a variable result.
+ *
+ * @details Represents captured input state or incoming serial stream bytes at an
+ * execution tick. The codec validates that peripheral_type and channel are valid
+ * and that data conforms to the peripheral's captured layout.
+ */
+typedef struct
+{
+    /** Peripheral or signal family (e.g. DIGITAL_INPUT, ANALOG_INPUT, PWM_INPUT, UART, SPI, CAN). */
+    HIL_Application_Peripheral_Type_T peripheral_type;
+    /** Logical channel number within the peripheral family (bank 0 for digital). */
+    uint8_t channel;
+    /** Captured record payload bytes. */
+    HIL_Application_Byte_Span_T data;
+} HIL_Application_Captured_Record_T;
+
+/**
+ * @brief One variable-length firmware-to-Python Test Result body.
+ *
+ * @details Carries captured peripheral records and serial communication buffers
+ * for one zero-based tick boundary.
+ */
+typedef struct
+{
+    /** Zero-based tick whose execution/capture produced this result. */
+    uint32_t tick_number;
+    /** Number of captured peripheral records at records pointer (0..255). */
+    uint8_t record_count;
+    /** Recorded execution condition (OK, PARTIAL, EXECUTION_PROBLEM). */
+    HIL_Application_Result_Condition_T condition;
+    /** Streaming control flags (HIL_APPLICATION_RESULT_FLAG_*). */
+    uint8_t flags;
+    /** Integration-defined diagnostic value when condition is not OK (0 if OK). */
+    uint32_t problem_detail;
+    /** Array of captured peripheral records. */
+    const HIL_Application_Captured_Record_T* records;
+} HIL_Application_Variable_Test_Result_T;
+
 #ifdef __cplusplus
 }
 #endif
