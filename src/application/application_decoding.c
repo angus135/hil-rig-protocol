@@ -50,8 +50,10 @@ HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_Application_Message_Type_T type, s
             expected_size = HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE;
             break;
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
-            /* Test Configuration is variable-length because of its extension and is
-             * validated by the dedicated bounded scanner, never this fixed-body helper. */
+        case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT:
+            /* Test Configuration, Update Instruction, and Variable Test Result are variable-length
+             * and are validated by dedicated bounded scanners, never this fixed-body helper. */
             return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
@@ -156,6 +158,226 @@ HIL_APPLICATION_System_Info_Response_Scan( const HIL_Application_Context_T* cont
         return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
     }
     *decoded_storage_size = total_storage;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+/**
+ * @brief Common bounded scanner for a sequence of 4-byte-aligned TLV records.
+ *
+ * @details Validates the 4-byte TLV header, non-zero payload length bounded by
+ * max_variable_data_size and UINT8_MAX, exact zero pad bytes to align the record
+ * to a 4-byte boundary, and exact consumption of the declared payload extent.
+ */
+static HIL_Application_Status_T
+HIL_APPLICATION_Aligned_Records_Scan( const HIL_Application_Context_T* context,
+                                      const uint8_t* payload, size_t payload_size,
+                                      size_t offset_start, size_t record_count,
+                                      size_t* total_payload_bytes )
+{
+    size_t offset        = offset_start;
+    size_t total_payload = 0u;
+
+    for ( size_t i = 0u; i < record_count; ++i )
+    {
+        if ( payload_size - offset < HIL_APPLICATION_RECORD_HEADER_SIZE )
+        {
+            return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+        }
+        const uint16_t record_payload_len =
+            HIL_APPLICATION_Read_U16_Le( &payload[offset + 2u] );
+        offset += HIL_APPLICATION_RECORD_HEADER_SIZE;
+
+        if ( record_payload_len == 0u || record_payload_len > ( uint16_t )UINT8_MAX )
+        {
+            return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+        }
+        if ( ( size_t )record_payload_len > context->config.max_variable_data_size )
+        {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+        if ( payload_size - offset < ( size_t )record_payload_len )
+        {
+            return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+        }
+        offset += ( size_t )record_payload_len;
+
+        const size_t pad = HIL_APPLICATION_Align4_Padding( ( size_t )record_payload_len );
+        if ( payload_size - offset < pad )
+        {
+            return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+        }
+        for ( size_t p = 0u; p < pad; ++p )
+        {
+            if ( payload[offset + p] != 0u )
+            {
+                return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+            }
+        }
+        offset += pad;
+
+        if ( !HIL_APPLICATION_Checked_Add_Size( total_payload, ( size_t )record_payload_len,
+                                                &total_payload ) )
+        {
+            return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+        }
+    }
+
+    if ( offset != payload_size )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+
+    *total_payload_bytes = total_payload;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Update_Instruction_Scan( const HIL_Application_Context_T* context,
+                                         const uint8_t* payload, size_t payload_size,
+                                         size_t* decoded_storage_size )
+{
+    if ( context == NULL || payload == NULL || decoded_storage_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *decoded_storage_size = 0u;
+
+    if ( payload_size < HIL_APPLICATION_UPDATE_INSTRUCTION_HEADER_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+
+    const uint8_t  op_count = payload[HIL_APPLICATION_UPDATE_INSTRUCTION_COUNT_OFFSET];
+    const uint8_t  flags    = payload[HIL_APPLICATION_UPDATE_INSTRUCTION_FLAGS_OFFSET];
+    const uint16_t reserved =
+        HIL_APPLICATION_Read_U16_Le( &payload[HIL_APPLICATION_UPDATE_INSTRUCTION_RESERVED_OFFSET] );
+
+    if ( reserved != 0u )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    if ( flags > HIL_APPLICATION_INSTRUCTION_FLAG_HAS_MORE_CHUNKS )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( op_count == 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+
+    size_t                   total_payload_bytes = 0u;
+    HIL_Application_Status_T status              = HIL_APPLICATION_Aligned_Records_Scan(
+        context, payload, payload_size, HIL_APPLICATION_UPDATE_INSTRUCTION_HEADER_SIZE,
+        ( size_t )op_count, &total_payload_bytes );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+
+    size_t struct_array_size = 0u;
+    if ( !HIL_APPLICATION_Checked_Mul_Size( ( size_t )op_count,
+                                            sizeof( HIL_Application_Logical_Operation_T ),
+                                            &struct_array_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    size_t aligned_struct_array_size = 0u;
+    if ( !HIL_APPLICATION_Align_Up_Size( struct_array_size,
+                                         HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT,
+                                         &aligned_struct_array_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    if ( !HIL_APPLICATION_Checked_Add_Size( aligned_struct_array_size, total_payload_bytes,
+                                            decoded_storage_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Variable_Test_Result_Scan( const HIL_Application_Context_T* context,
+                                           const uint8_t* payload, size_t payload_size,
+                                           size_t* decoded_storage_size )
+{
+    if ( context == NULL || payload == NULL || decoded_storage_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *decoded_storage_size = 0u;
+
+    if ( payload_size < HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+
+    const uint8_t  rec_count = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_COUNT_OFFSET];
+    const uint8_t  condition = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_CONDITION_OFFSET];
+    const uint8_t  flags     = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_FLAGS_OFFSET];
+    const uint8_t  reserved  = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_RESERVED_OFFSET];
+    const uint32_t problem_detail = HIL_APPLICATION_Read_U32_Le(
+        &payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_PROBLEM_DETAIL_OFFSET] );
+
+    if ( reserved != 0u )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    if ( flags > HIL_APPLICATION_RESULT_FLAG_HAS_MORE_CHUNKS )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( condition != ( uint8_t )HIL_APPLICATION_RESULT_CONDITION_OK
+         && condition != ( uint8_t )HIL_APPLICATION_RESULT_CONDITION_PARTIAL
+         && condition != ( uint8_t )HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( condition == ( uint8_t )HIL_APPLICATION_RESULT_CONDITION_OK && problem_detail != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+
+    if ( rec_count == 0u )
+    {
+        if ( payload_size != HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE )
+        {
+            return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+        }
+        *decoded_storage_size = 0u;
+        return HIL_APPLICATION_STATUS_OK;
+    }
+
+    size_t                   total_payload_bytes = 0u;
+    HIL_Application_Status_T status              = HIL_APPLICATION_Aligned_Records_Scan(
+        context, payload, payload_size, HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE,
+        ( size_t )rec_count, &total_payload_bytes );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+
+    size_t struct_array_size = 0u;
+    if ( !HIL_APPLICATION_Checked_Mul_Size( ( size_t )rec_count,
+                                            sizeof( HIL_Application_Captured_Record_T ),
+                                            &struct_array_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    size_t aligned_struct_array_size = 0u;
+    if ( !HIL_APPLICATION_Align_Up_Size( struct_array_size,
+                                         HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT,
+                                         &aligned_struct_array_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    if ( !HIL_APPLICATION_Checked_Add_Size( aligned_struct_array_size, total_payload_bytes,
+                                            decoded_storage_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+
     return HIL_APPLICATION_STATUS_OK;
 }
 
@@ -600,6 +822,94 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
     return HIL_APPLICATION_STATUS_OK;
 }
 
+HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_decode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, HIL_Application_Update_Instruction_T* data,
+    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
+    size_t max_decoded_data_size, size_t* used_decoded_size )
+{
+    ( void )sub_type;
+    ( void )test_id;
+
+    if ( payload_size == NULL || used_decoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *payload_size      = 0u;
+    *used_decoded_size = 0u;
+    if ( context == NULL || data == NULL || payload == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+
+    size_t                   required_storage = 0u;
+    HIL_Application_Status_T status           = HIL_APPLICATION_Update_Instruction_Scan(
+        context, payload, max_payload_size, &required_storage );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    if ( required_storage > max_decoded_data_size )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+    if ( required_storage != 0u && decoded_data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+
+    size_t running_payload = 0u;
+    HIL_APPLICATION_Decode_U32_Le( &data->tick_number, &payload[running_payload],
+                                   &running_payload );
+    data->operation_count = payload[running_payload++];
+    data->flags           = payload[running_payload++];
+    running_payload += 2u; /* skip reserved bytes */
+
+    HIL_Application_Logical_Operation_T* operations =
+        ( HIL_Application_Logical_Operation_T* )( void* )decoded_data;
+    data->operations = operations;
+
+    size_t struct_array_size =
+        ( size_t )data->operation_count * sizeof( HIL_Application_Logical_Operation_T );
+    size_t pool_offset = 0u;
+    if ( !HIL_APPLICATION_Align_Up_Size( struct_array_size,
+                                         HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT, &pool_offset ) )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
+    uint8_t* payload_pool         = decoded_data + pool_offset;
+    size_t   payload_bytes_copied = 0u;
+
+    for ( size_t i = 0u; i < ( size_t )data->operation_count; ++i )
+    {
+        operations[i].peripheral_type =
+            ( HIL_Application_Peripheral_Type_T )payload[running_payload++];
+        operations[i].channel = payload[running_payload++];
+        const uint16_t op_payload_len =
+            HIL_APPLICATION_Read_U16_Le( &payload[running_payload] );
+        running_payload += HIL_APPLICATION_WIRE_U16_SIZE;
+
+        operations[i].payload.size = ( uint8_t )op_payload_len;
+        operations[i].payload.data = &payload_pool[payload_bytes_copied];
+
+        memcpy( &payload_pool[payload_bytes_copied], &payload[running_payload],
+                ( size_t )op_payload_len );
+        running_payload += ( size_t )op_payload_len;
+        payload_bytes_copied += ( size_t )op_payload_len;
+
+        const size_t pad = HIL_APPLICATION_Align4_Padding( ( size_t )op_payload_len );
+        running_payload += pad;
+    }
+
+    if ( running_payload != max_payload_size )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
+    *payload_size      = running_payload;
+    *used_decoded_size = pool_offset + payload_bytes_copied;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
 HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Variable_Instruction_Data_T* data,
@@ -724,6 +1034,105 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
     }
     *payload_size = running_total;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_decode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, HIL_Application_Variable_Test_Result_T* data,
+    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
+    size_t max_decoded_data_size, size_t* used_decoded_size )
+{
+    ( void )sub_type;
+    ( void )test_id;
+
+    if ( payload_size == NULL || used_decoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *payload_size      = 0u;
+    *used_decoded_size = 0u;
+    if ( context == NULL || data == NULL || payload == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+
+    size_t                   required_storage = 0u;
+    HIL_Application_Status_T status           = HIL_APPLICATION_Variable_Test_Result_Scan(
+        context, payload, max_payload_size, &required_storage );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    if ( required_storage > max_decoded_data_size )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+    if ( required_storage != 0u && decoded_data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+
+    size_t running_payload = 0u;
+    HIL_APPLICATION_Decode_U32_Le( &data->tick_number, &payload[running_payload],
+                                   &running_payload );
+    data->record_count = payload[running_payload++];
+    data->condition    = ( HIL_Application_Result_Condition_T )payload[running_payload++];
+    data->flags        = payload[running_payload++];
+    running_payload += 1u; /* skip reserved byte */
+    HIL_APPLICATION_Decode_U32_Le( &data->problem_detail, &payload[running_payload],
+                                   &running_payload );
+
+    if ( data->record_count == 0u )
+    {
+        data->records      = NULL;
+        *payload_size      = running_payload;
+        *used_decoded_size = 0u;
+        return HIL_APPLICATION_STATUS_OK;
+    }
+
+    HIL_Application_Captured_Record_T* records =
+        ( HIL_Application_Captured_Record_T* )( void* )decoded_data;
+    data->records = records;
+
+    size_t struct_array_size =
+        ( size_t )data->record_count * sizeof( HIL_Application_Captured_Record_T );
+    size_t pool_offset = 0u;
+    if ( !HIL_APPLICATION_Align_Up_Size( struct_array_size,
+                                         HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT, &pool_offset ) )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
+    uint8_t* payload_pool         = decoded_data + pool_offset;
+    size_t   payload_bytes_copied = 0u;
+
+    for ( size_t i = 0u; i < ( size_t )data->record_count; ++i )
+    {
+        records[i].peripheral_type =
+            ( HIL_Application_Peripheral_Type_T )payload[running_payload++];
+        records[i].channel = payload[running_payload++];
+        const uint16_t rec_data_len =
+            HIL_APPLICATION_Read_U16_Le( &payload[running_payload] );
+        running_payload += HIL_APPLICATION_WIRE_U16_SIZE;
+
+        records[i].data.size = ( uint8_t )rec_data_len;
+        records[i].data.data = &payload_pool[payload_bytes_copied];
+
+        memcpy( &payload_pool[payload_bytes_copied], &payload[running_payload],
+                ( size_t )rec_data_len );
+        running_payload += ( size_t )rec_data_len;
+        payload_bytes_copied += ( size_t )rec_data_len;
+
+        const size_t pad = HIL_APPLICATION_Align4_Padding( ( size_t )rec_data_len );
+        running_payload += pad;
+    }
+
+    if ( running_payload != max_payload_size )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
+    *payload_size      = running_payload;
+    *used_decoded_size = pool_offset + payload_bytes_copied;
     return HIL_APPLICATION_STATUS_OK;
 }
 

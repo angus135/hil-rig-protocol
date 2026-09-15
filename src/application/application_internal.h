@@ -158,7 +158,7 @@ typedef struct
 } HIL_Application_Envelope_T;
 
 /** Maximum temporary decode storage required by a supported body. */
-#define HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE ( 2u * HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE )
+#define HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE ( 2048u )
 
 /** Checked size_t addition. Returns zero without writing result on overflow/error. */
 static inline int HIL_APPLICATION_Checked_Add_Size( size_t lhs, size_t rhs, size_t* result )
@@ -180,6 +180,22 @@ static inline int HIL_APPLICATION_Checked_Mul_Size( size_t lhs, size_t rhs, size
     }
     *result = lhs * rhs;
     return 1;
+}
+
+/** Checked align-up for a size_t value to a given alignment. Returns zero on overflow/error. */
+static inline int HIL_APPLICATION_Align_Up_Size( size_t value, size_t alignment, size_t* result )
+{
+    if ( result == NULL || alignment == 0u )
+    {
+        return 0;
+    }
+    const size_t remainder = value % alignment;
+    if ( remainder == 0u )
+    {
+        *result = value;
+        return 1;
+    }
+    return HIL_APPLICATION_Checked_Add_Size( value, alignment - remainder, result );
 }
 
 /** Checked conversion from local size_t length to the uint16_t payload-length wire field. */

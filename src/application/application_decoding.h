@@ -67,6 +67,41 @@ HIL_Application_Status_T HIL_APPLICATION_Error_Scan( const HIL_Application_Conte
                                                      size_t* decoded_storage_size );
 
 /**
+ * @brief Scan an Update Instruction payload without allocating.
+ *
+ * @details Validates the 8-byte header, reserved fields, and the 4-byte-aligned
+ * TLV record sequence for all operations, and computes the required decode storage.
+ *
+ * @param[in]  context              Application context.
+ * @param[in]  payload              First byte of the declared payload.
+ * @param[in]  payload_size         Declared payload extent in bytes.
+ * @param[out] decoded_storage_size Required decoded storage in bytes.
+ * @return Application status.
+ */
+HIL_Application_Status_T
+HIL_APPLICATION_Update_Instruction_Scan( const HIL_Application_Context_T* context,
+                                         const uint8_t* payload, size_t payload_size,
+                                         size_t* decoded_storage_size );
+
+/**
+ * @brief Scan a Variable Test Result payload without allocating.
+ *
+ * @details Validates the 12-byte header, condition, flags, reserved fields, and
+ * the 4-byte-aligned TLV record sequence for all captured records, and computes
+ * the required decode storage.
+ *
+ * @param[in]  context              Application context.
+ * @param[in]  payload              First byte of the declared payload.
+ * @param[in]  payload_size         Declared payload extent in bytes.
+ * @param[out] decoded_storage_size Required decoded storage in bytes.
+ * @return Application status.
+ */
+HIL_Application_Status_T
+HIL_APPLICATION_Variable_Test_Result_Scan( const HIL_Application_Context_T* context,
+                                           const uint8_t* payload, size_t payload_size,
+                                           size_t* decoded_storage_size );
+
+/**
  * @brief Decode the fixed System Information Request payload.
  * @param[in]  context               Application context.
  * @param[in]  sub_type              Parsed message subtype.
@@ -148,6 +183,26 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
     const uint8_t* payload, size_t max_payload_size, size_t* payload_size );
 
 /**
+ * @brief Decode an Update Instruction payload and its logical operations.
+ * @param[in]  context               Application context.
+ * @param[in]  sub_type              Parsed message subtype.
+ * @param[in]  test_id               Parsed Test ID value.
+ * @param[out] data                  Typed body destination.
+ * @param[in]  payload               First byte of the declared payload.
+ * @param[in]  max_payload_size      Declared payload extent in bytes.
+ * @param[out] payload_size          Number of payload bytes consumed on success.
+ * @param[out] decoded_data          Caller storage for operations array and payload bytes.
+ * @param[in]  max_decoded_data_size Available decoded_data capacity.
+ * @param[out] used_decoded_size     Bytes used in decoded_data on success.
+ * @return Application status.
+ */
+HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_decode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, HIL_Application_Update_Instruction_T* data,
+    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
+    size_t max_decoded_data_size, size_t* used_decoded_size );
+
+/**
  * @brief Preserve the Variable Instruction Data decoder entry point.
  * @details Runtime decoding remains deliberately NOT_IMPLEMENTED.
  * @param[in]  context               Application context.
@@ -226,6 +281,26 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Test_Result_T* data,
     const uint8_t* payload, size_t max_payload_size, size_t* payload_size );
+
+/**
+ * @brief Decode a Variable Test Result payload and its captured records.
+ * @param[in]  context               Application context.
+ * @param[in]  sub_type              Parsed message subtype.
+ * @param[in]  test_id               Parsed Test ID value.
+ * @param[out] data                  Typed body destination.
+ * @param[in]  payload               First byte of the declared payload.
+ * @param[in]  max_payload_size      Declared payload extent in bytes.
+ * @param[out] payload_size          Number of payload bytes consumed on success.
+ * @param[out] decoded_data          Caller storage for records array and data bytes.
+ * @param[in]  max_decoded_data_size Available decoded_data capacity.
+ * @param[out] used_decoded_size     Bytes used in decoded_data on success.
+ * @return Application status.
+ */
+HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_decode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, HIL_Application_Variable_Test_Result_T* data,
+    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
+    size_t max_decoded_data_size, size_t* used_decoded_size );
 
 /**
  * @brief Preserve the Variable Result Data decoder entry point.

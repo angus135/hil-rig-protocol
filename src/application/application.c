@@ -171,6 +171,11 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Decode(
             return HIL_APPLICATION_Test_Instructions_decode(
                 context, &message->subtype, message->test_id, &message->body.test_instruction,
                 payload, payload_size, consumed_payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
+            return HIL_APPLICATION_Update_Instruction_decode(
+                context, &message->subtype, message->test_id, &message->body.update_instruction,
+                payload, payload_size, consumed_payload_size, decoded_data, max_decoded_data_size,
+                used_decoded_size );
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
             return HIL_APPLICATION_Variable_Instruction_Data_decode(
                 context, &message->subtype, message->test_id,
@@ -190,6 +195,11 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Decode(
             return HIL_APPLICATION_Test_Result_decode( context, &message->subtype, message->test_id,
                                                        &message->body.test_result, payload,
                                                        payload_size, consumed_payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT:
+            return HIL_APPLICATION_Variable_Test_Result_decode(
+                context, &message->subtype, message->test_id,
+                &message->body.variable_test_result, payload, payload_size,
+                consumed_payload_size, decoded_data, max_decoded_data_size, used_decoded_size );
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
             return HIL_APPLICATION_Variable_Result_Data_decode(
                 context, &message->subtype, message->test_id, &message->body.variable_result_data,
@@ -620,6 +630,14 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
                 return status;
             }
             return HIL_APPLICATION_STATUS_OK;
+        case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
+            return HIL_APPLICATION_Update_Instruction_Scan(
+                context, &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES], payload_size,
+                required_storage_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT:
+            return HIL_APPLICATION_Variable_Test_Result_Scan(
+                context, &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES], payload_size,
+                required_storage_size );
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
             return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
