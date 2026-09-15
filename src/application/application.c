@@ -104,6 +104,10 @@ HIL_APPLICATION_Body_Encode( const HIL_Application_Context_T* context,
             return HIL_APPLICATION_Test_Instructions_encode(
                 context, &message->subtype, message->test_id, &message->body.test_instruction,
                 payload_capacity, payload, payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
+            return HIL_APPLICATION_Update_Instruction_encode(
+                context, &message->subtype, message->test_id, &message->body.update_instruction,
+                payload_capacity, payload, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
             return HIL_APPLICATION_Variable_Instruction_Data_encode(
                 context, &message->subtype, message->test_id,
@@ -120,6 +124,10 @@ HIL_APPLICATION_Body_Encode( const HIL_Application_Context_T* context,
             return HIL_APPLICATION_Test_Result_encode( context, &message->subtype, message->test_id,
                                                        &message->body.test_result, payload_capacity,
                                                        payload, payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT:
+            return HIL_APPLICATION_Variable_Test_Result_encode(
+                context, &message->subtype, message->test_id,
+                &message->body.variable_test_result, payload_capacity, payload, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
             return HIL_APPLICATION_Variable_Result_Data_encode(
                 context, &message->subtype, message->test_id, &message->body.variable_result_data,
