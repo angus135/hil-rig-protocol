@@ -50,6 +50,33 @@
 #define HIL_APPLICATION_ERROR_FIXED_PAYLOAD_SIZE 12u
 /** @} */
 
+/** @name Update Instruction payload header offsets and wire widths */
+/** @{ */
+#define HIL_APPLICATION_UPDATE_INSTRUCTION_TICK_OFFSET 0u
+#define HIL_APPLICATION_UPDATE_INSTRUCTION_COUNT_OFFSET 4u
+#define HIL_APPLICATION_UPDATE_INSTRUCTION_FLAGS_OFFSET 5u
+#define HIL_APPLICATION_UPDATE_INSTRUCTION_RESERVED_OFFSET 6u
+#define HIL_APPLICATION_UPDATE_INSTRUCTION_HEADER_SIZE 8u
+/** @} */
+
+/** @name Variable Test Result payload header offsets and wire widths */
+/** @{ */
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_TICK_OFFSET 0u
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_COUNT_OFFSET 4u
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_CONDITION_OFFSET 5u
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_FLAGS_OFFSET 6u
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_RESERVED_OFFSET 7u
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_PROBLEM_DETAIL_OFFSET 8u
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE 12u
+/** @} */
+
+/** @name Operation and captured record TLV wire widths */
+/** @{ */
+#define HIL_APPLICATION_RECORD_HEADER_SIZE 4u
+#define HIL_APPLICATION_OPERATION_RECORD_HEADER_SIZE HIL_APPLICATION_RECORD_HEADER_SIZE
+#define HIL_APPLICATION_CAPTURED_RECORD_HEADER_SIZE HIL_APPLICATION_RECORD_HEADER_SIZE
+/** @} */
+
 /** Fixed Test Instruction payload width derived from the published wire fields. */
 #define HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE                                        \
     ( HIL_APPLICATION_WIRE_U32_SIZE                                                                \
@@ -76,6 +103,12 @@ static_assert( HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE == 13u,
                "Application Response fixed payload wire width changed" );
 static_assert( HIL_APPLICATION_ERROR_FIXED_PAYLOAD_SIZE == 12u,
                "Application Error fixed payload wire width changed" );
+static_assert( HIL_APPLICATION_UPDATE_INSTRUCTION_HEADER_SIZE == 8u,
+               "Update Instruction payload header wire width changed" );
+static_assert( HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE == 12u,
+               "Variable Test Result payload header wire width changed" );
+static_assert( HIL_APPLICATION_RECORD_HEADER_SIZE == 4u,
+               "Record header wire width changed" );
 #else
 _Static_assert( HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE == 50u,
                 "Test Instruction fixed payload wire width changed" );
@@ -85,6 +118,12 @@ _Static_assert( HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE == 13u,
                 "Application Response fixed payload wire width changed" );
 _Static_assert( HIL_APPLICATION_ERROR_FIXED_PAYLOAD_SIZE == 12u,
                 "Application Error fixed payload wire width changed" );
+_Static_assert( HIL_APPLICATION_UPDATE_INSTRUCTION_HEADER_SIZE == 8u,
+                "Update Instruction payload header wire width changed" );
+_Static_assert( HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE == 12u,
+                "Variable Test Result payload header wire width changed" );
+_Static_assert( HIL_APPLICATION_RECORD_HEADER_SIZE == 4u,
+                "Record header wire width changed" );
 #endif
 
 /**

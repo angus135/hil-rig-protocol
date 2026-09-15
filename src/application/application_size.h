@@ -99,6 +99,22 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_size(
     size_t* encoded_size );
 
 /**
+ * @brief Determine the encoded size of an Update Instruction payload.
+ *
+ * @param[in]  context       Application context.
+ * @param[in]  sub_type      Message subtype.
+ * @param[in]  test_id       Test ID.
+ * @param[in]  data          Update instruction data.
+ * @param[out] encoded_size  Encoded payload size in bytes, excluding the common envelope.
+ *
+ * @return Application status.
+ */
+HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Update_Instruction_T* data,
+    size_t* encoded_size );
+
+/**
  * @brief Determine the encoded size of variable instruction data.
  *
  * @param[in]  context       Application context.
@@ -162,6 +178,22 @@ HIL_APPLICATION_Test_Result_size( const HIL_Application_Context_T*         conte
                                   const HIL_Application_Message_Subtype_T* sub_type,
                                   const HIL_Application_Test_Id_T          test_id,
                                   const HIL_Application_Test_Result_T* data, size_t* encoded_size );
+
+/**
+ * @brief Determine the encoded size of a variable test result payload.
+ *
+ * @param[in]  context       Application context.
+ * @param[in]  sub_type      Message subtype.
+ * @param[in]  test_id       Test ID.
+ * @param[in]  data          Variable test result data.
+ * @param[out] encoded_size  Encoded payload size in bytes, excluding the common envelope.
+ *
+ * @return Application status.
+ */
+HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Test_Result_T* data,
+    size_t* encoded_size );
 
 /**
  * @brief Determine the encoded size of variable result data.

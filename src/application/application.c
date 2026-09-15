@@ -43,6 +43,10 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Size( const HIL_Application
             return HIL_APPLICATION_Test_Instructions_size(
                 context, &message->subtype, message->test_id, &message->body.test_instruction,
                 payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
+            return HIL_APPLICATION_Update_Instruction_size(
+                context, &message->subtype, message->test_id, &message->body.update_instruction,
+                payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
             return HIL_APPLICATION_Variable_Instruction_Data_size(
                 context, &message->subtype, message->test_id,
@@ -61,6 +65,10 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Size( const HIL_Application
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
             return HIL_APPLICATION_Variable_Result_Data_size(
                 context, &message->subtype, message->test_id, &message->body.variable_result_data,
+                payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT:
+            return HIL_APPLICATION_Variable_Test_Result_size(
+                context, &message->subtype, message->test_id, &message->body.variable_test_result,
                 payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
             return HIL_APPLICATION_Response_size( context, &message->body.response, payload_size );
