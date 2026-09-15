@@ -900,3 +900,4 @@ def test_uninitialized_decode_context():
         assert function(ctx, wire, length, size) == lib.HIL_APPLICATION_STATUS_UNINITIALIZED
         assert size[0] == 0
     assert_decode_failure(ctx, wire, length, lib.HIL_APPLICATION_STATUS_UNINITIALIZED)
+

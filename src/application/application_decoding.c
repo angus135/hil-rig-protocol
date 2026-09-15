@@ -850,7 +850,9 @@ HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_decode(
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    if ( required_storage != 0u && decoded_data == NULL )
+    if ( required_storage != 0u
+         && ( decoded_data == NULL
+              || ( ( ( uintptr_t )decoded_data ) % HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ) != 0u ) )
     {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
@@ -1064,7 +1066,9 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_decode(
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
-    if ( required_storage != 0u && decoded_data == NULL )
+    if ( required_storage != 0u
+         && ( decoded_data == NULL
+              || ( ( ( uintptr_t )decoded_data ) % HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ) != 0u ) )
     {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }

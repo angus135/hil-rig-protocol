@@ -512,6 +512,32 @@ TEST_P( ApplicationAlignedRecords, ExactEncodeCapacityAndEveryShortDecodeCapacit
     }
 }
 
+TEST_P( ApplicationAlignedRecords, DecodeRejectsUnalignedStoragePointer )
+{
+    if ( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT <= 1u )
+    {
+        GTEST_SKIP();
+    }
+    const std::vector<std::uint8_t> payload = { 1u, 2u, 3u };
+    const auto                      wire    = Wire( 16u, 0u, payload );
+    std::size_t                     required = 0u;
+    ASSERT_EQ( HIL_APPLICATION_Decode_Storage_Size( &context, wire.data(), wire.size(), &required ),
+               HIL_APPLICATION_STATUS_OK );
+    ASSERT_LT( required + HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT, storage.size() );
+
+    for ( std::size_t offset = 1u; offset < HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT; ++offset )
+    {
+        SCOPED_TRACE( offset );
+        HIL_Application_Message_T decoded{};
+        std::size_t               used = 99u;
+        EXPECT_EQ( HIL_APPLICATION_Decode_Message( &context, wire.data(), wire.size(), &decoded,
+                                                   storage.data() + offset, required, &used ),
+                   HIL_APPLICATION_STATUS_INVALID_ARGUMENT );
+        EXPECT_EQ( used, 0u );
+        EXPECT_EQ( decoded.type, HIL_APPLICATION_MESSAGE_TYPE_INVALID );
+    }
+}
+
 INSTANTIATE_TEST_SUITE_P( UpdateAndResult, ApplicationAlignedRecords, ::testing::Bool() );
 
 }  // namespace

@@ -767,8 +767,16 @@ static HIL_Application_Status_T HIL_APPLICATION_Validate_Decoded_Envelope(
     size_t encoded_message_size, size_t required_decode_storage )
 {
     HIL_Application_Message_T message;
-    uint8_t                   decoded_storage[HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE];
-    size_t                    used_storage = 0u;
+    union
+    {
+        uint8_t bytes[HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE];
+#if defined( _MSC_VER )
+        long double align;
+#else
+        max_align_t align;
+#endif
+    } decoded_storage;
+    size_t used_storage = 0u;
 
     if ( required_decode_storage > HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE )
     {
@@ -778,10 +786,10 @@ static HIL_Application_Status_T HIL_APPLICATION_Validate_Decoded_Envelope(
      */
     memset( &message, 0, sizeof( message ) );
     message.type = HIL_APPLICATION_MESSAGE_TYPE_INVALID;
-    return HIL_APPLICATION_Decode_Internal( context, encoded_message, encoded_message_size,
-                                            &message,
-                                            required_decode_storage == 0u ? NULL : decoded_storage,
-                                            required_decode_storage, &used_storage );
+    return HIL_APPLICATION_Decode_Internal(
+        context, encoded_message, encoded_message_size, &message,
+        required_decode_storage == 0u ? NULL : decoded_storage.bytes, required_decode_storage,
+        &used_storage );
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
