@@ -407,7 +407,7 @@ TEST_P( ApplicationAlignedRecords, FlagsAndTickBoundsAcrossTypedAndWireValidatio
     }
 }
 
-TEST_P( ApplicationAlignedRecords, ConfiguredRecordLimitIsEnforcedByAllDecodeFacades )
+TEST_P( ApplicationAlignedRecords, ConfiguredRecordLimitIsEnforcedByAllFacades )
 {
     HIL_Application_Config_T config{};
     ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
@@ -415,9 +415,24 @@ TEST_P( ApplicationAlignedRecords, ConfiguredRecordLimitIsEnforcedByAllDecodeFac
     ASSERT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_OK );
     for ( const unsigned length : { 3u, 4u, 5u } )
     {
-        const auto wire = Wire( 16u, 0u, std::vector<std::uint8_t>( length, 0xabu ) );
+        const auto payload  = std::vector<std::uint8_t>( length, 0xabu );
+        const auto message  = Message( 16u, 0u, payload );
+        const auto wire     = Wire( 16u, 0u, payload );
         const auto expected =
             length <= 4u ? HIL_APPLICATION_STATUS_OK : HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+
+        EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), expected );
+
+        std::array<std::uint8_t, 256u> encoded_buf{};
+        std::size_t                    encoded_used = 0u;
+        EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, encoded_buf.data(),
+                                                   encoded_buf.size(), &encoded_used ),
+                   expected );
+        if ( length > 4u )
+        {
+            EXPECT_EQ( encoded_used, 0u );
+        }
+
         std::size_t required = 99u;
         EXPECT_EQ(
             HIL_APPLICATION_Decode_Storage_Size( &context, wire.data(), wire.size(), &required ),

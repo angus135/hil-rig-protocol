@@ -269,12 +269,18 @@ def test_invalid_wire_header(codec, result_family, field):
     assert caught.value.status is status
 
 
-def test_configured_decode_span_limit(result_family):
+def test_configured_span_limit(result_family):
     codec = p.ApplicationCodec(p.ApplicationConfig(max_variable_data_size=3))
     assert codec.decode(golden(result_family, ((p.PeripheralType.UART, 0, b"abc"),)))
     with pytest.raises(p.ApplicationDecodeError) as caught:
         codec.decode(golden(result_family, ((p.PeripheralType.UART, 0, b"abcd"),)))
     assert caught.value.status is p.ApplicationStatus.VALIDATION_FAILED
+    value_ok = message(result_family, ((p.PeripheralType.UART, 0, b"abc"),))
+    assert codec.encode(value_ok) == golden(result_family, ((p.PeripheralType.UART, 0, b"abc"),))
+    value_bad = message(result_family, ((p.PeripheralType.UART, 0, b"abcd"),))
+    with pytest.raises(p.ApplicationEncodeError) as caught_enc:
+        codec.encode(value_bad)
+    assert caught_enc.value.status is p.ApplicationStatus.VALIDATION_FAILED
 
 
 def test_decode_storage_larger_than_wire(codec, result_family):
