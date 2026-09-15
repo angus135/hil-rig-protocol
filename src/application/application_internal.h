@@ -77,6 +77,14 @@
 #define HIL_APPLICATION_CAPTURED_RECORD_HEADER_SIZE HIL_APPLICATION_RECORD_HEADER_SIZE
 /** @} */
 
+/** @name Variable record format constants */
+/** @{ */
+#define HIL_APPLICATION_DIGITAL_BANK_RESERVED_MASK ( 0xFC00u )
+#define HIL_APPLICATION_CAN_FRAME_WIRE_SIZE ( 12u )
+#define HIL_APPLICATION_CAN_MAX_STANDARD_ID ( 0x7FFu )
+#define HIL_APPLICATION_CAN_MAX_DLC ( 8u )
+/** @} */
+
 /** Fixed Test Instruction payload width derived from the published wire fields. */
 #define HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE                                        \
     ( HIL_APPLICATION_WIRE_U32_SIZE                                                                \
@@ -109,6 +117,8 @@ static_assert( HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE == 12u,
                "Variable Test Result payload header wire width changed" );
 static_assert( HIL_APPLICATION_RECORD_HEADER_SIZE == 4u,
                "Record header wire width changed" );
+static_assert( HIL_APPLICATION_CAN_FRAME_WIRE_SIZE == 12u,
+               "CAN frame wire width changed" );
 #else
 _Static_assert( HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE == 50u,
                 "Test Instruction fixed payload wire width changed" );
@@ -124,6 +134,8 @@ _Static_assert( HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE == 12u,
                 "Variable Test Result payload header wire width changed" );
 _Static_assert( HIL_APPLICATION_RECORD_HEADER_SIZE == 4u,
                 "Record header wire width changed" );
+_Static_assert( HIL_APPLICATION_CAN_FRAME_WIRE_SIZE == 12u,
+                "CAN frame wire width changed" );
 #endif
 
 /**
@@ -190,6 +202,12 @@ static inline int HIL_APPLICATION_Enum_To_U8( int value, uint8_t* result )
     }
     *result = ( uint8_t )value;
     return 1;
+}
+
+/** Calculate pad bytes needed to align a size to a 4-byte boundary. */
+static inline size_t HIL_APPLICATION_Align4_Padding( size_t size )
+{
+    return ( 4u - ( size % 4u ) ) % 4u;
 }
 
 /** Write one little-endian uint16_t without relying on host byte order. */
