@@ -70,6 +70,51 @@ typedef struct
 } HIL_Application_Test_Instruction_T;
 
 /**
+ * @name Update Instruction streaming control flags
+ * @{
+ */
+/** Streaming control flag: final or only message for this tick. */
+#define HIL_APPLICATION_INSTRUCTION_FLAG_COMPLETE_TICK ( 0x00u )
+/** Streaming control flag: subsequent chunk message with the same tick follows. */
+#define HIL_APPLICATION_INSTRUCTION_FLAG_HAS_MORE_CHUNKS ( 0x01u )
+/** @} */
+
+/**
+ * @brief One logical peripheral operation for an update-based instruction.
+ *
+ * @details Represents a discrete output change or communication transfer at an
+ * execution tick. The codec validates that peripheral_type and channel are valid
+ * and that payload conforms to the peripheral's logical data layout.
+ */
+typedef struct
+{
+    /** Peripheral or signal family (e.g. DIGITAL_OUTPUT, ANALOG_OUTPUT, PWM_OUTPUT, UART, SPI, CAN). */
+    HIL_Application_Peripheral_Type_T peripheral_type;
+    /** Logical channel number within the peripheral family (bank 0 for digital). */
+    uint8_t channel;
+    /** Logical operation payload bytes. */
+    HIL_Application_Byte_Span_T payload;
+} HIL_Application_Logical_Operation_T;
+
+/**
+ * @brief One variable-length Python-to-firmware Update Instruction body.
+ *
+ * @details Carries sparse logical peripheral operations and streaming serial data
+ * for one zero-based tick boundary.
+ */
+typedef struct
+{
+    /** Zero-based tick identity; codec requires value < context max_expected_tick_count. */
+    uint32_t tick_number;
+    /** Number of operations at operations pointer (1..255). */
+    uint8_t operation_count;
+    /** Streaming control flags (HIL_APPLICATION_INSTRUCTION_FLAG_*). */
+    uint8_t flags;
+    /** Array of logical operations packed in this message. */
+    const HIL_Application_Logical_Operation_T* operations;
+} HIL_Application_Update_Instruction_T;
+
+/**
  * @brief Future variable communication bytes associated with one test tick.
  *
  * @details This structure is retained for future variable-message design. The
