@@ -205,6 +205,24 @@ static inline uint16_t HIL_APPLICATION_Read_U16_Le( const uint8_t* src )
     return ( uint16_t )( ( uint16_t )src[0] | ( uint16_t )( ( uint16_t )src[1] << 8 ) );
 }
 
+/** Write one little-endian uint32_t without relying on host byte order. */
+static inline void HIL_APPLICATION_Write_U32_Le( uint8_t* dst, uint32_t value )
+{
+    dst[0] = ( uint8_t )( value & 0xffu );
+    dst[1] = ( uint8_t )( ( value >> 8 ) & 0xffu );
+    dst[2] = ( uint8_t )( ( value >> 16 ) & 0xffu );
+    dst[3] = ( uint8_t )( ( value >> 24 ) & 0xffu );
+}
+
+/** Read one little-endian uint32_t without relying on host byte order. */
+static inline uint32_t HIL_APPLICATION_Read_U32_Le( const uint8_t* src )
+{
+    return ( ( uint32_t )src[0] )
+           | ( ( uint32_t )src[1] << 8 )
+           | ( ( uint32_t )src[2] << 16 )
+           | ( ( uint32_t )src[3] << 24 );
+}
+
 /** Encode only the fixed 23-byte common envelope; payload length is patched later by the façade. */
 HIL_Application_Status_T HIL_APPLICATION_Header_Encoding( const HIL_Application_Message_T* message,
                                                           uint8_t* dest, size_t dest_capacity );

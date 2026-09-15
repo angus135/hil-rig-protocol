@@ -705,6 +705,9 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
             return HIL_APPLICATION_Test_Instructions_validate( context,
                                                                &message->body.test_instruction );
+        case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
+            return HIL_APPLICATION_Update_Instruction_validate(
+                context, &message->body.update_instruction );
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
             return HIL_APPLICATION_Variable_Instruction_Data_validate(
                 context, &message->body.variable_instruction_data );
@@ -716,6 +719,9 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
                                                             &message->body.global_control );
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
             return HIL_APPLICATION_Test_Result_validate( context, &message->body.test_result );
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT:
+            return HIL_APPLICATION_Variable_Test_Result_validate(
+                context, &message->body.variable_test_result );
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
             return HIL_APPLICATION_Variable_Result_Data_validate(
                 context, &message->body.variable_result_data );
