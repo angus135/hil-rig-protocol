@@ -8,7 +8,9 @@
  */
 
 #include "hil_rig_protocol/application/application_message.h"
+#include "application_internal.h"
 #include "application_size.h"
+#include "application_validation.h"
 #include "hil_rig_protocol/application/application_control.h"
 #include "hil_rig_protocol/application/application_error.h"
 #include "hil_rig_protocol/application/application_instruction.h"
@@ -490,6 +492,160 @@ HIL_APPLICATION_Test_Instructions_validate( const HIL_Application_Context_T*    
     return HIL_APPLICATION_STATUS_OK;
 }
 
+HIL_Application_Status_T
+HIL_APPLICATION_Update_Instruction_validate( const HIL_Application_Context_T*           context,
+                                            const HIL_Application_Update_Instruction_T* data )
+{
+    if ( context == NULL || data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( context->initialized == 0u )
+    {
+        return HIL_APPLICATION_STATUS_UNINITIALIZED;
+    }
+    if ( data->tick_number >= context->config.max_expected_tick_count )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->flags > HIL_APPLICATION_INSTRUCTION_FLAG_HAS_MORE_CHUNKS )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->operation_count == 0u || data->operations == NULL )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+
+    /* Enforce no duplicate (peripheral_type, channel) pairs */
+    for ( size_t i = 0u; i < ( size_t )data->operation_count; ++i )
+    {
+        for ( size_t j = i + 1u; j < ( size_t )data->operation_count; ++j )
+        {
+            if ( data->operations[i].peripheral_type == data->operations[j].peripheral_type
+                 && data->operations[i].channel == data->operations[j].channel )
+            {
+                return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+            }
+        }
+    }
+
+    for ( size_t i = 0u; i < ( size_t )data->operation_count; ++i )
+    {
+        const HIL_Application_Logical_Operation_T* op = &data->operations[i];
+
+        if ( op->payload.size == 0u || op->payload.data == NULL )
+        {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+
+        switch ( op->peripheral_type )
+        {
+            case HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT:
+            {
+                if ( op->channel != 0u || op->payload.size != 2u )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                const uint16_t mask = HIL_APPLICATION_Read_U16_Le( op->payload.data );
+                if ( ( mask & 0xFC00u ) != 0u )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                break;
+            }
+            case HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT:
+            {
+                if ( op->channel >= HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT
+                     || op->payload.size != 4u )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                break;
+            }
+            case HIL_APPLICATION_PERIPHERAL_PWM_OUTPUT:
+            {
+                if ( op->channel >= HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT
+                     || op->payload.size != 6u )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                const uint32_t period_ns = HIL_APPLICATION_Read_U32_Le( &op->payload.data[0] );
+                const uint16_t duty      = HIL_APPLICATION_Read_U16_Le( &op->payload.data[4] );
+                if ( !HIL_APPLICATION_Pwm_Value_Is_Valid( period_ns, duty ) )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                break;
+            }
+            case HIL_APPLICATION_PERIPHERAL_UART:
+            {
+                if ( op->channel >= HIL_APPLICATION_UART_CHANNEL_COUNT )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                break;
+            }
+            case HIL_APPLICATION_PERIPHERAL_SPI:
+            {
+                if ( op->channel >= HIL_APPLICATION_SPI_CHANNEL_COUNT )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                const uint8_t num_packets = op->payload.data[0];
+                if ( num_packets == 0u )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                if ( ( size_t )op->payload.size <= 1u + ( size_t )num_packets )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                const size_t expected_data_len =
+                    ( size_t )op->payload.size - 1u - ( size_t )num_packets;
+                size_t sum_packet_sizes = 0u;
+                for ( size_t p = 0u; p < ( size_t )num_packets; ++p )
+                {
+                    const uint8_t pkt_len = op->payload.data[1u + p];
+                    if ( pkt_len == 0u )
+                    {
+                        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                    }
+                    sum_packet_sizes += pkt_len;
+                }
+                if ( sum_packet_sizes != expected_data_len )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                break;
+            }
+            case HIL_APPLICATION_PERIPHERAL_CAN:
+            {
+                if ( op->channel >= HIL_APPLICATION_CAN_CHANNEL_COUNT
+                     || ( op->payload.size % 12u ) != 0u )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                for ( size_t f = 0u; f < ( size_t )op->payload.size; f += 12u )
+                {
+                    const uint16_t can_id =
+                        HIL_APPLICATION_Read_U16_Le( &op->payload.data[f] );
+                    const uint8_t dlc = op->payload.data[f + 2u];
+                    const uint8_t res = op->payload.data[f + 11u];
+                    if ( can_id > 0x7FFu || dlc > 8u || res != 0u )
+                    {
+                        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                    }
+                }
+                break;
+            }
+            default:
+                return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+    }
+    return HIL_APPLICATION_STATUS_OK;
+}
+
 HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_validate(
     const HIL_Application_Context_T*                   context,
     const HIL_Application_Variable_Instruction_Data_T* data )
@@ -580,6 +736,146 @@ HIL_APPLICATION_Test_Result_validate( const HIL_Application_Context_T*     conte
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Variable_Test_Result_validate( const HIL_Application_Context_T*             context,
+                                               const HIL_Application_Variable_Test_Result_T* data )
+{
+    if ( context == NULL || data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( context->initialized == 0u )
+    {
+        return HIL_APPLICATION_STATUS_UNINITIALIZED;
+    }
+    if ( data->tick_number >= context->config.max_expected_tick_count )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->flags > HIL_APPLICATION_RESULT_FLAG_HAS_MORE_CHUNKS )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->condition != HIL_APPLICATION_RESULT_CONDITION_OK
+         && data->condition != HIL_APPLICATION_RESULT_CONDITION_PARTIAL
+         && data->condition != HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->condition == HIL_APPLICATION_RESULT_CONDITION_OK && data->problem_detail != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->record_count != 0u && data->records == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+
+    /* Enforce no duplicate (peripheral_type, channel) pairs */
+    for ( size_t i = 0u; i < ( size_t )data->record_count; ++i )
+    {
+        for ( size_t j = i + 1u; j < ( size_t )data->record_count; ++j )
+        {
+            if ( data->records[i].peripheral_type == data->records[j].peripheral_type
+                 && data->records[i].channel == data->records[j].channel )
+            {
+                return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+            }
+        }
+    }
+
+    for ( size_t i = 0u; i < ( size_t )data->record_count; ++i )
+    {
+        const HIL_Application_Captured_Record_T* rec = &data->records[i];
+
+        if ( rec->data.size == 0u || rec->data.data == NULL )
+        {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+
+        switch ( rec->peripheral_type )
+        {
+            case HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT:
+            {
+                if ( rec->channel != 0u || rec->data.size != 2u )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                const uint16_t mask = HIL_APPLICATION_Read_U16_Le( rec->data.data );
+                if ( ( mask & 0xFC00u ) != 0u )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                break;
+            }
+            case HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT:
+            {
+                if ( rec->channel >= HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT
+                     || rec->data.size != 4u )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                break;
+            }
+            case HIL_APPLICATION_PERIPHERAL_PWM_INPUT:
+            {
+                if ( rec->channel >= HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT
+                     || rec->data.size != 6u )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                const uint32_t period_ns = HIL_APPLICATION_Read_U32_Le( &rec->data.data[0] );
+                const uint16_t duty      = HIL_APPLICATION_Read_U16_Le( &rec->data.data[4] );
+                if ( !HIL_APPLICATION_Pwm_Value_Is_Valid( period_ns, duty ) )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                break;
+            }
+            case HIL_APPLICATION_PERIPHERAL_UART:
+            {
+                if ( rec->channel >= HIL_APPLICATION_UART_CHANNEL_COUNT )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                break;
+            }
+            case HIL_APPLICATION_PERIPHERAL_SPI:
+            {
+                if ( rec->channel >= HIL_APPLICATION_SPI_CHANNEL_COUNT )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                break;
+            }
+            case HIL_APPLICATION_PERIPHERAL_CAN:
+            {
+                if ( rec->channel >= HIL_APPLICATION_CAN_CHANNEL_COUNT
+                     || ( rec->data.size % 12u ) != 0u )
+                {
+                    return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                }
+                for ( size_t f = 0u; f < ( size_t )rec->data.size; f += 12u )
+                {
+                    const uint16_t can_id =
+                        HIL_APPLICATION_Read_U16_Le( &rec->data.data[f] );
+                    const uint8_t dlc = rec->data.data[f + 2u];
+                    const uint8_t res = rec->data.data[f + 11u];
+                    if ( can_id > 0x7FFu || dlc > 8u || res != 0u )
+                    {
+                        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+                    }
+                }
+                break;
+            }
+            default:
+                return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+    }
+
     return HIL_APPLICATION_STATUS_OK;
 }
 
