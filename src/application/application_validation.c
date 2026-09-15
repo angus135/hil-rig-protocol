@@ -492,6 +492,13 @@ HIL_APPLICATION_Test_Instructions_validate( const HIL_Application_Context_T*    
     return HIL_APPLICATION_STATUS_OK;
 }
 
+/**
+ * @brief Validate a 16-bit digital bank payload and ensure reserved bits are zero.
+ *
+ * @param[in] channel Logical bank index (must be 0).
+ * @param[in] span    Payload byte span containing little-endian uint16_t mask.
+ * @return Application status.
+ */
 static HIL_Application_Status_T
 HIL_APPLICATION_Digital_Bank_Payload_validate( uint8_t                            channel,
                                                const HIL_Application_Byte_Span_T* span )
@@ -506,6 +513,14 @@ HIL_APPLICATION_Digital_Bank_Payload_validate( uint8_t                          
                : HIL_APPLICATION_STATUS_VALIDATION_FAILED;
 }
 
+/**
+ * @brief Validate a 6-byte PWM payload (uint32 period_ns + uint16 duty_permyriad).
+ *
+ * @param[in] channel      Logical PWM channel index.
+ * @param[in] max_channels Permitted channel bound.
+ * @param[in] span         Payload byte span.
+ * @return Application status.
+ */
 static HIL_Application_Status_T
 HIL_APPLICATION_Pwm_Payload_validate( uint8_t channel, size_t max_channels,
                                       const HIL_Application_Byte_Span_T* span )
@@ -521,6 +536,13 @@ HIL_APPLICATION_Pwm_Payload_validate( uint8_t channel, size_t max_channels,
                : HIL_APPLICATION_STATUS_VALIDATION_FAILED;
 }
 
+/**
+ * @brief Validate a CAN payload containing one or more 12-byte CAN frames.
+ *
+ * @param[in] channel Logical CAN channel index.
+ * @param[in] span    Payload byte span.
+ * @return Application status.
+ */
 static HIL_Application_Status_T
 HIL_APPLICATION_Can_Payload_validate( uint8_t channel, const HIL_Application_Byte_Span_T* span )
 {
@@ -544,8 +566,8 @@ HIL_APPLICATION_Can_Payload_validate( uint8_t channel, const HIL_Application_Byt
 }
 
 HIL_Application_Status_T
-HIL_APPLICATION_Update_Instruction_validate( const HIL_Application_Context_T*           context,
-                                            const HIL_Application_Update_Instruction_T* data )
+HIL_APPLICATION_Update_Instruction_validate( const HIL_Application_Context_T*            context,
+                                             const HIL_Application_Update_Instruction_T* data )
 {
     if ( context == NULL || data == NULL )
     {
@@ -623,8 +645,7 @@ HIL_APPLICATION_Update_Instruction_validate( const HIL_Application_Context_T*   
                     return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
                 }
                 break;
-            case HIL_APPLICATION_PERIPHERAL_SPI:
-            {
+            case HIL_APPLICATION_PERIPHERAL_SPI: {
                 if ( op->channel >= HIL_APPLICATION_SPI_CHANNEL_COUNT )
                 {
                     return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
@@ -764,7 +785,7 @@ HIL_APPLICATION_Test_Result_validate( const HIL_Application_Context_T*     conte
 }
 
 HIL_Application_Status_T
-HIL_APPLICATION_Variable_Test_Result_validate( const HIL_Application_Context_T*             context,
+HIL_APPLICATION_Variable_Test_Result_validate( const HIL_Application_Context_T* context,
                                                const HIL_Application_Variable_Test_Result_T* data )
 {
     if ( context == NULL || data == NULL )

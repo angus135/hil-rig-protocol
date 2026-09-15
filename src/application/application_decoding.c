@@ -168,11 +168,9 @@ HIL_APPLICATION_System_Info_Response_Scan( const HIL_Application_Context_T* cont
  * max_variable_data_size and UINT8_MAX, exact zero pad bytes to align the record
  * to a 4-byte boundary, and exact consumption of the declared payload extent.
  */
-static HIL_Application_Status_T
-HIL_APPLICATION_Aligned_Records_Scan( const HIL_Application_Context_T* context,
-                                      const uint8_t* payload, size_t payload_size,
-                                      size_t offset_start, size_t record_count,
-                                      size_t* total_payload_bytes )
+static HIL_Application_Status_T HIL_APPLICATION_Aligned_Records_Scan(
+    const HIL_Application_Context_T* context, const uint8_t* payload, size_t payload_size,
+    size_t offset_start, size_t record_count, size_t* total_payload_bytes )
 {
     size_t offset        = offset_start;
     size_t total_payload = 0u;
@@ -183,8 +181,7 @@ HIL_APPLICATION_Aligned_Records_Scan( const HIL_Application_Context_T* context,
         {
             return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
         }
-        const uint16_t record_payload_len =
-            HIL_APPLICATION_Read_U16_Le( &payload[offset + 2u] );
+        const uint16_t record_payload_len = HIL_APPLICATION_Read_U16_Le( &payload[offset + 2u] );
         offset += HIL_APPLICATION_RECORD_HEADER_SIZE;
 
         if ( record_payload_len == 0u || record_payload_len > ( uint16_t )UINT8_MAX )
@@ -313,10 +310,10 @@ HIL_APPLICATION_Variable_Test_Result_Scan( const HIL_Application_Context_T* cont
         return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
     }
 
-    const uint8_t  rec_count = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_COUNT_OFFSET];
-    const uint8_t  condition = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_CONDITION_OFFSET];
-    const uint8_t  flags     = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_FLAGS_OFFSET];
-    const uint8_t  reserved  = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_RESERVED_OFFSET];
+    const uint8_t  rec_count      = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_COUNT_OFFSET];
+    const uint8_t  condition      = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_CONDITION_OFFSET];
+    const uint8_t  flags          = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_FLAGS_OFFSET];
+    const uint8_t  reserved       = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_RESERVED_OFFSET];
     const uint32_t problem_detail = HIL_APPLICATION_Read_U32_Le(
         &payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_PROBLEM_DETAIL_OFFSET] );
 
@@ -884,9 +881,8 @@ HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_decode(
     {
         operations[i].peripheral_type =
             ( HIL_Application_Peripheral_Type_T )payload[running_payload++];
-        operations[i].channel = payload[running_payload++];
-        const uint16_t op_payload_len =
-            HIL_APPLICATION_Read_U16_Le( &payload[running_payload] );
+        operations[i].channel         = payload[running_payload++];
+        const uint16_t op_payload_len = HIL_APPLICATION_Read_U16_Le( &payload[running_payload] );
         running_payload += HIL_APPLICATION_WIRE_U16_SIZE;
 
         operations[i].payload.size = ( uint8_t )op_payload_len;
@@ -1110,9 +1106,8 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_decode(
     {
         records[i].peripheral_type =
             ( HIL_Application_Peripheral_Type_T )payload[running_payload++];
-        records[i].channel = payload[running_payload++];
-        const uint16_t rec_data_len =
-            HIL_APPLICATION_Read_U16_Le( &payload[running_payload] );
+        records[i].channel          = payload[running_payload++];
+        const uint16_t rec_data_len = HIL_APPLICATION_Read_U16_Le( &payload[running_payload] );
         running_payload += HIL_APPLICATION_WIRE_U16_SIZE;
 
         records[i].data.size = ( uint8_t )rec_data_len;

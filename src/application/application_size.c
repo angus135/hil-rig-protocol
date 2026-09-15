@@ -128,9 +128,19 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_size(
     return HIL_APPLICATION_STATUS_OK;
 }
 
+/**
+ * @brief Accumulate the encoded wire size of one 4-byte-aligned TLV record.
+ *
+ * @details Computes the 4-byte header width, payload byte length, and 4-byte
+ * boundary padding, adding the total to running_total with checked arithmetic.
+ *
+ * @param[in]     span          Payload byte span.
+ * @param[in,out] running_total Accumulated wire payload size in bytes.
+ * @return Application status.
+ */
 static HIL_Application_Status_T
 HIL_APPLICATION_Aligned_Record_size( const HIL_Application_Byte_Span_T* span,
-                                     size_t*                           running_total )
+                                     size_t*                            running_total )
 {
     if ( span->size != 0u && span->data == NULL )
     {
