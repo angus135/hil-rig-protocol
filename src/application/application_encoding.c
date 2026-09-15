@@ -571,6 +571,95 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
     return HIL_APPLICATION_STATUS_OK;
 }
 
+static HIL_Application_Status_T
+HIL_APPLICATION_Aligned_Record_encode( HIL_Application_Peripheral_Type_T peripheral_type,
+                                       uint8_t                           channel,
+                                       const HIL_Application_Byte_Span_T* span,
+                                       uint8_t*                          payload,
+                                       size_t*                           running_total )
+{
+    uint8_t wire_periph = 0u;
+
+    if ( !HIL_APPLICATION_Enum_To_U8( ( int )peripheral_type, &wire_periph ) )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+
+    payload[( *running_total )++] = wire_periph;
+    payload[( *running_total )++] = channel;
+    HIL_APPLICATION_Encode_U16_Le( &payload[*running_total], ( uint16_t )span->size,
+                                   running_total );
+
+    if ( span->size != 0u )
+    {
+        memcpy( &payload[*running_total], span->data, span->size );
+        *running_total += span->size;
+    }
+
+    const size_t pad = HIL_APPLICATION_Align4_Padding( ( size_t )span->size );
+    for ( size_t p = 0u; p < pad; ++p )
+    {
+        payload[( *running_total )++] = 0u;
+    }
+
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Update_Instruction_T* data,
+    size_t max_payload_size, uint8_t* payload, size_t* used_size )
+{
+    HIL_Application_Status_T status;
+    size_t                   required_size = 0u;
+    size_t                   running_total = 0u;
+
+    if ( used_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *used_size = 0u;
+    if ( data == NULL || payload == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+
+    status =
+        HIL_APPLICATION_Update_Instruction_size( context, sub_type, test_id, data, &required_size );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    if ( max_payload_size < required_size )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+
+    HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->tick_number, &running_total );
+    payload[running_total++] = data->operation_count;
+    payload[running_total++] = data->flags;
+    HIL_APPLICATION_Encode_U16_Le( &payload[running_total], 0u, &running_total );
+
+    for ( size_t i = 0u; i < ( size_t )data->operation_count; ++i )
+    {
+        const HIL_Application_Logical_Operation_T* op = &data->operations[i];
+        status = HIL_APPLICATION_Aligned_Record_encode( op->peripheral_type, op->channel,
+                                                        &op->payload, payload, &running_total );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+
+    if ( running_total != required_size )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
+
+    *used_size = running_total;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
 HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_encode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T                    test_id,
@@ -694,6 +783,69 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
     {
         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
     }
+    *used_size = running_total;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Test_Result_T* data,
+    size_t max_payload_size, uint8_t* payload, size_t* used_size )
+{
+    HIL_Application_Status_T status;
+    size_t                   required_size = 0u;
+    size_t                   running_total = 0u;
+    uint8_t                  wire_condition = 0u;
+
+    if ( used_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *used_size = 0u;
+    if ( data == NULL || payload == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+
+    status = HIL_APPLICATION_Variable_Test_Result_size( context, sub_type, test_id, data,
+                                                        &required_size );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    if ( max_payload_size < required_size )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+
+    if ( !HIL_APPLICATION_Enum_To_U8( ( int )data->condition, &wire_condition ) )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+
+    HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->tick_number, &running_total );
+    payload[running_total++] = data->record_count;
+    payload[running_total++] = wire_condition;
+    payload[running_total++] = data->flags;
+    payload[running_total++] = 0u; /* reserved */
+    HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->problem_detail, &running_total );
+
+    for ( size_t i = 0u; i < ( size_t )data->record_count; ++i )
+    {
+        const HIL_Application_Captured_Record_T* rec = &data->records[i];
+        status = HIL_APPLICATION_Aligned_Record_encode( rec->peripheral_type, rec->channel,
+                                                        &rec->data, payload, &running_total );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+
+    if ( running_total != required_size )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
+
     *used_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }

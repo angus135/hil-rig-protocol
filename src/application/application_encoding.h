@@ -112,6 +112,22 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
     size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
 /**
+ * @brief Encode the variable-length Update Instruction payload.
+ * @param[in]  context          Application context.
+ * @param[in]  sub_type         Message subtype selected by the public envelope.
+ * @param[in]  test_id          Envelope Test ID value.
+ * @param[in]  data             Typed Update Instruction body.
+ * @param[in]  max_payload_size Available payload capacity after the common header.
+ * @param[out] payload          Destination payload buffer.
+ * @param[out] used_size        Payload bytes written on success.
+ * @return Application status.
+ */
+HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Update_Instruction_T* data,
+    size_t max_payload_size, uint8_t* payload, size_t* used_size );
+
+/**
  * @brief Preserve the Variable Instruction Data encoder entry point.
  * @param[in]  context          Application context.
  * @param[in]  sub_type         Message subtype.
@@ -175,6 +191,22 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_encode(
 HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Test_Result_T* data,
+    size_t max_payload_size, uint8_t* payload, size_t* used_size );
+
+/**
+ * @brief Encode the variable-length Variable Test Result payload.
+ * @param[in]  context          Application context.
+ * @param[in]  sub_type         Message subtype selected by the public envelope.
+ * @param[in]  test_id          Envelope Test ID value.
+ * @param[in]  data             Typed Variable Test Result body.
+ * @param[in]  max_payload_size Available payload capacity after the common header.
+ * @param[out] payload          Destination payload buffer.
+ * @param[out] used_size        Payload bytes written on success.
+ * @return Application status.
+ */
+HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Test_Result_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
 /**
