@@ -131,8 +131,11 @@ def _read_aligned_records(
         if size == 0 or offset + size > capacity or span.data != storage + offset:
             raise ApplicationBindingError("native record span disagrees with decode storage")
         result.append(
-            (PeripheralType(record.peripheral_type), int(record.channel),
-             bytes(ffi.buffer(span.data, size)))
+            (
+                PeripheralType(record.peripheral_type),
+                int(record.channel),
+                bytes(ffi.buffer(span.data, size)),
+            )
         )
         offset += size
     if offset != capacity:
@@ -146,11 +149,17 @@ def _read_update_instruction(
     if native.operation_count == 0:
         raise ApplicationBindingError("native update instruction has no operations")
     records = _read_aligned_records(
-        native.operations, int(native.operation_count), "HIL_Application_Logical_Operation_T",
-        "payload", storage, capacity,
+        native.operations,
+        int(native.operation_count),
+        "HIL_Application_Logical_Operation_T",
+        "payload",
+        storage,
+        capacity,
     )
     return UpdateInstruction(
-        test_id=test_id, tick_number=int(native.tick_number), flags=int(native.flags),
+        test_id=test_id,
+        tick_number=int(native.tick_number),
+        flags=int(native.flags),
         operations=tuple(LogicalOperation(*record) for record in records),
     )
 
@@ -159,12 +168,19 @@ def _read_variable_test_result(
     test_id: TestId, native: Any, storage: Any, capacity: int
 ) -> VariableTestResult:
     records = _read_aligned_records(
-        native.records, int(native.record_count), "HIL_Application_Captured_Record_T",
-        "data", storage, capacity,
+        native.records,
+        int(native.record_count),
+        "HIL_Application_Captured_Record_T",
+        "data",
+        storage,
+        capacity,
     )
     return VariableTestResult(
-        test_id=test_id, tick_number=int(native.tick_number), flags=int(native.flags),
-        condition=ResultCondition(native.condition), problem_detail=int(native.problem_detail),
+        test_id=test_id,
+        tick_number=int(native.tick_number),
+        flags=int(native.flags),
+        condition=ResultCondition(native.condition),
+        problem_detail=int(native.problem_detail),
         records=tuple(CapturedRecord(*record) for record in records),
     )
 

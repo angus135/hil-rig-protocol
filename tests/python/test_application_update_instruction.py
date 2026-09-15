@@ -54,16 +54,28 @@ def golden(result_family, entries, *, tick=0, flags=0, condition=0, detail=0):
 
 def representative(result_family):
     return (
-        (p.PeripheralType.DIGITAL_INPUT if result_family else p.PeripheralType.DIGITAL_OUTPUT,
-         0, b"\xff\x03"),
-        (p.PeripheralType.ANALOG_INPUT if result_family else p.PeripheralType.ANALOG_OUTPUT,
-         1, struct.pack("<I", 0x12345678)),
-        (p.PeripheralType.PWM_INPUT if result_family else p.PeripheralType.PWM_OUTPUT,
-         1, struct.pack("<IH", 0x11223344, 10000)),
+        (
+            p.PeripheralType.DIGITAL_INPUT if result_family else p.PeripheralType.DIGITAL_OUTPUT,
+            0,
+            b"\xff\x03",
+        ),
+        (
+            p.PeripheralType.ANALOG_INPUT if result_family else p.PeripheralType.ANALOG_OUTPUT,
+            1,
+            struct.pack("<I", 0x12345678),
+        ),
+        (
+            p.PeripheralType.PWM_INPUT if result_family else p.PeripheralType.PWM_OUTPUT,
+            1,
+            struct.pack("<IH", 0x11223344, 10000),
+        ),
         (p.PeripheralType.UART, 0, b"\x00\xff\x80\x01\x02"),
-        (p.PeripheralType.SPI, 1, b"\x12\x34\x56" if result_family
-         else b"\x02\x01\x02\x12\x34\x56"),
-        (p.PeripheralType.CAN, 1, struct.pack("<HB8sB", 0x7ff, 8, bytes(range(8)), 0)),
+        (
+            p.PeripheralType.SPI,
+            1,
+            b"\x12\x34\x56" if result_family else b"\x02\x01\x02\x12\x34\x56",
+        ),
+        (p.PeripheralType.CAN, 1, struct.pack("<HB8sB", 0x7FF, 8, bytes(range(8)), 0)),
     )
 
 
@@ -82,11 +94,13 @@ def test_representative_golden_and_native_facades(codec, result_family):
     required = ffi.new("size_t *")
     assert lib.HIL_APPLICATION_Encoded_Size(context, native, required) == p.ApplicationStatus.OK
     assert required[0] == len(wire)
-    assert lib.HIL_APPLICATION_Validate_Encoded_Message(
-        context, wire, len(wire), required
-    ) == p.ApplicationStatus.OK
+    assert (
+        lib.HIL_APPLICATION_Validate_Encoded_Message(context, wire, len(wire), required)
+        == p.ApplicationStatus.OK
+    )
     ctype = (
-        "HIL_Application_Captured_Record_T" if result_family
+        "HIL_Application_Captured_Record_T"
+        if result_family
         else "HIL_Application_Logical_Operation_T"
     )
     alignment = lib.HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT
@@ -106,10 +120,12 @@ def test_every_uart_length_and_padding(codec, result_family, size):
     assert codec.decode(wire) == value
 
 
-@pytest.mark.parametrize("condition", [p.ResultCondition.OK, p.ResultCondition.PARTIAL,
-                                        p.ResultCondition.EXECUTION_PROBLEM])
+@pytest.mark.parametrize(
+    "condition",
+    [p.ResultCondition.OK, p.ResultCondition.PARTIAL, p.ResultCondition.EXECUTION_PROBLEM],
+)
 @pytest.mark.parametrize("flags", [0, 1])
-@pytest.mark.parametrize("detail", [0, 0xffffffff])
+@pytest.mark.parametrize("detail", [0, 0xFFFFFFFF])
 def test_empty_results(codec, condition, flags, detail):
     value = message(True, (), condition=condition, flags=flags, problem_detail=detail)
     wire = golden(True, (), condition=condition, flags=flags, detail=detail)
@@ -163,9 +179,10 @@ def test_exact_message_size_limit(result_family):
     assert caught.value.status is p.ApplicationStatus.INVALID_LENGTH
 
 
-@pytest.mark.parametrize("field,value", [("flags", 2), ("flags", 255),
-                                          ("tick_number", 1000000),
-                                          ("tick_number", 0xffffffff)])
+@pytest.mark.parametrize(
+    "field,value",
+    [("flags", 2), ("flags", 255), ("tick_number", 1000000), ("tick_number", 0xFFFFFFFF)],
+)
 def test_native_message_semantics(codec, result_family, field, value):
     with pytest.raises(p.ApplicationEncodeError) as caught:
         codec.encode(message(result_family, **{field: value}))
@@ -231,7 +248,7 @@ def test_every_truncation_and_bad_padding(codec, result_family):
 def test_invalid_wire_span_length(codec, result_family, length):
     wire = bytearray(golden(result_family, ((p.PeripheralType.UART, 0, b"x"),)))
     offset = 23 + (12 if result_family else 8) + 2
-    wire[offset:offset + 2] = struct.pack("<H", length)
+    wire[offset : offset + 2] = struct.pack("<H", length)
     with pytest.raises(p.ApplicationDecodeError) as caught:
         codec.decode(wire)
     assert caught.value.status is p.ApplicationStatus.MALFORMED_MESSAGE
@@ -265,7 +282,8 @@ def test_decode_storage_larger_than_wire(codec, result_family):
     value = message(result_family, entries)
     wire = codec.encode(value)
     descriptor = (
-        "HIL_Application_Captured_Record_T" if result_family
+        "HIL_Application_Captured_Record_T"
+        if result_family
         else "HIL_Application_Logical_Operation_T"
     )
     assert len(entries) * ffi.sizeof(descriptor) + sum(len(e[2]) for e in entries) > len(wire)
@@ -309,7 +327,6 @@ def test_native_pointer_invariants(codec, result_family, monkeypatch, corruption
         native = args[3]
         body = native.body.variable_test_result if result_family else native.body.update_instruction
         field = "records" if result_family else "operations"
-        records = getattr(body, field)
         if corruption == "array":
             setattr(body, field, ffi.NULL)
         elif corruption == "count":
@@ -317,7 +334,8 @@ def test_native_pointer_invariants(codec, result_family, monkeypatch, corruption
         else:
             # Public pointers are const; mutate the owned allocation to simulate a broken decoder.
             ctype = (
-                "HIL_Application_Captured_Record_T" if result_family
+                "HIL_Application_Captured_Record_T"
+                if result_family
                 else "HIL_Application_Logical_Operation_T"
             )
             record = ffi.cast(f"{ctype} *", args[4])[0]
@@ -391,8 +409,12 @@ def test_message_representation(result_family):
     assert len(getattr(replace(value, **{field: entries * 255}), field)) == 255
     with pytest.raises(ValueError):
         replace(value, **{field: entries * 256})
-    for name, invalid in [("flags", -1), ("flags", 256), ("tick_number", -1),
-                          ("tick_number", 1 << 32)]:
+    for name, invalid in [
+        ("flags", -1),
+        ("flags", 256),
+        ("tick_number", -1),
+        ("tick_number", 1 << 32),
+    ]:
         with pytest.raises(ValueError):
             replace(value, **{name: invalid})
     with pytest.raises(TypeError):

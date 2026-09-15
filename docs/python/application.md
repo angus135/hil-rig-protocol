@@ -316,8 +316,14 @@ record names a `PeripheralType`, a logical channel, and immutable `bytes`.
 
 ```python
 from hil_rig_protocol import (
-    ApplicationCodec, ApplicationConfig, CapturedRecord, LogicalOperation,
-    PeripheralType, TestId, UpdateInstruction, VariableTestResult,
+    ApplicationCodec,
+    ApplicationConfig,
+    CapturedRecord,
+    LogicalOperation,
+    PeripheralType,
+    TestId,
+    UpdateInstruction,
+    VariableTestResult,
 )
 
 codec = ApplicationCodec(ApplicationConfig())
