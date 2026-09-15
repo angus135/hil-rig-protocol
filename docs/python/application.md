@@ -2,8 +2,8 @@
 
 `ApplicationCodec` encodes and decodes complete BASIC System Information,
 Execution Control, Global Control, Test Configuration, fixed Digital, Analog
-and PWM Test Instruction and Test Result messages, Application Responses, and
-Application Errors. All wire
+and PWM Test Instruction and Test Result messages, sparse Update Instruction and
+Variable Test Result messages, Application Responses, and Application Errors. All wire
 encoding, decoding and protocol validation execute the shared native C Application
 implementation. Import the supported API from `hil_rig_protocol`; CFFI objects and
 conversion helpers are private.
@@ -308,10 +308,73 @@ hardware and shows all three messages plus these explicit Transport calls. See
 the [Transport servicing example](../../examples/python/transport_servicing.py)
 for caller-owned byte-stream servicing.
 
+## Sparse updates and variable results
+
+`UpdateInstruction` (type 21) carries a tuple of `LogicalOperation` values.
+`VariableTestResult` (type 34) carries a tuple of `CapturedRecord` values. Each
+record names a `PeripheralType`, a logical channel, and immutable `bytes`.
+
+```python
+from hil_rig_protocol import (
+    ApplicationCodec, ApplicationConfig, CapturedRecord, LogicalOperation,
+    PeripheralType, TestId, UpdateInstruction, VariableTestResult,
+)
+
+codec = ApplicationCodec(ApplicationConfig())
+test_id = TestId(bytes(range(16)))  # Example only; allocate a fresh ID per real test.
+update = UpdateInstruction(
+    test_id=test_id,
+    tick_number=10,
+    operations=(
+        LogicalOperation(PeripheralType.DIGITAL_OUTPUT, 0, b"\x05\x00"),
+        LogicalOperation(PeripheralType.UART, 1, b"hello"),
+        LogicalOperation(PeripheralType.SPI, 0, b"\x02\x01\x02\x12\x34\x56"),
+    ),
+)
+assert codec.decode(codec.encode(update)) == update
+
+result = VariableTestResult(
+    test_id=test_id,
+    tick_number=10,
+    records=(CapturedRecord(PeripheralType.UART, 1, b"reply"),),
+)
+assert codec.decode(codec.encode(result)) == result
+```
+
+Flags `0` completes the tick; flags `1` means more chunks follow for that tick.
+The caller splits streams into payloads of at most 255 bytes and messages within
+the configured message size. The codec preserves flags and tick numbers; it does
+not split, accumulate, order, or execute chunks. Duplicate peripheral/channel
+pairs within one message are rejected by C.
+
+SPI update payloads contain a packet count, one nonzero size byte per packet,
+then the concatenated packet data. SPI result payloads are raw received bytes.
+The [wire specification](../application_layer/application_wire_format.md) defines
+digital, analogue, PWM and CAN payloads. Update operations must be nonempty;
+results may have no records, including pure fault reports. An `OK` result requires
+zero `problem_detail`.
+
+Python constructors check representation (exact enum types, unsigned integer
+widths, immutable byte spans and tuples). Peripheral rules and protocol semantics
+remain in C. Decoding allocates aligned storage for native record descriptors and
+payloads, checks their bounds and pointers, and returns detached Python values.
+Native storage can be larger than the encoded message.
+
+After binding changes, rebuild the native extension before running Python tests:
+
+```sh
+python -m pip install -e ".[test]"
+python -m pytest tests/python/test_application_update_instruction.py
+python -m pytest tests/python
+```
+
+The package build generates CFFI source and compiles it through CMake;
+`bindings/python/build_ffi.py` alone generates C source and does not build the extension.
+
 ## Deferred scope
 
-Variable-length instruction/result data and variable-data declarations are not
-supported. Response and Error remain outside the public Python subset. No test
+The separate legacy `VARIABLE_INSTRUCTION_DATA` and `VARIABLE_RESULT_DATA` message
+families remain unsupported. No test
 lifecycle, active-test state, role enforcement, tick sequencing,
 every-tick/state-change translation, hardware I/O or consuming
 Python API/MCU integration is provided. These require separate future work; no

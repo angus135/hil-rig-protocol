@@ -17,6 +17,7 @@ from .application_types import (
     ApplicationResponse,
     BusRole,
     CANConfig,
+    CapturedRecord,
     ControlCommand,
     DigitalInputConfig,
     DigitalInputValue,
@@ -29,6 +30,8 @@ from .application_types import (
     I2CConfig,
     I2CPullUp,
     I2CVoltage,
+    LogicalOperation,
+    PeripheralType,
     PeripheralVoltage,
     ProtocolVersion,
     PWMInputConfig,
@@ -57,10 +60,113 @@ from .application_types import (
     UARTParity,
     UARTStopBits,
     UARTWordLength,
+    UpdateInstruction,
+    VariableTestResult,
 )
 from .errors import ApplicationBindingError
 
 _T = TypeVar("_T")
+
+
+def _write_aligned_records(
+    values: tuple[Any, ...], ctype: str, span_name: str
+) -> tuple[Any, list[Any]]:
+    if not values:
+        return _binding.ffi.NULL, []
+    records = _binding.ffi.new(f"{ctype}[]", len(values))
+    owners = [records]
+    for value, record in zip(values, records, strict=True):
+        record.peripheral_type = value.peripheral_type
+        record.channel = value.channel
+        payload = getattr(value, span_name)
+        span = getattr(record, span_name)
+        span.size = len(payload)
+        if payload:
+            owner = _binding.ffi.new("uint8_t[]", payload)
+            span.data = owner
+            owners.append(owner)
+    return records, owners
+
+
+def _write_update_instruction(value: UpdateInstruction, native: Any) -> list[Any]:
+    native.tick_number = value.tick_number
+    native.flags = value.flags
+    native.operation_count = len(value.operations)
+    native.operations, owners = _write_aligned_records(
+        value.operations, "HIL_Application_Logical_Operation_T", "payload"
+    )
+    return owners
+
+
+def _write_variable_test_result(value: VariableTestResult, native: Any) -> list[Any]:
+    native.tick_number = value.tick_number
+    native.flags = value.flags
+    native.condition = value.condition
+    native.problem_detail = value.problem_detail
+    native.record_count = len(value.records)
+    native.records, owners = _write_aligned_records(
+        value.records, "HIL_Application_Captured_Record_T", "data"
+    )
+    return owners
+
+
+def _read_aligned_records(
+    records: Any, count: int, ctype: str, span_name: str, storage: Any, capacity: int
+) -> tuple[tuple[PeripheralType, int, bytes], ...]:
+    """Check descriptor and payload ownership before dereferencing native pointers."""
+    ffi = _binding.ffi
+    if count == 0:
+        if capacity != 0 or records != ffi.NULL:
+            raise ApplicationBindingError("native empty records disagree with decode storage")
+        return ()
+    alignment = int(_binding.lib.HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT)
+    offset = ((count * ffi.sizeof(ctype) + alignment - 1) // alignment) * alignment
+    if storage == ffi.NULL or ffi.cast("uint8_t *", records) != storage or offset > capacity:
+        raise ApplicationBindingError("native record array disagrees with decode storage")
+    result = []
+    for i in range(count):
+        record = records[i]
+        span = getattr(record, span_name)
+        size = int(span.size)
+        if size == 0 or offset + size > capacity or span.data != storage + offset:
+            raise ApplicationBindingError("native record span disagrees with decode storage")
+        result.append(
+            (PeripheralType(record.peripheral_type), int(record.channel),
+             bytes(ffi.buffer(span.data, size)))
+        )
+        offset += size
+    if offset != capacity:
+        raise ApplicationBindingError("native records do not fill decode storage")
+    return tuple(result)
+
+
+def _read_update_instruction(
+    test_id: TestId, native: Any, storage: Any, capacity: int
+) -> UpdateInstruction:
+    if native.operation_count == 0:
+        raise ApplicationBindingError("native update instruction has no operations")
+    records = _read_aligned_records(
+        native.operations, int(native.operation_count), "HIL_Application_Logical_Operation_T",
+        "payload", storage, capacity,
+    )
+    return UpdateInstruction(
+        test_id=test_id, tick_number=int(native.tick_number), flags=int(native.flags),
+        operations=tuple(LogicalOperation(*record) for record in records),
+    )
+
+
+def _read_variable_test_result(
+    test_id: TestId, native: Any, storage: Any, capacity: int
+) -> VariableTestResult:
+    records = _read_aligned_records(
+        native.records, int(native.record_count), "HIL_Application_Captured_Record_T",
+        "data", storage, capacity,
+    )
+    return VariableTestResult(
+        test_id=test_id, tick_number=int(native.tick_number), flags=int(native.flags),
+        condition=ResultCondition(native.condition), problem_detail=int(native.problem_detail),
+        records=tuple(CapturedRecord(*record) for record in records),
+    )
 
 
 def _write_record(value: Any, native: Any) -> None:
