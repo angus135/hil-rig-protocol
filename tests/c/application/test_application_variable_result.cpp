@@ -62,10 +62,10 @@ HIL_Application_Message_T
 WrapVariableTestResult( const HIL_Application_Variable_Test_Result_T& variable_result )
 {
     HIL_Application_Message_T message{};
-    message.type                     = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT;
-    message.subtype                  = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
-    message.has_test_id              = 1u;
-    message.test_id                  = TestId();
+    message.type                      = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT;
+    message.subtype                   = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    message.has_test_id               = 1u;
+    message.test_id                   = TestId();
     message.body.variable_test_result = variable_result;
     return message;
 }
@@ -74,10 +74,9 @@ std::vector<std::uint8_t>
 EncodeVariableTestResult( const HIL_Application_Context_T&              context,
                           const HIL_Application_Variable_Test_Result_T& variable_result )
 {
-    const auto  message = WrapVariableTestResult( variable_result );
-    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
-               HIL_APPLICATION_STATUS_OK );
-    std::size_t size    = 0u;
+    const auto message = WrapVariableTestResult( variable_result );
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
+    std::size_t size = 0u;
     EXPECT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &size ),
                HIL_APPLICATION_STATUS_OK );
     std::vector<std::uint8_t> encoded( size );
@@ -95,9 +94,8 @@ std::size_t CalculateExpectedStorage( std::size_t record_count, std::size_t tota
     {
         return 0u;
     }
-    const std::size_t struct_bytes =
-        record_count * sizeof( HIL_Application_Captured_Record_T );
-    const std::size_t align_mask = HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT - 1u;
+    const std::size_t struct_bytes = record_count * sizeof( HIL_Application_Captured_Record_T );
+    const std::size_t align_mask   = HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT - 1u;
     const std::size_t aligned_struct_bytes = ( struct_bytes + align_mask ) & ~align_mask;
     return aligned_struct_bytes + total_payload_bytes;
 }
@@ -134,30 +132,29 @@ void ExpectVariableTestResultEqual( const HIL_Application_Variable_Test_Result_T
 void ExpectRoundTrip( const HIL_Application_Context_T&              context,
                       const HIL_Application_Variable_Test_Result_T& res )
 {
-    const auto           first = EncodeVariableTestResult( context, res );
-    AlignedDecodeStorage storage{};
+    const auto                first = EncodeVariableTestResult( context, res );
+    AlignedDecodeStorage      storage{};
     HIL_Application_Message_T decoded{};
     std::size_t               required = 99u;
     ASSERT_EQ(
         HIL_APPLICATION_Decode_Storage_Size( &context, first.data(), first.size(), &required ),
         HIL_APPLICATION_STATUS_OK );
     std::size_t used = 99u;
-    ASSERT_EQ( HIL_APPLICATION_Decode_Message(
-                   &context, first.data(), first.size(), &decoded,
-                   required == 0u ? nullptr : storage.bytes.data(),
-                   required == 0u ? 0u : storage.bytes.size(), &used ),
+    ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, first.data(), first.size(), &decoded,
+                                               required == 0u ? nullptr : storage.bytes.data(),
+                                               required == 0u ? 0u : storage.bytes.size(), &used ),
                HIL_APPLICATION_STATUS_OK );
     ASSERT_EQ( used, required );
     std::size_t validated_storage = 99u;
-    ASSERT_EQ( HIL_APPLICATION_Validate_Encoded_Message(
-                   &context, first.data(), first.size(), &validated_storage ),
+    ASSERT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &context, first.data(), first.size(),
+                                                         &validated_storage ),
                HIL_APPLICATION_STATUS_OK );
     EXPECT_EQ( validated_storage, required );
     EXPECT_EQ( decoded.has_test_id, 1u );
     EXPECT_EQ( decoded.subtype, HIL_APPLICATION_MESSAGE_SUBTYPE_NONE );
     const auto expected_id = TestId();
     EXPECT_TRUE( std::equal( std::begin( expected_id.bytes ), std::end( expected_id.bytes ),
-                            std::begin( decoded.test_id.bytes ) ) );
+                             std::begin( decoded.test_id.bytes ) ) );
     ASSERT_EQ( decoded.type, HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT );
     ExpectVariableTestResultEqual( res, decoded.body.variable_test_result );
     const auto second = EncodeVariableTestResult( context, decoded.body.variable_test_result );
@@ -183,12 +180,14 @@ void ExpectDecodeFailure( const HIL_Application_Context_T& context,
                           HIL_Application_Status_T         expected_status )
 {
     std::size_t required = 99u;
-    EXPECT_EQ( HIL_APPLICATION_Decode_Storage_Size( &context, bytes.data(), bytes.size(), &required ),
-               expected_status );
+    EXPECT_EQ(
+        HIL_APPLICATION_Decode_Storage_Size( &context, bytes.data(), bytes.size(), &required ),
+        expected_status );
     EXPECT_EQ( required, 0u );
     required = 99u;
-    EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &context, bytes.data(), bytes.size(), &required ),
-               expected_status );
+    EXPECT_EQ(
+        HIL_APPLICATION_Validate_Encoded_Message( &context, bytes.data(), bytes.size(), &required ),
+        expected_status );
     EXPECT_EQ( required, 0u );
     HIL_Application_Message_T decoded{};
     decoded.type = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
@@ -229,22 +228,23 @@ TEST( ApplicationVariableResultGolden, EmptyResultZeroRecordsMatchesLiteralWireL
     {
         EXPECT_EQ( encoded[3u + i], test_id.bytes[i] );
     }
-    EXPECT_EQ( encoded[19], static_cast<std::uint8_t>( HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT ) );
+    EXPECT_EQ( encoded[19],
+               static_cast<std::uint8_t>( HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT ) );
     EXPECT_EQ( encoded[20], static_cast<std::uint8_t>( HIL_APPLICATION_MESSAGE_SUBTYPE_NONE ) );
     EXPECT_EQ( encoded[21], 12u ); /* payload_length LE u16 */
     EXPECT_EQ( encoded[22], 0u );
 
     /* Payload header fields */
     const std::size_t p = kPayloadOffset;
-    EXPECT_EQ( encoded[p + 0u], 10u );  /* tick_number LE u32 */
+    EXPECT_EQ( encoded[p + 0u], 10u ); /* tick_number LE u32 */
     EXPECT_EQ( encoded[p + 1u], 0u );
     EXPECT_EQ( encoded[p + 2u], 0u );
     EXPECT_EQ( encoded[p + 3u], 0u );
-    EXPECT_EQ( encoded[p + 4u], 0u );   /* record_count */
+    EXPECT_EQ( encoded[p + 4u], 0u ); /* record_count */
     EXPECT_EQ( encoded[p + 5u], static_cast<std::uint8_t>( HIL_APPLICATION_RESULT_CONDITION_OK ) );
-    EXPECT_EQ( encoded[p + 6u], 0u );   /* flags */
-    EXPECT_EQ( encoded[p + 7u], 0u );   /* reserved */
-    EXPECT_EQ( encoded[p + 8u], 0u );   /* problem_detail LE u32 */
+    EXPECT_EQ( encoded[p + 6u], 0u ); /* flags */
+    EXPECT_EQ( encoded[p + 7u], 0u ); /* reserved */
+    EXPECT_EQ( encoded[p + 8u], 0u ); /* problem_detail LE u32 */
     EXPECT_EQ( encoded[p + 9u], 0u );
     EXPECT_EQ( encoded[p + 10u], 0u );
     EXPECT_EQ( encoded[p + 11u], 0u );
@@ -270,7 +270,8 @@ TEST( ApplicationVariableResultGolden, FaultReportZeroRecordsMatchesLiteralWireL
     const std::size_t p = kPayloadOffset;
     EXPECT_EQ( encoded[p + 0u], 55u );
     EXPECT_EQ( encoded[p + 4u], 0u );
-    EXPECT_EQ( encoded[p + 5u], static_cast<std::uint8_t>( HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM ) );
+    EXPECT_EQ( encoded[p + 5u],
+               static_cast<std::uint8_t>( HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM ) );
     EXPECT_EQ( encoded[p + 6u], 0u );
     EXPECT_EQ( encoded[p + 7u], 0u );
     EXPECT_EQ( encoded[p + 8u], 0xefu );
@@ -300,8 +301,7 @@ TEST( ApplicationVariableResultGolden, RepresentativeMultiRecordMatchesLiteralWi
     /* 5. CAN (ch 1): 24 bytes (2 CAN frames), 0 pad */
     const std::array<std::uint8_t, 24u> can = {
         0x50u, 0x00u, 2u, 0x11u, 0x22u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
-        0x00u, 0x01u, 8u, 0xaau, 0xbbu, 0xccu, 0xddu, 0xeeu, 0xffu, 0x12u, 0x34u, 0x00u
-    };
+        0x00u, 0x01u, 8u, 0xaau, 0xbbu, 0xccu, 0xddu, 0xeeu, 0xffu, 0x12u, 0x34u, 0x00u };
 
     std::array<HIL_Application_Captured_Record_T, 5u> recs{};
     recs[0].peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
@@ -340,9 +340,9 @@ TEST( ApplicationVariableResultGolden, RepresentativeMultiRecordMatchesLiteralWi
 
     std::vector<std::uint8_t> golden( kExpectedTotalSize, 0u );
     /* Envelope */
-    golden[0] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MAJOR );
-    golden[1] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MINOR );
-    golden[2] = 1u;
+    golden[0]          = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MAJOR );
+    golden[1]          = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MINOR );
+    golden[2]          = 1u;
     const auto test_id = TestId();
     std::copy( std::begin( test_id.bytes ), std::end( test_id.bytes ), golden.begin() + 3 );
     golden[19] = static_cast<std::uint8_t>( HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT );
@@ -359,7 +359,7 @@ TEST( ApplicationVariableResultGolden, RepresentativeMultiRecordMatchesLiteralWi
     PutU32Le( golden, p + 8u, 0x00004321u );
 
     /* Rec 0 (Digital) */
-    std::size_t cur = p + 12u;
+    std::size_t cur  = p + 12u;
     golden[cur + 0u] = static_cast<std::uint8_t>( HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT );
     golden[cur + 1u] = 0u;
     PutU16Le( golden, cur + 2u, 2u );
@@ -373,7 +373,8 @@ TEST( ApplicationVariableResultGolden, RepresentativeMultiRecordMatchesLiteralWi
     golden[cur + 0u] = static_cast<std::uint8_t>( HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT );
     golden[cur + 1u] = 1u;
     PutU16Le( golden, cur + 2u, 4u );
-    std::copy( analog.begin(), analog.end(), golden.begin() + static_cast<std::ptrdiff_t>( cur + 4u ) );
+    std::copy( analog.begin(), analog.end(),
+               golden.begin() + static_cast<std::ptrdiff_t>( cur + 4u ) );
 
     /* Rec 2 (PWM) */
     cur += 8u;
@@ -477,8 +478,7 @@ TEST( ApplicationVariableResultValidation, ExecutionProblemAllowsNonZeroProblemD
     res.records        = nullptr;
 
     const auto message = WrapVariableTestResult( res );
-    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
-               HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
 }
 
 TEST( ApplicationVariableResultValidation, PartialConditionAllowsNonZeroProblemDetail )
@@ -493,8 +493,7 @@ TEST( ApplicationVariableResultValidation, PartialConditionAllowsNonZeroProblemD
     res.records        = nullptr;
 
     const auto message = WrapVariableTestResult( res );
-    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
-               HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
 }
 
 TEST( ApplicationVariableResultValidation, InvalidConditionRejected )
@@ -539,7 +538,7 @@ TEST( ApplicationVariableResultValidation, OutputPeripheralsRejectedInResult )
     const auto context = MakeContext();
 
     const std::array<std::uint8_t, 2u> digital = { 0x01u, 0x00u };
-    HIL_Application_Captured_Record_T rec{};
+    HIL_Application_Captured_Record_T  rec{};
     rec.peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT; /* output not permitted */
     rec.channel         = 0u;
     rec.data            = { digital.data(), static_cast<std::uint8_t>( digital.size() ) };
@@ -563,13 +562,13 @@ TEST( ApplicationVariableResultValidation, EnvelopeRequiresTestIdAndSubtypeNone 
     res.record_count = 0u;
 
     /* Missing test_id */
-    auto message = WrapVariableTestResult( res );
+    auto message        = WrapVariableTestResult( res );
     message.has_test_id = 0u;
     EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
                HIL_APPLICATION_STATUS_INCONSISTENT_TEST_ID );
 
     /* Subtype not NONE */
-    message = WrapVariableTestResult( res );
+    message         = WrapVariableTestResult( res );
     message.subtype = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
     EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
                HIL_APPLICATION_STATUS_INVALID_SUBTYPE );
@@ -605,7 +604,8 @@ TEST( ApplicationVariableResultDecode, TrailingBytesWhenRecordCountZeroRejected 
 
     /* Append unexpected byte to payload */
     wire.push_back( 0x00u );
-    PutU16Le( wire, kPayloadLengthOffset, static_cast<std::uint16_t>( wire.size() - kPayloadOffset ) );
+    PutU16Le( wire, kPayloadLengthOffset,
+              static_cast<std::uint16_t>( wire.size() - kPayloadOffset ) );
 
     ExpectDecodeFailure( context, wire, HIL_APPLICATION_STATUS_MALFORMED_MESSAGE );
 }
@@ -615,7 +615,7 @@ TEST( ApplicationVariableResultDecode, NonZeroPaddingBytesRejected )
     const auto context = MakeContext();
 
     const std::array<std::uint8_t, 2u> digital = { 0x01u, 0x00u };
-    HIL_Application_Captured_Record_T rec{};
+    HIL_Application_Captured_Record_T  rec{};
     rec.peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
     rec.channel         = 0u;
     rec.data            = { digital.data(), static_cast<std::uint8_t>( digital.size() ) };
@@ -639,7 +639,7 @@ TEST( ApplicationVariableResultDecode, StorageBufferTooSmallRejected )
     const auto context = MakeContext();
 
     const std::array<std::uint8_t, 2u> digital = { 0x01u, 0x00u };
-    HIL_Application_Captured_Record_T rec{};
+    HIL_Application_Captured_Record_T  rec{};
     rec.peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT;
     rec.channel         = 0u;
     rec.data            = { digital.data(), static_cast<std::uint8_t>( digital.size() ) };
@@ -652,9 +652,9 @@ TEST( ApplicationVariableResultDecode, StorageBufferTooSmallRejected )
 
     const auto wire = EncodeVariableTestResult( context, res );
 
-    AlignedDecodeStorage storage{};
+    AlignedDecodeStorage      storage{};
     HIL_Application_Message_T decoded{};
-    std::size_t used = 0u;
+    std::size_t               used = 0u;
 
     std::size_t req = 0u;
     ASSERT_EQ( HIL_APPLICATION_Decode_Storage_Size( &context, wire.data(), wire.size(), &req ),

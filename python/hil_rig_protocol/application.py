@@ -19,6 +19,8 @@ from ._application_conversion import (
     _read_test_configuration,
     _read_test_instruction,
     _read_test_result,
+    _read_update_instruction,
+    _read_variable_test_result,
     _write_error,
     _write_execution_control,
     _write_global_control,
@@ -28,6 +30,8 @@ from ._application_conversion import (
     _write_test_configuration,
     _write_test_instruction,
     _write_test_result,
+    _write_update_instruction,
+    _write_variable_test_result,
 )
 from .application_types import (
     PROTOCOL_VERSION,
@@ -45,6 +49,8 @@ from .application_types import (
     TestId,
     TestInstruction,
     TestResult,
+    UpdateInstruction,
+    VariableTestResult,
 )
 from .errors import (
     ApplicationBindingError,
@@ -174,6 +180,18 @@ def _build_message(message: ApplicationMessage) -> tuple[Any, list[Any]]:
         native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
         native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT
         owners = _write_test_result(message, native.body.test_result)
+    elif type(message) is UpdateInstruction:
+        native.has_test_id = 1
+        native.test_id.bytes[0:16] = message.test_id.bytes
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
+        native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION
+        owners = _write_update_instruction(message, native.body.update_instruction)
+    elif type(message) is VariableTestResult:
+        native.has_test_id = 1
+        native.test_id.bytes[0:16] = message.test_id.bytes
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
+        native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT
+        owners = _write_variable_test_result(message, native.body.variable_test_result)
     elif type(message) is ApplicationResponse:
         native.has_test_id = int(message.test_id is not None)
         if message.test_id is not None:
@@ -230,6 +248,8 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
         lib.HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL,
         lib.HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL,
         lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT,
         lib.HIL_APPLICATION_MESSAGE_TYPE_RESPONSE,
         lib.HIL_APPLICATION_MESSAGE_TYPE_ERROR,
     )
@@ -301,14 +321,19 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
     if native.has_test_id != 1 or native.subtype != lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE:
         raise ApplicationBindingError("native decoder returned an inconsistent message envelope")
     test_id = TestId(bytes(_binding.ffi.buffer(native.test_id.bytes, 16)))
+    if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
+        return _read_update_instruction(test_id, native.body.update_instruction, storage, capacity)
+    if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT:
+        return _read_variable_test_result(
+            test_id, native.body.variable_test_result, storage, capacity
+        )
     if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
         if capacity != 0:
             raise ApplicationBindingError("native fixed message unexpectedly used decode storage")
         return _read_execution_control(test_id, native.body.execution_control)
     if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
         span = native.body.test_configuration.extension_data
-        # Check ownership before dereferencing any native pointer. Configuration
-        # extensions are the only decode-storage users in the supported subset.
+        # Check ownership before dereferencing any native pointer.
         if span.size != capacity or span.data != storage:
             raise ApplicationBindingError("native extension span disagrees with decode storage")
         return _read_test_configuration(test_id, native.body.test_configuration)
@@ -366,6 +391,8 @@ class ApplicationCodec:
             ExecutionControl,
             GlobalControl,
             TestResult,
+            UpdateInstruction,
+            VariableTestResult,
             ApplicationResponse,
             ApplicationErrorMessage,
         ):
@@ -412,7 +439,17 @@ class ApplicationCodec:
                 "decode-storage query",
             )
             capacity = int(required[0])
-            if capacity > len(snapshot):
+            storage_limit = len(snapshot)
+            if len(snapshot) >= 31 and snapshot[19] in (21, 34):
+                # TLV descriptors expand into native structs, so storage may exceed wire size.
+                ctype = (
+                    "HIL_Application_Logical_Operation_T" if snapshot[19] == 21
+                    else "HIL_Application_Captured_Record_T"
+                )
+                alignment = int(_binding.lib.HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT)
+                descriptor_bytes = snapshot[27] * _binding.ffi.sizeof(ctype)
+                storage_limit += ((descriptor_bytes + alignment - 1) // alignment) * alignment
+            if capacity > storage_limit:
                 raise ApplicationBindingError(
                     "native decode-storage query returned an impossible size"
                 )
