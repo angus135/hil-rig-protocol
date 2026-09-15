@@ -74,10 +74,9 @@ std::vector<std::uint8_t>
 EncodeUpdateInstruction( const HIL_Application_Context_T&            context,
                          const HIL_Application_Update_Instruction_T& update_instruction )
 {
-    const auto  message = WrapUpdateInstruction( update_instruction );
-    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
-               HIL_APPLICATION_STATUS_OK );
-    std::size_t size    = 0u;
+    const auto message = WrapUpdateInstruction( update_instruction );
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
+    std::size_t size = 0u;
     EXPECT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &size ),
                HIL_APPLICATION_STATUS_OK );
     std::vector<std::uint8_t> encoded( size );
@@ -93,7 +92,7 @@ std::size_t CalculateExpectedStorage( std::size_t operation_count, std::size_t t
 {
     const std::size_t struct_bytes =
         operation_count * sizeof( HIL_Application_Logical_Operation_T );
-    const std::size_t align_mask = HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT - 1u;
+    const std::size_t align_mask           = HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT - 1u;
     const std::size_t aligned_struct_bytes = ( struct_bytes + align_mask ) & ~align_mask;
     return aligned_struct_bytes + total_payload_bytes;
 }
@@ -110,7 +109,8 @@ void ExpectUpdateInstructionEqual( const HIL_Application_Update_Instruction_T& e
         ASSERT_NE( expected.operations, nullptr );
         for ( std::size_t i = 0u; i < expected.operation_count; ++i )
         {
-            EXPECT_EQ( actual.operations[i].peripheral_type, expected.operations[i].peripheral_type );
+            EXPECT_EQ( actual.operations[i].peripheral_type,
+                       expected.operations[i].peripheral_type );
             EXPECT_EQ( actual.operations[i].channel, expected.operations[i].channel );
             ASSERT_EQ( actual.operations[i].payload.size, expected.operations[i].payload.size );
             for ( std::size_t j = 0u; j < expected.operations[i].payload.size; ++j )
@@ -125,8 +125,8 @@ void ExpectUpdateInstructionEqual( const HIL_Application_Update_Instruction_T& e
 void ExpectRoundTrip( const HIL_Application_Context_T&            context,
                       const HIL_Application_Update_Instruction_T& inst )
 {
-    const auto           first = EncodeUpdateInstruction( context, inst );
-    AlignedDecodeStorage storage{};
+    const auto                first = EncodeUpdateInstruction( context, inst );
+    AlignedDecodeStorage      storage{};
     HIL_Application_Message_T decoded{};
     std::size_t               required = 99u;
     ASSERT_EQ(
@@ -139,15 +139,15 @@ void ExpectRoundTrip( const HIL_Application_Context_T&            context,
                HIL_APPLICATION_STATUS_OK );
     ASSERT_EQ( used, required );
     std::size_t validated_storage = 99u;
-    ASSERT_EQ( HIL_APPLICATION_Validate_Encoded_Message(
-                   &context, first.data(), first.size(), &validated_storage ),
+    ASSERT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &context, first.data(), first.size(),
+                                                         &validated_storage ),
                HIL_APPLICATION_STATUS_OK );
     EXPECT_EQ( validated_storage, required );
     EXPECT_EQ( decoded.has_test_id, 1u );
     EXPECT_EQ( decoded.subtype, HIL_APPLICATION_MESSAGE_SUBTYPE_NONE );
     const auto expected_id = TestId();
     EXPECT_TRUE( std::equal( std::begin( expected_id.bytes ), std::end( expected_id.bytes ),
-                            std::begin( decoded.test_id.bytes ) ) );
+                             std::begin( decoded.test_id.bytes ) ) );
     ASSERT_EQ( decoded.type, HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION );
     ExpectUpdateInstructionEqual( inst, decoded.body.update_instruction );
     const auto second = EncodeUpdateInstruction( context, decoded.body.update_instruction );
@@ -173,12 +173,14 @@ void ExpectDecodeFailure( const HIL_Application_Context_T& context,
                           HIL_Application_Status_T         expected_status )
 {
     std::size_t required = 99u;
-    EXPECT_EQ( HIL_APPLICATION_Decode_Storage_Size( &context, bytes.data(), bytes.size(), &required ),
-               expected_status );
+    EXPECT_EQ(
+        HIL_APPLICATION_Decode_Storage_Size( &context, bytes.data(), bytes.size(), &required ),
+        expected_status );
     EXPECT_EQ( required, 0u );
     required = 99u;
-    EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &context, bytes.data(), bytes.size(), &required ),
-               expected_status );
+    EXPECT_EQ(
+        HIL_APPLICATION_Validate_Encoded_Message( &context, bytes.data(), bytes.size(), &required ),
+        expected_status );
     EXPECT_EQ( required, 0u );
     HIL_Application_Message_T decoded{};
     decoded.type = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
@@ -197,7 +199,7 @@ TEST( ApplicationUpdateInstructionGolden, SingleOperationDigitalMatchesLiteralWi
 {
     const auto context = MakeContext();
 
-    const std::array<std::uint8_t, 2u> digital_payload = { 0x05u, 0x00u };  /* bits 0 and 2 set */
+    const std::array<std::uint8_t, 2u>  digital_payload = { 0x05u, 0x00u }; /* bits 0 and 2 set */
     HIL_Application_Logical_Operation_T op{};
     op.peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
     op.channel         = 0u;
@@ -212,7 +214,8 @@ TEST( ApplicationUpdateInstructionGolden, SingleOperationDigitalMatchesLiteralWi
 
     const auto encoded = EncodeUpdateInstruction( context, inst );
 
-    /* Sizing check: envelope 23 + update header 8 + record (4 header + 2 payload + 2 pad = 8) = 39 bytes */
+    /* Sizing check: envelope 23 + update header 8 + record (4 header + 2 payload + 2 pad = 8) = 39
+     * bytes */
     ASSERT_EQ( encoded.size(), kHeaderSize + kUpdateHeaderSize + 8u );
 
     /* Envelope fields */
@@ -224,27 +227,29 @@ TEST( ApplicationUpdateInstructionGolden, SingleOperationDigitalMatchesLiteralWi
     {
         EXPECT_EQ( encoded[3u + i], test_id.bytes[i] );
     }
-    EXPECT_EQ( encoded[19], static_cast<std::uint8_t>( HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION ) );
+    EXPECT_EQ( encoded[19],
+               static_cast<std::uint8_t>( HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION ) );
     EXPECT_EQ( encoded[20], static_cast<std::uint8_t>( HIL_APPLICATION_MESSAGE_SUBTYPE_NONE ) );
     EXPECT_EQ( encoded[21], 16u ); /* 8 header + 8 record */
     EXPECT_EQ( encoded[22], 0u );
 
     /* Payload header fields */
     const std::size_t p = kPayloadOffset;
-    EXPECT_EQ( encoded[p + 0u], 42u );   /* tick_number LE u32 */
+    EXPECT_EQ( encoded[p + 0u], 42u ); /* tick_number LE u32 */
     EXPECT_EQ( encoded[p + 1u], 0u );
     EXPECT_EQ( encoded[p + 2u], 0u );
     EXPECT_EQ( encoded[p + 3u], 0u );
-    EXPECT_EQ( encoded[p + 4u], 1u );    /* operation_count */
-    EXPECT_EQ( encoded[p + 5u], 0u );    /* flags */
-    EXPECT_EQ( encoded[p + 6u], 0u );    /* reserved u16 */
+    EXPECT_EQ( encoded[p + 4u], 1u ); /* operation_count */
+    EXPECT_EQ( encoded[p + 5u], 0u ); /* flags */
+    EXPECT_EQ( encoded[p + 6u], 0u ); /* reserved u16 */
     EXPECT_EQ( encoded[p + 7u], 0u );
 
     /* TLV record fields */
     const std::size_t r = p + kUpdateHeaderSize;
-    EXPECT_EQ( encoded[r + 0u], static_cast<std::uint8_t>( HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT ) );
-    EXPECT_EQ( encoded[r + 1u], 0u );    /* channel */
-    EXPECT_EQ( encoded[r + 2u], 2u );    /* payload_length LE u16 */
+    EXPECT_EQ( encoded[r + 0u],
+               static_cast<std::uint8_t>( HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT ) );
+    EXPECT_EQ( encoded[r + 1u], 0u ); /* channel */
+    EXPECT_EQ( encoded[r + 2u], 2u ); /* payload_length LE u16 */
     EXPECT_EQ( encoded[r + 3u], 0u );
     EXPECT_EQ( encoded[r + 4u], 0x05u ); /* payload data */
     EXPECT_EQ( encoded[r + 5u], 0x00u );
@@ -274,9 +279,8 @@ TEST( ApplicationUpdateInstructionGolden, RepresentativeMultiPeripheralMatchesLi
     const std::array<std::uint8_t, 8u> spi = { 2u, 2u, 3u, 0x11u, 0x22u, 0x33u, 0x44u, 0x55u };
 
     /* 6. CAN (ch 0): 12 bytes CAN frame: id 0x123, dlc 4, 8 data bytes, reserved 0, 0 pad */
-    const std::array<std::uint8_t, 12u> can = {
-        0x23u, 0x01u, 4u, 0xdeu, 0xadu, 0xbeu, 0xefu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u
-    };
+    const std::array<std::uint8_t, 12u> can = { 0x23u, 0x01u, 4u,    0xdeu, 0xadu, 0xbeu,
+                                                0xefu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u };
 
     std::array<HIL_Application_Logical_Operation_T, 6u> ops{};
     ops[0].peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
@@ -317,9 +321,9 @@ TEST( ApplicationUpdateInstructionGolden, RepresentativeMultiPeripheralMatchesLi
 
     std::vector<std::uint8_t> golden( kExpectedTotalSize, 0u );
     /* Envelope */
-    golden[0] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MAJOR );
-    golden[1] = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MINOR );
-    golden[2] = 1u;
+    golden[0]          = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MAJOR );
+    golden[1]          = static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MINOR );
+    golden[2]          = 1u;
     const auto test_id = TestId();
     std::copy( std::begin( test_id.bytes ), std::end( test_id.bytes ), golden.begin() + 3 );
     golden[19] = static_cast<std::uint8_t>( HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION );
@@ -335,7 +339,7 @@ TEST( ApplicationUpdateInstructionGolden, RepresentativeMultiPeripheralMatchesLi
     golden[p + 7u] = 0u;
 
     /* Op 0 (Digital) */
-    std::size_t cur = p + 8u;
+    std::size_t cur  = p + 8u;
     golden[cur + 0u] = static_cast<std::uint8_t>( HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT );
     golden[cur + 1u] = 0u;
     PutU16Le( golden, cur + 2u, 2u );
@@ -349,7 +353,8 @@ TEST( ApplicationUpdateInstructionGolden, RepresentativeMultiPeripheralMatchesLi
     golden[cur + 0u] = static_cast<std::uint8_t>( HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT );
     golden[cur + 1u] = 2u;
     PutU16Le( golden, cur + 2u, 4u );
-    std::copy( analog.begin(), analog.end(), golden.begin() + static_cast<std::ptrdiff_t>( cur + 4u ) );
+    std::copy( analog.begin(), analog.end(),
+               golden.begin() + static_cast<std::ptrdiff_t>( cur + 4u ) );
 
     /* Op 2 (PWM) */
     cur += 8u;
@@ -423,7 +428,7 @@ TEST( ApplicationUpdateInstructionValidation, TickNumberWithinBounds )
 {
     const auto context = MakeContext( HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE, 100u );
 
-    const std::array<std::uint8_t, 2u> digital = { 0x01u, 0x00u };
+    const std::array<std::uint8_t, 2u>  digital = { 0x01u, 0x00u };
     HIL_Application_Logical_Operation_T op{};
     op.peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
     op.channel         = 0u;
@@ -437,7 +442,7 @@ TEST( ApplicationUpdateInstructionValidation, TickNumberWithinBounds )
     /* Valid tick numbers */
     for ( const auto tick : { 0u, 99u } )
     {
-        inst.tick_number = tick;
+        inst.tick_number   = tick;
         const auto message = WrapUpdateInstruction( inst );
         EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
                    HIL_APPLICATION_STATUS_OK );
@@ -452,7 +457,7 @@ TEST( ApplicationUpdateInstructionValidation, StreamingFlagsWithinBounds )
 {
     const auto context = MakeContext();
 
-    const std::array<std::uint8_t, 2u> digital = { 0x01u, 0x00u };
+    const std::array<std::uint8_t, 2u>  digital = { 0x01u, 0x00u };
     HIL_Application_Logical_Operation_T op{};
     op.peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
     op.channel         = 0u;
@@ -464,15 +469,13 @@ TEST( ApplicationUpdateInstructionValidation, StreamingFlagsWithinBounds )
     inst.operations      = &op;
 
     /* Valid flags */
-    inst.flags = HIL_APPLICATION_INSTRUCTION_FLAG_COMPLETE_TICK;
+    inst.flags   = HIL_APPLICATION_INSTRUCTION_FLAG_COMPLETE_TICK;
     auto message = WrapUpdateInstruction( inst );
-    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
-               HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
 
     inst.flags = HIL_APPLICATION_INSTRUCTION_FLAG_HAS_MORE_CHUNKS;
-    message = WrapUpdateInstruction( inst );
-    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
-               HIL_APPLICATION_STATUS_OK );
+    message    = WrapUpdateInstruction( inst );
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
 
     /* Invalid flags */
     inst.flags = 0x02u;
@@ -525,7 +528,7 @@ TEST( ApplicationUpdateInstructionValidation, DigitalMaskReservedBitsEnforced )
     const auto context = MakeContext();
 
     /* Reserved bit 10 set (0x0400u) */
-    const std::array<std::uint8_t, 2u> bad_digital = { 0x00u, 0x04u };
+    const std::array<std::uint8_t, 2u>  bad_digital = { 0x00u, 0x04u };
     HIL_Application_Logical_Operation_T op{};
     op.peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
     op.channel         = 0u;
@@ -546,7 +549,7 @@ TEST( ApplicationUpdateInstructionValidation, PwmParametersValidated )
 
     /* 1. Duty > 10000 */
     {
-        const std::array<std::uint8_t, 6u> bad_duty = { 0x40u, 0x42u, 0x0fu, 0x00u, 0x11u, 0x27u };
+        const std::array<std::uint8_t, 6u>  bad_duty = { 0x40u, 0x42u, 0x0fu, 0x00u, 0x11u, 0x27u };
         HIL_Application_Logical_Operation_T op{};
         op.peripheral_type = HIL_APPLICATION_PERIPHERAL_PWM_OUTPUT;
         op.channel         = 0u;
@@ -563,11 +566,12 @@ TEST( ApplicationUpdateInstructionValidation, PwmParametersValidated )
 
     /* 2. Zero period with non-zero duty */
     {
-        const std::array<std::uint8_t, 6u> zero_period = { 0x00u, 0x00u, 0x00u, 0x00u, 0x88u, 0x13u };
+        const std::array<std::uint8_t, 6u>  zero_period = { 0x00u, 0x00u, 0x00u,
+                                                            0x00u, 0x88u, 0x13u };
         HIL_Application_Logical_Operation_T op{};
         op.peripheral_type = HIL_APPLICATION_PERIPHERAL_PWM_OUTPUT;
         op.channel         = 0u;
-        op.payload         = { zero_period.data(), static_cast<std::uint8_t>( zero_period.size() ) };
+        op.payload = { zero_period.data(), static_cast<std::uint8_t>( zero_period.size() ) };
 
         HIL_Application_Update_Instruction_T inst{};
         inst.tick_number     = 1u;
@@ -585,9 +589,8 @@ TEST( ApplicationUpdateInstructionValidation, CanFrameStructureValidated )
 
     /* 1. CAN ID > 0x7FF */
     {
-        const std::array<std::uint8_t, 12u> bad_id = {
-            0x00u, 0x08u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u
-        };
+        const std::array<std::uint8_t, 12u> bad_id = { 0x00u, 0x08u, 0u, 0u, 0u, 0u,
+                                                       0u,    0u,    0u, 0u, 0u, 0u };
         HIL_Application_Logical_Operation_T op{};
         op.peripheral_type = HIL_APPLICATION_PERIPHERAL_CAN;
         op.channel         = 0u;
@@ -604,9 +607,8 @@ TEST( ApplicationUpdateInstructionValidation, CanFrameStructureValidated )
 
     /* 2. CAN DLC > 8 */
     {
-        const std::array<std::uint8_t, 12u> bad_dlc = {
-            0x00u, 0x01u, 9u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u
-        };
+        const std::array<std::uint8_t, 12u> bad_dlc = { 0x00u, 0x01u, 9u, 0u, 0u, 0u,
+                                                        0u,    0u,    0u, 0u, 0u, 0u };
         HIL_Application_Logical_Operation_T op{};
         op.peripheral_type = HIL_APPLICATION_PERIPHERAL_CAN;
         op.channel         = 0u;
@@ -645,7 +647,7 @@ TEST( ApplicationUpdateInstructionValidation, SpiPacketStructureValidated )
 
     /* 1. Packet count zero */
     {
-        const std::array<std::uint8_t, 3u> bad_spi = { 0u, 1u, 0xaau };
+        const std::array<std::uint8_t, 3u>  bad_spi = { 0u, 1u, 0xaau };
         HIL_Application_Logical_Operation_T op{};
         op.peripheral_type = HIL_APPLICATION_PERIPHERAL_SPI;
         op.channel         = 0u;
@@ -662,7 +664,8 @@ TEST( ApplicationUpdateInstructionValidation, SpiPacketStructureValidated )
 
     /* 2. Sum of packet lengths mismatch */
     {
-        const std::array<std::uint8_t, 4u> bad_spi = { 1u, 5u, 0x11u, 0x22u }; /* advertised 5, only 2 data */
+        const std::array<std::uint8_t, 4u>  bad_spi = { 1u, 5u, 0x11u,
+                                                        0x22u }; /* advertised 5, only 2 data */
         HIL_Application_Logical_Operation_T op{};
         op.peripheral_type = HIL_APPLICATION_PERIPHERAL_SPI;
         op.channel         = 0u;
@@ -682,7 +685,7 @@ TEST( ApplicationUpdateInstructionValidation, InputPeripheralsRejectedInInstruct
 {
     const auto context = MakeContext();
 
-    const std::array<std::uint8_t, 2u> data = { 0x01u, 0x00u };
+    const std::array<std::uint8_t, 2u>  data = { 0x01u, 0x00u };
     HIL_Application_Logical_Operation_T op{};
     op.peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT; /* input not permitted */
     op.channel         = 0u;
@@ -701,7 +704,7 @@ TEST( ApplicationUpdateInstructionValidation, EnvelopeRequiresTestIdAndSubtypeNo
 {
     const auto context = MakeContext();
 
-    const std::array<std::uint8_t, 2u> digital = { 0x01u, 0x00u };
+    const std::array<std::uint8_t, 2u>  digital = { 0x01u, 0x00u };
     HIL_Application_Logical_Operation_T op{};
     op.peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
     op.channel         = 0u;
@@ -714,13 +717,13 @@ TEST( ApplicationUpdateInstructionValidation, EnvelopeRequiresTestIdAndSubtypeNo
     inst.operations      = &op;
 
     /* Missing test_id */
-    auto message = WrapUpdateInstruction( inst );
+    auto message        = WrapUpdateInstruction( inst );
     message.has_test_id = 0u;
     EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
                HIL_APPLICATION_STATUS_INCONSISTENT_TEST_ID );
 
     /* Subtype not NONE */
-    message = WrapUpdateInstruction( inst );
+    message         = WrapUpdateInstruction( inst );
     message.subtype = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
     EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
                HIL_APPLICATION_STATUS_INVALID_SUBTYPE );
@@ -730,7 +733,7 @@ TEST( ApplicationUpdateInstructionDecode, NonZeroReservedBytesRejected )
 {
     const auto context = MakeContext();
 
-    const std::array<std::uint8_t, 2u> digital = { 0x01u, 0x00u };
+    const std::array<std::uint8_t, 2u>  digital = { 0x01u, 0x00u };
     HIL_Application_Logical_Operation_T op{};
     op.peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
     op.channel         = 0u;
@@ -758,7 +761,7 @@ TEST( ApplicationUpdateInstructionDecode, NonZeroPaddingBytesRejected )
 {
     const auto context = MakeContext();
 
-    const std::array<std::uint8_t, 2u> digital = { 0x01u, 0x00u };
+    const std::array<std::uint8_t, 2u>  digital = { 0x01u, 0x00u };
     HIL_Application_Logical_Operation_T op{};
     op.peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
     op.channel         = 0u;
@@ -782,7 +785,7 @@ TEST( ApplicationUpdateInstructionDecode, StorageBufferTooSmallRejected )
 {
     const auto context = MakeContext();
 
-    const std::array<std::uint8_t, 2u> digital = { 0x01u, 0x00u };
+    const std::array<std::uint8_t, 2u>  digital = { 0x01u, 0x00u };
     HIL_Application_Logical_Operation_T op{};
     op.peripheral_type = HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT;
     op.channel         = 0u;
@@ -796,9 +799,9 @@ TEST( ApplicationUpdateInstructionDecode, StorageBufferTooSmallRejected )
 
     const auto wire = EncodeUpdateInstruction( context, inst );
 
-    AlignedDecodeStorage storage{};
+    AlignedDecodeStorage      storage{};
     HIL_Application_Message_T decoded{};
-    std::size_t used = 0u;
+    std::size_t               used = 0u;
 
     std::size_t req = 0u;
     ASSERT_EQ( HIL_APPLICATION_Decode_Storage_Size( &context, wire.data(), wire.size(), &req ),

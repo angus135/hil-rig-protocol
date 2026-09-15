@@ -3,8 +3,8 @@
 This release provides the complete caller-driven Transport facade, including
 validated configuration, native lifetime ownership, encoded I/O servicing,
 opaque Application data, events, and status snapshots. ApplicationCodec provides
-stateless native encoding/decoding for complete Test Configuration and fixed
-Digital, Analog and PWM Test Instruction/Result messages.
+stateless native encoding/decoding for complete Application messages, including
+fixed Test Instruction/Result and sparse Update Instruction/Variable Test Result.
 """
 
 from .application import ApplicationCodec, check_protocol_version
@@ -21,6 +21,7 @@ from .application_types import (
     ApplicationStatus,
     BusRole,
     CANConfig,
+    CapturedRecord,
     ControlCommand,
     DigitalInputConfig,
     DigitalInputValue,
@@ -33,6 +34,8 @@ from .application_types import (
     I2CConfig,
     I2CPullUp,
     I2CVoltage,
+    LogicalOperation,
+    PeripheralType,
     PeripheralVoltage,
     ProtocolVersion,
     PWMInputConfig,
@@ -61,6 +64,8 @@ from .application_types import (
     UARTParity,
     UARTStopBits,
     UARTWordLength,
+    UpdateInstruction,
+    VariableTestResult,
 )
 from .errors import (
     ApplicationBindingError,
@@ -96,6 +101,11 @@ from .transport_types import (
 )
 
 __all__ = [
+    "PeripheralType",
+    "LogicalOperation",
+    "CapturedRecord",
+    "UpdateInstruction",
+    "VariableTestResult",
     "ApplicationCodec",
     "check_protocol_version",
     "ApplicationStatus",

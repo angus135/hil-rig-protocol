@@ -13,6 +13,23 @@ _UINT32_MAX = (1 << 32) - 1
 _UINT16_MAX = (1 << 16) - 1
 
 
+class PeripheralType(IntEnum):
+    """Logical peripheral selectors; the C codec validates direction and support."""
+
+    INVALID = 0
+    DIGITAL_INPUT = 1
+    DIGITAL_OUTPUT = 2
+    ANALOG_INPUT = 3
+    ANALOG_OUTPUT = 4
+    PWM_INPUT = 5
+    PWM_OUTPUT = 6
+    UART = 16
+    SPI = 17
+    I2C = 18
+    CAN = 19
+    RESERVED = 255
+
+
 class ApplicationStatus(IntEnum):
     """Local status returned by the native Application facade."""
 
@@ -718,6 +735,79 @@ class TestResult:
 
 
 @dataclass(frozen=True, slots=True)
+class LogicalOperation:
+    """One update operation with immutable, peripheral-specific payload bytes."""
+
+    peripheral_type: PeripheralType
+    channel: int
+    payload: bytes
+
+    def __post_init__(self) -> None:
+        _exact("peripheral_type", self.peripheral_type, PeripheralType)
+        _validate_integer("channel", self.channel, 0, 255)
+        _bytes("payload", self.payload)
+
+
+@dataclass(frozen=True, slots=True)
+class CapturedRecord:
+    """One captured peripheral record with Python-owned data bytes."""
+
+    peripheral_type: PeripheralType
+    channel: int
+    data: bytes
+
+    def __post_init__(self) -> None:
+        _exact("peripheral_type", self.peripheral_type, PeripheralType)
+        _validate_integer("channel", self.channel, 0, 255)
+        _bytes("data", self.data)
+
+
+def _variable_records(name: str, value: object, element: type) -> None:
+    _exact(name, value, tuple)
+    assert isinstance(value, tuple)
+    if len(value) > 255:
+        raise ValueError(f"{name} must contain at most 255 elements")
+    for item in value:
+        _exact(name, item, element)
+
+
+@dataclass(frozen=True, slots=True)
+class UpdateInstruction:
+    """Sparse operations at a tick; flags 0 completes the tick, 1 signals more chunks."""
+
+    test_id: TestId
+    tick_number: int = 0
+    flags: int = 0
+    operations: tuple[LogicalOperation, ...] = ()
+
+    def __post_init__(self) -> None:
+        _exact("test_id", self.test_id, TestId)
+        _validate_integer("tick_number", self.tick_number, 0, _UINT32_MAX)
+        _validate_integer("flags", self.flags, 0, 255)
+        _variable_records("operations", self.operations, LogicalOperation)
+
+
+@dataclass(frozen=True, slots=True)
+class VariableTestResult:
+    """Captured records or an empty result/fault report; C validates result semantics."""
+
+    test_id: TestId
+    tick_number: int = 0
+    condition: ResultCondition = ResultCondition.OK
+    flags: int = 0
+    problem_detail: int = 0
+    records: tuple[CapturedRecord, ...] = ()
+
+    def __post_init__(self) -> None:
+        _exact("test_id", self.test_id, TestId)
+        _validate_integer("tick_number", self.tick_number, 0, _UINT32_MAX)
+        _exact("condition", self.condition, ResultCondition)
+        _validate_integer("flags", self.flags, 0, 255)
+        _validate_integer("problem_detail", self.problem_detail, 0, _UINT32_MAX)
+        _variable_records("records", self.records, CapturedRecord)
+
+
+@dataclass(frozen=True, slots=True)
 class ExecutionControl:
     """A START or ABORT request scoped to one required test identifier."""
 
@@ -795,15 +885,22 @@ type ApplicationMessage = (
     | SystemInfoResponse
     | TestConfiguration
     | TestInstruction
+    | UpdateInstruction
     | ExecutionControl
     | GlobalControl
     | TestResult
+    | VariableTestResult
     | ApplicationResponse
     | ApplicationErrorMessage
 )
 
 
 __all__ = [
+    "PeripheralType",
+    "LogicalOperation",
+    "CapturedRecord",
+    "UpdateInstruction",
+    "VariableTestResult",
     "ApplicationStatus",
     "ProtocolVersion",
     "PROTOCOL_VERSION",
