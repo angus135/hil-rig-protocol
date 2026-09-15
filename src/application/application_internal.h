@@ -50,6 +50,41 @@
 #define HIL_APPLICATION_ERROR_FIXED_PAYLOAD_SIZE 12u
 /** @} */
 
+/** @name Update Instruction payload header offsets and wire widths */
+/** @{ */
+#define HIL_APPLICATION_UPDATE_INSTRUCTION_TICK_OFFSET 0u
+#define HIL_APPLICATION_UPDATE_INSTRUCTION_COUNT_OFFSET 4u
+#define HIL_APPLICATION_UPDATE_INSTRUCTION_FLAGS_OFFSET 5u
+#define HIL_APPLICATION_UPDATE_INSTRUCTION_RESERVED_OFFSET 6u
+#define HIL_APPLICATION_UPDATE_INSTRUCTION_HEADER_SIZE 8u
+/** @} */
+
+/** @name Variable Test Result payload header offsets and wire widths */
+/** @{ */
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_TICK_OFFSET 0u
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_COUNT_OFFSET 4u
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_CONDITION_OFFSET 5u
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_FLAGS_OFFSET 6u
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_RESERVED_OFFSET 7u
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_PROBLEM_DETAIL_OFFSET 8u
+#define HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE 12u
+/** @} */
+
+/** @name Operation and captured record TLV wire widths */
+/** @{ */
+#define HIL_APPLICATION_RECORD_HEADER_SIZE 4u
+#define HIL_APPLICATION_OPERATION_RECORD_HEADER_SIZE HIL_APPLICATION_RECORD_HEADER_SIZE
+#define HIL_APPLICATION_CAPTURED_RECORD_HEADER_SIZE HIL_APPLICATION_RECORD_HEADER_SIZE
+/** @} */
+
+/** @name Variable record format constants */
+/** @{ */
+#define HIL_APPLICATION_DIGITAL_BANK_RESERVED_MASK ( 0xFC00u )
+#define HIL_APPLICATION_CAN_FRAME_WIRE_SIZE ( 12u )
+#define HIL_APPLICATION_CAN_MAX_STANDARD_ID ( 0x7FFu )
+#define HIL_APPLICATION_CAN_MAX_DLC ( 8u )
+/** @} */
+
 /** Fixed Test Instruction payload width derived from the published wire fields. */
 #define HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE                                        \
     ( HIL_APPLICATION_WIRE_U32_SIZE                                                                \
@@ -76,6 +111,12 @@ static_assert( HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE == 13u,
                "Application Response fixed payload wire width changed" );
 static_assert( HIL_APPLICATION_ERROR_FIXED_PAYLOAD_SIZE == 12u,
                "Application Error fixed payload wire width changed" );
+static_assert( HIL_APPLICATION_UPDATE_INSTRUCTION_HEADER_SIZE == 8u,
+               "Update Instruction payload header wire width changed" );
+static_assert( HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE == 12u,
+               "Variable Test Result payload header wire width changed" );
+static_assert( HIL_APPLICATION_RECORD_HEADER_SIZE == 4u, "Record header wire width changed" );
+static_assert( HIL_APPLICATION_CAN_FRAME_WIRE_SIZE == 12u, "CAN frame wire width changed" );
 #else
 _Static_assert( HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE == 50u,
                 "Test Instruction fixed payload wire width changed" );
@@ -85,6 +126,12 @@ _Static_assert( HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE == 13u,
                 "Application Response fixed payload wire width changed" );
 _Static_assert( HIL_APPLICATION_ERROR_FIXED_PAYLOAD_SIZE == 12u,
                 "Application Error fixed payload wire width changed" );
+_Static_assert( HIL_APPLICATION_UPDATE_INSTRUCTION_HEADER_SIZE == 8u,
+                "Update Instruction payload header wire width changed" );
+_Static_assert( HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE == 12u,
+                "Variable Test Result payload header wire width changed" );
+_Static_assert( HIL_APPLICATION_RECORD_HEADER_SIZE == 4u, "Record header wire width changed" );
+_Static_assert( HIL_APPLICATION_CAN_FRAME_WIRE_SIZE == 12u, "CAN frame wire width changed" );
 #endif
 
 /**
@@ -107,7 +154,7 @@ typedef struct
 } HIL_Application_Envelope_T;
 
 /** Maximum temporary decode storage required by a supported body. */
-#define HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE ( 2u * HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE )
+#define HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE ( 2048u )
 
 /** Checked size_t addition. Returns zero without writing result on overflow/error. */
 static inline int HIL_APPLICATION_Checked_Add_Size( size_t lhs, size_t rhs, size_t* result )
@@ -129,6 +176,22 @@ static inline int HIL_APPLICATION_Checked_Mul_Size( size_t lhs, size_t rhs, size
     }
     *result = lhs * rhs;
     return 1;
+}
+
+/** Checked align-up for a size_t value to a given alignment. Returns zero on overflow/error. */
+static inline int HIL_APPLICATION_Align_Up_Size( size_t value, size_t alignment, size_t* result )
+{
+    if ( result == NULL || alignment == 0u )
+    {
+        return 0;
+    }
+    const size_t remainder = value % alignment;
+    if ( remainder == 0u )
+    {
+        *result = value;
+        return 1;
+    }
+    return HIL_APPLICATION_Checked_Add_Size( value, alignment - remainder, result );
 }
 
 /** Checked conversion from local size_t length to the uint16_t payload-length wire field. */
@@ -153,6 +216,12 @@ static inline int HIL_APPLICATION_Enum_To_U8( int value, uint8_t* result )
     return 1;
 }
 
+/** Calculate pad bytes needed to align a size to a 4-byte boundary. */
+static inline size_t HIL_APPLICATION_Align4_Padding( size_t size )
+{
+    return ( 4u - ( size % 4u ) ) % 4u;
+}
+
 /** Write one little-endian uint16_t without relying on host byte order. */
 static inline void HIL_APPLICATION_Write_U16_Le( uint8_t* dst, uint16_t value )
 {
@@ -164,6 +233,22 @@ static inline void HIL_APPLICATION_Write_U16_Le( uint8_t* dst, uint16_t value )
 static inline uint16_t HIL_APPLICATION_Read_U16_Le( const uint8_t* src )
 {
     return ( uint16_t )( ( uint16_t )src[0] | ( uint16_t )( ( uint16_t )src[1] << 8 ) );
+}
+
+/** Write one little-endian uint32_t without relying on host byte order. */
+static inline void HIL_APPLICATION_Write_U32_Le( uint8_t* dst, uint32_t value )
+{
+    dst[0] = ( uint8_t )( value & 0xffu );
+    dst[1] = ( uint8_t )( ( value >> 8 ) & 0xffu );
+    dst[2] = ( uint8_t )( ( value >> 16 ) & 0xffu );
+    dst[3] = ( uint8_t )( ( value >> 24 ) & 0xffu );
+}
+
+/** Read one little-endian uint32_t without relying on host byte order. */
+static inline uint32_t HIL_APPLICATION_Read_U32_Le( const uint8_t* src )
+{
+    return ( ( uint32_t )src[0] ) | ( ( uint32_t )src[1] << 8 ) | ( ( uint32_t )src[2] << 16 )
+           | ( ( uint32_t )src[3] << 24 );
 }
 
 /** Encode only the fixed 23-byte common envelope; payload length is patched later by the façade. */

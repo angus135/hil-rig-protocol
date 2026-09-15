@@ -421,7 +421,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
     switch ( expected.type )
     {
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
-            std::cout << "testing info request..." << "\n";
             EXPECT_EQ( expected.body.system_info_request.query,
                        actual.body.system_info_request.query );
             EXPECT_EQ( expected.body.system_info_request.request_firmware_git_hash,
@@ -429,7 +428,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
-            std::cout << "testing info response..." << "\n";
             EXPECT_EQ( expected.body.system_info_response.application_protocol_major,
                        actual.body.system_info_response.application_protocol_major );
             EXPECT_EQ( expected.body.system_info_response.application_protocol_minor,
@@ -447,7 +445,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
-            std::cout << "testing test config..." << "\n";
             EXPECT_EQ( expected.body.test_configuration.tick_duration_us.microseconds,
                        actual.body.test_configuration.tick_duration_us.microseconds );
             EXPECT_EQ( expected.body.test_configuration.expected_tick_count,
@@ -574,7 +571,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
-            std::cout << "testing test instruction..." << "\n";
             EXPECT_EQ( expected.body.test_instruction.tick_number,
                        actual.body.test_instruction.tick_number );
 
@@ -595,15 +591,9 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
                 EXPECT_EQ( expected.body.test_instruction.pwm_outputs[i].duty_cycle_permyriad,
                            actual.body.test_instruction.pwm_outputs[i].duty_cycle_permyriad );
             }
-
-            // ExpectDataDeclarationsEqual( expected.body.test_instruction.variable_data,
-            //                              expected.body.test_instruction.variable_data_count,
-            //                              actual.body.test_instruction.variable_data,
-            //                              actual.body.test_instruction.variable_data_count );
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
-            std::cout << "testing variable inst..." << "\n";
             EXPECT_EQ( expected.body.variable_instruction_data.tick_number,
                        actual.body.variable_instruction_data.tick_number );
 
@@ -615,20 +605,17 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
-            std::cout << "testing ex control..." << "\n";
             EXPECT_EQ( expected.body.execution_control.command,
                        actual.body.execution_control.command );
             EXPECT_EQ( expected.body.execution_control.flags, actual.body.execution_control.flags );
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
-            std::cout << "testing global control..." << "\n";
             EXPECT_EQ( expected.body.global_control.command, actual.body.global_control.command );
             EXPECT_EQ( expected.body.global_control.flags, actual.body.global_control.flags );
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
-            std::cout << "testing test result..." << "\n";
             EXPECT_EQ( expected.body.test_result.tick_number, actual.body.test_result.tick_number );
 
             for ( std::size_t i = 0u; i < HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT; ++i )
@@ -650,15 +637,9 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             }
 
             EXPECT_EQ( expected.body.test_result.condition, actual.body.test_result.condition );
-
-            // ExpectDataDeclarationsEqual( expected.body.test_result.variable_data,
-            //                              expected.body.test_result.variable_data_count,
-            //                              actual.body.test_result.variable_data,
-            //                              actual.body.test_result.variable_data_count );
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
-            std::cout << "testing variable result..." << "\n";
             EXPECT_EQ( expected.body.variable_result_data.tick_number,
                        actual.body.variable_result_data.tick_number );
 
@@ -670,7 +651,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
-            std::cout << "testing response..." << "\n";
             EXPECT_EQ( expected.body.response.scope, actual.body.response.scope );
             EXPECT_EQ( expected.body.response.outcome, actual.body.response.outcome );
             EXPECT_EQ( expected.body.response.reason, actual.body.response.reason );
@@ -682,7 +662,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
             break;
 
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
-            std::cout << "testing error..." << "\n";
             EXPECT_EQ( expected.body.error.category, actual.body.error.category );
             EXPECT_EQ( expected.body.error.recoverable, actual.body.error.recoverable );
             EXPECT_EQ( expected.body.error.has_tick_number, actual.body.error.has_tick_number );

@@ -1,6 +1,6 @@
 /**
  * @file application_instruction.h
- * @brief Python-to-firmware fixed Test Instruction and future variable-data types.
+ * @brief Python-to-firmware fixed Test Instruction, variable Update Instruction, and related types.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_INSTRUCTION_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_INSTRUCTION_H
@@ -68,6 +68,71 @@ typedef struct
     // /** Number of declarations at variable_data. */
     // uint8_t variable_data_count;
 } HIL_Application_Test_Instruction_T;
+
+/**
+ * @name Update Instruction streaming control flags
+ * @{
+ */
+/** Streaming control flag: final or only message for this tick. */
+#define HIL_APPLICATION_INSTRUCTION_FLAG_COMPLETE_TICK ( 0x00u )
+/** Streaming control flag: subsequent chunk message with the same tick follows. */
+#define HIL_APPLICATION_INSTRUCTION_FLAG_HAS_MORE_CHUNKS ( 0x01u )
+/** @} */
+
+/**
+ * @brief One logical peripheral operation for an update-based instruction.
+ *
+ * @details Represents a discrete output change or communication transfer at an
+ * execution tick. The codec validates that peripheral_type and channel are valid
+ * and that payload conforms to the peripheral's logical data layout.
+ */
+typedef struct
+{
+    /** Peripheral or signal family (e.g. DIGITAL_OUTPUT, ANALOG_OUTPUT, PWM_OUTPUT, UART, SPI,
+     * CAN). */
+    HIL_Application_Peripheral_Type_T peripheral_type;
+    /** Logical channel number within the peripheral family (bank 0 for digital). */
+    uint8_t channel;
+    /** Logical operation payload bytes. */
+    HIL_Application_Byte_Span_T payload;
+} HIL_Application_Logical_Operation_T;
+
+/**
+ * @brief One variable-length Python-to-firmware Update Instruction body.
+ *
+ * @details Carries sparse logical peripheral operations and streaming serial data
+ * for one zero-based tick boundary.
+ *
+ * @par Wire layout
+ * The encoded payload begins with an 8-byte header:
+ * - tick_number at offset 0 as uint32_t little-endian (4 bytes).
+ * - operation_count at offset 4 as uint8_t (1 byte, 1..255).
+ * - flags at offset 5 as uint8_t (1 byte; COMPLETE_TICK or HAS_MORE_CHUNKS).
+ * - reserved at offset 6 as uint16_t little-endian (2 bytes, must be zero).
+ *
+ * The header is followed by operation_count 4-byte-aligned TLV records:
+ * - peripheral_type at offset 0 as uint8_t (1 byte).
+ * - channel at offset 1 as uint8_t (1 byte).
+ * - payload_length at offset 2 as uint16_t little-endian (2 bytes, 1..255).
+ * - payload bytes at offset 4 (payload_length bytes).
+ * - padding bytes (0 to 3 zero bytes to align the record to a 4-byte boundary).
+ *
+ * Structural validation requires tick_number < max_expected_tick_count,
+ * operation_count in 1..255, operations != NULL, no duplicate (peripheral_type, channel)
+ * pairs, and valid payload layouts for DIGITAL_OUTPUT, ANALOG_OUTPUT, PWM_OUTPUT,
+ * UART, SPI, and CAN.
+ */
+typedef struct
+{
+    /** Zero-based tick identity; codec requires value < context max_expected_tick_count. */
+    uint32_t tick_number;
+    /** Number of operations at operations pointer (1..255). */
+    uint8_t operation_count;
+    /** Streaming control flags (HIL_APPLICATION_INSTRUCTION_FLAG_*). */
+    uint8_t flags;
+    /** Array of logical operations packed in this message. */
+    const HIL_Application_Logical_Operation_T* operations;
+} HIL_Application_Update_Instruction_T;
 
 /**
  * @brief Future variable communication bytes associated with one test tick.

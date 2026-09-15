@@ -128,6 +128,73 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_size(
     return HIL_APPLICATION_STATUS_OK;
 }
 
+/**
+ * @brief Accumulate the encoded wire size of one 4-byte-aligned TLV record.
+ *
+ * @details Computes the 4-byte header width, payload byte length, and 4-byte
+ * boundary padding, adding the total to running_total with checked arithmetic.
+ *
+ * @param[in]     span          Payload byte span.
+ * @param[in,out] running_total Accumulated wire payload size in bytes.
+ * @return Application status.
+ */
+static HIL_Application_Status_T
+HIL_APPLICATION_Aligned_Record_size( const HIL_Application_Byte_Span_T* span,
+                                     size_t*                            running_total )
+{
+    if ( span->size != 0u && span->data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    const size_t pad              = HIL_APPLICATION_Align4_Padding( ( size_t )span->size );
+    size_t       record_wire_size = 0u;
+    if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_RECORD_HEADER_SIZE,
+                                            ( size_t )span->size, &record_wire_size )
+         || !HIL_APPLICATION_Checked_Add_Size( record_wire_size, pad, &record_wire_size )
+         || !HIL_APPLICATION_Checked_Add_Size( *running_total, record_wire_size, running_total ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Update_Instruction_T* data,
+    size_t* encoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+
+    if ( encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *encoded_size = 0u;
+    if ( data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( data->operation_count != 0u && data->operations == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+
+    size_t running_total = HIL_APPLICATION_UPDATE_INSTRUCTION_HEADER_SIZE;
+    for ( size_t i = 0u; i < ( size_t )data->operation_count; ++i )
+    {
+        const HIL_Application_Status_T status =
+            HIL_APPLICATION_Aligned_Record_size( &data->operations[i].payload, &running_total );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    *encoded_size = running_total;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
 HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_size(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T                    test_id,
@@ -202,6 +269,43 @@ HIL_APPLICATION_Test_Result_size( const HIL_Application_Context_T*         conte
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
     *encoded_size = HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Test_Result_T* data,
+    size_t* encoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+
+    if ( encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *encoded_size = 0u;
+    if ( data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( data->record_count != 0u && data->records == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+
+    size_t running_total = HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE;
+    for ( size_t i = 0u; i < ( size_t )data->record_count; ++i )
+    {
+        const HIL_Application_Status_T status =
+            HIL_APPLICATION_Aligned_Record_size( &data->records[i].data, &running_total );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    *encoded_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
 }
 

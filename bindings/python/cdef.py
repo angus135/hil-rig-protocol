@@ -708,6 +708,39 @@ typedef struct
 
 /* application_message.h */
 
+#define HIL_APPLICATION_INSTRUCTION_FLAG_COMPLETE_TICK ...
+#define HIL_APPLICATION_INSTRUCTION_FLAG_HAS_MORE_CHUNKS ...
+#define HIL_APPLICATION_RESULT_FLAG_COMPLETE_TICK ...
+#define HIL_APPLICATION_RESULT_FLAG_HAS_MORE_CHUNKS ...
+
+typedef struct {
+    HIL_Application_Peripheral_Type_T peripheral_type;
+    uint8_t channel;
+    HIL_Application_Byte_Span_T payload;
+} HIL_Application_Logical_Operation_T;
+
+typedef struct {
+    uint32_t tick_number;
+    uint8_t operation_count;
+    uint8_t flags;
+    const HIL_Application_Logical_Operation_T* operations;
+} HIL_Application_Update_Instruction_T;
+
+typedef struct {
+    HIL_Application_Peripheral_Type_T peripheral_type;
+    uint8_t channel;
+    HIL_Application_Byte_Span_T data;
+} HIL_Application_Captured_Record_T;
+
+typedef struct {
+    uint32_t tick_number;
+    uint8_t record_count;
+    HIL_Application_Result_Condition_T condition;
+    uint8_t flags;
+    uint32_t problem_detail;
+    const HIL_Application_Captured_Record_T* records;
+} HIL_Application_Variable_Test_Result_T;
+
 typedef enum
 {
     HIL_APPLICATION_MESSAGE_TYPE_INVALID,
@@ -715,10 +748,12 @@ typedef enum
     HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE,
     HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION,
     HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION,
+    HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION,
     HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA,
     HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL,
     HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL,
     HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT,
+    HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT,
     HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA,
     HIL_APPLICATION_MESSAGE_TYPE_RESPONSE,
     HIL_APPLICATION_MESSAGE_TYPE_ERROR,
@@ -745,9 +780,11 @@ typedef struct
         HIL_Application_System_Info_Response_T system_info_response;
         HIL_Application_Test_Configuration_T test_configuration;
         HIL_Application_Test_Instruction_T test_instruction;
+        HIL_Application_Update_Instruction_T update_instruction;
         HIL_Application_Execution_Control_T execution_control;
         HIL_Application_Global_Control_T global_control;
         HIL_Application_Test_Result_T test_result;
+        HIL_Application_Variable_Test_Result_T variable_test_result;
         HIL_Application_Response_T response;
         HIL_Application_Error_T error;
     } body;
