@@ -22,6 +22,18 @@ extern "C"
 {
 #endif
 
+/*
+ * TODO BEFORE PUBLISHING: COORDINATE AND CONFIRM THE VERSION NUMBER WITH THE TEAMMATE.
+ * Intend to merge the teammate's work with this
+ * branch's UPDATE_INSTRUCTION / VARIABLE_TEST_RESULT codec and Python bindings
+ * and publish ONE combined version update, subject to agreement before release.
+ * Do not independently publish this branch or assume the current version is final.
+ * Agree an unpublished version number with the teammate and verify the
+ * merged changes together. Keep the root VERSION file and all macros below in
+ * sync; coordinate the matching host/firmware versions for exact-version discovery.
+ * Remove this TODO only once the combined release/version decision is resolved.
+ */
+
 /** Major component of the library's semantic version. */
 #define HIL_RIG_PROTOCOL_VERSION_MAJOR 0u
 
