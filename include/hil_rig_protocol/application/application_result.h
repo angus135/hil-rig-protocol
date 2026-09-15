@@ -1,6 +1,6 @@
 /**
  * @file application_result.h
- * @brief Firmware-to-Python fixed Test Result and future variable-data types.
+ * @brief Firmware-to-Python fixed and variable Test Result types.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_RESULT_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_RESULT_H
@@ -167,7 +167,8 @@ typedef HIL_Application_Peripheral_Data_T HIL_Application_Variable_Result_Data_T
  */
 typedef struct
 {
-    /** Peripheral or signal family (e.g. DIGITAL_INPUT, ANALOG_INPUT, PWM_INPUT, UART, SPI, CAN). */
+    /** Peripheral or signal family (e.g. DIGITAL_INPUT, ANALOG_INPUT, PWM_INPUT, UART, SPI, CAN).
+     */
     HIL_Application_Peripheral_Type_T peripheral_type;
     /** Logical channel number within the peripheral family (bank 0 for digital). */
     uint8_t channel;
@@ -180,6 +181,27 @@ typedef struct
  *
  * @details Carries captured peripheral records and serial communication buffers
  * for one zero-based tick boundary.
+ *
+ * @par Wire layout
+ * The encoded payload begins with a 12-byte header:
+ * - tick_number at offset 0 as uint32_t little-endian (4 bytes).
+ * - record_count at offset 4 as uint8_t (1 byte, 0..255).
+ * - condition at offset 5 as uint8_t (1 byte; OK, PARTIAL, or EXECUTION_PROBLEM).
+ * - flags at offset 6 as uint8_t (1 byte; COMPLETE_TICK or HAS_MORE_CHUNKS).
+ * - reserved at offset 7 as uint8_t (1 byte, must be zero).
+ * - problem_detail at offset 8 as uint32_t little-endian (4 bytes; 0 when condition is OK).
+ *
+ * When record_count is 0, the payload consists solely of the 12-byte header.
+ * When record_count > 0, the header is followed by record_count 4-byte-aligned TLV records:
+ * - peripheral_type at offset 0 as uint8_t (1 byte).
+ * - channel at offset 1 as uint8_t (1 byte).
+ * - payload_length at offset 2 as uint16_t little-endian (2 bytes, 1..255).
+ * - data bytes at offset 4 (payload_length bytes).
+ * - padding bytes (0 to 3 zero bytes to align the record to a 4-byte boundary).
+ *
+ * Structural validation requires tick_number < max_expected_tick_count,
+ * problem_detail == 0 when condition is OK, no duplicate (peripheral_type, channel)
+ * pairs, and valid captured payload extents.
  */
 typedef struct
 {

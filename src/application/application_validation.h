@@ -82,8 +82,8 @@ HIL_APPLICATION_Test_Instructions_validate( const HIL_Application_Context_T*    
  * @return Application status.
  */
 HIL_Application_Status_T
-HIL_APPLICATION_Update_Instruction_validate( const HIL_Application_Context_T*           context,
-                                            const HIL_Application_Update_Instruction_T* data );
+HIL_APPLICATION_Update_Instruction_validate( const HIL_Application_Context_T*            context,
+                                             const HIL_Application_Update_Instruction_T* data );
 
 /**
  * @brief Preserve the reserved Variable Instruction Data validation entry point.
@@ -141,7 +141,7 @@ HIL_APPLICATION_Test_Result_validate( const HIL_Application_Context_T*     conte
  * @return Application status.
  */
 HIL_Application_Status_T
-HIL_APPLICATION_Variable_Test_Result_validate( const HIL_Application_Context_T*             context,
+HIL_APPLICATION_Variable_Test_Result_validate( const HIL_Application_Context_T* context,
                                                const HIL_Application_Variable_Test_Result_T* data );
 
 /**

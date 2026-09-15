@@ -44,8 +44,10 @@ There is no Application sequence number. Transport delivery acknowledgement rema
 | `VARIABLE_INSTRUCTION_DATA` | 18 |
 | `EXECUTION_CONTROL` | 19 |
 | `GLOBAL_CONTROL` | 20 |
+| `UPDATE_INSTRUCTION` | 21 |
 | `TEST_RESULT` | 32 |
 | `VARIABLE_RESULT_DATA` | 33 |
+| `VARIABLE_TEST_RESULT` | 34 |
 | `RESPONSE` | 48 |
 | `ERROR` | 49 |
 | `RESERVED` | 255 |
@@ -79,11 +81,13 @@ Presence rules:
 | System Information request/response | forbidden |
 | Test Configuration | required |
 | Test Instruction | required |
+| Update Instruction | required |
 | Variable Instruction Data | required |
 | Execution Control | required |
 | Global Control | forbidden |
 | Test Result | required |
 | Variable Result Data | required |
+| Variable Test Result | required |
 | Application Response | required for test scopes; forbidden for Global Control scope |
 | Application Error | optional: present for a test-specific fault, absent for a global fault |
 
@@ -98,12 +102,14 @@ do not retain a transaction and therefore do not enforce it.
 | System Information Response | Firmware | Python | No Test ID | Matching request as defined by integration | Diagnostic data only; no transaction effect |
 | Test Configuration | Python | Firmware | Fresh Test ID | Starts a new upload attempt | Configuration Response; `ACCEPTED` creates active upload transaction |
 | Test Instruction | Python | Firmware | Active Test ID and tick | Configuration accepted; tick T is the expected next tick and T - 1 was accepted when T > 0 | Tick Response after all declared data; no later tick is yet submitted |
+| Update Instruction | Python | Firmware | Active Test ID and tick | Configuration accepted; tick T is the expected next tick | Tick Response |
 | Variable Instruction Data | Python | Firmware | Active Test ID, tick, peripheral, channel | One matching unique, nonzero declaration in the outstanding fixed instruction | Included in correlated Tick Response; duplicates are invalid |
 | Execution Control START | Python | Firmware | Accepted Test ID and START | Complete Test `ACCEPTED` | Execution-Control Response reports actual operation outcome |
 | Execution Control ABORT | Python | Firmware | Identified active Test ID and ABORT | Matching active transaction/operation | `COMPLETED` prevents previous transaction continuing normally |
 | Global Control RESET_APPLICATION | Python | Firmware | No Test ID | None | `COMPLETED` clears active Application transaction data/conditions; Transport unchanged |
 | Test Result | Firmware | Python | Accepted Test ID and tick | START completed; execution completed or stopped early and result set is available | Exactly one fixed result for every configured tick in increasing order; no per-result Response |
 | Variable Result Data | Firmware | Python | Test ID, tick, peripheral, channel | Matching preceding declaration in the current fixed result | Sent in declaration order before the next fixed result; no per-result Response |
+| Variable Test Result | Firmware | Python | Accepted Test ID and tick | START completed; execution completed or stopped early and sparse records produced | Sent in tick order; no per-result Response |
 | Application Response | Firmware | Python | Scope-dependent | A correlated request/data acceptance decision | Carries semantic outcome and transaction effect |
 | Application Error | Firmware | Python | Optional Test ID/tick | Broader fault rather than one request rejection | Integration-dependent recovery |
 

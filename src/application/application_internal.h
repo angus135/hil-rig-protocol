@@ -115,10 +115,8 @@ static_assert( HIL_APPLICATION_UPDATE_INSTRUCTION_HEADER_SIZE == 8u,
                "Update Instruction payload header wire width changed" );
 static_assert( HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE == 12u,
                "Variable Test Result payload header wire width changed" );
-static_assert( HIL_APPLICATION_RECORD_HEADER_SIZE == 4u,
-               "Record header wire width changed" );
-static_assert( HIL_APPLICATION_CAN_FRAME_WIRE_SIZE == 12u,
-               "CAN frame wire width changed" );
+static_assert( HIL_APPLICATION_RECORD_HEADER_SIZE == 4u, "Record header wire width changed" );
+static_assert( HIL_APPLICATION_CAN_FRAME_WIRE_SIZE == 12u, "CAN frame wire width changed" );
 #else
 _Static_assert( HIL_APPLICATION_TEST_INSTRUCTION_FIXED_PAYLOAD_SIZE == 50u,
                 "Test Instruction fixed payload wire width changed" );
@@ -132,10 +130,8 @@ _Static_assert( HIL_APPLICATION_UPDATE_INSTRUCTION_HEADER_SIZE == 8u,
                 "Update Instruction payload header wire width changed" );
 _Static_assert( HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE == 12u,
                 "Variable Test Result payload header wire width changed" );
-_Static_assert( HIL_APPLICATION_RECORD_HEADER_SIZE == 4u,
-                "Record header wire width changed" );
-_Static_assert( HIL_APPLICATION_CAN_FRAME_WIRE_SIZE == 12u,
-                "CAN frame wire width changed" );
+_Static_assert( HIL_APPLICATION_RECORD_HEADER_SIZE == 4u, "Record header wire width changed" );
+_Static_assert( HIL_APPLICATION_CAN_FRAME_WIRE_SIZE == 12u, "CAN frame wire width changed" );
 #endif
 
 /**
@@ -251,9 +247,7 @@ static inline void HIL_APPLICATION_Write_U32_Le( uint8_t* dst, uint32_t value )
 /** Read one little-endian uint32_t without relying on host byte order. */
 static inline uint32_t HIL_APPLICATION_Read_U32_Le( const uint8_t* src )
 {
-    return ( ( uint32_t )src[0] )
-           | ( ( uint32_t )src[1] << 8 )
-           | ( ( uint32_t )src[2] << 16 )
+    return ( ( uint32_t )src[0] ) | ( ( uint32_t )src[1] << 8 ) | ( ( uint32_t )src[2] << 16 )
            | ( ( uint32_t )src[3] << 24 );
 }
 
