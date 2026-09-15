@@ -32,6 +32,9 @@ extern "C"
  */
 #if defined( __cplusplus )
 #define HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ( alignof( max_align_t ) )
+#elif defined( _MSC_VER )
+/* MSVC's C standard library does not currently provide C11 max_align_t. */
+#define HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ( __alignof( long double ) )
 #else
 #define HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ( _Alignof( max_align_t ) )
 #endif
