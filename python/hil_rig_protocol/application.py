@@ -443,7 +443,8 @@ class ApplicationCodec:
             if len(snapshot) >= 31 and snapshot[19] in (21, 34):
                 # TLV descriptors expand into native structs, so storage may exceed wire size.
                 ctype = (
-                    "HIL_Application_Logical_Operation_T" if snapshot[19] == 21
+                    "HIL_Application_Logical_Operation_T"
+                    if snapshot[19] == 21
                     else "HIL_Application_Captured_Record_T"
                 )
                 alignment = int(_binding.lib.HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT)
