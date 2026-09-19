@@ -608,7 +608,7 @@ HIL_APPLICATION_Update_Instruction_validate( const HIL_Application_Context_T*   
         const HIL_Application_Logical_Operation_T* op = &data->operations[i];
 
         if ( HIL_APPLICATION_Byte_Span_validate( &op->payload,
-                                                 HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE )
+                                                 context->config.max_variable_data_size )
                  != HIL_APPLICATION_STATUS_OK
              || op->payload.size == 0u )
         {
@@ -825,7 +825,7 @@ HIL_APPLICATION_Variable_Test_Result_validate( const HIL_Application_Context_T* 
         const HIL_Application_Captured_Record_T* rec = &data->records[i];
 
         if ( HIL_APPLICATION_Byte_Span_validate( &rec->data,
-                                                 HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE )
+                                                 context->config.max_variable_data_size )
                  != HIL_APPLICATION_STATUS_OK
              || rec->data.size == 0u )
         {
