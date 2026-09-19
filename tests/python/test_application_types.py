@@ -457,7 +457,7 @@ def test_semantically_invalid_values_can_be_represented():
         replace(result(), condition=p.ResultCondition.RESERVED).condition
         is p.ResultCondition.RESERVED
     )
-    assert p.ApplicationConfig(0, 0, 0, 0).max_encoded_message_size == 0
+    assert p.ApplicationConfig(0, 0, 0).max_encoded_message_size == 0
 
 
 def test_exact_records_and_tuples_reject_subclasses():

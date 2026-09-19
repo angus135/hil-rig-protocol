@@ -254,13 +254,6 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
         lib.HIL_APPLICATION_MESSAGE_TYPE_ERROR,
     )
     if native.type not in supported:
-        if native.type in (
-            lib.HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA,
-            lib.HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA,
-        ):
-            # C may support a family that this public Python subset defers. No
-            # native failure occurred, so do not manufacture a failure status.
-            raise ApplicationDecodeError("Application message family is not supported by Python")
         raise ApplicationBindingError("native decoder returned an impossible message type")
     if native.type in (
         lib.HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST,

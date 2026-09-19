@@ -26,7 +26,6 @@ application_codec = ApplicationCodec(
     ApplicationConfig(
         max_encoded_message_size=512,
         max_variable_data_size=255,
-        max_variable_transfers_per_tick=8,
         max_expected_tick_count=1_000_000,
     )
 )
@@ -37,7 +36,6 @@ These defaults match `HIL_APPLICATION_Default_Config`. The first three fields ar
 native `size_t`; the last is `uint32_t`. Python permits their full unsigned
 representation ranges; native initialization decides whether a policy is usable.
 `max_variable_data_size` bounds extension bytes and communication capture limits.
-`max_variable_transfers_per_tick` is retained native policy for deferred work.
 `max_expected_tick_count` limits configuration tick counts and is the exclusive
 upper bound for fixed-message tick numbers. These limits reserve no tick storage.
 
@@ -379,9 +377,7 @@ The package build generates CFFI source and compiles it through CMake;
 
 ## Deferred scope
 
-The separate legacy `VARIABLE_INSTRUCTION_DATA` and `VARIABLE_RESULT_DATA` message
-families remain unsupported. No test
-lifecycle, active-test state, role enforcement, tick sequencing,
+No test lifecycle, active-test state, role enforcement, tick sequencing,
 every-tick/state-change translation, hardware I/O or consuming
 Python API/MCU integration is provided. These require separate future work; no
 typed Application methods are added to `Transport`.
