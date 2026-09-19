@@ -158,14 +158,15 @@ The codec checks wire structure and correlation fields only. Firmware and Python
 interpret whether an outcome is appropriate for their current workflow. A
 Transport ACK confirms reliable delivery; an Application Response reports an
 Application-level semantic outcome. Test Results receive no Application
-acknowledgements. Variable CAN, SPI, UART, and I2C instruction/result messages
-remain deferred.
+acknowledgements. Type 21 Update Instruction and Type 34 Variable Test Result
+messages are supported as bounded chunks. The codec does not accumulate or
+order chunks across calls.
 
 `ResultCondition` includes `OK`, `PARTIAL`, `EXECUTION_PROBLEM` and `RESERVED`.
-Native C accepts the first three, including `PARTIAL` even though variable data is
-deferred. `EXECUTION_PROBLEM` means the complete fixed capture set cannot be
-trusted. The consuming application interprets condition and problem detail; the
-codec returns the complete values without filtering them.
+Native C accepts the first three, including `PARTIAL`. `EXECUTION_PROBLEM` means
+the complete fixed capture set cannot be trusted. The consuming application
+interprets condition and problem detail; the codec returns the complete values
+without filtering them.
 
 ### Units and fixed extents
 
@@ -350,6 +351,14 @@ The caller splits streams into payloads of at most 255 bytes and messages within
 the configured message size. The codec preserves flags and tick numbers; it does
 not split, accumulate, order, or execute chunks. Duplicate peripheral/channel
 pairs within one message are rejected by C.
+
+For one Test ID, select either fixed Test Instruction or Type 21 for the
+instruction stream, and either fixed Test Result or Type 34 for the result
+stream; do not mix families within either stream. For Type 21, continuations are
+contiguous and retain Test ID and tick number. For Type 34, continuations are
+contiguous, retain Test ID and tick number, and repeat `condition` and
+`problem_detail`. Python considers a Type 34 tick complete only after its
+`COMPLETE_TICK` chunk. These are integration rules, not codec state.
 
 SPI update payloads contain a packet count, one nonzero size byte per packet,
 then the concatenated packet data. SPI result payloads are raw received bytes.
