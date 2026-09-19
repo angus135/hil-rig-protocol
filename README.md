@@ -71,8 +71,8 @@ PWM, configured tick-ceiling, and result-condition validation. Variable Update
 Instruction (Type 21) and Variable Test Result (Type 34) provide sparse peripheral
 operation and event streaming using 4-byte-aligned TLV framing, streaming chunk flags
 (`COMPLETE_TICK` and `HAS_MORE_CHUNKS`), and allocation-free decode storage scanning.
-Discovery uses an explicit exact-version gate before a test conversation. Wire
-values 18 and 33 are retired and reserved and must not be reused; analogue
+Discovery uses an explicit exact-version gate before a test conversation. Retired
+variable-message identifiers remain reserved and must not be reused; analogue
 hardware ranges and stateful production conversation orchestration remain
 integration work.
 

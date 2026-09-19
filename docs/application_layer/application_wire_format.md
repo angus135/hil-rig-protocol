@@ -567,9 +567,9 @@ The wire contract is paired with deterministic public output rules:
 
 ## Current support boundary
 
-Type 18 and Type 33 are retired and reserved wire identifiers. Type 21 and Type
-34 bodies are supported by the codec; endpoint workflow semantics remain outside
-the codec. See the support
+Retired variable-message identifiers remain reserved. Type 21 and Type 34 bodies
+are supported by the codec; endpoint workflow semantics remain outside the codec.
+See the support
 table in
 [Application Layer codec and transaction design](application_layer.md#current-message-family-implementation-status)
 before treating a payload family as fully operational.
