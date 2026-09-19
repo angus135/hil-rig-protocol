@@ -8,9 +8,9 @@
 
 The C Application layer is a stateless message codec. This foundation implements the common architecture-independent envelope, bounded encode/decode behaviour, exact complete-message length checks, common Test-ID/type/subtype validation, exact-version discovery, and the supported message-specific body paths. It does not implement firmware state machines, test-upload tracking, hardware control, or Transport behaviour.
 
-Type 18 and Type 33 are retired and reserved wire identifiers. Type 21 and
-Type 34 are supported bounded chunk families; cross-message assembly and
-endpoint lifecycle rules remain outside this stateless codec.
+Retired variable-message identifiers remain reserved. Type 21 and Type 34 are
+supported bounded chunk families; cross-message assembly and endpoint lifecycle
+rules remain outside this stateless codec.
 
 The shared codec converts between typed data and exactly one complete Application message:
 

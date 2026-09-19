@@ -5,7 +5,7 @@
 
 ## Status
 
-This document describes the public typed messages and the common wire envelope implemented by the stateless C codec. The public C structures are API representations, not packed wire structures: native enum width, `size_t`, padding, unions and pointer representation do not define encoded bytes. Response and Error wire operations are supported. Type 18 and Type 33 are retired and reserved; production endpoint conversation orchestration remains outside the codec.
+This document describes the public typed messages and the common wire envelope implemented by the stateless C codec. The public C structures are API representations, not packed wire structures: native enum width, `size_t`, padding, unions and pointer representation do not define encoded bytes. Response and Error wire operations are supported. Retired variable-message identifiers remain reserved; production endpoint conversation orchestration remains outside the codec.
 
 ## Common envelope
 
