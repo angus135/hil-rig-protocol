@@ -47,13 +47,15 @@ HIL_Application_Test_Id_T TestId()
 
 HIL_Application_Context_T
 MakeContext( std::size_t   max_message = HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE,
-             std::uint32_t max_ticks   = HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT )
+             std::uint32_t max_ticks   = HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT,
+             std::size_t   max_variable_data_size = HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE )
 {
     HIL_Application_Config_T  config{};
     HIL_Application_Context_T context{};
     EXPECT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
     config.max_encoded_message_size = max_message;
     config.max_expected_tick_count  = max_ticks;
+    config.max_variable_data_size   = max_variable_data_size;
     EXPECT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_OK );
     return context;
 }
@@ -496,6 +498,41 @@ TEST( ApplicationUpdateInstructionValidation, ZeroOperationCountRejected )
     inst.operations      = nullptr;
 
     ExpectValidationFailure( context, inst );
+}
+
+TEST( ApplicationUpdateInstructionValidation, ConfiguredVariableDataSizeBoundsUartPayload )
+{
+    const auto context = MakeContext( HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE,
+                                      HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT, 3u );
+
+    const std::array<std::uint8_t, 3u> accepted_payload = { 'a', 'b', 'c' };
+    HIL_Application_Logical_Operation_T accepted_operation{};
+    accepted_operation.peripheral_type = HIL_APPLICATION_PERIPHERAL_UART;
+    accepted_operation.channel         = 0u;
+    accepted_operation.payload         = { accepted_payload.data(),
+                                           static_cast<std::uint8_t>( accepted_payload.size() ) };
+
+    HIL_Application_Update_Instruction_T accepted{};
+    accepted.flags           = HIL_APPLICATION_INSTRUCTION_FLAG_COMPLETE_TICK;
+    accepted.operation_count = 1u;
+    accepted.operations     = &accepted_operation;
+
+    const auto encoded = EncodeUpdateInstruction( context, accepted );
+    EXPECT_FALSE( encoded.empty() );
+    ExpectRoundTrip( context, accepted );
+
+    const std::array<std::uint8_t, 4u> rejected_payload = { 'a', 'b', 'c', 'd' };
+    HIL_Application_Logical_Operation_T rejected_operation{};
+    rejected_operation.peripheral_type = HIL_APPLICATION_PERIPHERAL_UART;
+    rejected_operation.channel         = 0u;
+    rejected_operation.payload         = { rejected_payload.data(),
+                                           static_cast<std::uint8_t>( rejected_payload.size() ) };
+
+    HIL_Application_Update_Instruction_T rejected{};
+    rejected.flags           = HIL_APPLICATION_INSTRUCTION_FLAG_COMPLETE_TICK;
+    rejected.operation_count = 1u;
+    rejected.operations     = &rejected_operation;
+    ExpectValidationFailure( context, rejected );
 }
 
 TEST( ApplicationUpdateInstructionValidation, DuplicatePeripheralChannelPairRejected )
