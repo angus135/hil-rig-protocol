@@ -370,16 +370,14 @@ complete-test storage capacity, cross-driver conflicts, or workflow state.
 Analogue-input sampling frequency, analogue-output DAC/reference selection, and
 hardware-specific rate/timing choices remain firmware policies. Unsupported
 hardware configurations must be rejected by integration rather than silently
-substituted. Those decisions
-belong to firmware integration. Variable communication instruction/result
-messages remain deferred even though communication Test Configuration is now
-implemented.
+substituted. Those decisions belong to firmware integration. Type 21 and Type
+34 communication operation/capture records are bounded per-message wire data;
+their cross-message assembly remains endpoint integration policy.
 
 ## Test Instruction fixed body
 
 Test Instruction is a fully supported fixed codec family. It requires subtype `NONE` and a Test ID.
-The payload is exactly 50 bytes and the complete message is exactly 73 bytes. Variable instruction
-declarations/data remain deliberately deferred and are not represented or encoded by this fixed body.
+The payload is exactly 50 bytes and the complete message is exactly 73 bytes.
 
 | Payload offset | Width | Field |
 | ---: | ---: | --- |
@@ -397,7 +395,7 @@ channels, or ordering is an integration responsibility.
 
 ## Update Instruction body
 
-Update Instruction is a fully supported variable-length codec family (type 21). It requires subtype `NONE` and a Test ID. It carries sparse logical peripheral operations and streaming serial data for one zero-based tick.
+Update Instruction is a fully supported variable-length codec family (type 21). It requires subtype `NONE` and a Test ID. Each message contains one chunk of sparse logical peripheral operations and streaming serial data for one zero-based tick. Cross-message chunk order and family selection are endpoint integration rules.
 
 ### Payload header (8 bytes)
 
@@ -452,8 +450,7 @@ actual lifecycle checks and decisions about Application Responses remain endpoin
 ## Test Result fixed body
 
 Test Result is a fully supported fixed codec family. It requires subtype `NONE` and a Test ID. The
-payload is exactly 39 bytes and the complete message is exactly 62 bytes. Variable result
-declarations/data remain deliberately deferred and are not represented or encoded by this fixed body.
+payload is exactly 39 bytes and the complete message is exactly 62 bytes.
 
 | Payload offset | Width | Field |
 | ---: | ---: | --- |
@@ -468,13 +465,13 @@ declarations/data remain deliberately deferred and are not represented or encode
 The codec accepts only Digital values 0 and 1. PWM duty is valid from 0 through 10000, and a zero
 period requires zero duty. `tick_number` must be less than `context->config.max_expected_tick_count`.
 The only structurally valid conditions are `OK`, `PARTIAL`, and `EXECUTION_PROBLEM`; unknown and
-reserved values are rejected. `PARTIAL` is representable even though variable result-data support is
-deferred. Analogue values and `problem_detail` have no additional codec range rule. Active-test tick
+reserved values are rejected. `PARTIAL` is representable. Analogue values and `problem_detail` have
+no additional codec range rule. Active-test tick
 comparison, enabled-channel semantics, result ordering, and hardware feasibility are integration-owned.
 
 ## Variable Test Result body
 
-Variable Test Result is a fully supported variable-length codec family (type 34). It requires subtype `NONE` and a Test ID. It carries captured peripheral state and incoming communication buffers for one zero-based tick.
+Variable Test Result is a fully supported variable-length codec family (type 34). It requires subtype `NONE` and a Test ID. Each message contains one result chunk with captured peripheral state and incoming communication buffers for one zero-based tick. Cross-message chunk order and assembly are endpoint integration rules.
 
 ### Payload header (12 bytes)
 
@@ -570,9 +567,9 @@ The wire contract is paired with deterministic public output rules:
 
 ## Current support boundary
 
-The presence of a documented identifier or public C structure does not mean all façade operations are
-complete. Variable instruction/result bodies remain deliberately deferred.
-Response and Error wire operations are supported; endpoint workflow semantics remain outside the codec. See the support
+Type 18 and Type 33 are retired and reserved wire identifiers. Type 21 and Type
+34 bodies are supported by the codec; endpoint workflow semantics remain outside
+the codec. See the support
 table in
 [Application Layer codec and transaction design](application_layer.md#current-message-family-implementation-status)
 before treating a payload family as fully operational.
