@@ -23,16 +23,12 @@ extern "C"
 typedef enum
 {
     /**
-     * Every configured fixed capture is valid. Under the future variable-data
-     * declaration design, every declaration would identify valid variable
-     * result data associated with this result.
+     * Every configured fixed capture is valid.
      */
     HIL_APPLICATION_RESULT_CONDITION_OK = 0,
     /**
-     * Reserved for future variable-data semantics in which every configured
-     * fixed capture is valid but one or more requested variable communication
-     * captures failed or are incomplete. The current implementation does not
-     * encode result declarations or variable result-data messages.
+     * Every configured fixed capture is valid but one or more requested
+     * variable communication captures failed or are incomplete.
      */
     HIL_APPLICATION_RESULT_CONDITION_PARTIAL = 1,
     /**
@@ -40,7 +36,6 @@ typedef enum
      *
      * The complete set of fixed captured-value fields remains present for
      * structural consistency but is semantically invalid and must be ignored.
-     * A future declaration design may still identify valid variable result data.
      * This condition does not replace an Application Error sent when the
      * problem is detected.
      */
@@ -95,15 +90,6 @@ typedef enum
  * set of fixed values is ignored. The initial protocol cannot express selective
  * validity among fixed digital, analogue, or PWM fields.
  *
- * @par Future variable-data declaration design
- * A future version may add declarations that associate nonzero data.size values
- * with variable result-data messages and define their uniqueness, ordering,
- * completeness, and PARTIAL-result semantics. Those declarations are not
- * represented by HIL_Application_Test_Result_T and are not encoded or validated
- * by the current implementation. The commented declaration members below are
- * retained only as design notes and must not be treated as part of the current
- * public wire contract.
- *
  * Result messages have no Application Response or Application-level
  * stop-and-wait acknowledgement. Transport owns delivery acknowledgement and
  * retransmission. Future pipelining, interleaving, ranges, declaration-based
@@ -122,10 +108,6 @@ typedef struct
     HIL_Application_Analog_Input_Value_T analog_inputs[HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT];
     /** Complete PWM-input state; element i is PWM_INPUT channel i. */
     HIL_Application_Pwm_Input_Value_T pwm_inputs[HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT];
-    /** Future design only: variable-data declarations are not currently encoded. */
-    // const HIL_Application_Data_Declaration_T* variable_data;
-    // /** Number of result declarations at variable_data. */
-    // uint32_t variable_data_count;
     /** Recorded condition reported after execution; not an execution-time Error. */
     HIL_Application_Result_Condition_T condition;
     /**
@@ -136,17 +118,6 @@ typedef struct
      */
     uint32_t problem_detail;
 } HIL_Application_Test_Result_T;
-
-/**
- * @brief Future variable result-data body for one tick/channel.
- *
- * @details This alias is retained for future variable-message design. The
- * current Application implementation does not encode or decode variable
- * result-data messages, and Test Result bodies do not contain declarations that
- * reference them. Future correlation and storage ownership are expected to
- * follow the corresponding variable instruction-data design.
- */
-typedef HIL_Application_Peripheral_Data_T HIL_Application_Variable_Result_Data_T;
 
 /**
  * @name Variable Test Result streaming control flags

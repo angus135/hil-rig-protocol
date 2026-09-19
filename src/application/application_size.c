@@ -3,9 +3,7 @@
  * @brief Message-specific Application payload-size calculations.
  *
  * @details Sizes in this file exclude the common 23-byte envelope. The public
- * façade adds that envelope with checked arithmetic. Families intentionally
- * deferred from this foundation return NOT_IMPLEMENTED rather than deriving a
- * size from native C representation.
+ * façade adds that envelope with checked arithmetic.
  */
 
 #include "application_size.h"
@@ -195,19 +193,6 @@ HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_size(
     return HIL_APPLICATION_STATUS_OK;
 }
 
-HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_size(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T                    test_id,
-    const HIL_Application_Variable_Instruction_Data_T* data, size_t* encoded_size )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )encoded_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
 HIL_Application_Status_T HIL_APPLICATION_Execution_Control_size(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Execution_Control_T* data,
@@ -307,19 +292,6 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_size(
     }
     *encoded_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_size(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Result_Data_T* data,
-    size_t* encoded_size )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )encoded_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Response_size( const HIL_Application_Context_T*  context,

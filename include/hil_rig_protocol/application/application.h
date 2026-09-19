@@ -94,15 +94,13 @@ HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      c
  * @brief Calculate the exact complete encoded size for one typed message.
  *
  * @details The result includes the fixed 23-byte envelope. The function clears
- * encoded_size before validation. Message families whose body-size calculation
- * is deliberately unfinished return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED.
+ * encoded_size before validation.
  *
  * @param[in]  context      Initialized codec context.
  * @param[in]  message      Typed message to size.
  * @param[out] encoded_size Exact complete-message size on success; zero on failure.
  *
  * @retval HIL_APPLICATION_STATUS_OK Size calculated successfully.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Selected body sizing is deliberately unfinished.
  * @return Otherwise, the most specific argument, context, validation, length,
  *         or message-type error.
  */
@@ -130,7 +128,6 @@ HIL_Application_Status_T HIL_APPLICATION_Encoded_Size( const HIL_Application_Con
  *
  * @retval HIL_APPLICATION_STATUS_OK Complete message encoded successfully.
  * @retval HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL Caller output capacity is insufficient.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Selected body encoder is deliberately unfinished.
  * @return Otherwise, the most specific argument, context, validation, length,
  *         or message-type error.
  */
@@ -150,8 +147,6 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
  * undersized or oversized fixed bodies return MALFORMED_MESSAGE. Test Configuration
  * extension storage is also bounded by context->config.max_variable_data_size; a
  * correctly shaped message that exceeds that local policy returns VALIDATION_FAILED.
- * Variable-storage families whose sizing remains unfinished return
- * HIL_APPLICATION_STATUS_NOT_IMPLEMENTED.
  *
  * This operation uses a lightweight private envelope object rather than a full
  * HIL_Application_Message_T merely to classify the family.
@@ -164,8 +159,6 @@ HIL_Application_Status_T HIL_APPLICATION_Encode_Message( const HIL_Application_C
  * @retval HIL_APPLICATION_STATUS_OK Storage requirement calculated successfully.
  * @retval HIL_APPLICATION_STATUS_TRUNCATED_MESSAGE Input ends before its declared complete length.
  * @retval HIL_APPLICATION_STATUS_MALFORMED_MESSAGE Input contains trailing or malformed body bytes.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Storage sizing for the selected family is
- *         unfinished.
  * @return Otherwise, the most specific argument, context, version, type, subtype, or length error.
  */
 HIL_Application_Status_T
@@ -204,7 +197,6 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
  *         syntax.
  * @retval HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL Caller-provided decoded-data storage is
  *         insufficient.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Selected body decoder/validator is unfinished.
  * @return Otherwise, the most specific argument, context, version, type, subtype,
  *         or validation error.
  */
@@ -226,7 +218,6 @@ HIL_APPLICATION_Decode_Message( const HIL_Application_Context_T* context,
  * @param[in] message Typed message to validate.
  *
  * @retval HIL_APPLICATION_STATUS_OK Message satisfies currently implemented structural rules.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Selected family's validation remains unfinished.
  * @return Otherwise, the most specific argument, context, type, subtype, Test-ID,
  *         or validation error.
  */
@@ -250,7 +241,6 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
  * @param[out] required_decode_storage Decode-storage requirement on success; zero on failure.
  *
  * @retval HIL_APPLICATION_STATUS_OK Encoded message is structurally valid.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Selected body/storage validation is unfinished.
  * @return Otherwise, the same structural/status classification used by normal decoding.
  */
 HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(

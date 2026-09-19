@@ -108,7 +108,7 @@ typedef enum
     HIL_APPLICATION_RESPONSE_REASON_INCONSISTENT_TEST_ID = 3,
     /** Tick identity or range is invalid. */
     HIL_APPLICATION_RESPONSE_REASON_INVALID_TICK = 4,
-    /** Fixed declaration and variable-data length disagree. */
+    /** Received data or assembled operation/result lengths are inconsistent. */
     HIL_APPLICATION_RESPONSE_REASON_LENGTH_MISMATCH = 5,
     /** Firmware/host integration cannot take retention responsibility. */
     HIL_APPLICATION_RESPONSE_REASON_STORAGE_UNAVAILABLE = 6,
