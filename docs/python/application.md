@@ -2,8 +2,8 @@
 
 `ApplicationCodec` encodes and decodes complete BASIC System Information,
 Execution Control, Global Control, Test Configuration, fixed Digital, Analog
-and PWM Test Instruction and Test Result messages, Application Responses, and
-Application Errors. All wire
+and PWM Test Instruction and Test Result messages, sparse Update Instruction and
+Variable Test Result messages, Application Responses, and Application Errors. All wire
 encoding, decoding and protocol validation execute the shared native C Application
 implementation. Import the supported API from `hil_rig_protocol`; CFFI objects and
 conversion helpers are private.
@@ -26,7 +26,6 @@ application_codec = ApplicationCodec(
     ApplicationConfig(
         max_encoded_message_size=512,
         max_variable_data_size=255,
-        max_variable_transfers_per_tick=8,
         max_expected_tick_count=1_000_000,
     )
 )
@@ -37,7 +36,6 @@ These defaults match `HIL_APPLICATION_Default_Config`. The first three fields ar
 native `size_t`; the last is `uint32_t`. Python permits their full unsigned
 representation ranges; native initialization decides whether a policy is usable.
 `max_variable_data_size` bounds extension bytes and communication capture limits.
-`max_variable_transfers_per_tick` is retained native policy for deferred work.
 `max_expected_tick_count` limits configuration tick counts and is the exclusive
 upper bound for fixed-message tick numbers. These limits reserve no tick storage.
 
@@ -160,14 +158,15 @@ The codec checks wire structure and correlation fields only. Firmware and Python
 interpret whether an outcome is appropriate for their current workflow. A
 Transport ACK confirms reliable delivery; an Application Response reports an
 Application-level semantic outcome. Test Results receive no Application
-acknowledgements. Variable CAN, SPI, UART, and I2C instruction/result messages
-remain deferred.
+acknowledgements. Type 21 Update Instruction and Type 34 Variable Test Result
+messages are supported as bounded chunks. The codec does not accumulate or
+order chunks across calls.
 
 `ResultCondition` includes `OK`, `PARTIAL`, `EXECUTION_PROBLEM` and `RESERVED`.
-Native C accepts the first three, including `PARTIAL` even though variable data is
-deferred. `EXECUTION_PROBLEM` means the complete fixed capture set cannot be
-trusted. The consuming application interprets condition and problem detail; the
-codec returns the complete values without filtering them.
+Native C accepts the first three, including `PARTIAL`. `EXECUTION_PROBLEM` means
+the complete fixed capture set cannot be trusted. The consuming application
+interprets condition and problem detail; the codec returns the complete values
+without filtering them.
 
 ### Units and fixed extents
 
@@ -308,11 +307,86 @@ hardware and shows all three messages plus these explicit Transport calls. See
 the [Transport servicing example](../../examples/python/transport_servicing.py)
 for caller-owned byte-stream servicing.
 
+## Sparse updates and variable results
+
+`UpdateInstruction` (type 21) carries a tuple of `LogicalOperation` values.
+`VariableTestResult` (type 34) carries a tuple of `CapturedRecord` values. Each
+record names a `PeripheralType`, a logical channel, and immutable `bytes`.
+
+```python
+from hil_rig_protocol import (
+    ApplicationCodec,
+    ApplicationConfig,
+    CapturedRecord,
+    LogicalOperation,
+    PeripheralType,
+    TestId,
+    UpdateInstruction,
+    VariableTestResult,
+)
+
+codec = ApplicationCodec(ApplicationConfig())
+test_id = TestId(bytes(range(16)))  # Example only; allocate a fresh ID per real test.
+update = UpdateInstruction(
+    test_id=test_id,
+    tick_number=10,
+    operations=(
+        LogicalOperation(PeripheralType.DIGITAL_OUTPUT, 0, b"\x05\x00"),
+        LogicalOperation(PeripheralType.UART, 1, b"hello"),
+        LogicalOperation(PeripheralType.SPI, 0, b"\x02\x01\x02\x12\x34\x56"),
+    ),
+)
+assert codec.decode(codec.encode(update)) == update
+
+result = VariableTestResult(
+    test_id=test_id,
+    tick_number=10,
+    records=(CapturedRecord(PeripheralType.UART, 1, b"reply"),),
+)
+assert codec.decode(codec.encode(result)) == result
+```
+
+Flags `0` completes the tick; flags `1` means more chunks follow for that tick.
+The caller splits streams into payloads of at most 255 bytes and messages within
+the configured message size. The codec preserves flags and tick numbers; it does
+not split, accumulate, order, or execute chunks. Duplicate peripheral/channel
+pairs within one message are rejected by C.
+
+For one Test ID, select either fixed Test Instruction or Type 21 for the
+instruction stream, and either fixed Test Result or Type 34 for the result
+stream; do not mix families within either stream. For Type 21, continuations are
+contiguous and retain Test ID and tick number. For Type 34, continuations are
+contiguous, retain Test ID and tick number, and repeat `condition` and
+`problem_detail`. Python considers a Type 34 tick complete only after its
+`COMPLETE_TICK` chunk. These are integration rules, not codec state.
+
+SPI update payloads contain a packet count, one nonzero size byte per packet,
+then the concatenated packet data. SPI result payloads are raw received bytes.
+The [wire specification](../application_layer/application_wire_format.md) defines
+digital, analogue, PWM and CAN payloads. Update operations must be nonempty;
+results may have no records, including pure fault reports. An `OK` result requires
+zero `problem_detail`.
+
+Python constructors check representation (exact enum types, unsigned integer
+widths, immutable byte spans and tuples). Peripheral rules and protocol semantics
+remain in C. Decoding allocates aligned storage for native record descriptors and
+payloads, checks their bounds and pointers, and returns detached Python values.
+Native storage can be larger than the encoded message.
+
+After binding changes, rebuild the native extension before running Python tests:
+
+```sh
+python -m pip install -e ".[test]"
+python -m pytest tests/python/test_application_update_instruction.py
+python -m pytest tests/python
+```
+
+The package build generates CFFI source and compiles it through CMake;
+`bindings/python/build_ffi.py` alone generates C source and does not build the extension.
+
 ## Deferred scope
 
-Variable-length instruction/result data and variable-data declarations are not
-supported. Response and Error remain outside the public Python subset. No test
-lifecycle, active-test state, role enforcement, tick sequencing,
+No test lifecycle, active-test state, role enforcement, tick sequencing,
 every-tick/state-change translation, hardware I/O or consuming
 Python API/MCU integration is provided. These require separate future work; no
 typed Application methods are added to `Transport`.

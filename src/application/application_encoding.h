@@ -112,21 +112,20 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_encode(
     size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
 /**
- * @brief Preserve the Variable Instruction Data encoder entry point.
+ * @brief Encode the variable-length Update Instruction payload.
  * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
+ * @param[in]  sub_type         Message subtype selected by the public envelope.
  * @param[in]  test_id          Envelope Test ID value.
- * @param[in]  data             Typed variable instruction body.
- * @param[in]  max_payload_size Available payload capacity.
+ * @param[in]  data             Typed Update Instruction body.
+ * @param[in]  max_payload_size Available payload capacity after the common header.
  * @param[out] payload          Destination payload buffer.
- * @param[out] used_size        Set to zero by the current stub when non-NULL.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Variable instruction encoding is deferred.
+ * @param[out] used_size        Payload bytes written on success.
+ * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_encode(
+HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_encode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T                    test_id,
-    const HIL_Application_Variable_Instruction_Data_T* data, size_t max_payload_size,
-    uint8_t* payload, size_t* used_size );
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Update_Instruction_T* data,
+    size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
 /**
  * @brief Encode the five-byte Execution Control payload.
@@ -162,7 +161,6 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_encode(
 
 /**
  * @brief Encode the exact 39-byte fixed Test Result payload.
- * @details Variable result declarations/data remain deliberately deferred.
  * @param[in]  context          Application context.
  * @param[in]  sub_type         Message subtype selected by the public envelope.
  * @param[in]  test_id          Envelope Test ID value.
@@ -178,19 +176,19 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_encode(
     size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
 /**
- * @brief Preserve the Variable Result Data encoder entry point.
+ * @brief Encode the variable-length Variable Test Result payload.
  * @param[in]  context          Application context.
- * @param[in]  sub_type         Message subtype.
+ * @param[in]  sub_type         Message subtype selected by the public envelope.
  * @param[in]  test_id          Envelope Test ID value.
- * @param[in]  data             Typed variable result body.
- * @param[in]  max_payload_size Available payload capacity.
+ * @param[in]  data             Typed Variable Test Result body.
+ * @param[in]  max_payload_size Available payload capacity after the common header.
  * @param[out] payload          Destination payload buffer.
- * @param[out] used_size        Payload-size output reserved for future implementation.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Variable result encoding is deferred.
+ * @param[out] used_size        Payload bytes written on success.
+ * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_encode(
+HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_encode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Result_Data_T* data,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Test_Result_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
 /**

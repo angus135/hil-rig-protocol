@@ -1,6 +1,6 @@
 /**
  * @file application_result.h
- * @brief Firmware-to-Python fixed Test Result and future variable-data types.
+ * @brief Firmware-to-Python fixed and variable Test Result types.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_RESULT_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_RESULT_H
@@ -23,16 +23,12 @@ extern "C"
 typedef enum
 {
     /**
-     * Every configured fixed capture is valid. Under the future variable-data
-     * declaration design, every declaration would identify valid variable
-     * result data associated with this result.
+     * Every configured fixed capture is valid.
      */
     HIL_APPLICATION_RESULT_CONDITION_OK = 0,
     /**
-     * Reserved for future variable-data semantics in which every configured
-     * fixed capture is valid but one or more requested variable communication
-     * captures failed or are incomplete. The current implementation does not
-     * encode result declarations or variable result-data messages.
+     * Every configured fixed capture is valid but one or more requested
+     * variable communication captures failed or are incomplete.
      */
     HIL_APPLICATION_RESULT_CONDITION_PARTIAL = 1,
     /**
@@ -40,7 +36,6 @@ typedef enum
      *
      * The complete set of fixed captured-value fields remains present for
      * structural consistency but is semantically invalid and must be ignored.
-     * A future declaration design may still identify valid variable result data.
      * This condition does not replace an Application Error sent when the
      * problem is detected.
      */
@@ -95,15 +90,6 @@ typedef enum
  * set of fixed values is ignored. The initial protocol cannot express selective
  * validity among fixed digital, analogue, or PWM fields.
  *
- * @par Future variable-data declaration design
- * A future version may add declarations that associate nonzero data.size values
- * with variable result-data messages and define their uniqueness, ordering,
- * completeness, and PARTIAL-result semantics. Those declarations are not
- * represented by HIL_Application_Test_Result_T and are not encoded or validated
- * by the current implementation. The commented declaration members below are
- * retained only as design notes and must not be treated as part of the current
- * public wire contract.
- *
  * Result messages have no Application Response or Application-level
  * stop-and-wait acknowledgement. Transport owns delivery acknowledgement and
  * retransmission. Future pipelining, interleaving, ranges, declaration-based
@@ -122,10 +108,6 @@ typedef struct
     HIL_Application_Analog_Input_Value_T analog_inputs[HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT];
     /** Complete PWM-input state; element i is PWM_INPUT channel i. */
     HIL_Application_Pwm_Input_Value_T pwm_inputs[HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT];
-    /** Future design only: variable-data declarations are not currently encoded. */
-    // const HIL_Application_Data_Declaration_T* variable_data;
-    // /** Number of result declarations at variable_data. */
-    // uint32_t variable_data_count;
     /** Recorded condition reported after execution; not an execution-time Error. */
     HIL_Application_Result_Condition_T condition;
     /**
@@ -138,15 +120,75 @@ typedef struct
 } HIL_Application_Test_Result_T;
 
 /**
- * @brief Future variable result-data body for one tick/channel.
- *
- * @details This alias is retained for future variable-message design. The
- * current Application implementation does not encode or decode variable
- * result-data messages, and Test Result bodies do not contain declarations that
- * reference them. Future correlation and storage ownership are expected to
- * follow the corresponding variable instruction-data design.
+ * @name Variable Test Result streaming control flags
+ * @{
  */
-typedef HIL_Application_Peripheral_Data_T HIL_Application_Variable_Result_Data_T;
+/** Streaming control flag: complete tick result. */
+#define HIL_APPLICATION_RESULT_FLAG_COMPLETE_TICK ( 0x00u )
+/** Streaming control flag: subsequent result chunk with the same tick follows. */
+#define HIL_APPLICATION_RESULT_FLAG_HAS_MORE_CHUNKS ( 0x01u )
+/** @} */
+
+/**
+ * @brief One captured peripheral event or measurement in a variable result.
+ *
+ * @details Represents captured input state or incoming serial stream bytes at an
+ * execution tick. The codec validates that peripheral_type and channel are valid
+ * and that data conforms to the peripheral's captured layout.
+ */
+typedef struct
+{
+    /** Peripheral or signal family (e.g. DIGITAL_INPUT, ANALOG_INPUT, PWM_INPUT, UART, SPI, CAN).
+     */
+    HIL_Application_Peripheral_Type_T peripheral_type;
+    /** Logical channel number within the peripheral family (bank 0 for digital). */
+    uint8_t channel;
+    /** Captured record payload bytes. */
+    HIL_Application_Byte_Span_T data;
+} HIL_Application_Captured_Record_T;
+
+/**
+ * @brief One variable-length firmware-to-Python Test Result body.
+ *
+ * @details Carries captured peripheral records and serial communication buffers
+ * for one zero-based tick boundary.
+ *
+ * @par Wire layout
+ * The encoded payload begins with a 12-byte header:
+ * - tick_number at offset 0 as uint32_t little-endian (4 bytes).
+ * - record_count at offset 4 as uint8_t (1 byte, 0..255).
+ * - condition at offset 5 as uint8_t (1 byte; OK, PARTIAL, or EXECUTION_PROBLEM).
+ * - flags at offset 6 as uint8_t (1 byte; COMPLETE_TICK or HAS_MORE_CHUNKS).
+ * - reserved at offset 7 as uint8_t (1 byte, must be zero).
+ * - problem_detail at offset 8 as uint32_t little-endian (4 bytes; 0 when condition is OK).
+ *
+ * When record_count is 0, the payload consists solely of the 12-byte header.
+ * When record_count > 0, the header is followed by record_count 4-byte-aligned TLV records:
+ * - peripheral_type at offset 0 as uint8_t (1 byte).
+ * - channel at offset 1 as uint8_t (1 byte).
+ * - payload_length at offset 2 as uint16_t little-endian (2 bytes, 1..255).
+ * - data bytes at offset 4 (payload_length bytes).
+ * - padding bytes (0 to 3 zero bytes to align the record to a 4-byte boundary).
+ *
+ * Structural validation requires tick_number < max_expected_tick_count,
+ * problem_detail == 0 when condition is OK, no duplicate (peripheral_type, channel)
+ * pairs, and valid captured payload extents.
+ */
+typedef struct
+{
+    /** Zero-based tick whose execution/capture produced this result. */
+    uint32_t tick_number;
+    /** Number of captured peripheral records at records pointer (0..255). */
+    uint8_t record_count;
+    /** Recorded execution condition (OK, PARTIAL, EXECUTION_PROBLEM). */
+    HIL_Application_Result_Condition_T condition;
+    /** Streaming control flags (HIL_APPLICATION_RESULT_FLAG_*). */
+    uint8_t flags;
+    /** Integration-defined diagnostic value when condition is not OK (0 if OK). */
+    uint32_t problem_detail;
+    /** Array of captured peripheral records. */
+    const HIL_Application_Captured_Record_T* records;
+} HIL_Application_Variable_Test_Result_T;
 
 #ifdef __cplusplus
 }

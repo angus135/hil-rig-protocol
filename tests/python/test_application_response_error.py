@@ -28,7 +28,7 @@ def test_response_exact_golden_and_every_scope(codec: p.ApplicationCodec) -> Non
         detail=0x89ABCDEF,
     )
     expected = bytes.fromhex(
-        "000201101112131415161718191a1b1c1d1e1f30000d00020409785634120200efcdab89"
+        "000301101112131415161718191a1b1c1d1e1f30000d00020409785634120200efcdab89"
     )
     assert codec.encode(response) == expected
     assert codec.decode(expected) == response
@@ -111,7 +111,7 @@ def test_error_exact_golden_and_three_structural_forms(codec: p.ApplicationCodec
         diagnostic_data=b"\xde\xad\xbe\xef",
     )
     expected = bytes.fromhex(
-        "0002000000000000000000000000000000000031001000050100000000000403020104deadbeef"
+        "0003000000000000000000000000000000000031001000050100000000000403020104deadbeef"
     )
     assert codec.encode(global_error) == expected
     assert codec.decode(expected) == global_error

@@ -37,7 +37,6 @@ extern "C"
 
 #define HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE 255u
 #define HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE
-#define HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK 8u
 #define HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT 1000000u
 
 /** Default operational maximum complete Application message size. */
@@ -97,16 +96,16 @@ typedef enum
     HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION = 16,
     /** Python-to-firmware fixed instruction for one tick. */
     HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION = 17,
-    /** Python-to-firmware variable channel bytes for one tick. */
-    HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA = 18,
     /** Python-to-firmware test-scoped execution/abort request. */
     HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL = 19,
     /** Python-to-firmware test-independent Application recovery request. */
     HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL = 20,
+    /** Python-to-firmware variable update instruction for one tick. */
+    HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION = 21,
     /** Firmware-to-Python fixed result in an ordered N-tick result set. */
     HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT = 32,
-    /** Firmware-to-Python variable bytes declared by a preceding fixed result. */
-    HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA = 33,
+    /** Firmware-to-Python variable-length captured result for one tick. */
+    HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT = 34,
     /** Firmware-to-Python acceptance/rejection/completion outcome. */
     HIL_APPLICATION_MESSAGE_TYPE_RESPONSE = 48,
     /** Firmware-to-Python broader Application fault report. */
@@ -139,11 +138,11 @@ typedef enum
  * types.
  *
  * has_test_id is zero for System Information and Global Control, one for Test
- * Configuration, Test Instruction, Variable Instruction Data, Execution
- * Control, Test Result, and Variable Result Data, optional for Error, and
- * scope-dependent for Response. A Global Control Response has no Test ID; all
- * test-scoped Responses require one. test_id bytes are ignored when
- * has_test_id is zero; no byte pattern is reserved for absence.
+ * Configuration, Test Instruction, Update Instruction, Execution Control, Test
+ * Result, and Variable Test Result, optional for Error, and scope-dependent for
+ * Response. A Global Control Response has no Test ID; all test-scoped Responses
+ * require one. test_id bytes are ignored when has_test_id is zero; no byte
+ * pattern is reserved for absence.
  *
  * Nested pointer fields are borrowed only during synchronous typed validation
  * or encoding. A successful decoder copies variable arrays/bytes into the
@@ -171,16 +170,16 @@ typedef struct
         HIL_Application_Test_Configuration_T test_configuration;
         /** Body for TEST_INSTRUCTION. */
         HIL_Application_Test_Instruction_T test_instruction;
-        /** Body for VARIABLE_INSTRUCTION_DATA. */
-        HIL_Application_Variable_Instruction_Data_T variable_instruction_data;
+        /** Body for UPDATE_INSTRUCTION. */
+        HIL_Application_Update_Instruction_T update_instruction;
         /** Body for EXECUTION_CONTROL. */
         HIL_Application_Execution_Control_T execution_control;
         /** Body for GLOBAL_CONTROL. */
         HIL_Application_Global_Control_T global_control;
         /** Body for TEST_RESULT. */
         HIL_Application_Test_Result_T test_result;
-        /** Body for VARIABLE_RESULT_DATA. */
-        HIL_Application_Variable_Result_Data_T variable_result_data;
+        /** Body for VARIABLE_TEST_RESULT. */
+        HIL_Application_Variable_Test_Result_T variable_test_result;
         /** Body for RESPONSE. */
         HIL_Application_Response_T response;
         /** Body for ERROR. */

@@ -130,21 +130,21 @@ payload offset
 | 4 | 2 bytes | application protocol minor | little-endian `uint16_t` |
 | 6 | 2 bytes | application protocol patch | little-endian `uint16_t` |
 
-For repository protocol version 0.2.0, a BASIC request asking for the Git hash has this literal complete
+For repository protocol version 0.3.0, a BASIC request asking for the Git hash has this literal complete
 wire vector:
 
 ```text
-00 02 00
+00 03 00
 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 01 01 08 00
-01 01 00 00 02 00 00 00
+01 01 00 00 03 00 00 00
 ```
 
 Broken down:
 
 ```text
 00       protocol major = 0
-02       protocol minor = 2
+03       protocol minor = 3
 00       Test ID absent
 00..00   16 zero Test-ID bytes
 01       SYSTEM_INFO_REQUEST
@@ -153,12 +153,12 @@ Broken down:
 01       request firmware Git hash
 01       BASIC query
 00 00    protocol major = 0
-02 00    protocol minor = 2
+03 00    protocol minor = 3
 00 00    protocol patch = 0
 ```
 
-The literal version bytes above are a golden example for protocol 0.2.0, not a rule that future protocol
-versions remain 0.2.0.
+The literal version bytes above are a golden example for protocol 0.3.0, not a rule that future protocol
+versions remain 0.3.0.
 
 ## System Information Response
 
@@ -370,16 +370,14 @@ complete-test storage capacity, cross-driver conflicts, or workflow state.
 Analogue-input sampling frequency, analogue-output DAC/reference selection, and
 hardware-specific rate/timing choices remain firmware policies. Unsupported
 hardware configurations must be rejected by integration rather than silently
-substituted. Those decisions
-belong to firmware integration. Variable communication instruction/result
-messages remain deferred even though communication Test Configuration is now
-implemented.
+substituted. Those decisions belong to firmware integration. Type 21 and Type
+34 communication operation/capture records are bounded per-message wire data;
+their cross-message assembly remains endpoint integration policy.
 
 ## Test Instruction fixed body
 
 Test Instruction is a fully supported fixed codec family. It requires subtype `NONE` and a Test ID.
-The payload is exactly 50 bytes and the complete message is exactly 73 bytes. Variable instruction
-declarations/data remain deliberately deferred and are not represented or encoded by this fixed body.
+The payload is exactly 50 bytes and the complete message is exactly 73 bytes.
 
 | Payload offset | Width | Field |
 | ---: | ---: | --- |
@@ -394,6 +392,41 @@ period requires zero duty. `tick_number` must be less than `context->config.max_
 Analogue range and hardware-specific PWM feasibility are not validated. The codec retains no active
 Test Configuration, so comparing the tick against that test's actual `expected_tick_count`, enabled
 channels, or ordering is an integration responsibility.
+
+## Update Instruction body
+
+Update Instruction is a fully supported variable-length codec family (type 21). It requires subtype `NONE` and a Test ID. Each message contains one chunk of sparse logical peripheral operations and streaming serial data for one zero-based tick. Cross-message chunk order and family selection are endpoint integration rules.
+
+### Payload header (8 bytes)
+
+| Payload offset | Width | Field | Encoding rule |
+| ---: | ---: | --- | --- |
+| 0 | 4 | `tick_number` | little-endian `uint32_t`, must be `< max_expected_tick_count` |
+| 4 | 1 | `operation_count` | unsigned byte, valid range `1..255` |
+| 5 | 1 | `flags` | `0x00` (`COMPLETE_TICK`) or `0x01` (`HAS_MORE_CHUNKS`) |
+| 6 | 2 | `reserved` | little-endian `uint16_t`, must be zero |
+
+### Operation records (4-byte aligned TLV framing)
+
+The header is immediately followed by `operation_count` records. Each record has a 4-byte header, followed by its payload bytes, and padded to a 4-byte boundary:
+
+| Record offset | Width | Field | Encoding rule |
+| ---: | ---: | --- | --- |
+| 0 | 1 | `peripheral_type` | enum identifier (`DIGITAL_OUTPUT`, `ANALOG_OUTPUT`, `PWM_OUTPUT`, `UART`, `SPI`, `CAN`) |
+| 1 | 1 | `channel` | logical channel index within peripheral family |
+| 2 | 2 | `payload_length` | little-endian `uint16_t`, valid range `1..255` |
+| 4 | N | payload data | exactly `payload_length` bytes |
+| 4 + N | 0..3 | zero padding | `(4 - (N % 4)) % 4` zero bytes to align to a 4-byte boundary |
+
+Padding bytes must strictly be zero on the wire. No duplicate `(peripheral_type, channel)` pairs may appear in the same message.
+
+#### Supported peripheral operation payloads:
+- **`DIGITAL_OUTPUT`**: Channel must be 0 (bank 0). Payload length must be exactly 2 bytes (16-bit mask, bits 10..15 reserved zero).
+- **`ANALOG_OUTPUT`**: Channel must be `< 6`. Payload length must be exactly 4 bytes (`uint32_t` little-endian microvolts).
+- **`PWM_OUTPUT`**: Channel must be `< 2`. Payload length must be exactly 6 bytes (`uint32_t` period ns + `uint16_t` duty permyriad). Duty $\le 10000$, and zero period requires zero duty.
+- **`UART`**: Channel must be `< 2`. Payload length must be `1..255` bytes raw communication data.
+- **`SPI`**: Channel must be `< 2`. Payload framing: `num_packets (1B)` + `packet_sizes (P bytes)` + `data (M bytes)`, where each packet size $\ge 1$ and $\sum \text{sizes} == M$.
+- **`CAN`**: Channel must be `< 2`. Payload length must be a non-zero multiple of 12 bytes ($12 \times K$). Each frame is 2B `can_id` ($\le 0x7FF$) + 1B `dlc` ($\le 8$) + 8B data + 1B reserved zero.
 
 ## Execution Control and Global Control
 
@@ -417,8 +450,7 @@ actual lifecycle checks and decisions about Application Responses remain endpoin
 ## Test Result fixed body
 
 Test Result is a fully supported fixed codec family. It requires subtype `NONE` and a Test ID. The
-payload is exactly 39 bytes and the complete message is exactly 62 bytes. Variable result
-declarations/data remain deliberately deferred and are not represented or encoded by this fixed body.
+payload is exactly 39 bytes and the complete message is exactly 62 bytes.
 
 | Payload offset | Width | Field |
 | ---: | ---: | --- |
@@ -433,13 +465,52 @@ declarations/data remain deliberately deferred and are not represented or encode
 The codec accepts only Digital values 0 and 1. PWM duty is valid from 0 through 10000, and a zero
 period requires zero duty. `tick_number` must be less than `context->config.max_expected_tick_count`.
 The only structurally valid conditions are `OK`, `PARTIAL`, and `EXECUTION_PROBLEM`; unknown and
-reserved values are rejected. `PARTIAL` is representable even though variable result-data support is
-deferred. Analogue values and `problem_detail` have no additional codec range rule. Active-test tick
+reserved values are rejected. `PARTIAL` is representable. Analogue values and `problem_detail` have
+no additional codec range rule. Active-test tick
 comparison, enabled-channel semantics, result ordering, and hardware feasibility are integration-owned.
+
+## Variable Test Result body
+
+Variable Test Result is a fully supported variable-length codec family (type 34). It requires subtype `NONE` and a Test ID. Each message contains one result chunk with captured peripheral state and incoming communication buffers for one zero-based tick. Cross-message chunk order and assembly are endpoint integration rules.
+
+### Payload header (12 bytes)
+
+| Payload offset | Width | Field | Encoding rule |
+| ---: | ---: | --- | --- |
+| 0 | 4 | `tick_number` | little-endian `uint32_t`, must be `< max_expected_tick_count` |
+| 4 | 1 | `record_count` | unsigned byte, valid range `0..255` |
+| 5 | 1 | `condition` | `OK` (0), `PARTIAL` (1), or `EXECUTION_PROBLEM` (2) |
+| 6 | 1 | `flags` | `0x00` (`COMPLETE_TICK`) or `0x01` (`HAS_MORE_CHUNKS`) |
+| 7 | 1 | `reserved` | unsigned byte, must be zero |
+| 8 | 4 | `problem_detail` | little-endian `uint32_t`, must be 0 when `condition == OK` |
+
+When `record_count == 0`, the payload is exactly 12 bytes.
+
+### Captured records (4-byte aligned TLV framing)
+
+When `record_count > 0`, the header is followed by `record_count` records using the identical 4-byte-aligned TLV layout:
+
+| Record offset | Width | Field | Encoding rule |
+| ---: | ---: | --- | --- |
+| 0 | 1 | `peripheral_type` | enum identifier (`DIGITAL_INPUT`, `ANALOG_INPUT`, `PWM_INPUT`, `UART`, `SPI`, `CAN`) |
+| 1 | 1 | `channel` | logical channel index within peripheral family |
+| 2 | 2 | `payload_length` | little-endian `uint16_t`, valid range `1..255` |
+| 4 | N | captured data | exactly `payload_length` bytes |
+| 4 + N | 0..3 | zero padding | `(4 - (N % 4)) % 4` zero bytes to align to a 4-byte boundary |
+
+Padding bytes must strictly be zero on the wire. No duplicate `(peripheral_type, channel)` pairs may appear in the same message.
+
+#### Supported captured record payloads:
+- **`DIGITAL_INPUT`**: Channel must be 0 (bank 0). Payload length must be exactly 2 bytes (16-bit mask, bits 10..15 reserved zero).
+- **`ANALOG_INPUT`**: Channel must be `< 2`. Payload length must be exactly 4 bytes (`uint32_t` little-endian microvolts).
+- **`PWM_INPUT`**: Channel must be `< 2`. Payload length must be exactly 6 bytes (`uint32_t` period ns + `uint16_t` duty permyriad). Duty $\le 10000$, zero period requires zero duty.
+- **`UART`**: Channel must be `< 2`. Payload length must be `1..255` bytes raw captured data.
+- **`SPI`**: Channel must be `< 2`. Payload length must be `1..255` bytes raw captured data.
+- **`CAN`**: Channel must be `< 2`. Payload length must be a non-zero multiple of 12 bytes ($12 \times K$). Each frame is 2B `can_id` ($\le 0x7FF$) + 1B `dlc` ($\le 8$) + 8B data + 1B reserved zero.
 
 ## Application Response
 
-Application Response is supported in v0.2.0 as type 48, subtype `NONE`. Its body
+Application Response was introduced in v0.2.0 and remains supported as type 48, subtype `NONE`. Its body
 is exactly 13 bytes and requires no decode storage.
 
 | Payload offset | Width | Field |
@@ -460,7 +531,7 @@ apply a scope/outcome/reason/command/tick compatibility matrix.
 
 ## Application Error
 
-Application Error is supported in v0.2.0 as type 49, subtype `NONE`. Its body is
+Application Error was introduced in v0.2.0 and remains supported as type 49, subtype `NONE`. Its body is
 `12 + N` bytes.
 
 | Payload offset | Width | Field |
@@ -496,9 +567,9 @@ The wire contract is paired with deterministic public output rules:
 
 ## Current support boundary
 
-The presence of a documented identifier or public C structure does not mean all façade operations are
-complete. Variable instruction/result bodies remain deliberately deferred.
-Response and Error wire operations are supported; endpoint workflow semantics remain outside the codec. See the support
+Retired variable-message identifiers remain reserved. Type 21 and Type 34 bodies
+are supported by the codec; endpoint workflow semantics remain outside the codec.
+See the support
 table in
 [Application Layer codec and transaction design](application_layer.md#current-message-family-implementation-status)
 before treating a payload family as fully operational.

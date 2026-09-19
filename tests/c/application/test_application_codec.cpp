@@ -155,10 +155,17 @@ static_assert( HIL_APPLICATION_HEADER_SIZE_BYTES == 23u );
 static_assert( HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE == 23u + UINT16_MAX );
 static_assert( HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE == 28u );
 static_assert( HIL_RIG_PROTOCOL_VERSION_MAJOR == 0u );
-static_assert( HIL_RIG_PROTOCOL_VERSION_MINOR == 2u );
+static_assert( HIL_RIG_PROTOCOL_VERSION_MINOR == 3u );
 static_assert( HIL_RIG_PROTOCOL_VERSION_PATCH == 0u );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST == 1 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION == 17 );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL == 19 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL == 20 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION == 21 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT == 32 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT == 34 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_RESPONSE == 48 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_ERROR == 49 );
 static_assert( HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC == 1 );
 static_assert( HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC == 1 );
 
@@ -352,6 +359,38 @@ TEST( ApplicationCodecEnvelope, RejectsMalformedLiteralEnvelopeFields )
     bytes[20] = static_cast<std::uint8_t>( HIL_APPLICATION_MESSAGE_SUBTYPE_NONE );
     ExpectDecodeFailurePublishesNothing( context, bytes.data(), bytes.size(),
                                          HIL_APPLICATION_STATUS_INVALID_SUBTYPE, true );
+}
+
+TEST( ApplicationCodecEnvelope, RejectsRetiredVariableMessageTypes )
+{
+    const auto context = MakeCodecContext();
+
+    for ( const std::uint8_t type : std::array<std::uint8_t, 2u>{ 18u, 33u } )
+    {
+        auto bytes = BasicSystemInfoGolden();
+        bytes[19] = type;
+
+        std::size_t required_storage = 999u;
+        EXPECT_EQ( HIL_APPLICATION_Decode_Storage_Size( &context, bytes.data(), bytes.size(),
+                                                        &required_storage ),
+                   HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE );
+        EXPECT_EQ( required_storage, 0u );
+
+        required_storage = 999u;
+        EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message(
+                       &context, bytes.data(), bytes.size(), &required_storage ),
+                   HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE );
+        EXPECT_EQ( required_storage, 0u );
+
+        HIL_Application_Message_T decoded{};
+        decoded.type     = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
+        std::size_t used = 999u;
+        EXPECT_EQ( HIL_APPLICATION_Decode_Message( &context, bytes.data(), bytes.size(), &decoded,
+                                                   nullptr, 0u, &used ),
+                   HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE );
+        EXPECT_EQ( decoded.type, HIL_APPLICATION_MESSAGE_TYPE_INVALID );
+        EXPECT_EQ( used, 0u );
+    }
 }
 
 TEST( ApplicationCodecEnvelope, PayloadLengthIsLiteralLittleEndianUint16BeyondOneByte )
@@ -577,8 +616,6 @@ TEST( ApplicationCodecContext, AliasedDefaultConfigurationInitializesAndPreserve
     EXPECT_EQ( context.initialized, 1u );
     EXPECT_EQ( context.config.max_encoded_message_size, expected.max_encoded_message_size );
     EXPECT_EQ( context.config.max_variable_data_size, expected.max_variable_data_size );
-    EXPECT_EQ( context.config.max_variable_transfers_per_tick,
-               expected.max_variable_transfers_per_tick );
     EXPECT_EQ( context.config.max_expected_tick_count, expected.max_expected_tick_count );
 }
 
@@ -594,7 +631,6 @@ TEST( ApplicationCodecContext, InvalidAliasedConfigurationFailsAndClearsContext 
     EXPECT_EQ( context.initialized, 0u );
     EXPECT_EQ( context.config.max_encoded_message_size, 0u );
     EXPECT_EQ( context.config.max_variable_data_size, 0u );
-    EXPECT_EQ( context.config.max_variable_transfers_per_tick, 0u );
     EXPECT_EQ( context.config.max_expected_tick_count, 0u );
 }
 
@@ -605,7 +641,6 @@ TEST( ApplicationCodecContext, NonAliasedConfigurationIsStillCopiedOnSuccessfulI
     ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
     config.max_encoded_message_size        = 400u;
     config.max_variable_data_size          = 32u;
-    config.max_variable_transfers_per_tick = 3u;
     config.max_expected_tick_count         = 123u;
 
     ASSERT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_OK );
@@ -614,7 +649,6 @@ TEST( ApplicationCodecContext, NonAliasedConfigurationIsStillCopiedOnSuccessfulI
     EXPECT_EQ( context.initialized, 1u );
     EXPECT_EQ( context.config.max_encoded_message_size, 400u );
     EXPECT_EQ( context.config.max_variable_data_size, 32u );
-    EXPECT_EQ( context.config.max_variable_transfers_per_tick, 3u );
     EXPECT_EQ( context.config.max_expected_tick_count, 123u );
 }
 
@@ -765,36 +799,12 @@ TEST( ApplicationCodecValidation,
     std::array<std::uint8_t, 37u> mismatched_wire_version{};
     std::copy_n( valid.begin(), 35u, mismatched_wire_version.begin() );
     mismatched_wire_version[kPayloadLengthOffset] = 14u;
-    mismatched_wire_version[25]                   = 3u;
+    mismatched_wire_version[25]                   = 4u;
     mismatched_wire_version[35]                   = 0u;
     mismatched_wire_version[36]                   = 0u;
     ExpectDecodeFailurePublishesNothing( context, mismatched_wire_version.data(),
                                          mismatched_wire_version.size(),
                                          HIL_APPLICATION_STATUS_MALFORMED_MESSAGE, true );
-}
-
-TEST( ApplicationCodecDeferredFamilies, UnfinishedVariableInstructionRemainsCleanlyNotImplemented )
-{
-    const auto                context = MakeCodecContext();
-    HIL_Application_Message_T message{};
-    message.type        = HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA;
-    message.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
-    message.has_test_id = 1u;
-
-    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
-               HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
-
-    std::array<std::uint8_t, 64u> encoded{};
-    std::size_t                   encoded_size = 99u;
-    EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, encoded.data(), encoded.size(),
-                                               &encoded_size ),
-               HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
-    EXPECT_EQ( encoded_size, 0u );
-
-    encoded_size = 99u;
-    EXPECT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &encoded_size ),
-               HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
-    EXPECT_EQ( encoded_size, 0u );
 }
 
 TEST( ApplicationCodecFacade, UninitializedContextClearsAllPublishableOutputMetadata )

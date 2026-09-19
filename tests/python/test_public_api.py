@@ -13,6 +13,11 @@ from hil_rig_protocol import (
 )
 
 EXPECTED_EXPORTS = {
+    "PeripheralType",
+    "LogicalOperation",
+    "CapturedRecord",
+    "UpdateInstruction",
+    "VariableTestResult",
     "ApplicationCodec",
     "check_protocol_version",
     "ApplicationStatus",

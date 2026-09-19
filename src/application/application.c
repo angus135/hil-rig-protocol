@@ -43,10 +43,10 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Size( const HIL_Application
             return HIL_APPLICATION_Test_Instructions_size(
                 context, &message->subtype, message->test_id, &message->body.test_instruction,
                 payload_size );
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
-            return HIL_APPLICATION_Variable_Instruction_Data_size(
-                context, &message->subtype, message->test_id,
-                &message->body.variable_instruction_data, payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
+            return HIL_APPLICATION_Update_Instruction_size(
+                context, &message->subtype, message->test_id, &message->body.update_instruction,
+                payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
             return HIL_APPLICATION_Execution_Control_size(
                 context, &message->subtype, message->test_id, &message->body.execution_control,
@@ -58,9 +58,9 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Size( const HIL_Application
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
             return HIL_APPLICATION_Test_Result_size( context, &message->subtype, message->test_id,
                                                      &message->body.test_result, payload_size );
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
-            return HIL_APPLICATION_Variable_Result_Data_size(
-                context, &message->subtype, message->test_id, &message->body.variable_result_data,
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT:
+            return HIL_APPLICATION_Variable_Test_Result_size(
+                context, &message->subtype, message->test_id, &message->body.variable_test_result,
                 payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
             return HIL_APPLICATION_Response_size( context, &message->body.response, payload_size );
@@ -96,10 +96,10 @@ HIL_APPLICATION_Body_Encode( const HIL_Application_Context_T* context,
             return HIL_APPLICATION_Test_Instructions_encode(
                 context, &message->subtype, message->test_id, &message->body.test_instruction,
                 payload_capacity, payload, payload_size );
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
-            return HIL_APPLICATION_Variable_Instruction_Data_encode(
-                context, &message->subtype, message->test_id,
-                &message->body.variable_instruction_data, payload_capacity, payload, payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
+            return HIL_APPLICATION_Update_Instruction_encode(
+                context, &message->subtype, message->test_id, &message->body.update_instruction,
+                payload_capacity, payload, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
             return HIL_APPLICATION_Execution_Control_encode(
                 context, &message->subtype, message->test_id, &message->body.execution_control,
@@ -112,9 +112,9 @@ HIL_APPLICATION_Body_Encode( const HIL_Application_Context_T* context,
             return HIL_APPLICATION_Test_Result_encode( context, &message->subtype, message->test_id,
                                                        &message->body.test_result, payload_capacity,
                                                        payload, payload_size );
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
-            return HIL_APPLICATION_Variable_Result_Data_encode(
-                context, &message->subtype, message->test_id, &message->body.variable_result_data,
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT:
+            return HIL_APPLICATION_Variable_Test_Result_encode(
+                context, &message->subtype, message->test_id, &message->body.variable_test_result,
                 payload_capacity, payload, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
             return HIL_APPLICATION_Response_encode( context, &message->body.response,
@@ -155,11 +155,11 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Decode(
             return HIL_APPLICATION_Test_Instructions_decode(
                 context, &message->subtype, message->test_id, &message->body.test_instruction,
                 payload, payload_size, consumed_payload_size );
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
-            return HIL_APPLICATION_Variable_Instruction_Data_decode(
-                context, &message->subtype, message->test_id,
-                &message->body.variable_instruction_data, payload, payload_size,
-                consumed_payload_size, decoded_data, max_decoded_data_size, used_decoded_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
+            return HIL_APPLICATION_Update_Instruction_decode(
+                context, &message->subtype, message->test_id, &message->body.update_instruction,
+                payload, payload_size, consumed_payload_size, decoded_data, max_decoded_data_size,
+                used_decoded_size );
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
             return HIL_APPLICATION_Execution_Control_decode(
                 context, &message->subtype, message->test_id, &message->body.execution_control,
@@ -174,9 +174,9 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Decode(
             return HIL_APPLICATION_Test_Result_decode( context, &message->subtype, message->test_id,
                                                        &message->body.test_result, payload,
                                                        payload_size, consumed_payload_size );
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
-            return HIL_APPLICATION_Variable_Result_Data_decode(
-                context, &message->subtype, message->test_id, &message->body.variable_result_data,
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT:
+            return HIL_APPLICATION_Variable_Test_Result_decode(
+                context, &message->subtype, message->test_id, &message->body.variable_test_result,
                 payload, payload_size, consumed_payload_size, decoded_data, max_decoded_data_size,
                 used_decoded_size );
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
@@ -297,8 +297,6 @@ HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_
     }
     config->max_encoded_message_size = HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE;
     config->max_variable_data_size   = HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE;
-    config->max_variable_transfers_per_tick =
-        HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK;
     config->max_expected_tick_count = HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT;
     return HIL_APPLICATION_STATUS_OK;
 }
@@ -338,9 +336,7 @@ HIL_Application_Status_T HIL_APPLICATION_Init( HIL_Application_Context_T*      c
     {
         return HIL_APPLICATION_STATUS_INVALID_LENGTH;
     }
-    if ( config_copy.max_variable_data_size > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE
-         || config_copy.max_variable_transfers_per_tick
-                > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK )
+    if ( config_copy.max_variable_data_size > HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE )
     {
         return HIL_APPLICATION_STATUS_INVALID_COUNT;
     }
@@ -604,9 +600,14 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
                 return status;
             }
             return HIL_APPLICATION_STATUS_OK;
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
-            return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+        case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
+            return HIL_APPLICATION_Update_Instruction_Scan(
+                context, &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES], payload_size,
+                required_storage_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT:
+            return HIL_APPLICATION_Variable_Test_Result_Scan(
+                context, &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES], payload_size,
+                required_storage_size );
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
             return HIL_APPLICATION_Error_Scan( context,
                                                &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES],
@@ -697,9 +698,9 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
             return HIL_APPLICATION_Test_Instructions_validate( context,
                                                                &message->body.test_instruction );
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
-            return HIL_APPLICATION_Variable_Instruction_Data_validate(
-                context, &message->body.variable_instruction_data );
+        case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
+            return HIL_APPLICATION_Update_Instruction_validate( context,
+                                                                &message->body.update_instruction );
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
             return HIL_APPLICATION_Execution_Control_validate( context,
                                                                &message->body.execution_control );
@@ -708,9 +709,9 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
                                                             &message->body.global_control );
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
             return HIL_APPLICATION_Test_Result_validate( context, &message->body.test_result );
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
-            return HIL_APPLICATION_Variable_Result_Data_validate(
-                context, &message->body.variable_result_data );
+        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT:
+            return HIL_APPLICATION_Variable_Test_Result_validate(
+                context, &message->body.variable_test_result );
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
             return HIL_APPLICATION_Response_validate( context, &message->body.response );
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:

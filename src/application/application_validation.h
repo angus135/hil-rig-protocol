@@ -74,14 +74,16 @@ HIL_APPLICATION_Test_Instructions_validate( const HIL_Application_Context_T*    
                                             const HIL_Application_Test_Instruction_T* data );
 
 /**
- * @brief Preserve the reserved Variable Instruction Data validation entry point.
+ * @brief Validate an Update Instruction body.
+ * @details Enforces tick ceiling, flags, operation count, unique (peripheral, channel)
+ * pairs, and per-peripheral payload bounds.
  * @param[in] context Initialized Application context.
- * @param[in] data    Typed variable instruction body.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Variable instruction validation is deferred.
+ * @param[in] data    Typed update instruction body.
+ * @return Application status.
  */
-HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_validate(
-    const HIL_Application_Context_T*                   context,
-    const HIL_Application_Variable_Instruction_Data_T* data );
+HIL_Application_Status_T
+HIL_APPLICATION_Update_Instruction_validate( const HIL_Application_Context_T*            context,
+                                             const HIL_Application_Update_Instruction_T* data );
 
 /**
  * @brief Validate an Execution Control body.
@@ -121,14 +123,16 @@ HIL_APPLICATION_Test_Result_validate( const HIL_Application_Context_T*     conte
                                       const HIL_Application_Test_Result_T* data );
 
 /**
- * @brief Preserve the reserved Variable Result Data validation entry point.
+ * @brief Validate a Variable Test Result body.
+ * @details Enforces tick ceiling, condition, problem_detail, flags, unique
+ * (peripheral, channel) pairs, and per-peripheral payload bounds.
  * @param[in] context Initialized Application context.
- * @param[in] data    Typed variable result body.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Variable result validation is deferred.
+ * @param[in] data    Typed variable test result body.
+ * @return Application status.
  */
 HIL_Application_Status_T
-HIL_APPLICATION_Variable_Result_Data_validate( const HIL_Application_Context_T* context,
-                                               const HIL_Application_Variable_Result_Data_T* data );
+HIL_APPLICATION_Variable_Test_Result_validate( const HIL_Application_Context_T* context,
+                                               const HIL_Application_Variable_Test_Result_T* data );
 
 /**
  * @brief Validate the structural fields of an Application Response body.

@@ -234,6 +234,23 @@ ENUMS = {
             "RESERVED": "HIL_APPLICATION_RESULT_CONDITION_RESERVED",
         },
     ),
+    p.PeripheralType: (
+        "HIL_Application_Peripheral_Type_T",
+        {
+            "INVALID": "HIL_APPLICATION_PERIPHERAL_INVALID",
+            "DIGITAL_INPUT": "HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT",
+            "DIGITAL_OUTPUT": "HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT",
+            "ANALOG_INPUT": "HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT",
+            "ANALOG_OUTPUT": "HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT",
+            "PWM_INPUT": "HIL_APPLICATION_PERIPHERAL_PWM_INPUT",
+            "PWM_OUTPUT": "HIL_APPLICATION_PERIPHERAL_PWM_OUTPUT",
+            "UART": "HIL_APPLICATION_PERIPHERAL_UART",
+            "SPI": "HIL_APPLICATION_PERIPHERAL_SPI",
+            "I2C": "HIL_APPLICATION_PERIPHERAL_I2C",
+            "CAN": "HIL_APPLICATION_PERIPHERAL_CAN",
+            "RESERVED": "HIL_APPLICATION_PERIPHERAL_RESERVED",
+        },
+    ),
 }
 
 NATIVE_RECORDS = {
@@ -440,7 +457,7 @@ def test_semantically_invalid_values_can_be_represented():
         replace(result(), condition=p.ResultCondition.RESERVED).condition
         is p.ResultCondition.RESERVED
     )
-    assert p.ApplicationConfig(0, 0, 0, 0).max_encoded_message_size == 0
+    assert p.ApplicationConfig(0, 0, 0).max_encoded_message_size == 0
 
 
 def test_exact_records_and_tuples_reject_subclasses():

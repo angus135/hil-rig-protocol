@@ -11,9 +11,9 @@ The current design has two public layers:
 - **Application Layer** — defines typed messages and the exchange contract for
   system information, test configuration, instructions, execution control,
   results, responses, and errors. Its stateless C codec converts between typed
-  data and one complete, architecture-independent Application message. Several
-  variable instruction/result message-family operations remain deliberately
-  `NOT_IMPLEMENTED`.
+  data and one complete, architecture-independent Application message. Update
+  Instruction and Variable Test Result messages carry bounded chunks; endpoint
+  integrations assemble those chunks across messages.
 - **Transport Layer** — carries each complete, opaque Application message over
   a caller-owned byte stream. Its facade is designed to own framing, integrity,
   session establishment, ordered reliable delivery, and recovery without
@@ -63,14 +63,18 @@ backpressure, reliability, corruption, reset, recovery, and ownership behavior.
 
 The Application layer now has a fixed 23-byte architecture-independent common
 envelope, bounded encode/decode paths, structural validation, exact System
-Information discovery, and complete fixed codec support for Execution Control,
-Global Control, Test Configuration, Test Instruction, Test Result, Application
-Response, and Application Error. Fixed
-Instruction/Result payloads are 50/39 bytes respectively, with Boolean Digital,
-PWM, configured tick-ceiling, and result-condition validation. Discovery uses an
-explicit exact-version gate before a test conversation. Variable-data families
-remain deliberately `NOT_IMPLEMENTED`; analogue hardware
-ranges and stateful production conversation orchestration remain integration work.
+Information discovery, and complete codec support for Execution Control,
+Global Control, Test Configuration, Test Instruction, Update Instruction,
+Test Result, Variable Test Result, Application Response, and Application Error.
+Fixed Instruction/Result payloads are 50/39 bytes respectively, with Boolean Digital,
+PWM, configured tick-ceiling, and result-condition validation. Variable Update
+Instruction (Type 21) and Variable Test Result (Type 34) provide sparse peripheral
+operation and event streaming using 4-byte-aligned TLV framing, streaming chunk flags
+(`COMPLETE_TICK` and `HAS_MORE_CHUNKS`), and allocation-free decode storage scanning.
+Discovery uses an explicit exact-version gate before a test conversation. Retired
+variable-message identifiers remain reserved and must not be reused; analogue
+hardware ranges and stateful production conversation orchestration remain
+integration work.
 
 Public C Application-to-Transport integration now exercises representative and
 maximum Test Configuration messages, fixed Test Instructions from host to rig and Test Results

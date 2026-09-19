@@ -126,7 +126,6 @@ def test_defaults_direction_neutrality_and_statelessness(codec):
         (p.ApplicationConfig(max_encoded_message_size=0), p.ApplicationStatus.BUFFER_TOO_SMALL),
         (p.ApplicationConfig(max_encoded_message_size=65559), p.ApplicationStatus.INVALID_LENGTH),
         (p.ApplicationConfig(max_variable_data_size=256), p.ApplicationStatus.INVALID_COUNT),
-        (p.ApplicationConfig(max_variable_transfers_per_tick=9), p.ApplicationStatus.INVALID_COUNT),
         (p.ApplicationConfig(max_expected_tick_count=1000001), p.ApplicationStatus.INVALID_LENGTH),
     ],
 )
@@ -277,19 +276,13 @@ def test_invalid_wire_envelope(codec, offset, value, status):
     assert caught.value.status is status
 
 
-@pytest.mark.parametrize(
-    "family",
-    [
-        "VARIABLE_INSTRUCTION_DATA",
-        "VARIABLE_RESULT_DATA",
-    ],
-)
-def test_deferred_families(codec, family):
+@pytest.mark.parametrize("wire_type", [18, 33])
+def test_retired_variable_wire_types_are_invalid(codec, wire_type):
     wire = bytearray(codec.encode(instruction()))
-    wire[19] = getattr(lib, "HIL_APPLICATION_MESSAGE_TYPE_" + family)
+    wire[19] = wire_type
     with pytest.raises(p.ApplicationDecodeError) as caught:
         codec.decode(wire)
-    assert caught.value.status is p.ApplicationStatus.NOT_IMPLEMENTED
+    assert caught.value.status is p.ApplicationStatus.INVALID_MESSAGE_TYPE
 
 
 @pytest.mark.parametrize(
@@ -297,8 +290,8 @@ def test_deferred_families(codec, family):
     [
         # Golden vectors from tests/c/application/test_application_codec.cpp.
         bytes.fromhex(
-            "00 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 "
-            "01 08 00 01 01 00 00 02 00 00 00"
+            "00 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 "
+            "01 08 00 01 01 00 00 03 00 00 00"
         ),
         bytes.fromhex(
             "00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 "
@@ -406,11 +399,11 @@ def test_maximum_discovery_response_owns_both_native_storage_spans():
 
 def test_foreign_discovery_decodes_before_explicit_compatibility_failure(codec):
     wire = bytearray(codec.encode(p.SystemInfoRequest()))
-    wire[1] = 3
-    wire[27] = 3
+    wire[1] = 4
+    wire[27] = 4
     peer = codec.decode(wire)
     assert isinstance(peer, p.SystemInfoRequest)
-    assert peer.protocol_version.minor == 3
+    assert peer.protocol_version.minor == 4
     with pytest.raises(p.ApplicationVersionMismatchError):
         p.check_protocol_version(peer.protocol_version)
 
