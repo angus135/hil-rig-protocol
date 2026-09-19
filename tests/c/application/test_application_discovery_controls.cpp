@@ -153,12 +153,12 @@ TEST( ApplicationDiscovery, ForeignDiscoveryDecodesButBodyMustAgreeWithEnvelope 
     ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &request, encoded.data(), encoded.size(),
                                                &output_size ),
                HIL_APPLICATION_STATUS_OK );
-    encoded[1]  = 3u;
-    encoded[27] = 3u;
+    encoded[1]  = 4u;
+    encoded[27] = 4u;
     ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), output_size, &decoded,
                                                nullptr, 0u, &used_storage ),
                HIL_APPLICATION_STATUS_OK );
-    EXPECT_EQ( decoded.body.system_info_request.application_protocol_minor, 3u );
+    EXPECT_EQ( decoded.body.system_info_request.application_protocol_minor, 4u );
     EXPECT_EQ( HIL_APPLICATION_Check_Protocol_Version(
                    decoded.body.system_info_request.application_protocol_major,
                    decoded.body.system_info_request.application_protocol_minor,
