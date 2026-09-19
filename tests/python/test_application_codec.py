@@ -276,6 +276,15 @@ def test_invalid_wire_envelope(codec, offset, value, status):
     assert caught.value.status is status
 
 
+@pytest.mark.parametrize("wire_type", [18, 33])
+def test_retired_variable_wire_types_are_invalid(codec, wire_type):
+    wire = bytearray(codec.encode(instruction()))
+    wire[19] = wire_type
+    with pytest.raises(p.ApplicationDecodeError) as caught:
+        codec.decode(wire)
+    assert caught.value.status is p.ApplicationStatus.INVALID_MESSAGE_TYPE
+
+
 @pytest.mark.parametrize(
     "wire",
     [

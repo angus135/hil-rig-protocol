@@ -41,18 +41,21 @@ There is no Application sequence number. Transport delivery acknowledgement rema
 | `SYSTEM_INFO_RESPONSE` | 2 |
 | `TEST_CONFIGURATION` | 16 |
 | `TEST_INSTRUCTION` | 17 |
-| `VARIABLE_INSTRUCTION_DATA` | 18 |
+| Retired/reserved | 18 |
 | `EXECUTION_CONTROL` | 19 |
 | `GLOBAL_CONTROL` | 20 |
 | `UPDATE_INSTRUCTION` | 21 |
 | `TEST_RESULT` | 32 |
-| `VARIABLE_RESULT_DATA` | 33 |
+| Retired/reserved | 33 |
 | `VARIABLE_TEST_RESULT` | 34 |
 | `RESPONSE` | 48 |
 | `ERROR` | 49 |
 | `RESERVED` | 255 |
 
 The explicit values are stable one-byte wire identifiers. Changing an assigned value requires protocol-version compatibility review.
+Wire values 18 and 33 are retired and reserved: they historically identified the
+removed Variable Instruction Data and Variable Result Data placeholder families,
+respectively, and neither value may be reused.
 
 ## Test ID
 
