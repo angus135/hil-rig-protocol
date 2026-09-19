@@ -290,8 +290,8 @@ def test_retired_variable_wire_types_are_invalid(codec, wire_type):
     [
         # Golden vectors from tests/c/application/test_application_codec.cpp.
         bytes.fromhex(
-            "00 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 "
-            "01 08 00 01 01 00 00 02 00 00 00"
+            "00 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 "
+            "01 08 00 01 01 00 00 03 00 00 00"
         ),
         bytes.fromhex(
             "00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 "
@@ -399,11 +399,11 @@ def test_maximum_discovery_response_owns_both_native_storage_spans():
 
 def test_foreign_discovery_decodes_before_explicit_compatibility_failure(codec):
     wire = bytearray(codec.encode(p.SystemInfoRequest()))
-    wire[1] = 3
-    wire[27] = 3
+    wire[1] = 4
+    wire[27] = 4
     peer = codec.decode(wire)
     assert isinstance(peer, p.SystemInfoRequest)
-    assert peer.protocol_version.minor == 3
+    assert peer.protocol_version.minor == 4
     with pytest.raises(p.ApplicationVersionMismatchError):
         p.check_protocol_version(peer.protocol_version)
 

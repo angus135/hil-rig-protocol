@@ -130,21 +130,21 @@ payload offset
 | 4 | 2 bytes | application protocol minor | little-endian `uint16_t` |
 | 6 | 2 bytes | application protocol patch | little-endian `uint16_t` |
 
-For repository protocol version 0.2.0, a BASIC request asking for the Git hash has this literal complete
+For repository protocol version 0.3.0, a BASIC request asking for the Git hash has this literal complete
 wire vector:
 
 ```text
-00 02 00
+00 03 00
 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 01 01 08 00
-01 01 00 00 02 00 00 00
+01 01 00 00 03 00 00 00
 ```
 
 Broken down:
 
 ```text
 00       protocol major = 0
-02       protocol minor = 2
+03       protocol minor = 3
 00       Test ID absent
 00..00   16 zero Test-ID bytes
 01       SYSTEM_INFO_REQUEST
@@ -153,12 +153,12 @@ Broken down:
 01       request firmware Git hash
 01       BASIC query
 00 00    protocol major = 0
-02 00    protocol minor = 2
+03 00    protocol minor = 3
 00 00    protocol patch = 0
 ```
 
-The literal version bytes above are a golden example for protocol 0.2.0, not a rule that future protocol
-versions remain 0.2.0.
+The literal version bytes above are a golden example for protocol 0.3.0, not a rule that future protocol
+versions remain 0.3.0.
 
 ## System Information Response
 
@@ -510,7 +510,7 @@ Padding bytes must strictly be zero on the wire. No duplicate `(peripheral_type,
 
 ## Application Response
 
-Application Response is supported in v0.2.0 as type 48, subtype `NONE`. Its body
+Application Response was introduced in v0.2.0 and remains supported as type 48, subtype `NONE`. Its body
 is exactly 13 bytes and requires no decode storage.
 
 | Payload offset | Width | Field |
@@ -531,7 +531,7 @@ apply a scope/outcome/reason/command/tick compatibility matrix.
 
 ## Application Error
 
-Application Error is supported in v0.2.0 as type 49, subtype `NONE`. Its body is
+Application Error was introduced in v0.2.0 and remains supported as type 49, subtype `NONE`. Its body is
 `12 + N` bytes.
 
 | Payload offset | Width | Field |
