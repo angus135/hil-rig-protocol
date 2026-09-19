@@ -96,7 +96,8 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_encode(
 
 /**
  * @brief Encode the exact 50-byte fixed Test Instruction payload.
- * @details Variable instruction declarations/data remain deliberately deferred.
+ * @details Type 21 variable instruction records are encoded by
+ *          HIL_APPLICATION_Update_Instruction_encode().
  * @param[in]  context          Application context.
  * @param[in]  sub_type         Message subtype selected by the public envelope.
  * @param[in]  test_id          Envelope Test ID value.

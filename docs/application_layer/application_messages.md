@@ -122,7 +122,7 @@ after decoding. `HIL_Application_Context_T` contains no endpoint role.
 Caller storage supplied to `HIL_APPLICATION_Decode_Message` must have at least
 `HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT` alignment. The constant is usable as
 a C11 `_Alignas` operand and a C++ `alignas` operand and is sufficient for every
-public typed object placed in decode storage. The size query reports usable byte capacity assuming that alignment. This foundation does not add a new runtime alignment policy; existing message-specific storage behaviour is preserved while variable-storage families remain unfinished.
+public typed object placed in decode storage. The size query reports usable byte capacity assuming that alignment. This foundation does not add a new runtime alignment policy; Type 21 and Type 34 storage behaviour is implemented within the existing per-message storage contract, while cross-message assembly remains an endpoint responsibility.
 
 ```c
 _Alignas(HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT)
