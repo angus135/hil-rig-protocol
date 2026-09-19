@@ -158,7 +158,14 @@ static_assert( HIL_RIG_PROTOCOL_VERSION_MAJOR == 0u );
 static_assert( HIL_RIG_PROTOCOL_VERSION_MINOR == 2u );
 static_assert( HIL_RIG_PROTOCOL_VERSION_PATCH == 0u );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST == 1 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION == 17 );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL == 19 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL == 20 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION == 21 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT == 32 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT == 34 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_RESPONSE == 48 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_ERROR == 49 );
 static_assert( HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC == 1 );
 static_assert( HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC == 1 );
 
@@ -352,6 +359,38 @@ TEST( ApplicationCodecEnvelope, RejectsMalformedLiteralEnvelopeFields )
     bytes[20] = static_cast<std::uint8_t>( HIL_APPLICATION_MESSAGE_SUBTYPE_NONE );
     ExpectDecodeFailurePublishesNothing( context, bytes.data(), bytes.size(),
                                          HIL_APPLICATION_STATUS_INVALID_SUBTYPE, true );
+}
+
+TEST( ApplicationCodecEnvelope, RejectsRetiredVariableMessageTypes )
+{
+    const auto context = MakeCodecContext();
+
+    for ( const std::uint8_t type : { 18u, 33u } )
+    {
+        auto bytes = BasicSystemInfoGolden();
+        bytes[19] = type;
+
+        std::size_t required_storage = 999u;
+        EXPECT_EQ( HIL_APPLICATION_Decode_Storage_Size( &context, bytes.data(), bytes.size(),
+                                                        &required_storage ),
+                   HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE );
+        EXPECT_EQ( required_storage, 0u );
+
+        required_storage = 999u;
+        EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message(
+                       &context, bytes.data(), bytes.size(), &required_storage ),
+                   HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE );
+        EXPECT_EQ( required_storage, 0u );
+
+        HIL_Application_Message_T decoded{};
+        decoded.type     = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
+        std::size_t used = 999u;
+        EXPECT_EQ( HIL_APPLICATION_Decode_Message( &context, bytes.data(), bytes.size(), &decoded,
+                                                   nullptr, 0u, &used ),
+                   HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE );
+        EXPECT_EQ( decoded.type, HIL_APPLICATION_MESSAGE_TYPE_INVALID );
+        EXPECT_EQ( used, 0u );
+    }
 }
 
 TEST( ApplicationCodecEnvelope, PayloadLengthIsLiteralLittleEndianUint16BeyondOneByte )
