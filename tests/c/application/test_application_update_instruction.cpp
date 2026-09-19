@@ -46,9 +46,9 @@ HIL_Application_Test_Id_T TestId()
 }
 
 HIL_Application_Context_T
-MakeContext( std::size_t   max_message = HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE,
-             std::uint32_t max_ticks   = HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT,
-             std::size_t   max_variable_data_size = HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE )
+MakeContext( std::size_t   max_message          = HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE,
+             std::uint32_t max_ticks            = HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT,
+             std::size_t max_variable_data_size = HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE )
 {
     HIL_Application_Config_T  config{};
     HIL_Application_Context_T context{};
@@ -505,7 +505,7 @@ TEST( ApplicationUpdateInstructionValidation, ConfiguredVariableDataSizeBoundsUa
     const auto context = MakeContext( HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE,
                                       HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT, 3u );
 
-    const std::array<std::uint8_t, 3u> accepted_payload = { 'a', 'b', 'c' };
+    const std::array<std::uint8_t, 3u>  accepted_payload = { 'a', 'b', 'c' };
     HIL_Application_Logical_Operation_T accepted_operation{};
     accepted_operation.peripheral_type = HIL_APPLICATION_PERIPHERAL_UART;
     accepted_operation.channel         = 0u;
@@ -515,13 +515,13 @@ TEST( ApplicationUpdateInstructionValidation, ConfiguredVariableDataSizeBoundsUa
     HIL_Application_Update_Instruction_T accepted{};
     accepted.flags           = HIL_APPLICATION_INSTRUCTION_FLAG_COMPLETE_TICK;
     accepted.operation_count = 1u;
-    accepted.operations     = &accepted_operation;
+    accepted.operations      = &accepted_operation;
 
     const auto encoded = EncodeUpdateInstruction( context, accepted );
     EXPECT_FALSE( encoded.empty() );
     ExpectRoundTrip( context, accepted );
 
-    const std::array<std::uint8_t, 4u> rejected_payload = { 'a', 'b', 'c', 'd' };
+    const std::array<std::uint8_t, 4u>  rejected_payload = { 'a', 'b', 'c', 'd' };
     HIL_Application_Logical_Operation_T rejected_operation{};
     rejected_operation.peripheral_type = HIL_APPLICATION_PERIPHERAL_UART;
     rejected_operation.channel         = 0u;
@@ -531,7 +531,7 @@ TEST( ApplicationUpdateInstructionValidation, ConfiguredVariableDataSizeBoundsUa
     HIL_Application_Update_Instruction_T rejected{};
     rejected.flags           = HIL_APPLICATION_INSTRUCTION_FLAG_COMPLETE_TICK;
     rejected.operation_count = 1u;
-    rejected.operations     = &rejected_operation;
+    rejected.operations      = &rejected_operation;
     ExpectValidationFailure( context, rejected );
 }
 

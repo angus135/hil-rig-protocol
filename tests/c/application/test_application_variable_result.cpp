@@ -46,9 +46,9 @@ HIL_Application_Test_Id_T TestId()
 }
 
 HIL_Application_Context_T
-MakeContext( std::size_t   max_message = HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE,
-             std::uint32_t max_ticks   = HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT,
-             std::size_t   max_variable_data_size = HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE )
+MakeContext( std::size_t   max_message          = HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE,
+             std::uint32_t max_ticks            = HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT,
+             std::size_t max_variable_data_size = HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE )
 {
     HIL_Application_Config_T  config{};
     HIL_Application_Context_T context{};
@@ -430,7 +430,7 @@ TEST( ApplicationVariableResultValidation, ConfiguredVariableDataSizeBoundsUartP
                                       HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT, 3u );
 
     const std::array<std::uint8_t, 3u> accepted_payload = { 'a', 'b', 'c' };
-    HIL_Application_Captured_Record_T accepted_record{};
+    HIL_Application_Captured_Record_T  accepted_record{};
     accepted_record.peripheral_type = HIL_APPLICATION_PERIPHERAL_UART;
     accepted_record.channel         = 0u;
     accepted_record.data            = { accepted_payload.data(),
@@ -446,7 +446,7 @@ TEST( ApplicationVariableResultValidation, ConfiguredVariableDataSizeBoundsUartP
     ExpectRoundTrip( context, accepted );
 
     const std::array<std::uint8_t, 4u> rejected_payload = { 'a', 'b', 'c', 'd' };
-    HIL_Application_Captured_Record_T rejected_record{};
+    HIL_Application_Captured_Record_T  rejected_record{};
     rejected_record.peripheral_type = HIL_APPLICATION_PERIPHERAL_UART;
     rejected_record.channel         = 0u;
     rejected_record.data            = { rejected_payload.data(),

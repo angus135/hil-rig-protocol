@@ -297,7 +297,7 @@ HIL_Application_Status_T HIL_APPLICATION_Default_Config( HIL_Application_Config_
     }
     config->max_encoded_message_size = HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE;
     config->max_variable_data_size   = HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE;
-    config->max_expected_tick_count = HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT;
+    config->max_expected_tick_count  = HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT;
     return HIL_APPLICATION_STATUS_OK;
 }
 
@@ -729,8 +729,8 @@ static HIL_Application_Status_T HIL_APPLICATION_Validate_Decoded_Envelope(
 {
     HIL_Application_Message_T message;
     _Alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT )
-    uint8_t decoded_storage[HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE];
-    size_t                    used_storage = 0u;
+        uint8_t decoded_storage[HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE];
+    size_t      used_storage = 0u;
 
     if ( required_decode_storage > HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE )
     {
