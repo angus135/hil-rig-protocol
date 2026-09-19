@@ -5,8 +5,8 @@
  * @details These helpers report payload bytes only. The public
  * HIL_APPLICATION_Encoded_Size() façade adds the fixed 23-byte envelope with
  * checked arithmetic and enforces the configured complete-message limit.
- * Deliberately unfinished family-specific sizing returns NOT_IMPLEMENTED rather
- * than inferring a size from native C structure layout.
+ * Family-specific sizing validates the typed body before reporting its explicit
+ * payload width.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_SIZE_INTERNAL_H
 #define HIL_RIG_PROTOCOL_APPLICATION_SIZE_INTERNAL_H
@@ -115,22 +115,6 @@ HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_size(
     size_t* encoded_size );
 
 /**
- * @brief Determine the encoded size of variable instruction data.
- *
- * @param[in]  context       Application context.
- * @param[in]  sub_type      Message subtype.
- * @param[in]  test_id       Test ID.
- * @param[in]  data          Variable instruction data.
- * @param[out] encoded_size  Encoded payload size in bytes, excluding the common envelope.
- *
- * @return Application status.
- */
-HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_size(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T                    test_id,
-    const HIL_Application_Variable_Instruction_Data_T* data, size_t* encoded_size );
-
-/**
  * @brief Determine the encoded size of execution control data.
  *
  * @param[in]  context       Application context.
@@ -193,22 +177,6 @@ HIL_APPLICATION_Test_Result_size( const HIL_Application_Context_T*         conte
 HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_size(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Test_Result_T* data,
-    size_t* encoded_size );
-
-/**
- * @brief Determine the encoded size of variable result data.
- *
- * @param[in]  context       Application context.
- * @param[in]  sub_type      Message subtype.
- * @param[in]  test_id       Test ID.
- * @param[in]  data          Variable result data.
- * @param[out] encoded_size  Encoded payload size in bytes, excluding the common envelope.
- *
- * @return Application status.
- */
-HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_size(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Result_Data_T* data,
     size_t* encoded_size );
 
 /**

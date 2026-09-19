@@ -86,16 +86,6 @@ HIL_APPLICATION_Update_Instruction_validate( const HIL_Application_Context_T*   
                                              const HIL_Application_Update_Instruction_T* data );
 
 /**
- * @brief Preserve the reserved Variable Instruction Data validation entry point.
- * @param[in] context Initialized Application context.
- * @param[in] data    Typed variable instruction body.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Variable instruction validation is deferred.
- */
-HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_validate(
-    const HIL_Application_Context_T*                   context,
-    const HIL_Application_Variable_Instruction_Data_T* data );
-
-/**
  * @brief Validate an Execution Control body.
  * @details Only START/ABORT commands are structurally accepted and reserved
  * flags must be zero.
@@ -143,16 +133,6 @@ HIL_APPLICATION_Test_Result_validate( const HIL_Application_Context_T*     conte
 HIL_Application_Status_T
 HIL_APPLICATION_Variable_Test_Result_validate( const HIL_Application_Context_T* context,
                                                const HIL_Application_Variable_Test_Result_T* data );
-
-/**
- * @brief Preserve the reserved Variable Result Data validation entry point.
- * @param[in] context Initialized Application context.
- * @param[in] data    Typed variable result body.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Variable result validation is deferred.
- */
-HIL_Application_Status_T
-HIL_APPLICATION_Variable_Result_Data_validate( const HIL_Application_Context_T* context,
-                                               const HIL_Application_Variable_Result_Data_T* data );
 
 /**
  * @brief Validate the structural fields of an Application Response body.

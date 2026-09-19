@@ -43,7 +43,7 @@ extern "C"
  * @param[in] type         Parsed Application message type.
  * @param[in] payload_size Declared payload extent in bytes.
  * @return OK for an exact fixed width, MALFORMED_MESSAGE for a width mismatch,
- *         or NOT_IMPLEMENTED when the selected family is not fixed-size here.
+ *         or INVALID_ARGUMENT when the selected family is variable-size here.
  */
 HIL_Application_Status_T
 HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_Application_Message_Type_T type,
@@ -166,8 +166,7 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
 /**
  * @brief Decode the exact 50-byte fixed Test Instruction payload.
  * @details The exact width is checked before any field is read and payload_size
- * is published only after all 50 bytes have been consumed. Variable instruction
- * declarations/data remain deliberately outside this fixed decoder.
+ * is published only after all 50 bytes have been consumed.
  * @param[in]  context          Application context.
  * @param[in]  sub_type         Parsed message subtype.
  * @param[in]  test_id          Parsed Test ID value.
@@ -199,27 +198,6 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Instructions_decode(
 HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Update_Instruction_T* data,
-    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
-    size_t max_decoded_data_size, size_t* used_decoded_size );
-
-/**
- * @brief Preserve the Variable Instruction Data decoder entry point.
- * @details Runtime decoding remains deliberately NOT_IMPLEMENTED.
- * @param[in]  context               Application context.
- * @param[in]  sub_type              Parsed message subtype.
- * @param[in]  test_id               Parsed Test ID value.
- * @param[out] data                  Typed body destination.
- * @param[in]  payload               Declared payload bytes.
- * @param[in]  max_payload_size      Declared payload extent.
- * @param[out] payload_size          Payload bytes consumed if implemented.
- * @param[out] decoded_data          Caller decoded-data storage.
- * @param[in]  max_decoded_data_size Available decoded-data capacity.
- * @param[out] used_decoded_size     Decoded-data bytes used if implemented.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Variable instruction decoding is deferred.
- */
-HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_decode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, HIL_Application_Variable_Instruction_Data_T* data,
     const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
     size_t max_decoded_data_size, size_t* used_decoded_size );
 
@@ -266,8 +244,7 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_decode(
 /**
  * @brief Decode the exact 39-byte fixed Test Result payload.
  * @details The exact width is checked before any field is read and payload_size
- * is published only after all 39 bytes have been consumed. Variable result
- * declarations/data remain deliberately outside this fixed decoder.
+ * is published only after all 39 bytes have been consumed.
  * @param[in]  context          Application context.
  * @param[in]  sub_type         Parsed message subtype.
  * @param[in]  test_id          Parsed Test ID value.
@@ -299,27 +276,6 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Result_decode(
 HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Variable_Test_Result_T* data,
-    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
-    size_t max_decoded_data_size, size_t* used_decoded_size );
-
-/**
- * @brief Preserve the Variable Result Data decoder entry point.
- * @details Runtime decoding remains deliberately NOT_IMPLEMENTED.
- * @param[in]  context               Application context.
- * @param[in]  sub_type              Parsed message subtype.
- * @param[in]  test_id               Parsed Test ID value.
- * @param[out] data                  Typed body destination.
- * @param[in]  payload               Declared payload bytes.
- * @param[in]  max_payload_size      Declared payload extent.
- * @param[out] payload_size          Payload bytes consumed if implemented.
- * @param[out] decoded_data          Caller decoded-data storage.
- * @param[in]  max_decoded_data_size Available decoded-data capacity.
- * @param[out] used_decoded_size     Decoded-data bytes used if implemented.
- * @retval HIL_APPLICATION_STATUS_NOT_IMPLEMENTED Variable result decoding is deferred.
- */
-HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_decode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, HIL_Application_Variable_Result_Data_T* data,
     const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
     size_t max_decoded_data_size, size_t* used_decoded_size );
 

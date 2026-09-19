@@ -56,10 +56,8 @@ HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_Application_Message_Type_T type, s
              * and are validated by dedicated bounded scanners, never this fixed-body helper. */
             return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA:
-        case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA:
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
-            return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+            return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
         default:
@@ -906,25 +904,6 @@ HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_decode(
     return HIL_APPLICATION_STATUS_OK;
 }
 
-HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_decode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, HIL_Application_Variable_Instruction_Data_T* data,
-    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
-    size_t max_decoded_data_size, size_t* used_decoded_size )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )payload;
-    ( void )max_payload_size;
-    ( void )payload_size;
-    ( void )decoded_data;
-    ( void )max_decoded_data_size;
-    ( void )used_decoded_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
 HIL_Application_Status_T HIL_APPLICATION_Execution_Control_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Execution_Control_T* data,
@@ -1129,25 +1108,6 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_decode(
     *payload_size      = running_payload;
     *used_decoded_size = pool_offset + payload_bytes_copied;
     return HIL_APPLICATION_STATUS_OK;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_decode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, HIL_Application_Variable_Result_Data_T* data,
-    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
-    size_t max_decoded_data_size, size_t* used_decoded_size )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )payload;
-    ( void )max_payload_size;
-    ( void )payload_size;
-    ( void )decoded_data;
-    ( void )max_decoded_data_size;
-    ( void )used_decoded_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Response_decode( HIL_Application_Response_T* data,

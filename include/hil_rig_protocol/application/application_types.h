@@ -262,58 +262,13 @@ typedef struct
 } HIL_Application_Pwm_Input_Value_T;
 
 /**
- * @brief Declared variable-data transfer associated with one fixed tick.
- *
- * @details data.size must be nonzero; a channel with no variable data is
- * omitted from the declaration array. Within one fixed instruction or result,
- * each (peripheral, channel) pair may be declared at most once. The future
- * codec validates those rules from the complete fixed message. The declaration
- * representation and its fixed-message integration remain future work in the
- * current façade.
- *
- * Under the initial transaction contract, each declaration has exactly one
- * matching variable instruction/result message. A duplicate variable message
- * for the same declaration is invalid. Endpoint integration tracks that
- * cross-message relationship; the stateless codec does not. Multi-part
- * Application transfers are deferred. Each complete encoded message uses one
- * MVP Transport frame.
- */
-typedef struct
-{
-    /** UART, SPI, I2C, or CAN channel carrying the variable bytes. */
-    HIL_Application_Channel_Id_T channel;
-    /** Exact bytes expected in the matching variable-data message. */
-    HIL_Application_Byte_Span_T data;
-} HIL_Application_Data_Declaration_T;
-
-/**
- * @brief Variable communication bytes associated with one test tick.
- *
- * @details The enclosing message envelope supplies the test ID. tick_number,
- * channel, and data.size provide Application correlation without a separate
- * sequence number. Encoding borrows data during the call; decoding copies it
- * into caller-provided storage and points data there. data.size must be
- * nonzero because channels without variable data are omitted rather than sent
- * as empty variable-data messages.
- */
-typedef struct
-{
-    /** Zero-based tick containing this transfer; integration validates its range. */
-    uint32_t tick_number;
-    /** UART, SPI, I2C, or CAN logical channel. */
-    HIL_Application_Channel_Id_T channel;
-    /** Complete declared transfer bytes; size is the declared byte length. */
-    HIL_Application_Byte_Span_T data;
-} HIL_Application_Peripheral_Data_T;
-
-/**
  * @brief Caller-selected structural bounds for stateless codec operations.
  *
  * @details HIL_APPLICATION_Init() copies this structure into the lightweight
  * codec context. Implemented checks use the applicable values for message sizing,
- * encoding, decoding, and structural validation. Other fields are retained for
- * deliberately deferred message-family work. These are local resource/policy
- * bounds, not final wire maxima and not reservations for an uploaded test.
+ * encoding, decoding, and structural validation. These are local
+ * resource/policy bounds, not final wire maxima and not reservations for an
+ * uploaded test.
  *
  * In particular, max_expected_tick_count limits whether the value carried by a
  * Test Configuration is structurally acceptable and is the exclusive upper
@@ -347,9 +302,6 @@ typedef struct
      * maximum even when this configured policy limit is lower.
      */
     size_t max_variable_data_size;
-
-    /** Maximum variable-data declarations in one typed tick body. */
-    size_t max_variable_transfers_per_tick;
 
     /**
      * Exclusive structural upper bound for fixed-message tick_number values and

@@ -691,18 +691,6 @@ HIL_APPLICATION_Update_Instruction_validate( const HIL_Application_Context_T*   
     return HIL_APPLICATION_STATUS_OK;
 }
 
-HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_validate(
-    const HIL_Application_Context_T*                   context,
-    const HIL_Application_Variable_Instruction_Data_T* data )
-{
-    if ( context->initialized == 0 )
-    {
-        return HIL_APPLICATION_STATUS_UNINITIALIZED;
-    }
-    ( void )data;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
 HIL_Application_Status_T
 HIL_APPLICATION_Execution_Control_validate( const HIL_Application_Context_T*           context,
                                             const HIL_Application_Execution_Control_T* data )
@@ -893,18 +881,6 @@ HIL_APPLICATION_Variable_Test_Result_validate( const HIL_Application_Context_T* 
     }
 
     return HIL_APPLICATION_STATUS_OK;
-}
-
-HIL_Application_Status_T
-HIL_APPLICATION_Variable_Result_Data_validate( const HIL_Application_Context_T* context,
-                                               const HIL_Application_Variable_Result_Data_T* data )
-{
-    if ( context->initialized == 0 )
-    {
-        return HIL_APPLICATION_STATUS_UNINITIALIZED;
-    }
-    ( void )data;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
 HIL_Application_Status_T

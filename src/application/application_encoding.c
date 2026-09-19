@@ -672,25 +672,6 @@ HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_encode(
     return HIL_APPLICATION_STATUS_OK;
 }
 
-HIL_Application_Status_T HIL_APPLICATION_Variable_Instruction_Data_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T                    test_id,
-    const HIL_Application_Variable_Instruction_Data_T* data, size_t max_payload_size,
-    uint8_t* payload, size_t* used_size )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    if ( used_size != NULL )
-    {
-        *used_size = 0u;
-    }
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
-}
-
 HIL_Application_Status_T HIL_APPLICATION_Execution_Control_encode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Execution_Control_T* data,
@@ -860,21 +841,6 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_encode(
 
     *used_size = running_total;
     return HIL_APPLICATION_STATUS_OK;
-}
-
-HIL_Application_Status_T HIL_APPLICATION_Variable_Result_Data_encode(
-    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
-    const HIL_Application_Test_Id_T test_id, const HIL_Application_Variable_Result_Data_T* data,
-    size_t max_payload_size, uint8_t* payload, size_t* used_size )
-{
-    ( void )context;
-    ( void )sub_type;
-    ( void )test_id;
-    ( void )data;
-    ( void )max_payload_size;
-    ( void )payload;
-    ( void )used_size;
-    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Response_encode( const HIL_Application_Context_T*  context,
