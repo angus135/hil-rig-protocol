@@ -245,8 +245,8 @@ TEST( ApplicationTransportIntegration, DiscoveryGatePermitsOnlyMatchingTestSubmi
     }
 
     auto foreign_discovery = discovery_wire;
-    foreign_discovery[1]   = 3u;
-    foreign_discovery[27]  = 3u;
+    foreign_discovery[1]   = 4u;
+    foreign_discovery[27]  = 4u;
     ASSERT_NO_FATAL_FAILURE( DeliverApplicationAndConfirm( pair, TransportTestDirection::HostToRig,
                                                            foreign_discovery, delivered ) );
     used_storage = 0u;
