@@ -365,7 +365,7 @@ TEST( ApplicationCodecEnvelope, RejectsRetiredVariableMessageTypes )
 {
     const auto context = MakeCodecContext();
 
-    for ( const std::uint8_t type : { 18u, 33u } )
+    for ( const std::uint8_t type : std::array<std::uint8_t, 2u>{ 18u, 33u } )
     {
         auto bytes = BasicSystemInfoGolden();
         bytes[19] = type;

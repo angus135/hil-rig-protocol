@@ -54,7 +54,7 @@ HIL_Application_Test_Id_T ExampleTestId()
     return test_id;
 }
 
-std::array<HIL_Application_Message_T, 11u> ConstructEveryMessageFamily()
+std::array<HIL_Application_Message_T, 9u> ConstructEveryMessageFamily()
 {
     const HIL_Application_Test_Id_T test_id = ExampleTestId();
 
