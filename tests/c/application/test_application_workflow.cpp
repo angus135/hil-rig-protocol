@@ -703,9 +703,9 @@ void CompileCodecFacadeUsage()
     HIL_Application_Message_T       decoded{};
 
     ( void )HIL_APPLICATION_Default_Config( &config );
-    config.max_encoded_message_size        = encoded_message.size();
-    config.max_variable_data_size          = 512u;
-    config.max_expected_tick_count         = 1000u;
+    config.max_encoded_message_size = encoded_message.size();
+    config.max_variable_data_size   = 512u;
+    config.max_expected_tick_count  = 1000u;
     ( void )HIL_APPLICATION_Init( &context, &config );
 
     HIL_Application_Message_T configuration{};
@@ -737,8 +737,8 @@ void CompileCodecFacadeUsage()
 
 void CompileUploadConformanceScenarios()
 {
-    const HIL_Application_Test_Id_T    test_a = ExampleTestId( 0x21u );
-    const HIL_Application_Test_Id_T    test_b = ExampleTestId( 0x22u );
+    const HIL_Application_Test_Id_T test_a = ExampleTestId( 0x21u );
+    const HIL_Application_Test_Id_T test_b = ExampleTestId( 0x22u );
 
     HIL_Application_Message_T configuration{};
     configuration.type        = HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION;
@@ -761,24 +761,26 @@ void CompileUploadConformanceScenarios()
                       HIL_APPLICATION_RESPONSE_REASON_HARDWARE_NOT_READY );
 
     HIL_Application_Message_T fixed_tick{};
-    fixed_tick.type                              = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
-    fixed_tick.subtype                           = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
-    fixed_tick.has_test_id                       = 1u;
-    fixed_tick.test_id                           = test_a;
-    fixed_tick.body.test_instruction.tick_number = 0u;
+    fixed_tick.type                               = HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION;
+    fixed_tick.subtype                            = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    fixed_tick.has_test_id                        = 1u;
+    fixed_tick.test_id                            = test_a;
+    fixed_tick.body.test_instruction.tick_number  = 0u;
     const HIL_Application_Message_T tick_accepted = TestResponse(
         test_a, HIL_APPLICATION_RESPONSE_SCOPE_TICK, HIL_APPLICATION_RESPONSE_OUTCOME_ACCEPTED,
         HIL_APPLICATION_RESPONSE_REASON_NONE, 0u );
 
     /* Stop-and-wait: tick 1 is constructed as permitted only after this ACCEPTED. */
-    HIL_Application_Message_T fixed_tick_1         = fixed_tick;
-    fixed_tick_1.body.test_instruction.tick_number = 1u;
+    HIL_Application_Message_T fixed_tick_1          = fixed_tick;
+    fixed_tick_1.body.test_instruction.tick_number  = 1u;
     const HIL_Application_Message_T tick_1_accepted = TestResponse(
         test_a, HIL_APPLICATION_RESPONSE_SCOPE_TICK, HIL_APPLICATION_RESPONSE_OUTCOME_ACCEPTED,
         HIL_APPLICATION_RESPONSE_REASON_NONE, 1u );
 
     const std::array<HIL_Application_Message_T, 3u> stop_and_wait_sequence{
-        fixed_tick, tick_accepted, fixed_tick_1,
+        fixed_tick,
+        tick_accepted,
+        fixed_tick_1,
     };
 
     HIL_Application_Message_T out_of_order_tick         = fixed_tick;
@@ -861,8 +863,8 @@ void CompileControlConformanceScenarios()
 
 void CompileSuccessfulResultConformanceScenario()
 {
-    const HIL_Application_Test_Id_T    test_a = ExampleTestId( 0x41u );
-    HIL_Application_Message_T fixed_result_0{};
+    const HIL_Application_Test_Id_T test_a = ExampleTestId( 0x41u );
+    HIL_Application_Message_T       fixed_result_0{};
     fixed_result_0.type                         = HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT;
     fixed_result_0.subtype                      = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
     fixed_result_0.has_test_id                  = 1u;
@@ -906,7 +908,7 @@ void CompileEarlyExecutionFailureResultScenario()
         result.has_test_id                  = 1u;
         result.test_id                      = test_a;
         result.body.test_result.tick_number = tick;
-        result.body.test_result.condition = HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM;
+        result.body.test_result.condition   = HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM;
         /* Zero-initialized fixed captures are present but Python must ignore them. */
     }
 

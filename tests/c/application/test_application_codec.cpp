@@ -368,7 +368,7 @@ TEST( ApplicationCodecEnvelope, RejectsRetiredVariableMessageTypes )
     for ( const std::uint8_t type : std::array<std::uint8_t, 2u>{ 18u, 33u } )
     {
         auto bytes = BasicSystemInfoGolden();
-        bytes[19] = type;
+        bytes[19]  = type;
 
         std::size_t required_storage = 999u;
         EXPECT_EQ( HIL_APPLICATION_Decode_Storage_Size( &context, bytes.data(), bytes.size(),
@@ -377,8 +377,8 @@ TEST( ApplicationCodecEnvelope, RejectsRetiredVariableMessageTypes )
         EXPECT_EQ( required_storage, 0u );
 
         required_storage = 999u;
-        EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message(
-                       &context, bytes.data(), bytes.size(), &required_storage ),
+        EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &context, bytes.data(), bytes.size(),
+                                                             &required_storage ),
                    HIL_APPLICATION_STATUS_INVALID_MESSAGE_TYPE );
         EXPECT_EQ( required_storage, 0u );
 
@@ -639,9 +639,9 @@ TEST( ApplicationCodecContext, NonAliasedConfigurationIsStillCopiedOnSuccessfulI
     HIL_Application_Config_T  config{};
     HIL_Application_Context_T context{};
     ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
-    config.max_encoded_message_size        = 400u;
-    config.max_variable_data_size          = 32u;
-    config.max_expected_tick_count         = 123u;
+    config.max_encoded_message_size = 400u;
+    config.max_variable_data_size   = 32u;
+    config.max_expected_tick_count  = 123u;
 
     ASSERT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_OK );
     config = HIL_Application_Config_T{};
