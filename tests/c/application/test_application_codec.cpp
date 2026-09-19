@@ -799,7 +799,7 @@ TEST( ApplicationCodecValidation,
     std::array<std::uint8_t, 37u> mismatched_wire_version{};
     std::copy_n( valid.begin(), 35u, mismatched_wire_version.begin() );
     mismatched_wire_version[kPayloadLengthOffset] = 14u;
-    mismatched_wire_version[25]                   = 3u;
+    mismatched_wire_version[25]                   = 4u;
     mismatched_wire_version[35]                   = 0u;
     mismatched_wire_version[36]                   = 0u;
     ExpectDecodeFailurePublishesNothing( context, mismatched_wire_version.data(),

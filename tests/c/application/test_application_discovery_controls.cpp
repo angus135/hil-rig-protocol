@@ -121,7 +121,7 @@ TEST( ApplicationDiscovery, RequestUsesApprovedEightByteLayoutAndExactVersionGat
     EXPECT_EQ( HIL_APPLICATION_Check_Protocol_Version( 1u, HIL_RIG_PROTOCOL_VERSION_MINOR,
                                                        HIL_RIG_PROTOCOL_VERSION_PATCH ),
                HIL_APPLICATION_STATUS_VERSION_MISMATCH );
-    EXPECT_EQ( HIL_APPLICATION_Check_Protocol_Version( HIL_RIG_PROTOCOL_VERSION_MAJOR, 3u,
+    EXPECT_EQ( HIL_APPLICATION_Check_Protocol_Version( HIL_RIG_PROTOCOL_VERSION_MAJOR, 4u,
                                                        HIL_RIG_PROTOCOL_VERSION_PATCH ),
                HIL_APPLICATION_STATUS_VERSION_MISMATCH );
     EXPECT_EQ( HIL_APPLICATION_Check_Protocol_Version( HIL_RIG_PROTOCOL_VERSION_MAJOR,
