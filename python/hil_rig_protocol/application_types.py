@@ -584,15 +584,11 @@ class ApplicationConfig:
 
     max_encoded_message_size: int = 512
     max_variable_data_size: int = 255
-    max_variable_transfers_per_tick: int = 8
     max_expected_tick_count: int = 1_000_000
 
     def __post_init__(self) -> None:
         _validate_integer("max_encoded_message_size", self.max_encoded_message_size, 0, _SIZE_MAX)
         _validate_integer("max_variable_data_size", self.max_variable_data_size, 0, _SIZE_MAX)
-        _validate_integer(
-            "max_variable_transfers_per_tick", self.max_variable_transfers_per_tick, 0, _SIZE_MAX
-        )
         _validate_integer("max_expected_tick_count", self.max_expected_tick_count, 0, _UINT32_MAX)
 
 

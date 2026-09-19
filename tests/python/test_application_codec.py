@@ -126,7 +126,6 @@ def test_defaults_direction_neutrality_and_statelessness(codec):
         (p.ApplicationConfig(max_encoded_message_size=0), p.ApplicationStatus.BUFFER_TOO_SMALL),
         (p.ApplicationConfig(max_encoded_message_size=65559), p.ApplicationStatus.INVALID_LENGTH),
         (p.ApplicationConfig(max_variable_data_size=256), p.ApplicationStatus.INVALID_COUNT),
-        (p.ApplicationConfig(max_variable_transfers_per_tick=9), p.ApplicationStatus.INVALID_COUNT),
         (p.ApplicationConfig(max_expected_tick_count=1000001), p.ApplicationStatus.INVALID_LENGTH),
     ],
 )
@@ -275,21 +274,6 @@ def test_invalid_wire_envelope(codec, offset, value, status):
     with pytest.raises(p.ApplicationDecodeError) as caught:
         codec.decode(wire)
     assert caught.value.status is status
-
-
-@pytest.mark.parametrize(
-    "family",
-    [
-        "VARIABLE_INSTRUCTION_DATA",
-        "VARIABLE_RESULT_DATA",
-    ],
-)
-def test_deferred_families(codec, family):
-    wire = bytearray(codec.encode(instruction()))
-    wire[19] = getattr(lib, "HIL_APPLICATION_MESSAGE_TYPE_" + family)
-    with pytest.raises(p.ApplicationDecodeError) as caught:
-        codec.decode(wire)
-    assert caught.value.status is p.ApplicationStatus.NOT_IMPLEMENTED
 
 
 @pytest.mark.parametrize(

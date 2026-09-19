@@ -268,14 +268,12 @@ def test_defaults_and_smaller_limits():
     assert native_value(config[0]) == {
         "max_encoded_message_size": 512,
         "max_variable_data_size": 255,
-        "max_variable_transfers_per_tick": 8,
         "max_expected_tick_count": 1000000,
     }
     context()
     ctx = context(
         max_encoded_message_size=73,
         max_variable_data_size=0,
-        max_variable_transfers_per_tick=0,
         max_expected_tick_count=2,
     )
     msg, _ = message("instruction")
@@ -297,7 +295,6 @@ def test_defaults_and_smaller_limits():
         ("max_encoded_message_size", 24, lib.HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL),
         ("max_encoded_message_size", 65559, lib.HIL_APPLICATION_STATUS_INVALID_LENGTH),
         ("max_variable_data_size", 256, lib.HIL_APPLICATION_STATUS_INVALID_COUNT),
-        ("max_variable_transfers_per_tick", 9, lib.HIL_APPLICATION_STATUS_INVALID_COUNT),
         ("max_expected_tick_count", 1000001, lib.HIL_APPLICATION_STATUS_INVALID_LENGTH),
     ],
 )
@@ -529,13 +526,6 @@ def test_extension_policy_failure_resets_decode_outputs():
     assert source_owner != ffi.NULL
 
 
-def test_deferred_variable_family():
-    ctx = context()
-    msg, _ = message("instruction")
-    msg.type = lib.HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA
-    assert_typed_failure(ctx, msg, lib.HIL_APPLICATION_STATUS_NOT_IMPLEMENTED)
-
-
 def test_null_initialization_arguments():
     assert (
         lib.HIL_APPLICATION_Default_Config(ffi.NULL) == lib.HIL_APPLICATION_STATUS_INVALID_ARGUMENT
@@ -623,11 +613,11 @@ def test_null_storage_with_nonzero_capacity():
         ("HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE", 2),
         ("HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION", 16),
         ("HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION", 17),
-        ("HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_INSTRUCTION_DATA", 18),
         ("HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL", 19),
         ("HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL", 20),
+        ("HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION", 21),
         ("HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT", 32),
-        ("HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_RESULT_DATA", 33),
+        ("HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT", 34),
         ("HIL_APPLICATION_MESSAGE_TYPE_RESPONSE", 48),
         ("HIL_APPLICATION_MESSAGE_TYPE_ERROR", 49),
         ("HIL_APPLICATION_MESSAGE_TYPE_RESERVED", 255),
@@ -744,7 +734,6 @@ def test_enum_values(name, value):
         ("HIL_APPLICATION_I2C_CHANNEL_COUNT", 2),
         ("HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE", 255),
         ("HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE", 255),
-        ("HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_COUNT_PTICK", 8),
         ("HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT", 1000000),
         ("HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE", 512),
         ("HIL_APPLICATION_PROTOCOL_MAJOR_SIZE_BYTES", 1),
