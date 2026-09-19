@@ -728,7 +728,8 @@ static HIL_Application_Status_T HIL_APPLICATION_Validate_Decoded_Envelope(
     size_t encoded_message_size, size_t required_decode_storage )
 {
     HIL_Application_Message_T message;
-    uint8_t                   decoded_storage[HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE];
+    _Alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT )
+    uint8_t decoded_storage[HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE];
     size_t                    used_storage = 0u;
 
     if ( required_decode_storage > HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE )
