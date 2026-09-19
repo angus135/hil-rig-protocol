@@ -32,9 +32,10 @@ application_codec = ApplicationCodec(
 assert application_codec.config == ApplicationConfig()
 ```
 
-These defaults match `HIL_APPLICATION_Default_Config`. The first three fields are
-native `size_t`; the last is `uint32_t`. Python permits their full unsigned
-representation ranges; native initialization decides whether a policy is usable.
+These defaults match `HIL_APPLICATION_Default_Config`. `max_encoded_message_size`
+and `max_variable_data_size` are native `size_t`; `max_expected_tick_count` is
+`uint32_t`. Python permits their full unsigned representation ranges; native
+initialization decides whether a policy is usable.
 `max_variable_data_size` bounds extension bytes and communication capture limits.
 `max_expected_tick_count` limits configuration tick counts and is the exclusive
 upper bound for fixed-message tick numbers. These limits reserve no tick storage.
