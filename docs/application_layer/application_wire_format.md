@@ -74,6 +74,14 @@ A correctly shaped Test Configuration whose extension exceeds the initialized
 structural policy bound. `BUFFER_TOO_SMALL` is reserved for insufficient caller-provided encode
 capacity or decoded-data storage.
 
+The v0.3.0 profile limits every complete Application message to 512 bytes. A
+context may select a smaller `max_encoded_message_size`, but initialization
+rejects values above 512. The one-byte variable span remains limited to 255
+bytes. A single Type 21 or Type 34 tick may contain at most eight messages, so
+eight maximum-size messages bound a chunked tick to 4096 complete encoded
+bytes. These cross-message limits are enforced by endpoint integrations, not by
+the stateless codec; no aggregate byte or record count is encoded.
+
 ## Fixed-width wire primitives
 
 | Primitive | Width | Encoding |
@@ -204,17 +212,17 @@ PWM duty uses **permyriad** (`0..10000`).
 | 64 | 6 | 6 Analogue Output records, 1 byte each |
 | 70 | 4 | 2 PWM Input records, 2 bytes each |
 | 74 | 16 | 2 PWM Output records, 8 bytes each |
-| 90 | 26 | 2 CAN records, 13 bytes each |
-| 116 | 28 | 2 SPI records, 14 bytes each |
-| 144 | 30 | 2 UART records, 15 bytes each |
-| 174 | 28 | 2 I2C records, 14 bytes each |
-| 202 | 1 | extension length, `uint8_t` |
-| 203 | N | exactly N extension bytes |
+| 90 | 18 | 2 CAN records, 9 bytes each |
+| 108 | 20 | 2 SPI records, 10 bytes each |
+| 128 | 22 | 2 UART records, 11 bytes each |
+| 150 | 20 | 2 I2C records, 10 bytes each |
+| 170 | 1 | extension length, `uint8_t` |
+| 171 | N | exactly N extension bytes |
 
 The fixed payload, through and including the extension-length byte, is exactly
-**203 bytes**. An empty-extension complete message is therefore `23 + 203 =
-226` bytes. Extension length N produces `226 + N` complete bytes. The maximum
-255-byte extension produces a 458-byte payload and a **481-byte complete
+**171 bytes**. An empty-extension complete message is therefore `23 + 171 =
+194` bytes. Extension length N produces `194 + N` complete bytes. The maximum
+255-byte extension produces a 426-byte payload and a **449-byte complete
 message**, which fits the 512-byte default `max_encoded_message_size`. The
 one-byte extension field sets the absolute wire maximum at 255 data bytes, but
 encoding, decoding, decode-storage queries, and encoded-message validation also
@@ -273,15 +281,14 @@ PWM Output, 8 bytes:
 | 2 | 4 | initial period in nanoseconds, `uint32_t` LE |
 | 6 | 2 | initial duty cycle in permyriad, `uint16_t` LE |
 
-CAN, 13 bytes:
+CAN, 9 bytes:
 
 | Record offset | Width | Field |
 | ---: | ---: | --- |
 | 0 | 1 | enabled |
 | 1 | 4 | bit rate, `uint32_t` LE |
-| 5 | 4 | capture limit in bytes, `uint32_t` LE |
-| 9 | 2 | standard receive filter ID, `uint16_t` LE |
-| 11 | 2 | standard receive filter mask, `uint16_t` LE |
+| 5 | 2 | standard receive filter ID, `uint16_t` LE |
+| 7 | 2 | standard receive filter mask, `uint16_t` LE |
 
 Only 11-bit standard CAN identifiers are supported. A received frame matches when
 `(received_standard_id & filter_mask) == (filter_id & filter_mask)`. A zero mask
@@ -293,7 +300,7 @@ selection are not protocol fields. CAN termination is not software-configurable
 through the Application protocol; physical termination must be fixed or handled
 outside Application configuration.
 
-SPI, 14 bytes:
+SPI, 10 bytes:
 
 | Record offset | Width | Field |
 | ---: | ---: | --- |
@@ -304,9 +311,8 @@ SPI, 14 bytes:
 | 7 | 1 | bit order |
 | 8 | 1 | clock polarity |
 | 9 | 1 | clock phase |
-| 10 | 4 | capture limit in bytes, `uint32_t` LE |
 
-UART, 15 bytes:
+UART, 11 bytes:
 
 | Record offset | Width | Field |
 | ---: | ---: | --- |
@@ -318,9 +324,8 @@ UART, 15 bytes:
 | 8 | 1 | stop bits |
 | 9 | 1 | RX enabled, Boolean |
 | 10 | 1 | TX enabled, Boolean |
-| 11 | 4 | capture limit in bytes, `uint32_t` LE |
 
-I2C, 14 bytes:
+I2C, 10 bytes:
 
 | Record offset | Width | Field |
 | ---: | ---: | --- |
@@ -330,7 +335,6 @@ I2C, 14 bytes:
 | 6 | 2 | own 7-bit address stored in `uint16_t`, LE |
 | 8 | 1 | voltage level |
 | 9 | 1 | pull-up selection |
-| 10 | 4 | capture limit in bytes, `uint32_t` LE |
 
 ### Enum assignments
 
@@ -359,9 +363,10 @@ The codec validates the fixed wire shape and typed protocol rules: valid
 Booleans/enums, canonical disabled records, a nonzero expected tick count within
 the configured limit, supported tick duration, zero flags, extension length no
 greater than `max_variable_data_size`, PWM duty no greater than 10000, zero duty
-when period is zero, nonzero rates for enabled communications, capture limits no
-greater than `max_variable_data_size`, 11-bit CAN filter ID/mask bounds, UART
-RX/TX availability and RX/capture consistency, and I2C role/address rules. I2C masters use own address zero; I2C slaves use a
+when period is zero, nonzero rates for enabled communications, 11-bit CAN
+filter ID/mask bounds, UART RX/TX availability, and canonical disabled I2C
+configuration. Enabled I2C is not implemented in v0.3.0 and returns
+`HIL_APPLICATION_STATUS_NOT_IMPLEMENTED`; I2C masters use own address zero; I2C slaves use a
 nonzero 7-bit address `1..127`.
 
 The codec deliberately does not validate physical-channel availability, exact
@@ -371,8 +376,9 @@ Analogue-input sampling frequency, analogue-output DAC/reference selection, and
 hardware-specific rate/timing choices remain firmware policies. Unsupported
 hardware configurations must be rejected by integration rather than silently
 substituted. Those decisions belong to firmware integration. Type 21 and Type
-34 communication operation/capture records are bounded per-message wire data;
-their cross-message assembly remains endpoint integration policy.
+34 communication operation/capture records are implemented bounded per-message
+wire data; I2C operation and capture records remain invalid in v0.3.0. Their
+cross-message assembly remains endpoint integration policy.
 
 ## Test Instruction fixed body
 
@@ -446,6 +452,31 @@ forbids one. `EXECUTION_CONTROL` is type 19 with subtype NONE: START is 1 and AB
 is 28 bytes. Decoding never performs a control. START requires an accepted complete test; ABORT abandons
 the identified operation; RESET_APPLICATION cleans Application state without resetting Transport. The
 actual lifecycle checks and decisions about Application Responses remain endpoint integration work.
+
+## Finalize Test Upload
+
+`FINALIZE_TEST_UPLOAD` is type 22, subtype `NONE`, and is sent from Python to
+firmware. It requires a Test ID and has a four-byte little-endian `flags` body;
+`flags` is reserved and must be zero in v0.3.0. The payload is four bytes and
+the complete message is exactly 27 bytes. It requires no decode storage.
+
+The host sends it only after every submitted instruction tick has received a
+positive Tick Response. It may also send it immediately after an accepted Test
+Configuration when the sparse upload contains no instruction messages. The
+request declares that no more instruction ticks or chunks will be submitted.
+Firmware rejects it when a chunked tick is incomplete, the Test ID is wrong,
+the upload is already invalid, storage is incomplete, or whole-test validation
+fails. An accepted Complete Test Response commits the retained upload and makes
+it eligible for START; a rejected response invalidates it. No instruction is
+valid after successful finalisation, and START remains invalid before the
+accepted Complete Test Response.
+
+Only one response-requiring operation may be outstanding. If Transport/session
+loss makes finalisation uncertain, the host enters the existing recovery path
+and does not blindly resend the request. There is no reverse finalisation
+message for results: fixed results and Type 34 results complete when tick
+`expected_tick_count - 1` is complete, with Type 34 requiring its
+`COMPLETE_TICK` chunk.
 
 ## Test Result fixed body
 
