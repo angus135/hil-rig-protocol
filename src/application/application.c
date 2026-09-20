@@ -47,6 +47,10 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Size( const HIL_Application
             return HIL_APPLICATION_Update_Instruction_size(
                 context, &message->subtype, message->test_id, &message->body.update_instruction,
                 payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD:
+            return HIL_APPLICATION_Finalize_Test_Upload_size(
+                context, &message->subtype, message->test_id, &message->body.finalize_test_upload,
+                payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
             return HIL_APPLICATION_Execution_Control_size(
                 context, &message->subtype, message->test_id, &message->body.execution_control,
@@ -99,6 +103,10 @@ HIL_APPLICATION_Body_Encode( const HIL_Application_Context_T* context,
         case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
             return HIL_APPLICATION_Update_Instruction_encode(
                 context, &message->subtype, message->test_id, &message->body.update_instruction,
+                payload_capacity, payload, payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD:
+            return HIL_APPLICATION_Finalize_Test_Upload_encode(
+                context, &message->subtype, message->test_id, &message->body.finalize_test_upload,
                 payload_capacity, payload, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
             return HIL_APPLICATION_Execution_Control_encode(
@@ -158,6 +166,11 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Decode(
         case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
             return HIL_APPLICATION_Update_Instruction_decode(
                 context, &message->subtype, message->test_id, &message->body.update_instruction,
+                payload, payload_size, consumed_payload_size, decoded_data, max_decoded_data_size,
+                used_decoded_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD:
+            return HIL_APPLICATION_Finalize_Test_Upload_decode(
+                context, &message->subtype, message->test_id, &message->body.finalize_test_upload,
                 payload, payload_size, consumed_payload_size, decoded_data, max_decoded_data_size,
                 used_decoded_size );
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
@@ -539,6 +552,7 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
+        case HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD:
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
             /* Share exact fixed-body width validation with normal body decoding. */
             return HIL_APPLICATION_Fixed_Body_Validate_Size( envelope.type, payload_size );
@@ -580,6 +594,16 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
             if ( ( size_t )extension_size > context->config.max_variable_data_size )
             {
                 return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+            }
+            for ( size_t i = 0u; i < HIL_APPLICATION_I2C_CHANNEL_COUNT; ++i )
+            {
+                if ( encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES
+                                     + HIL_APPLICATION_TEST_CONFIG_I2C_OFFSET
+                                     + ( i * HIL_APPLICATION_TEST_CONFIG_I2C_RECORD_SIZE )]
+                     == 1u )
+                {
+                    return HIL_APPLICATION_STATUS_NOT_IMPLEMENTED;
+                }
             }
             *required_storage_size = ( size_t )extension_size;
             return HIL_APPLICATION_STATUS_OK;
@@ -701,6 +725,9 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
         case HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION:
             return HIL_APPLICATION_Update_Instruction_validate( context,
                                                                 &message->body.update_instruction );
+        case HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD:
+            return HIL_APPLICATION_Finalize_Test_Upload_validate(
+                context, &message->body.finalize_test_upload );
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
             return HIL_APPLICATION_Execution_Control_validate( context,
                                                                &message->body.execution_control );
@@ -723,27 +750,72 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
     }
 }
 
-static HIL_Application_Status_T HIL_APPLICATION_Validate_Decoded_Envelope(
-    const HIL_Application_Context_T* context, const uint8_t* encoded_message,
-    size_t encoded_message_size, size_t required_decode_storage )
+static HIL_Application_Status_T
+HIL_APPLICATION_Validate_Encoded_System_Info_Response( const HIL_Application_Context_T*  context,
+                                                       const HIL_Application_Envelope_T* envelope,
+                                                       const uint8_t* payload, size_t payload_size )
 {
-    HIL_Application_Message_T message;
-    _Alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT )
-        uint8_t decoded_storage[HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE];
-    size_t      used_storage = 0u;
+    HIL_Application_System_Info_Response_T data   = { 0 };
+    size_t                                 offset = 0u;
 
-    if ( required_decode_storage > HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE )
+    data.application_protocol_major = HIL_APPLICATION_Read_U16_Le( &payload[offset] );
+    offset += HIL_APPLICATION_WIRE_U16_SIZE;
+    data.application_protocol_minor = HIL_APPLICATION_Read_U16_Le( &payload[offset] );
+    offset += HIL_APPLICATION_WIRE_U16_SIZE;
+    data.application_protocol_patch = HIL_APPLICATION_Read_U16_Le( &payload[offset] );
+    offset += HIL_APPLICATION_WIRE_U16_SIZE;
+    data.firmware_version_major = HIL_APPLICATION_Read_U16_Le( &payload[offset] );
+    offset += HIL_APPLICATION_WIRE_U16_SIZE;
+    data.firmware_version_minor = HIL_APPLICATION_Read_U16_Le( &payload[offset] );
+    offset += HIL_APPLICATION_WIRE_U16_SIZE;
+    data.firmware_version_patch = HIL_APPLICATION_Read_U16_Le( &payload[offset] );
+    offset += HIL_APPLICATION_WIRE_U16_SIZE;
+
+    const uint8_t diagnostic_size = payload[offset++];
+    data.diagnostic_data.size     = diagnostic_size;
+    data.diagnostic_data.data     = diagnostic_size == 0u ? NULL : &payload[offset];
+    offset += diagnostic_size;
+    const uint8_t git_hash_size = payload[offset++];
+    data.firmware_git_hash.size = git_hash_size;
+    data.firmware_git_hash.data = git_hash_size == 0u ? NULL : &payload[offset];
+
+    if ( offset + git_hash_size != payload_size )
     {
-        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
     }
-    /* Typed validation uses bounded local span storage; the storage query remains allocation-free.
-     */
-    memset( &message, 0, sizeof( message ) );
-    message.type = HIL_APPLICATION_MESSAGE_TYPE_INVALID;
-    return HIL_APPLICATION_Decode_Internal( context, encoded_message, encoded_message_size,
-                                            &message,
-                                            required_decode_storage == 0u ? NULL : decoded_storage,
-                                            required_decode_storage, &used_storage );
+    HIL_Application_Message_T message = { 0 };
+    message.type                      = envelope->type;
+    message.body.system_info_response = data;
+    HIL_Application_Status_T status =
+        HIL_APPLICATION_Validate_Discovery_Envelope_Body( envelope, &message );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    return HIL_APPLICATION_System_Info_Response_validate( context, &data );
+}
+
+static HIL_Application_Status_T
+HIL_APPLICATION_Validate_Encoded_Error( const HIL_Application_Context_T*  context,
+                                        const HIL_Application_Envelope_T* envelope,
+                                        const uint8_t* payload, size_t payload_size )
+{
+    ( void )payload_size;
+    HIL_Application_Error_T data  = { 0 };
+    data.category                 = ( HIL_Application_Error_Category_T )payload[0];
+    data.recoverable              = payload[1];
+    data.has_tick_number          = payload[2];
+    data.tick_number              = HIL_APPLICATION_Read_U32_Le( &payload[3] );
+    data.detail                   = HIL_APPLICATION_Read_U32_Le( &payload[7] );
+    const uint8_t diagnostic_size = payload[HIL_APPLICATION_ERROR_DIAGNOSTIC_LENGTH_OFFSET];
+    data.diagnostic_data.size     = diagnostic_size;
+    data.diagnostic_data.data =
+        diagnostic_size == 0u ? NULL : &payload[HIL_APPLICATION_ERROR_DIAGNOSTIC_DATA_OFFSET];
+    if ( data.has_tick_number == 1u && envelope->has_test_id == 0u )
+    {
+        return HIL_APPLICATION_STATUS_INCONSISTENT_TEST_ID;
+    }
+    return HIL_APPLICATION_Error_validate( context, &data );
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
@@ -777,14 +849,78 @@ HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
         return status;
     }
 
-    status = HIL_APPLICATION_Validate_Decoded_Envelope(
-        context, encoded_message, encoded_message_size, *required_decode_storage );
+    HIL_Application_Envelope_T envelope;
+    status = HIL_APPLICATION_Header_Decoding( &envelope, encoded_message, encoded_message_size );
     if ( status != HIL_APPLICATION_STATUS_OK )
     {
         *required_decode_storage = 0u;
         return status;
     }
-    return HIL_APPLICATION_STATUS_OK;
+    const uint8_t* payload      = &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES];
+    const size_t   payload_size = envelope.payload_length;
+
+    if ( envelope.type == HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION )
+    {
+        status = HIL_APPLICATION_Test_Configuration_Encoded_Validate(
+            context, payload, payload_size, required_decode_storage );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            *required_decode_storage = 0u;
+        }
+        return status;
+    }
+    if ( envelope.type == HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE )
+    {
+        status = HIL_APPLICATION_Validate_Encoded_System_Info_Response( context, &envelope, payload,
+                                                                        payload_size );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            *required_decode_storage = 0u;
+        }
+        return status;
+    }
+    if ( envelope.type == HIL_APPLICATION_MESSAGE_TYPE_ERROR )
+    {
+        status =
+            HIL_APPLICATION_Validate_Encoded_Error( context, &envelope, payload, payload_size );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            *required_decode_storage = 0u;
+        }
+        return status;
+    }
+    if ( envelope.type == HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION
+         || envelope.type == HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT )
+    {
+        return HIL_APPLICATION_STATUS_OK;
+    }
+
+    HIL_Application_Message_T message = { 0 };
+    message.type                      = envelope.type;
+    message.subtype                   = envelope.subtype;
+    message.has_test_id               = envelope.has_test_id;
+    message.test_id                   = envelope.test_id;
+    size_t consumed_payload_size      = 0u;
+    size_t used_decoded_size          = 0u;
+    status = HIL_APPLICATION_Body_Decode( context, &message, payload, payload_size,
+                                          &consumed_payload_size, NULL, 0u, &used_decoded_size );
+    if ( status == HIL_APPLICATION_STATUS_OK && consumed_payload_size != payload_size )
+    {
+        status = HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    if ( status == HIL_APPLICATION_STATUS_OK )
+    {
+        status = HIL_APPLICATION_Validate_Discovery_Envelope_Body( &envelope, &message );
+    }
+    if ( status == HIL_APPLICATION_STATUS_OK )
+    {
+        status = HIL_APPLICATION_Validate_Message( context, &message );
+    }
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        *required_decode_storage = 0u;
+    }
+    return status;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Check_Protocol_Version( uint16_t major, uint16_t minor,

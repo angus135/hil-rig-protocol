@@ -18,7 +18,7 @@ constexpr std::size_t kUpdateHeaderSize    = 8u;
 
 struct alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ) AlignedDecodeStorage
 {
-    std::array<std::uint8_t, 2048u> bytes{};
+    std::array<std::uint8_t, 4096u> bytes{};
 };
 
 void PutU16Le( std::vector<std::uint8_t>& bytes, std::size_t offset, std::uint16_t value )

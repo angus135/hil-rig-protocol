@@ -12,6 +12,7 @@
 #include "application_internal.h"
 #include "application_test_config_internal.h"
 #include "application_size.h"
+#include "application_validation.h"
 
 #include "hil_rig_protocol/application/application_control.h"
 #include "hil_rig_protocol/application/application_error.h"
@@ -42,6 +43,9 @@ HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_Application_Message_Type_T type, s
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
             expected_size = HIL_APPLICATION_CONTROL_FIXED_ENCODE_SIZE;
+            break;
+        case HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD:
+            expected_size = HIL_APPLICATION_WIRE_U32_SIZE;
             break;
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
             expected_size = HIL_APPLICATION_TEST_RESULT_FIXED_PAYLOAD_SIZE;
@@ -168,10 +172,12 @@ HIL_APPLICATION_System_Info_Response_Scan( const HIL_Application_Context_T* cont
  */
 static HIL_Application_Status_T HIL_APPLICATION_Aligned_Records_Scan(
     const HIL_Application_Context_T* context, const uint8_t* payload, size_t payload_size,
-    size_t offset_start, size_t record_count, size_t* total_payload_bytes )
+    size_t offset_start, size_t record_count, HIL_Application_Message_Type_T type,
+    size_t* total_payload_bytes )
 {
-    size_t offset        = offset_start;
-    size_t total_payload = 0u;
+    size_t   offset                                                        = offset_start;
+    size_t   total_payload                                                 = 0u;
+    uint16_t seen_peripheral_channels[HIL_APPLICATION_PERIPHERAL_CAN + 1u] = { 0u };
 
     for ( size_t i = 0u; i < record_count; ++i )
     {
@@ -179,6 +185,9 @@ static HIL_Application_Status_T HIL_APPLICATION_Aligned_Records_Scan(
         {
             return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
         }
+        const HIL_Application_Peripheral_Type_T peripheral_type =
+            ( HIL_Application_Peripheral_Type_T )payload[offset];
+        const uint8_t  channel            = payload[offset + 1u];
         const uint16_t record_payload_len = HIL_APPLICATION_Read_U16_Le( &payload[offset + 2u] );
         offset += HIL_APPLICATION_RECORD_HEADER_SIZE;
 
@@ -193,6 +202,24 @@ static HIL_Application_Status_T HIL_APPLICATION_Aligned_Records_Scan(
         if ( payload_size - offset < ( size_t )record_payload_len )
         {
             return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+        }
+        HIL_Application_Byte_Span_T record_span = { &payload[offset],
+                                                    ( uint8_t )record_payload_len };
+        HIL_Application_Status_T    status      = HIL_APPLICATION_Record_Pair_Mark(
+            seen_peripheral_channels, HIL_APPLICATION_PERIPHERAL_CAN + 1u, peripheral_type,
+            channel );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+        status = type == HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION
+                     ? HIL_APPLICATION_Logical_Operation_Fields_validate( context, peripheral_type,
+                                                                          channel, &record_span )
+                     : HIL_APPLICATION_Captured_Record_Fields_validate( context, peripheral_type,
+                                                                        channel, &record_span );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
         }
         offset += ( size_t )record_payload_len;
 
@@ -243,13 +270,19 @@ HIL_APPLICATION_Update_Instruction_Scan( const HIL_Application_Context_T* contex
     }
 
     const uint8_t  op_count = payload[HIL_APPLICATION_UPDATE_INSTRUCTION_COUNT_OFFSET];
-    const uint8_t  flags    = payload[HIL_APPLICATION_UPDATE_INSTRUCTION_FLAGS_OFFSET];
+    const uint32_t tick_number =
+        HIL_APPLICATION_Read_U32_Le( &payload[HIL_APPLICATION_UPDATE_INSTRUCTION_TICK_OFFSET] );
+    const uint8_t  flags = payload[HIL_APPLICATION_UPDATE_INSTRUCTION_FLAGS_OFFSET];
     const uint16_t reserved =
         HIL_APPLICATION_Read_U16_Le( &payload[HIL_APPLICATION_UPDATE_INSTRUCTION_RESERVED_OFFSET] );
 
     if ( reserved != 0u )
     {
         return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    if ( tick_number >= context->config.max_expected_tick_count )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
     if ( flags > HIL_APPLICATION_INSTRUCTION_FLAG_HAS_MORE_CHUNKS )
     {
@@ -263,7 +296,7 @@ HIL_APPLICATION_Update_Instruction_Scan( const HIL_Application_Context_T* contex
     size_t                   total_payload_bytes = 0u;
     HIL_Application_Status_T status              = HIL_APPLICATION_Aligned_Records_Scan(
         context, payload, payload_size, HIL_APPLICATION_UPDATE_INSTRUCTION_HEADER_SIZE,
-        ( size_t )op_count, &total_payload_bytes );
+        ( size_t )op_count, HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION, &total_payload_bytes );
     if ( status != HIL_APPLICATION_STATUS_OK )
     {
         return status;
@@ -308,7 +341,9 @@ HIL_APPLICATION_Variable_Test_Result_Scan( const HIL_Application_Context_T* cont
         return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
     }
 
-    const uint8_t  rec_count      = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_COUNT_OFFSET];
+    const uint8_t  rec_count = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_COUNT_OFFSET];
+    const uint32_t tick_number =
+        HIL_APPLICATION_Read_U32_Le( &payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_TICK_OFFSET] );
     const uint8_t  condition      = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_CONDITION_OFFSET];
     const uint8_t  flags          = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_FLAGS_OFFSET];
     const uint8_t  reserved       = payload[HIL_APPLICATION_VARIABLE_TEST_RESULT_RESERVED_OFFSET];
@@ -318,6 +353,10 @@ HIL_APPLICATION_Variable_Test_Result_Scan( const HIL_Application_Context_T* cont
     if ( reserved != 0u )
     {
         return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    if ( tick_number >= context->config.max_expected_tick_count )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
     if ( flags > HIL_APPLICATION_RESULT_FLAG_HAS_MORE_CHUNKS )
     {
@@ -347,7 +386,8 @@ HIL_APPLICATION_Variable_Test_Result_Scan( const HIL_Application_Context_T* cont
     size_t                   total_payload_bytes = 0u;
     HIL_Application_Status_T status              = HIL_APPLICATION_Aligned_Records_Scan(
         context, payload, payload_size, HIL_APPLICATION_VARIABLE_TEST_RESULT_HEADER_SIZE,
-        ( size_t )rec_count, &total_payload_bytes );
+        ( size_t )rec_count, HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT,
+        &total_payload_bytes );
     if ( status != HIL_APPLICATION_STATUS_OK )
     {
         return status;
@@ -605,7 +645,6 @@ static void HIL_APPLICATION_Can_Config_decode( HIL_Application_Can_Config_T* dat
     size_t offset = 0u;
     data->enabled = payload[offset++];
     HIL_APPLICATION_Decode_U32_Le( &data->bit_rate, &payload[offset], &offset );
-    HIL_APPLICATION_Decode_U32_Le( &data->capture_limit_bytes, &payload[offset], &offset );
     HIL_APPLICATION_Decode_U16_Le( &data->filter_id, &payload[offset], &offset );
     HIL_APPLICATION_Decode_U16_Le( &data->filter_mask, &payload[offset], &offset );
     *size = HIL_APPLICATION_TEST_CONFIG_CAN_RECORD_SIZE;
@@ -622,8 +661,7 @@ static void HIL_APPLICATION_Spi_Config_decode( HIL_Application_Spi_Config_T* dat
     data->bit_order      = ( HIL_Application_Spi_Bit_Order_T )payload[offset++];
     data->clock_polarity = ( HIL_Application_Spi_Clock_Polarity_T )payload[offset++];
     data->clock_phase    = ( HIL_Application_Spi_Clock_Phase_T )payload[offset++];
-    HIL_APPLICATION_Decode_U32_Le( &data->capture_limit_bytes, &payload[offset], &offset );
-    *size = HIL_APPLICATION_TEST_CONFIG_SPI_RECORD_SIZE;
+    *size                = HIL_APPLICATION_TEST_CONFIG_SPI_RECORD_SIZE;
 }
 
 static void HIL_APPLICATION_Uart_Config_decode( HIL_Application_Uart_Config_T* data,
@@ -638,8 +676,7 @@ static void HIL_APPLICATION_Uart_Config_decode( HIL_Application_Uart_Config_T* d
     data->stop_bits       = ( HIL_Application_Uart_Stop_Bits_T )payload[offset++];
     data->rx_enabled      = payload[offset++];
     data->tx_enabled      = payload[offset++];
-    HIL_APPLICATION_Decode_U32_Le( &data->capture_limit_bytes, &payload[offset], &offset );
-    *size = HIL_APPLICATION_TEST_CONFIG_UART_RECORD_SIZE;
+    *size                 = HIL_APPLICATION_TEST_CONFIG_UART_RECORD_SIZE;
 }
 
 static void HIL_APPLICATION_I2c_Config_decode( HIL_Application_I2c_Config_T* data,
@@ -652,8 +689,7 @@ static void HIL_APPLICATION_I2c_Config_decode( HIL_Application_I2c_Config_T* dat
     HIL_APPLICATION_Decode_U16_Le( &data->own_address_7bit, &payload[offset], &offset );
     data->voltage_level = ( HIL_Application_I2c_Voltage_Level_T )payload[offset++];
     data->pull_up       = ( HIL_Application_I2c_Pull_Up_T )payload[offset++];
-    HIL_APPLICATION_Decode_U32_Le( &data->capture_limit_bytes, &payload[offset], &offset );
-    *size = HIL_APPLICATION_TEST_CONFIG_I2C_RECORD_SIZE;
+    *size               = HIL_APPLICATION_TEST_CONFIG_I2C_RECORD_SIZE;
 }
 
 HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
@@ -762,6 +798,105 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
     running_total += span_encoded;
     *payload_size      = running_total;
     *used_decoded_size = span_decoded;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Test_Configuration_Encoded_Validate( const HIL_Application_Context_T* context,
+                                                     const uint8_t* payload, size_t payload_size,
+                                                     size_t* decoded_storage_size )
+{
+    HIL_Application_Test_Configuration_T data = { 0 };
+    size_t                               running_total;
+    size_t                               record_size = 0u;
+
+    if ( context == NULL || payload == NULL || decoded_storage_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *decoded_storage_size = 0u;
+    if ( payload_size < HIL_APPLICATION_TEST_CONFIG_FIXED_PAYLOAD_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    const uint8_t extension_size = payload[HIL_APPLICATION_TEST_CONFIG_EXTENSION_LENGTH_OFFSET];
+    size_t        required_payload_size = 0u;
+    if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_TEST_CONFIG_FIXED_PAYLOAD_SIZE,
+                                            extension_size, &required_payload_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    if ( payload_size != required_payload_size )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    if ( ( size_t )extension_size > context->config.max_variable_data_size )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+
+    running_total = 0u;
+    HIL_APPLICATION_Decode_U32_Le( &data.tick_duration_us.microseconds, &payload[running_total],
+                                   &running_total );
+    HIL_APPLICATION_Decode_U32_Le( &data.expected_tick_count, &payload[running_total],
+                                   &running_total );
+    HIL_APPLICATION_Decode_U32_Le( &data.flags, &payload[running_total], &running_total );
+
+#define HIL_APPLICATION_VALIDATE_ENCODED_CONFIG_ARRAY( array_, count_, decoder_ )                  \
+    do                                                                                             \
+    {                                                                                              \
+        for ( size_t i_ = 0u; i_ < ( count_ ); ++i_ )                                              \
+        {                                                                                          \
+            decoder_( &( array_ )[i_], &payload[running_total], &record_size );                    \
+            running_total += record_size;                                                          \
+        }                                                                                          \
+    } while ( 0 )
+
+    HIL_APPLICATION_VALIDATE_ENCODED_CONFIG_ARRAY( data.digital_in,
+                                                   HIL_APPLICATION_DIGITAL_INPUT_CHANNEL_COUNT,
+                                                   HIL_APPLICATION_Digital_Input_Config_decode );
+    HIL_APPLICATION_VALIDATE_ENCODED_CONFIG_ARRAY( data.digital_out,
+                                                   HIL_APPLICATION_DIGITAL_OUTPUT_CHANNEL_COUNT,
+                                                   HIL_APPLICATION_Digital_Output_Config_decode );
+    HIL_APPLICATION_VALIDATE_ENCODED_CONFIG_ARRAY( data.analog_in,
+                                                   HIL_APPLICATION_ANALOG_INPUT_CHANNEL_COUNT,
+                                                   HIL_APPLICATION_Analog_Input_Config_decode );
+    HIL_APPLICATION_VALIDATE_ENCODED_CONFIG_ARRAY( data.analog_out,
+                                                   HIL_APPLICATION_ANALOG_OUTPUT_CHANNEL_COUNT,
+                                                   HIL_APPLICATION_Analog_Output_Config_decode );
+    HIL_APPLICATION_VALIDATE_ENCODED_CONFIG_ARRAY( data.pwm_in,
+                                                   HIL_APPLICATION_PWM_INPUT_CHANNEL_COUNT,
+                                                   HIL_APPLICATION_Pwm_Input_Config_decode );
+    HIL_APPLICATION_VALIDATE_ENCODED_CONFIG_ARRAY( data.pwm_out,
+                                                   HIL_APPLICATION_PWM_OUTPUT_CHANNEL_COUNT,
+                                                   HIL_APPLICATION_Pwm_Output_Config_decode );
+    HIL_APPLICATION_VALIDATE_ENCODED_CONFIG_ARRAY( data.can, HIL_APPLICATION_CAN_CHANNEL_COUNT,
+                                                   HIL_APPLICATION_Can_Config_decode );
+    HIL_APPLICATION_VALIDATE_ENCODED_CONFIG_ARRAY( data.spi, HIL_APPLICATION_SPI_CHANNEL_COUNT,
+                                                   HIL_APPLICATION_Spi_Config_decode );
+    HIL_APPLICATION_VALIDATE_ENCODED_CONFIG_ARRAY( data.uart, HIL_APPLICATION_UART_CHANNEL_COUNT,
+                                                   HIL_APPLICATION_Uart_Config_decode );
+    HIL_APPLICATION_VALIDATE_ENCODED_CONFIG_ARRAY( data.i2c, HIL_APPLICATION_I2C_CHANNEL_COUNT,
+                                                   HIL_APPLICATION_I2c_Config_decode );
+
+#undef HIL_APPLICATION_VALIDATE_ENCODED_CONFIG_ARRAY
+
+    if ( running_total != HIL_APPLICATION_TEST_CONFIG_EXTENSION_LENGTH_OFFSET )
+    {
+        return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
+    }
+    data.extension_data.size = extension_size;
+    data.extension_data.data =
+        extension_size == 0u ? NULL : &payload[HIL_APPLICATION_TEST_CONFIG_EXTENSION_DATA_OFFSET];
+    {
+        const HIL_Application_Status_T status =
+            HIL_APPLICATION_Test_Configuration_validate( context, &data );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    *decoded_storage_size = extension_size;
     return HIL_APPLICATION_STATUS_OK;
 }
 
@@ -955,6 +1090,34 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_decode(
     HIL_APPLICATION_Decode_U32_Le( &data->flags, &payload[running_total], &running_total );
     *payload_size      = running_total;
     *used_decoded_size = 0u;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Finalize_Test_Upload_decode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, HIL_Application_Finalize_Test_Upload_T* data,
+    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
+    size_t max_decoded_data_size, size_t* used_decoded_size )
+{
+    ( void )context;
+    ( void )sub_type;
+    ( void )test_id;
+    ( void )decoded_data;
+    ( void )max_decoded_data_size;
+    if ( payload_size == NULL || used_decoded_size == NULL || data == NULL || payload == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *payload_size                         = 0u;
+    *used_decoded_size                    = 0u;
+    const HIL_Application_Status_T status = HIL_APPLICATION_Fixed_Body_Validate_Size(
+        HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD, max_payload_size );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    data->flags   = HIL_APPLICATION_Read_U32_Le( payload );
+    *payload_size = HIL_APPLICATION_WIRE_U32_SIZE;
     return HIL_APPLICATION_STATUS_OK;
 }
 

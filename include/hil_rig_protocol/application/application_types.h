@@ -297,9 +297,10 @@ typedef struct
     /**
      * Largest permitted variable byte span.
      *
-     * This bounds Test Configuration extension_data and enabled communication
-     * capture limits. The one-byte span wire format imposes an absolute 255-byte
-     * maximum even when this configured policy limit is lower.
+     * This bounds Test Configuration extension_data and variable record spans.
+     * The one-byte span wire format imposes an absolute 255-byte maximum even
+     * when this configured policy limit is lower. Capture capacity is not a
+     * protocol configuration field.
      */
     size_t max_variable_data_size;
 

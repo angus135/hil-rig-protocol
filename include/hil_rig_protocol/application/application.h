@@ -228,12 +228,10 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
 /**
  * @brief Structurally validate exactly one complete encoded Application message.
  *
- * @details This reuses the bounded normal decode path rather than defining a
- * second wire parser. required_decode_storage is cleared before work and is
- * zero on failure. No caller storage is allocated. The current implementation
- * uses one temporary HIL_Application_Message_T on the stack for body decoding
- * and typed validation; this is intentionally separate from the lightweight
- * envelope-only path used by HIL_APPLICATION_Decode_Storage_Size().
+ * @details This validates one complete message directly from its encoded bytes
+ * without allocating. required_decode_storage is still reported exactly as it
+ * would be for a subsequent full decode, but successful validation does not
+ * require that storage to fit a private validation buffer.
  *
  * @param[in]  context                 Initialized codec context.
  * @param[in]  encoded_message         Complete encoded message bytes.

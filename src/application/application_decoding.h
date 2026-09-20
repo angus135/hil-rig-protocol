@@ -163,6 +163,12 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_decode(
     const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
     size_t max_decoded_data_size, size_t* used_decoded_size );
 
+/** Validate one encoded Test Configuration without copying extension bytes. */
+HIL_Application_Status_T
+HIL_APPLICATION_Test_Configuration_Encoded_Validate( const HIL_Application_Context_T* context,
+                                                     const uint8_t* payload, size_t payload_size,
+                                                     size_t* decoded_storage_size );
+
 /**
  * @brief Decode the exact 50-byte fixed Test Instruction payload.
  * @details The exact width is checked before any field is read and payload_size
@@ -238,6 +244,13 @@ HIL_Application_Status_T HIL_APPLICATION_Execution_Control_decode(
 HIL_Application_Status_T HIL_APPLICATION_Global_Control_decode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, HIL_Application_Global_Control_T* data,
+    const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
+    size_t max_decoded_data_size, size_t* used_decoded_size );
+
+/** Decode the four-byte Finalize Test Upload payload. */
+HIL_Application_Status_T HIL_APPLICATION_Finalize_Test_Upload_decode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, HIL_Application_Finalize_Test_Upload_T* data,
     const uint8_t* payload, size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
     size_t max_decoded_data_size, size_t* used_decoded_size );
 

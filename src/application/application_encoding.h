@@ -78,7 +78,7 @@ HIL_Application_Status_T HIL_APPLICATION_System_Info_Response_encode(
 
 /**
  * @brief Encode the complete Test Configuration payload.
- * @details Encodes the 203-byte fixed portion, all fixed I/O and communication
+ * @details Encodes the 171-byte fixed portion, all fixed I/O and communication
  * arrays, and the one-byte-length-prefixed extension using explicit wire widths.
  * @param[in]  context          Application context.
  * @param[in]  sub_type         Message subtype selected by the public envelope.
@@ -158,6 +158,12 @@ HIL_Application_Status_T HIL_APPLICATION_Execution_Control_encode(
 HIL_Application_Status_T HIL_APPLICATION_Global_Control_encode(
     const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Global_Control_T* data,
+    size_t max_payload_size, uint8_t* payload, size_t* used_size );
+
+/** Encode the four-byte Finalize Test Upload payload. */
+HIL_Application_Status_T HIL_APPLICATION_Finalize_Test_Upload_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Finalize_Test_Upload_T* data,
     size_t max_payload_size, uint8_t* payload, size_t* used_size );
 
 /**

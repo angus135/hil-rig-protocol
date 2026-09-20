@@ -86,14 +86,12 @@ def configuration(extension: bytes = b"") -> p.TestConfiguration:
             p.CANConfig(
                 enabled=True,
                 bit_rate=125000,
-                capture_limit_bytes=71,
                 filter_id=0x123,
                 filter_mask=0x7F0,
             ),
             p.CANConfig(
                 enabled=True,
                 bit_rate=250000,
-                capture_limit_bytes=72,
                 filter_id=0x456,
                 filter_mask=0x700,
             ),
@@ -107,7 +105,6 @@ def configuration(extension: bytes = b"") -> p.TestConfiguration:
                 bit_order=p.SPIBitOrder.MSB_FIRST,
                 clock_polarity=p.SPIClockPolarity.IDLE_LOW,
                 clock_phase=p.SPIClockPhase.FIRST_EDGE,
-                capture_limit_bytes=81,
             ),
             p.SPIConfig(
                 enabled=True,
@@ -117,7 +114,6 @@ def configuration(extension: bytes = b"") -> p.TestConfiguration:
                 bit_order=p.SPIBitOrder.LSB_FIRST,
                 clock_polarity=p.SPIClockPolarity.IDLE_HIGH,
                 clock_phase=p.SPIClockPhase.SECOND_EDGE,
-                capture_limit_bytes=82,
             ),
         ),
         uart=(
@@ -130,7 +126,6 @@ def configuration(extension: bytes = b"") -> p.TestConfiguration:
                 stop_bits=p.UARTStopBits.BITS_1,
                 rx_enabled=True,
                 tx_enabled=False,
-                capture_limit_bytes=91,
             ),
             p.UARTConfig(
                 enabled=True,
@@ -141,27 +136,6 @@ def configuration(extension: bytes = b"") -> p.TestConfiguration:
                 stop_bits=p.UARTStopBits.BITS_2,
                 rx_enabled=True,
                 tx_enabled=True,
-                capture_limit_bytes=92,
-            ),
-        ),
-        i2c=(
-            p.I2CConfig(
-                enabled=True,
-                bit_rate=100000,
-                role=p.BusRole.MASTER,
-                own_address_7bit=0,
-                voltage_level=p.I2CVoltage.V_3V3,
-                pull_up=p.I2CPullUp.OHM_2K2,
-                capture_limit_bytes=101,
-            ),
-            p.I2CConfig(
-                enabled=True,
-                bit_rate=200000,
-                role=p.BusRole.SLAVE,
-                own_address_7bit=83,
-                voltage_level=p.I2CVoltage.V_5V,
-                pull_up=p.I2CPullUp.OHM_10K,
-                capture_limit_bytes=102,
             ),
         ),
         extension_data=b"",

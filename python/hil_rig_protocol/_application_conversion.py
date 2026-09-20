@@ -25,6 +25,7 @@ from .application_types import (
     DigitalOutputValue,
     ErrorCategory,
     ExecutionControl,
+    FinalizeTestUpload,
     GlobalControl,
     GlobalControlCommand,
     I2CConfig,
@@ -301,6 +302,15 @@ def _read_global_control(native: Any) -> GlobalControl:
     return GlobalControl(command=GlobalControlCommand(native.command), flags=int(native.flags))
 
 
+def _write_finalize_test_upload(value: FinalizeTestUpload, native: Any) -> list[Any]:
+    native.flags = value.flags
+    return []
+
+
+def _read_finalize_test_upload(test_id: TestId, native: Any) -> FinalizeTestUpload:
+    return FinalizeTestUpload(test_id=test_id, flags=int(native.flags))
+
+
 def _write_response(value: ApplicationResponse, native: Any) -> list[Any]:
     native.scope = value.scope
     native.outcome = value.outcome
@@ -439,7 +449,6 @@ def _read_can_config(native: Any) -> CANConfig:
     return CANConfig(
         enabled=_read_bool(native.enabled),
         bit_rate=int(native.bit_rate),
-        capture_limit_bytes=int(native.capture_limit_bytes),
         filter_id=int(native.filter_id),
         filter_mask=int(native.filter_mask),
     )
@@ -454,7 +463,6 @@ def _read_spi_config(native: Any) -> SPIConfig:
         bit_order=SPIBitOrder(native.bit_order),
         clock_polarity=SPIClockPolarity(native.clock_polarity),
         clock_phase=SPIClockPhase(native.clock_phase),
-        capture_limit_bytes=int(native.capture_limit_bytes),
     )
 
 
@@ -468,7 +476,6 @@ def _read_uart_config(native: Any) -> UARTConfig:
         stop_bits=UARTStopBits(native.stop_bits),
         rx_enabled=_read_bool(native.rx_enabled),
         tx_enabled=_read_bool(native.tx_enabled),
-        capture_limit_bytes=int(native.capture_limit_bytes),
     )
 
 
@@ -480,7 +487,6 @@ def _read_i2c_config(native: Any) -> I2CConfig:
         own_address_7bit=int(native.own_address_7bit),
         voltage_level=I2CVoltage(native.voltage_level),
         pull_up=I2CPullUp(native.pull_up),
-        capture_limit_bytes=int(native.capture_limit_bytes),
     )
 
 

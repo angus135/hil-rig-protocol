@@ -38,6 +38,7 @@ extern "C"
 #define HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE 255u
 #define HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE
 #define HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT 1000000u
+#define HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK ( 8u )
 
 /** Default operational maximum complete Application message size. */
 #define HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE 512u
@@ -60,9 +61,8 @@ extern "C"
       + HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES )
 /** @} */
 
-/** Largest complete message representable by the uint16_t payload-length field. */
-#define HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE                                                  \
-    ( HIL_APPLICATION_HEADER_SIZE_BYTES + ( size_t )UINT16_MAX )
+/** Fixed v0.3.0 profile ceiling for one complete Application message. */
+#define HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE
 
 /**
  * Smallest complete message supported by the current codec.
@@ -102,6 +102,8 @@ typedef enum
     HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL = 20,
     /** Python-to-firmware variable update instruction for one tick. */
     HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION = 21,
+    /** Python-to-firmware request to finalize a retained test upload. */
+    HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD = 22,
     /** Firmware-to-Python fixed result in an ordered N-tick result set. */
     HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT = 32,
     /** Firmware-to-Python variable-length captured result for one tick. */
@@ -172,6 +174,8 @@ typedef struct
         HIL_Application_Test_Instruction_T test_instruction;
         /** Body for UPDATE_INSTRUCTION. */
         HIL_Application_Update_Instruction_T update_instruction;
+        /** Body for FINALIZE_TEST_UPLOAD. */
+        HIL_Application_Finalize_Test_Upload_T finalize_test_upload;
         /** Body for EXECUTION_CONTROL. */
         HIL_Application_Execution_Control_T execution_control;
         /** Body for GLOBAL_CONTROL. */

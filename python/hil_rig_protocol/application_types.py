@@ -73,6 +73,11 @@ PROTOCOL_VERSION = ProtocolVersion(
     int(_binding.lib.HIL_RIG_PROTOCOL_VERSION_PATCH),
 )
 
+MAX_VARIABLE_CHUNKS_PER_TICK = int(_binding.lib.HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK)
+RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW = int(
+    _binding.lib.HIL_APPLICATION_RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW
+)
+
 
 class SystemInfoQuery(IntEnum):
     """Supported System Information query selectors."""
@@ -494,14 +499,12 @@ class CANConfig:
 
     enabled: bool = False
     bit_rate: int = 0
-    capture_limit_bytes: int = 0
     filter_id: int = 0
     filter_mask: int = 0
 
     def __post_init__(self) -> None:
         _exact("enabled", self.enabled, bool)
         _validate_integer("bit_rate", self.bit_rate, 0, _UINT32_MAX)
-        _validate_integer("capture_limit_bytes", self.capture_limit_bytes, 0, _UINT32_MAX)
         _validate_integer("filter_id", self.filter_id, 0, _UINT16_MAX)
         _validate_integer("filter_mask", self.filter_mask, 0, _UINT16_MAX)
 
@@ -517,7 +520,6 @@ class SPIConfig:
     bit_order: SPIBitOrder = SPIBitOrder.INVALID
     clock_polarity: SPIClockPolarity = SPIClockPolarity.INVALID
     clock_phase: SPIClockPhase = SPIClockPhase.INVALID
-    capture_limit_bytes: int = 0
 
     def __post_init__(self) -> None:
         _exact("enabled", self.enabled, bool)
@@ -527,7 +529,6 @@ class SPIConfig:
         _exact("bit_order", self.bit_order, SPIBitOrder)
         _exact("clock_polarity", self.clock_polarity, SPIClockPolarity)
         _exact("clock_phase", self.clock_phase, SPIClockPhase)
-        _validate_integer("capture_limit_bytes", self.capture_limit_bytes, 0, _UINT32_MAX)
 
 
 @dataclass(frozen=True, slots=True)
@@ -542,7 +543,6 @@ class UARTConfig:
     stop_bits: UARTStopBits = UARTStopBits.INVALID
     rx_enabled: bool = False
     tx_enabled: bool = False
-    capture_limit_bytes: int = 0
 
     def __post_init__(self) -> None:
         _exact("enabled", self.enabled, bool)
@@ -553,7 +553,6 @@ class UARTConfig:
         _exact("stop_bits", self.stop_bits, UARTStopBits)
         _exact("rx_enabled", self.rx_enabled, bool)
         _exact("tx_enabled", self.tx_enabled, bool)
-        _validate_integer("capture_limit_bytes", self.capture_limit_bytes, 0, _UINT32_MAX)
 
 
 @dataclass(frozen=True, slots=True)
@@ -566,7 +565,6 @@ class I2CConfig:
     own_address_7bit: int = 0
     voltage_level: I2CVoltage = I2CVoltage.INVALID
     pull_up: I2CPullUp = I2CPullUp.INVALID
-    capture_limit_bytes: int = 0
 
     def __post_init__(self) -> None:
         _exact("enabled", self.enabled, bool)
@@ -575,7 +573,6 @@ class I2CConfig:
         _validate_integer("own_address_7bit", self.own_address_7bit, 0, _UINT16_MAX)
         _exact("voltage_level", self.voltage_level, I2CVoltage)
         _exact("pull_up", self.pull_up, I2CPullUp)
-        _validate_integer("capture_limit_bytes", self.capture_limit_bytes, 0, _UINT32_MAX)
 
 
 @dataclass(frozen=True, slots=True)
@@ -830,6 +827,18 @@ class GlobalControl:
 
 
 @dataclass(frozen=True, slots=True)
+class FinalizeTestUpload:
+    """Host request declaring that no further instruction upload messages follow."""
+
+    test_id: TestId
+    flags: int = 0
+
+    def __post_init__(self) -> None:
+        _exact("test_id", self.test_id, TestId)
+        _validate_integer("flags", self.flags, 0, _UINT32_MAX)
+
+
+@dataclass(frozen=True, slots=True)
 class ApplicationResponse:
     """A direction-neutral, stateless Application Response wire value."""
 
@@ -884,6 +893,7 @@ type ApplicationMessage = (
     | UpdateInstruction
     | ExecutionControl
     | GlobalControl
+    | FinalizeTestUpload
     | TestResult
     | VariableTestResult
     | ApplicationResponse
@@ -941,11 +951,14 @@ __all__ = [
     "UARTConfig",
     "I2CConfig",
     "ApplicationConfig",
+    "MAX_VARIABLE_CHUNKS_PER_TICK",
+    "RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW",
     "TestConfiguration",
     "TestInstruction",
     "TestResult",
     "ExecutionControl",
     "GlobalControl",
+    "FinalizeTestUpload",
     "ApplicationResponse",
     "ApplicationErrorMessage",
     "ApplicationMessage",

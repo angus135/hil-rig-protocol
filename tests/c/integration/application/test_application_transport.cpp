@@ -105,9 +105,9 @@ TEST( ApplicationTransportIntegration, RepresentativeConfigurationEndToEndPreser
     ASSERT_EQ( encoded.validation_status, HIL_APPLICATION_STATUS_OK );
     ASSERT_EQ( encoded.sizing_status, HIL_APPLICATION_STATUS_OK );
     ASSERT_EQ( encoded.encoding_status, HIL_APPLICATION_STATUS_OK );
-    ASSERT_EQ( encoded.encoded_size, 229u );
-    ASSERT_EQ( encoded.output_size, 229u );
-    ASSERT_EQ( encoded.bytes.size(), 229u );
+    ASSERT_EQ( encoded.encoded_size, 197u );
+    ASSERT_EQ( encoded.output_size, 197u );
+    ASSERT_EQ( encoded.bytes.size(), 197u );
 
     TransportPairHarness pair{};
     ASSERT_NO_FATAL_FAILURE( InitializeAndEstablish( pair ) );
@@ -280,22 +280,22 @@ TEST( ApplicationTransportIntegration, MaximumConfigurationUsesExactLimitsAndChu
 
     ApplicationTestCodec host_codec{};
     ApplicationTestCodec rig_codec{};
-    ASSERT_NO_FATAL_FAILURE( InitializeApplicationCodec( host_codec, 481u, 255u, 3u ) );
-    ASSERT_NO_FATAL_FAILURE( InitializeApplicationCodec( rig_codec, 481u, 255u, 3u ) );
-    EXPECT_EQ( host_codec.Config().max_encoded_message_size, 481u );
-    EXPECT_EQ( rig_codec.Config().max_encoded_message_size, 481u );
+    ASSERT_NO_FATAL_FAILURE( InitializeApplicationCodec( host_codec, 449u, 255u, 3u ) );
+    ASSERT_NO_FATAL_FAILURE( InitializeApplicationCodec( rig_codec, 449u, 255u, 3u ) );
+    EXPECT_EQ( host_codec.Config().max_encoded_message_size, 449u );
+    EXPECT_EQ( rig_codec.Config().max_encoded_message_size, 449u );
 
     const auto encoded = host_codec.EncodeSupportedMessage( message );
     ASSERT_EQ( encoded.validation_status, HIL_APPLICATION_STATUS_OK );
     ASSERT_EQ( encoded.sizing_status, HIL_APPLICATION_STATUS_OK );
     ASSERT_EQ( encoded.encoding_status, HIL_APPLICATION_STATUS_OK );
-    ASSERT_EQ( encoded.encoded_size, 481u );
-    ASSERT_EQ( encoded.output_size, 481u );
+    ASSERT_EQ( encoded.encoded_size, 449u );
+    ASSERT_EQ( encoded.output_size, 449u );
 
     TransportPairHarness pair{};
-    ASSERT_NO_FATAL_FAILURE( InitializeAndEstablish( pair, 481u ) );
-    ASSERT_EQ( pair.Host().Config().max_application_message_size, 481u );
-    ASSERT_EQ( pair.Rig().Config().max_application_message_size, 481u );
+    ASSERT_NO_FATAL_FAILURE( InitializeAndEstablish( pair, 449u ) );
+    ASSERT_EQ( pair.Host().Config().max_application_message_size, 449u );
+    ASSERT_EQ( pair.Rig().Config().max_application_message_size, 449u );
     ASSERT_EQ( pair.Host().SubmitApplication( encoded.bytes ), HIL_TRANSPORT_STATUS_OK );
 
     const auto accepted = pair.Link().AcceptOutput( pair.Host(), pair.HostNow() );
@@ -369,13 +369,13 @@ TEST( ApplicationTransportIntegration, TransportSizeMismatchRejectsOnlyOversized
         extension.data(), static_cast<std::uint8_t>( extension.size() ) );
 
     ApplicationTestCodec codec{};
-    ASSERT_NO_FATAL_FAILURE( InitializeApplicationCodec( codec, 481u, 255u, 3u ) );
+    ASSERT_NO_FATAL_FAILURE( InitializeApplicationCodec( codec, 449u, 255u, 3u ) );
     const auto encoded_configuration = codec.EncodeSupportedMessage( configuration );
     ASSERT_EQ( encoded_configuration.encoding_status, HIL_APPLICATION_STATUS_OK );
-    ASSERT_EQ( encoded_configuration.bytes.size(), 481u );
+    ASSERT_EQ( encoded_configuration.bytes.size(), 449u );
 
     TransportPairHarness too_small_pair{};
-    ASSERT_NO_FATAL_FAILURE( InitializeAndEstablish( too_small_pair, 474u ) );
+    ASSERT_NO_FATAL_FAILURE( InitializeAndEstablish( too_small_pair, 448u ) );
     EXPECT_EQ( too_small_pair.Host().SubmitApplication( encoded_configuration.bytes ),
                HIL_TRANSPORT_STATUS_MESSAGE_TOO_LARGE );
     const auto rejected_status = too_small_pair.Host().GetStatus();
@@ -394,7 +394,7 @@ TEST( ApplicationTransportIntegration, TransportSizeMismatchRejectsOnlyOversized
     EXPECT_EQ( smaller_delivery, encoded_instruction.bytes );
 
     TransportPairHarness exact_pair{};
-    ASSERT_NO_FATAL_FAILURE( InitializeAndEstablish( exact_pair, 481u ) );
+    ASSERT_NO_FATAL_FAILURE( InitializeAndEstablish( exact_pair, 449u ) );
     std::vector<std::uint8_t> exact_delivery;
     ASSERT_NO_FATAL_FAILURE(
         DeliverApplicationAndConfirm( exact_pair, TransportTestDirection::HostToRig,

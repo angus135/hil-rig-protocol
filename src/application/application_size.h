@@ -146,6 +146,12 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_size(
     const HIL_Application_Test_Id_T test_id, const HIL_Application_Global_Control_T* data,
     size_t* encoded_size );
 
+/** Determine the encoded size of a Finalize Test Upload payload. */
+HIL_Application_Status_T HIL_APPLICATION_Finalize_Test_Upload_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Finalize_Test_Upload_T* data,
+    size_t* encoded_size );
+
 /**
  * @brief Publish the fixed 39-byte Test Result payload size.
  *

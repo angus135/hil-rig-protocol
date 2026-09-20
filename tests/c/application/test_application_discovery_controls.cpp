@@ -9,7 +9,8 @@
 #include "hil_rig_protocol/version.h"
 
 namespace {
-HIL_Application_Context_T MakeContext( std::size_t maximum = 1024u )
+HIL_Application_Context_T
+MakeContext( std::size_t maximum = HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE )
 {
     HIL_Application_Config_T  config{};
     HIL_Application_Context_T context{};
@@ -177,9 +178,9 @@ TEST( ApplicationDiscovery, ForeignDiscoveryDecodesButBodyMustAgreeWithEnvelope 
 TEST( ApplicationDiscovery, ResponseScansBothMaximumSpansWithoutAllocation )
 {
     std::array<std::uint8_t, 255u> diagnostic{};
-    std::array<std::uint8_t, 255u> git_hash{};
-    std::array<std::uint8_t, 547u> encoded{};
-    std::array<std::uint8_t, 510u> storage{};
+    std::array<std::uint8_t, 220u> git_hash{};
+    std::array<std::uint8_t, 512u> encoded{};
+    std::array<std::uint8_t, 475u> storage{};
     HIL_Application_Message_T      message{};
     HIL_Application_Message_T      decoded{};
     std::size_t                    encoded_size     = 0u;
@@ -194,15 +195,15 @@ TEST( ApplicationDiscovery, ResponseScansBothMaximumSpansWithoutAllocation )
     message.body.system_info_response.application_protocol_minor = HIL_RIG_PROTOCOL_VERSION_MINOR;
     message.body.system_info_response.application_protocol_patch = HIL_RIG_PROTOCOL_VERSION_PATCH;
     message.body.system_info_response.diagnostic_data            = { diagnostic.data(), 255u };
-    message.body.system_info_response.firmware_git_hash          = { git_hash.data(), 255u };
+    message.body.system_info_response.firmware_git_hash          = { git_hash.data(), 220u };
 
     const auto default_context = MakeContext( HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE );
     encoded_size               = 99u;
     EXPECT_EQ( HIL_APPLICATION_Encoded_Size( &default_context, &message, &encoded_size ),
-               HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL );
-    EXPECT_EQ( encoded_size, 0u );
+               HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( encoded_size, encoded.size() );
 
-    const auto context = MakeContext( 547u );
+    const auto context = MakeContext();
 
     ASSERT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &encoded_size ),
                HIL_APPLICATION_STATUS_OK );

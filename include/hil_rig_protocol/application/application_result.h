@@ -44,6 +44,9 @@ typedef enum
     HIL_APPLICATION_RESULT_CONDITION_RESERVED = 255
 } HIL_Application_Result_Condition_T;
 
+/** Result detail used when bounded capture capacity truncates variable data. */
+#define HIL_APPLICATION_RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW ( 1u )
+
 /**
  * @brief One fixed firmware-to-Python Test Result body.
  *
@@ -80,8 +83,8 @@ typedef enum
  * leaves Analogue Input values and problem_detail unconstrained. Comparing the
  * tick with an active Test Configuration, result ordering, enabled-channel
  * policy, and hardware feasibility are integration responsibilities. PARTIAL
- * remains structurally representable even though variable result-data support
- * is still deferred.
+ * is used for bounded variable-capture loss, including the defined capture
+ * overflow detail below.
  *
  * Firmware encodes deterministic zero values for fixed capture channels that
  * are disabled or not configured, and Python ignores those elements. Their
@@ -89,6 +92,13 @@ typedef enum
  * capture cannot be trusted, firmware uses EXECUTION_PROBLEM and the complete
  * set of fixed values is ignored. The initial protocol cannot express selective
  * validity among fixed digital, analogue, or PWM fields.
+ *
+ * A variable result with condition PARTIAL and problem_detail equal to
+ * HIL_APPLICATION_RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW reports that firmware
+ * retained the bounded prefix, discarded data beyond its internal capture
+ * capacity, and still completed the normal result stream. No additional Error,
+ * acknowledgement, or result-finalization message is introduced. A more
+ * serious failure that prevents tick completion uses EXECUTION_PROBLEM instead.
  *
  * Result messages have no Application Response or Application-level
  * stop-and-wait acknowledgement. Transport owns delivery acknowledgement and
