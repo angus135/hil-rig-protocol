@@ -42,10 +42,13 @@ typedef enum
      */
     HIL_APPLICATION_RESPONSE_SCOPE_TICK = 2,
     /**
-     * Automatic whole-test validation after all expected upload data arrives.
+     * Whole-test validation requested explicitly by FINALIZE_TEST_UPLOAD.
      *
-     * ACCEPTED makes the retained test available for START. A negative outcome
-     * invalidates the initial transaction.
+     * The host sends that request after every submitted tick is accepted, or
+     * immediately after an accepted zero-instruction configuration. Firmware
+     * responds with this Complete Test scope. ACCEPTED makes the retained test
+     * available for START. A negative outcome invalidates the initial
+     * transaction.
      */
     HIL_APPLICATION_RESPONSE_SCOPE_COMPLETE_TEST = 3,
     /** Validation/performance of an Execution Control request. */
@@ -143,9 +146,10 @@ typedef enum
  * sequence number. Python may have only one response-requiring Application
  * operation outstanding at a time. While awaiting its Response, it must not
  * repeat an indistinguishable System Information Request, Test Configuration,
- * START, ABORT, or RESET_APPLICATION request. After the final Tick Response,
- * the host sends FINALIZE_TEST_UPLOAD and must receive its Complete Test
- * Response before submitting START. If
+ * START, ABORT, or RESET_APPLICATION request. After every submitted tick has
+ * received an accepted Tick Response, or immediately after an accepted
+ * zero-instruction Test Configuration, the host sends FINALIZE_TEST_UPLOAD
+ * and must receive its Complete Test Response before submitting START. If
  * Transport/session failure makes an outcome uncertain, Python enters recovery
  * instead of blindly retrying. After explicitly abandoning the previous
  * operation, Python may request RESET_APPLICATION and must ignore a
