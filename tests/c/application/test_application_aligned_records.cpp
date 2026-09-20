@@ -2,6 +2,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -18,7 +19,7 @@ protected:
     HIL_Application_Context_T           context{};
     HIL_Application_Logical_Operation_T operation{};
     HIL_Application_Captured_Record_T   record{};
-    alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ) std::array<std::uint8_t, 2048u> storage{};
+    alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ) std::array<std::uint8_t, 4096u> storage{};
 
     void SetUp() override
     {
@@ -120,8 +121,10 @@ protected:
         SCOPED_TRACE( ::testing::Message() << "type=" << type << " channel=" << channel
                                            << " length=" << payload.size() );
         const auto message = Message( type, channel, payload );
-        const auto status =
-            valid ? HIL_APPLICATION_STATUS_OK : HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        const auto status  = valid ? HIL_APPLICATION_STATUS_OK
+                                   : ( type == HIL_APPLICATION_PERIPHERAL_I2C
+                                           ? HIL_APPLICATION_STATUS_NOT_IMPLEMENTED
+                                           : HIL_APPLICATION_STATUS_VALIDATION_FAILED );
         EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), status );
         std::array<std::uint8_t, 512u> encoded{};
         std::size_t                    used = 99u;
@@ -133,11 +136,10 @@ protected:
         {
             EXPECT_EQ( used, 0u );
             std::size_t required = 99u;
-            // Storage sizing checks framing, while full validation checks peripheral semantics.
+            // Storage sizing and full decoding share the encoded record validation rules.
             EXPECT_EQ( HIL_APPLICATION_Decode_Storage_Size( &context, wire.data(), wire.size(),
                                                             &required ),
-                       payload.empty() ? HIL_APPLICATION_STATUS_MALFORMED_MESSAGE
-                                       : HIL_APPLICATION_STATUS_OK );
+                       payload.empty() ? HIL_APPLICATION_STATUS_MALFORMED_MESSAGE : status );
             DecodeFailure( wire,
                            payload.empty() ? HIL_APPLICATION_STATUS_MALFORMED_MESSAGE : status );
             return;
@@ -269,7 +271,7 @@ TEST_P( ApplicationAlignedRecords, NonAdjacentDuplicatePairRejectedOnWire )
     Length( wire );
     std::size_t required = 99u;
     EXPECT_EQ( HIL_APPLICATION_Decode_Storage_Size( &context, wire.data(), wire.size(), &required ),
-               HIL_APPLICATION_STATUS_OK );
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
     DecodeFailure( wire, HIL_APPLICATION_STATUS_VALIDATION_FAILED );
 }
 
@@ -350,6 +352,127 @@ TEST_P( ApplicationAlignedRecords, ExactStorageOwnsPayloadAndPreservesGuardBytes
         HIL_APPLICATION_Encode_Message( &context, &decoded, encoded.data(), encoded.size(), &used ),
         HIL_APPLICATION_STATUS_OK );
     EXPECT_EQ( encoded, original );
+}
+
+TEST_P( ApplicationAlignedRecords, MaximumMinimumSizeRecordsFitThe512ByteProfile )
+{
+    const std::vector<std::pair<HIL_Application_Peripheral_Type_T, std::uint8_t>> descriptors =
+        GetParam()
+            ? std::vector<std::pair<HIL_Application_Peripheral_Type_T, std::uint8_t>>{
+                  { HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT, 0u },
+                  { HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT, 0u },
+                  { HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT, 1u },
+                  { HIL_APPLICATION_PERIPHERAL_PWM_INPUT, 0u },
+                  { HIL_APPLICATION_PERIPHERAL_PWM_INPUT, 1u },
+                  { HIL_APPLICATION_PERIPHERAL_UART, 0u },
+                  { HIL_APPLICATION_PERIPHERAL_UART, 1u },
+                  { HIL_APPLICATION_PERIPHERAL_SPI, 0u },
+                  { HIL_APPLICATION_PERIPHERAL_SPI, 1u },
+                  { HIL_APPLICATION_PERIPHERAL_CAN, 0u },
+                  { HIL_APPLICATION_PERIPHERAL_CAN, 1u },
+              }
+            : std::vector<std::pair<HIL_Application_Peripheral_Type_T, std::uint8_t>>{
+                  { HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT, 0u },
+                  { HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT, 0u },
+                  { HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT, 1u },
+                  { HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT, 2u },
+                  { HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT, 3u },
+                  { HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT, 4u },
+                  { HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT, 5u },
+                  { HIL_APPLICATION_PERIPHERAL_PWM_OUTPUT, 0u },
+                  { HIL_APPLICATION_PERIPHERAL_PWM_OUTPUT, 1u },
+                  { HIL_APPLICATION_PERIPHERAL_UART, 0u },
+                  { HIL_APPLICATION_PERIPHERAL_UART, 1u },
+                  { HIL_APPLICATION_PERIPHERAL_SPI, 0u },
+                  { HIL_APPLICATION_PERIPHERAL_SPI, 1u },
+                  { HIL_APPLICATION_PERIPHERAL_CAN, 0u },
+                  { HIL_APPLICATION_PERIPHERAL_CAN, 1u },
+              };
+    const std::size_t                                record_count = descriptors.size();
+    std::vector<std::vector<std::uint8_t>>           payloads( record_count );
+    std::vector<HIL_Application_Logical_Operation_T> operations;
+    std::vector<HIL_Application_Captured_Record_T>   records;
+    operations.resize( GetParam() ? 0u : record_count );
+    records.resize( GetParam() ? record_count : 0u );
+
+    for ( std::size_t i = 0u; i < record_count; ++i )
+    {
+        const auto [peripheral_type, channel] = descriptors[i];
+        const std::size_t payload_size =
+            peripheral_type == HIL_APPLICATION_PERIPHERAL_DIGITAL_INPUT
+                    || peripheral_type == HIL_APPLICATION_PERIPHERAL_DIGITAL_OUTPUT
+                ? 2u
+            : peripheral_type == HIL_APPLICATION_PERIPHERAL_ANALOG_INPUT
+                    || peripheral_type == HIL_APPLICATION_PERIPHERAL_ANALOG_OUTPUT
+                ? 4u
+            : peripheral_type == HIL_APPLICATION_PERIPHERAL_PWM_INPUT
+                    || peripheral_type == HIL_APPLICATION_PERIPHERAL_PWM_OUTPUT
+                ? 6u
+            : peripheral_type == HIL_APPLICATION_PERIPHERAL_CAN                ? 12u
+            : peripheral_type == HIL_APPLICATION_PERIPHERAL_SPI && !GetParam() ? 3u
+                                                                               : 1u;
+        payloads[i].assign( payload_size, 0u );
+        if ( peripheral_type == HIL_APPLICATION_PERIPHERAL_SPI && !GetParam() )
+        {
+            payloads[i][0] = 1u;
+            payloads[i][1] = 1u;
+            payloads[i][2] = 0xa5u;
+        }
+        else
+        {
+            payloads[i][0] = 0xa5u;
+        }
+        if ( GetParam() )
+        {
+            records[i] = { peripheral_type,
+                           channel,
+                           { payloads[i].data(), static_cast<std::uint8_t>( payload_size ) } };
+        }
+        else
+        {
+            operations[i] = { peripheral_type,
+                              channel,
+                              { payloads[i].data(), static_cast<std::uint8_t>( payload_size ) } };
+        }
+    }
+
+    HIL_Application_Message_T message{};
+    message.type        = GetParam() ? HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT
+                                     : HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION;
+    message.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    message.has_test_id = 1u;
+    if ( GetParam() )
+    {
+        message.body.variable_test_result.record_count = static_cast<std::uint8_t>( record_count );
+        message.body.variable_test_result.records      = records.data();
+        message.body.variable_test_result.condition    = HIL_APPLICATION_RESULT_CONDITION_OK;
+    }
+    else
+    {
+        message.body.update_instruction.operation_count = static_cast<std::uint8_t>( record_count );
+        message.body.update_instruction.operations      = operations.data();
+    }
+
+    std::size_t encoded_size = 99u;
+    ASSERT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &encoded_size ),
+               HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( encoded_size, GetParam() ? 147u : 175u );
+    std::vector<std::uint8_t> encoded( encoded_size );
+    std::size_t               used = 99u;
+    ASSERT_EQ(
+        HIL_APPLICATION_Encode_Message( &context, &message, encoded.data(), encoded.size(), &used ),
+        HIL_APPLICATION_STATUS_OK );
+
+    std::size_t required = 99u;
+    ASSERT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &context, encoded.data(), encoded.size(),
+                                                         &required ),
+               HIL_APPLICATION_STATUS_OK );
+    EXPECT_GT( required, encoded.size() );
+    ASSERT_LT( required, storage.size() );
+    HIL_Application_Message_T decoded{};
+    ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded.size(), &decoded,
+                                               storage.data(), storage.size(), &used ),
+               HIL_APPLICATION_STATUS_OK );
 }
 
 TEST_P( ApplicationAlignedRecords, FlagsAndTickBoundsAcrossTypedAndWireValidation )

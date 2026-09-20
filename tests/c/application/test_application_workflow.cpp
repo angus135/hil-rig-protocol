@@ -17,7 +17,7 @@
 namespace {
 struct alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ) AlignedDecodeStorageBuffer
 {
-    std::array<std::uint8_t, 2048u> bytes{};
+    std::array<std::uint8_t, 4096u> bytes{};
 };
 
 static_assert( alignof( AlignedDecodeStorageBuffer ) >= HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT );
@@ -405,8 +405,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
                            actual.body.test_configuration.can[i].enabled );
                 EXPECT_EQ( expected.body.test_configuration.can[i].bit_rate,
                            actual.body.test_configuration.can[i].bit_rate );
-                EXPECT_EQ( expected.body.test_configuration.can[i].capture_limit_bytes,
-                           actual.body.test_configuration.can[i].capture_limit_bytes );
                 EXPECT_EQ( expected.body.test_configuration.can[i].filter_id,
                            actual.body.test_configuration.can[i].filter_id );
                 EXPECT_EQ( expected.body.test_configuration.can[i].filter_mask,
@@ -428,8 +426,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
                            actual.body.test_configuration.spi[i].clock_polarity );
                 EXPECT_EQ( expected.body.test_configuration.spi[i].clock_phase,
                            actual.body.test_configuration.spi[i].clock_phase );
-                EXPECT_EQ( expected.body.test_configuration.spi[i].capture_limit_bytes,
-                           actual.body.test_configuration.spi[i].capture_limit_bytes );
             }
             for ( std::size_t i = 0u; i < HIL_APPLICATION_UART_CHANNEL_COUNT; ++i )
             {
@@ -449,8 +445,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
                            actual.body.test_configuration.uart[i].rx_enabled );
                 EXPECT_EQ( expected.body.test_configuration.uart[i].tx_enabled,
                            actual.body.test_configuration.uart[i].tx_enabled );
-                EXPECT_EQ( expected.body.test_configuration.uart[i].capture_limit_bytes,
-                           actual.body.test_configuration.uart[i].capture_limit_bytes );
             }
             for ( std::size_t i = 0u; i < HIL_APPLICATION_I2C_CHANNEL_COUNT; ++i )
             {
@@ -466,8 +460,6 @@ void ExpectMessagesEqual( const HIL_Application_Message_T& expected,
                            actual.body.test_configuration.i2c[i].voltage_level );
                 EXPECT_EQ( expected.body.test_configuration.i2c[i].pull_up,
                            actual.body.test_configuration.i2c[i].pull_up );
-                EXPECT_EQ( expected.body.test_configuration.i2c[i].capture_limit_bytes,
-                           actual.body.test_configuration.i2c[i].capture_limit_bytes );
             }
             ExpectByteSpanEqual( expected.body.test_configuration.extension_data,
                                  actual.body.test_configuration.extension_data );
@@ -695,8 +687,8 @@ void CompileCodecFacadeUsage()
     HIL_Application_Context_T context{};
     HIL_Application_Config_T  config{};
 
-    std::array<std::uint8_t, 2048u> encoded_message{};
-    std::array<std::uint8_t, 2048u> decode_storage{};
+    std::array<std::uint8_t, 4096u> encoded_message{};
+    std::array<std::uint8_t, 4096u> decode_storage{};
     std::size_t                     used_decoded_size{};
     std::size_t                     encoded_size            = 0u;
     std::size_t                     required_decode_storage = 0u;
@@ -978,6 +970,12 @@ void CompileSerializedOperationScenario()
     const HIL_Application_Message_T tick_accepted = TestResponse(
         test_a, HIL_APPLICATION_RESPONSE_SCOPE_TICK, HIL_APPLICATION_RESPONSE_OUTCOME_ACCEPTED,
         HIL_APPLICATION_RESPONSE_REASON_NONE, 0u );
+    HIL_Application_Message_T finalize_upload{};
+    finalize_upload.type        = HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD;
+    finalize_upload.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    finalize_upload.has_test_id = 1u;
+    finalize_upload.test_id     = test_a;
+    finalize_upload.body.finalize_test_upload.flags        = 0u;
     const HIL_Application_Message_T complete_test_accepted = TestResponse(
         test_a, HIL_APPLICATION_RESPONSE_SCOPE_COMPLETE_TEST,
         HIL_APPLICATION_RESPONSE_OUTCOME_ACCEPTED, HIL_APPLICATION_RESPONSE_REASON_NONE );
@@ -996,12 +994,21 @@ void CompileSerializedOperationScenario()
 
     /*
      * Each response-requiring operation completes before the next request.
-     * The automatic Complete Test Response precedes START. No request ID or
-     * Application sequence field is needed by this serialized MVP exchange.
+     * The host sends FINALIZE_TEST_UPLOAD before the Complete Test Response
+     * that precedes START. No request ID or Application sequence field is
+     * needed by this serialized MVP exchange.
      */
-    const std::array<HIL_Application_Message_T, 9u> serialized_exchange{
-        system_info_request, system_info_response,   configuration, configuration_accepted, tick,
-        tick_accepted,       complete_test_accepted, start,         start_completed,
+    const std::array<HIL_Application_Message_T, 10u> serialized_exchange{
+        system_info_request,
+        system_info_response,
+        configuration,
+        configuration_accepted,
+        tick,
+        tick_accepted,
+        finalize_upload,
+        complete_test_accepted,
+        start,
+        start_completed,
     };
     ( void )serialized_exchange;
 }
@@ -1249,7 +1256,7 @@ TEST( ApplicationEncodeDecode, EverySupportedCodecRoundTrips )
         {
             std::array<std::uint8_t, 4096u> encoded{};
             std::size_t                     encoded_size = 0u;
-            std::array<std::uint8_t, 2048u> decode_storage{};
+            std::array<std::uint8_t, 4096u> decode_storage{};
             std::size_t                     used_decoded_size{};
 
             ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &original, encoded.data(),
@@ -1299,7 +1306,7 @@ TEST( ApplicationEncodeDecode, TestConfigurationRoundTrips )
     EXPECT_EQ( encoded[HIL_APPLICATION_HEADER_SIZE_BYTES + 3u], 0x00u );
 
     HIL_Application_Message_T       decoded{};
-    std::array<std::uint8_t, 2048u> decode_storage{};
+    std::array<std::uint8_t, 4096u> decode_storage{};
     std::size_t                     used_decoded_size{};
 
     ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded,
@@ -1325,7 +1332,7 @@ TEST( ApplicationEncodeDecode, TestInstructionFixedBodyRoundTrips )
                HIL_APPLICATION_STATUS_OK );
 
     HIL_Application_Message_T       decoded{};
-    std::array<std::uint8_t, 2048u> decode_storage{};
+    std::array<std::uint8_t, 4096u> decode_storage{};
     std::size_t                     used_decoded_size{};
 
     ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded,
@@ -1351,7 +1358,7 @@ TEST( ApplicationEncodeDecode, TestResultFixedBodyRoundTrips )
                HIL_APPLICATION_STATUS_OK );
 
     HIL_Application_Message_T       decoded{};
-    std::array<std::uint8_t, 2048u> decode_storage{};
+    std::array<std::uint8_t, 4096u> decode_storage{};
     std::size_t                     used_decoded_size{};
 
     ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded_size, &decoded,
@@ -1368,7 +1375,7 @@ TEST( ApplicationDecode, RejectsNullArguments )
 
     std::array<std::uint8_t, 64u>   encoded{};
     HIL_Application_Message_T       message{};
-    std::array<std::uint8_t, 2048u> decode_storage{};
+    std::array<std::uint8_t, 4096u> decode_storage{};
     std::size_t                     used_decoded_size{};
 
     EXPECT_EQ( HIL_APPLICATION_Decode_Message( nullptr, encoded.data(), encoded.size(), &message,
@@ -1430,7 +1437,7 @@ TEST( ApplicationDecode, InvalidHeaderIsRejected )
     std::array<std::uint8_t, HIL_APPLICATION_HEADER_SIZE_BYTES - 1u> encoded{};
 
     HIL_Application_Message_T       decoded{};
-    std::array<std::uint8_t, 2048u> decode_storage{};
+    std::array<std::uint8_t, 4096u> decode_storage{};
     std::size_t                     used_decoded_size{};
 
     EXPECT_NE( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded.size(), &decoded,

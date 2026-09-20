@@ -9,7 +9,9 @@ fixed Test Instruction/Result and sparse Update Instruction/Variable Test Result
 
 from .application import ApplicationCodec, check_protocol_version
 from .application_types import (
+    MAX_VARIABLE_CHUNKS_PER_TICK,
     PROTOCOL_VERSION,
+    RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW,
     AnalogInputConfig,
     AnalogInputValue,
     AnalogOutputConfig,
@@ -29,6 +31,7 @@ from .application_types import (
     DigitalOutputValue,
     ErrorCategory,
     ExecutionControl,
+    FinalizeTestUpload,
     GlobalControl,
     GlobalControlCommand,
     I2CConfig,
@@ -152,10 +155,13 @@ __all__ = [
     "UARTConfig",
     "I2CConfig",
     "ApplicationConfig",
+    "MAX_VARIABLE_CHUNKS_PER_TICK",
+    "RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW",
     "TestConfiguration",
     "TestInstruction",
     "TestResult",
     "ExecutionControl",
+    "FinalizeTestUpload",
     "GlobalControl",
     "ApplicationResponse",
     "ApplicationErrorMessage",

@@ -18,7 +18,7 @@ constexpr std::size_t kResultHeaderSize    = 12u;
 
 struct alignas( HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT ) AlignedDecodeStorage
 {
-    std::array<std::uint8_t, 2048u> bytes{};
+    std::array<std::uint8_t, 4096u> bytes{};
 };
 
 void PutU16Le( std::vector<std::uint8_t>& bytes, std::size_t offset, std::uint16_t value )
@@ -531,6 +531,29 @@ TEST( ApplicationVariableResultValidation, PartialConditionAllowsNonZeroProblemD
 
     const auto message = WrapVariableTestResult( res );
     EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
+}
+
+TEST( ApplicationVariableResultValidation, CaptureOverflowUsesStablePartialProblemDetail )
+{
+    static_assert( HIL_APPLICATION_RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW == 1u );
+    const auto                         context = MakeContext();
+    const std::array<std::uint8_t, 1u> retained_prefix{ 0xa5u };
+    HIL_Application_Captured_Record_T  record{};
+    record.peripheral_type = HIL_APPLICATION_PERIPHERAL_UART;
+    record.channel         = 0u;
+    record.data = { retained_prefix.data(), static_cast<std::uint8_t>( retained_prefix.size() ) };
+
+    HIL_Application_Variable_Test_Result_T res{};
+    res.tick_number    = 3u;
+    res.condition      = HIL_APPLICATION_RESULT_CONDITION_PARTIAL;
+    res.flags          = HIL_APPLICATION_RESULT_FLAG_COMPLETE_TICK;
+    res.problem_detail = HIL_APPLICATION_RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW;
+    res.record_count   = 1u;
+    res.records        = &record;
+
+    const auto message = WrapVariableTestResult( res );
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
+    ExpectRoundTrip( context, res );
 }
 
 TEST( ApplicationVariableResultValidation, InvalidConditionRejected )

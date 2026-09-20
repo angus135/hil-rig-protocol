@@ -276,12 +276,19 @@ NATIVE_RECORDS = {
     p.TestConfiguration: "HIL_Application_Test_Configuration_T",
     p.TestInstruction: "HIL_Application_Test_Instruction_T",
     p.TestResult: "HIL_Application_Test_Result_T",
+    p.FinalizeTestUpload: "HIL_Application_Finalize_Test_Upload_T",
 }
 
 
 def record_cases():
     messages = [configuration(), instruction(), result()]
-    values = [p.ApplicationConfig(), messages[0].test_id, messages[0].tick_duration_us, *messages]
+    values = [
+        p.ApplicationConfig(),
+        messages[0].test_id,
+        messages[0].tick_duration_us,
+        p.FinalizeTestUpload(messages[0].test_id),
+        *messages,
+    ]
     for message in messages:
         for field in fields(message):
             value = getattr(message, field.name)
@@ -311,7 +318,7 @@ def test_records_are_frozen_slotted_and_cover_native_fields(value):
         value.extra = 1
     native_fields = dict(_binding.ffi.typeof(NATIVE_RECORDS[type(value)]).fields)
     public_fields = {field.name for field in fields(value)}
-    if type(value) in (p.TestConfiguration, p.TestInstruction, p.TestResult):
+    if type(value) in (p.TestConfiguration, p.TestInstruction, p.TestResult, p.FinalizeTestUpload):
         public_fields.remove("test_id")
     assert public_fields == set(native_fields)
 
@@ -397,6 +404,12 @@ def test_configuration_defaults_match_compiled_native():
         assert getattr(config, field.name) == getattr(native, field.name)
 
 
+def test_v030_application_constants_match_compiled_native():
+    assert p.MAX_VARIABLE_CHUNKS_PER_TICK == 8
+    assert p.RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW == 1
+    assert _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD == 22
+
+
 def test_discovery_and_control_values_are_frozen_and_representable():
     assert (
         p.ProtocolVersion(
@@ -431,13 +444,10 @@ def test_discovery_and_control_values_are_frozen_and_representable():
 
 
 def test_can_config_public_shape_and_uint16_filter_representation():
-    can = p.CANConfig(
-        enabled=True, bit_rate=500000, capture_limit_bytes=64, filter_id=0xFFFF, filter_mask=0xFFFF
-    )
+    can = p.CANConfig(enabled=True, bit_rate=500000, filter_id=0xFFFF, filter_mask=0xFFFF)
     assert [field.name for field in fields(can)] == [
         "enabled",
         "bit_rate",
-        "capture_limit_bytes",
         "filter_id",
         "filter_mask",
     ]

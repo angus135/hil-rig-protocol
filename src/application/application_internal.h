@@ -153,9 +153,6 @@ typedef struct
     uint16_t                          payload_length;
 } HIL_Application_Envelope_T;
 
-/** Maximum temporary decode storage required by a supported body. */
-#define HIL_APPLICATION_MAX_DECODE_STORAGE_SIZE ( 2048u )
-
 /** Checked size_t addition. Returns zero without writing result on overflow/error. */
 static inline int HIL_APPLICATION_Checked_Add_Size( size_t lhs, size_t rhs, size_t* result )
 {

@@ -144,8 +144,8 @@ typedef enum
  * operation outstanding at a time. While awaiting its Response, it must not
  * repeat an indistinguishable System Information Request, Test Configuration,
  * START, ABORT, or RESET_APPLICATION request. After the final Tick Response,
- * automatic whole-test validation remains outstanding until its Complete Test
- * Response; Python must receive that Response before submitting START. If
+ * the host sends FINALIZE_TEST_UPLOAD and must receive its Complete Test
+ * Response before submitting START. If
  * Transport/session failure makes an outcome uncertain, Python enters recovery
  * instead of blindly retrying. After explicitly abandoning the previous
  * operation, Python may request RESET_APPLICATION and must ignore a

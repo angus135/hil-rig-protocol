@@ -183,7 +183,6 @@ TEST( ApplicationFixedSubsetMessagePath,
         ASSERT_TRUE( ApplicationResultsEqual( result, host_codec.DecodedMessage() ) );
     }
 
-    // This is intentionally only a fixed-subset message path. A complete
-    // response-gated Application transaction remains deferred until Responses
-    // and the remaining control sizing are implemented.
+    // This remains a fixed-subset transport path. Finalisation and response
+    // correlation are endpoint-owned orchestration around the stateless codec.
 }

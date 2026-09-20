@@ -51,7 +51,7 @@ HIL_APPLICATION_System_Info_Response_validate( const HIL_Application_Context_T* 
  * @brief Validate Test Configuration structural protocol rules.
  * @details Checks global fields, the extension span, fixed-array Booleans and
  * enums, canonical disabled records, PWM constraints, communication rates and
- * capture limits, UART directions, and I2C role/address combinations. Hardware
+ * UART directions, and canonical disabled I2C configuration. Hardware
  * capability and workflow state remain integration-owned.
  * @param[in] context Initialized Application context.
  * @param[in] data    Typed Test Configuration body.
@@ -85,6 +85,22 @@ HIL_Application_Status_T
 HIL_APPLICATION_Update_Instruction_validate( const HIL_Application_Context_T*            context,
                                              const HIL_Application_Update_Instruction_T* data );
 
+/** Validate one encoded or typed logical operation payload. */
+HIL_Application_Status_T HIL_APPLICATION_Logical_Operation_Fields_validate(
+    const HIL_Application_Context_T* context, HIL_Application_Peripheral_Type_T peripheral_type,
+    uint8_t channel, const HIL_Application_Byte_Span_T* payload );
+
+/** Validate one encoded or typed captured-record payload. */
+HIL_Application_Status_T HIL_APPLICATION_Captured_Record_Fields_validate(
+    const HIL_Application_Context_T* context, HIL_Application_Peripheral_Type_T peripheral_type,
+    uint8_t channel, const HIL_Application_Byte_Span_T* data );
+
+/** Mark a fixed-state peripheral/channel pair and reject duplicates. */
+HIL_Application_Status_T
+HIL_APPLICATION_Record_Pair_Mark( uint16_t* seen_peripheral_channels, size_t seen_count,
+                                  HIL_Application_Peripheral_Type_T peripheral_type,
+                                  uint8_t                           channel );
+
 /**
  * @brief Validate an Execution Control body.
  * @details Only START/ABORT commands are structurally accepted and reserved
@@ -108,6 +124,11 @@ HIL_APPLICATION_Execution_Control_validate( const HIL_Application_Context_T*    
 HIL_Application_Status_T
 HIL_APPLICATION_Global_Control_validate( const HIL_Application_Context_T*        context,
                                          const HIL_Application_Global_Control_T* data );
+
+/** Validate a Finalize Test Upload body; v0.3.0 flags must be zero. */
+HIL_Application_Status_T
+HIL_APPLICATION_Finalize_Test_Upload_validate( const HIL_Application_Context_T* context,
+                                               const HIL_Application_Finalize_Test_Upload_T* data );
 
 /**
  * @brief Validate fixed Test Result structural value rules.

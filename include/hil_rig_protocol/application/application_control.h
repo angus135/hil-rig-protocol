@@ -24,7 +24,8 @@ extern "C"
  *
  * START requires a successfully accepted complete test. ABORT requests safe
  * termination or abandonment of the identified active transaction or
- * operation. There is no ARM or FINALIZE_TEST command.
+ * operation. START remains invalid until the host receives an accepted
+ * Complete Test Response for FINALIZE_TEST_UPLOAD.
  *
  * @warning Assigned values may become wire identifiers. Changing them can
  * break compatibility after wire-format approval.
@@ -101,6 +102,19 @@ typedef struct
      */
     uint32_t flags;
 } HIL_Application_Global_Control_T;
+
+/**
+ * @brief Host request declaring that a test upload is complete.
+ *
+ * @details Firmware validates the retained upload and reports the outcome
+ * using the existing COMPLETE_TEST Response scope. flags is reserved and
+ * must be zero in v0.3.0.
+ */
+typedef struct
+{
+    /** Reserved option bits; must be zero in v0.3.0. */
+    uint32_t flags;
+} HIL_Application_Finalize_Test_Upload_T;
 
 #ifdef __cplusplus
 }

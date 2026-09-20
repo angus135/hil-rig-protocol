@@ -146,6 +146,35 @@ def test_chunks_and_stateless_ticks(codec, result_family):
         assert codec.decode(codec.encode(value)) == value
 
 
+@pytest.mark.parametrize("result_family", [False, True])
+def test_maximum_minimum_size_records_fit_the_512_byte_profile(codec, result_family):
+    if result_family:
+        entries = (
+            *((p.PeripheralType.DIGITAL_INPUT, channel, b"\0\0") for channel in [0]),
+            *((p.PeripheralType.ANALOG_INPUT, channel, b"\0" * 4) for channel in range(2)),
+            *((p.PeripheralType.PWM_INPUT, channel, b"\0" * 6) for channel in range(2)),
+            *((p.PeripheralType.UART, channel, b"x") for channel in range(2)),
+            *((p.PeripheralType.SPI, channel, b"x") for channel in range(2)),
+            *((p.PeripheralType.CAN, channel, b"\0" * 12) for channel in range(2)),
+        )
+        expected_size = 147
+    else:
+        entries = (
+            *((p.PeripheralType.DIGITAL_OUTPUT, channel, b"\0\0") for channel in [0]),
+            *((p.PeripheralType.ANALOG_OUTPUT, channel, b"\0" * 4) for channel in range(6)),
+            *((p.PeripheralType.PWM_OUTPUT, channel, b"\0" * 6) for channel in range(2)),
+            *((p.PeripheralType.UART, channel, b"x") for channel in range(2)),
+            *((p.PeripheralType.SPI, channel, b"\1\1x") for channel in range(2)),
+            *((p.PeripheralType.CAN, channel, b"\0" * 12) for channel in range(2)),
+        )
+        expected_size = 175
+    value = message(result_family, entries)
+    wire = codec.encode(value)
+    assert len(wire) == expected_size
+    assert len(wire) <= 512
+    assert codec.decode(wire) == value
+
+
 def test_encode_keeps_all_borrowed_owners_alive(codec, result_family, monkeypatch):
     value = message(result_family, representative(result_family))
     size_query = application._native_encoded_size
@@ -206,13 +235,20 @@ def test_native_channel_boundary(codec, result_family, channel):
 def test_duplicate_and_wrong_direction(codec, result_family):
     entry = (p.PeripheralType.UART, 0, b"x")
     wrong = p.PeripheralType.DIGITAL_OUTPUT if result_family else p.PeripheralType.DIGITAL_INPUT
-    for entries in [(entry, entry), ((wrong, 0, b"\0\0"),), ((p.PeripheralType.I2C, 0, b"x"),)]:
+    for entries in [(entry, entry), ((wrong, 0, b"\0\0"),)]:
         with pytest.raises(p.ApplicationEncodeError) as caught:
             codec.encode(message(result_family, entries))
         assert caught.value.status is p.ApplicationStatus.VALIDATION_FAILED
         with pytest.raises(p.ApplicationDecodeError) as caught:
             codec.decode(golden(result_family, entries))
         assert caught.value.status is p.ApplicationStatus.VALIDATION_FAILED
+
+    with pytest.raises(p.ApplicationEncodeError) as caught:
+        codec.encode(message(result_family, ((p.PeripheralType.I2C, 0, b"x"),)))
+    assert caught.value.status is p.ApplicationStatus.NOT_IMPLEMENTED
+    with pytest.raises(p.ApplicationDecodeError) as caught:
+        codec.decode(golden(result_family, ((p.PeripheralType.I2C, 0, b"x"),)))
+    assert caught.value.status is p.ApplicationStatus.NOT_IMPLEMENTED
 
 
 def test_spi_packet_validation_and_raw_result(codec):

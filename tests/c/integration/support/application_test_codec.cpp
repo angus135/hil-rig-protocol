@@ -180,38 +180,27 @@ MakeApplicationConfigurationMessage( const std::uint8_t* const extension_data,
     config.pwm_out[1].initial_period_nanoseconds   = 50000u;
     config.pwm_out[1].initial_duty_cycle_permyriad = 3750u;
 
-    config.can[0].enabled             = 1u;
-    config.can[0].bit_rate            = 500000u;
-    config.can[0].capture_limit_bytes = 64u;
-    config.can[0].filter_id           = 0x0123u;
-    config.can[0].filter_mask         = 0x07f0u;
+    config.can[0].enabled     = 1u;
+    config.can[0].bit_rate    = 500000u;
+    config.can[0].filter_id   = 0x0123u;
+    config.can[0].filter_mask = 0x07f0u;
 
-    config.spi[1].enabled             = 1u;
-    config.spi[1].bit_rate            = 1000000u;
-    config.spi[1].role                = HIL_APPLICATION_BUS_ROLE_MASTER;
-    config.spi[1].data_width          = HIL_APPLICATION_SPI_DATA_WIDTH_8_BITS;
-    config.spi[1].bit_order           = HIL_APPLICATION_SPI_BIT_ORDER_MSB_FIRST;
-    config.spi[1].clock_polarity      = HIL_APPLICATION_SPI_CLOCK_POLARITY_IDLE_LOW;
-    config.spi[1].clock_phase         = HIL_APPLICATION_SPI_CLOCK_PHASE_FIRST_EDGE;
-    config.spi[1].capture_limit_bytes = 48u;
+    config.spi[1].enabled        = 1u;
+    config.spi[1].bit_rate       = 1000000u;
+    config.spi[1].role           = HIL_APPLICATION_BUS_ROLE_MASTER;
+    config.spi[1].data_width     = HIL_APPLICATION_SPI_DATA_WIDTH_8_BITS;
+    config.spi[1].bit_order      = HIL_APPLICATION_SPI_BIT_ORDER_MSB_FIRST;
+    config.spi[1].clock_polarity = HIL_APPLICATION_SPI_CLOCK_POLARITY_IDLE_LOW;
+    config.spi[1].clock_phase    = HIL_APPLICATION_SPI_CLOCK_PHASE_FIRST_EDGE;
 
-    config.uart[0].enabled             = 1u;
-    config.uart[0].baud_rate           = 115200u;
-    config.uart[0].electrical_mode     = HIL_APPLICATION_UART_ELECTRICAL_MODE_TTL_3V3;
-    config.uart[0].word_length         = HIL_APPLICATION_UART_WORD_LENGTH_8_BITS;
-    config.uart[0].parity              = HIL_APPLICATION_UART_PARITY_NONE;
-    config.uart[0].stop_bits           = HIL_APPLICATION_UART_STOP_BITS_1;
-    config.uart[0].rx_enabled          = 1u;
-    config.uart[0].tx_enabled          = 1u;
-    config.uart[0].capture_limit_bytes = 32u;
-
-    config.i2c[1].enabled             = 1u;
-    config.i2c[1].bit_rate            = 400000u;
-    config.i2c[1].role                = HIL_APPLICATION_BUS_ROLE_MASTER;
-    config.i2c[1].own_address_7bit    = 0u;
-    config.i2c[1].voltage_level       = HIL_APPLICATION_I2C_VOLTAGE_3V3;
-    config.i2c[1].pull_up             = HIL_APPLICATION_I2C_PULL_UP_4K7;
-    config.i2c[1].capture_limit_bytes = 16u;
+    config.uart[0].enabled         = 1u;
+    config.uart[0].baud_rate       = 115200u;
+    config.uart[0].electrical_mode = HIL_APPLICATION_UART_ELECTRICAL_MODE_TTL_3V3;
+    config.uart[0].word_length     = HIL_APPLICATION_UART_WORD_LENGTH_8_BITS;
+    config.uart[0].parity          = HIL_APPLICATION_UART_PARITY_NONE;
+    config.uart[0].stop_bits       = HIL_APPLICATION_UART_STOP_BITS_1;
+    config.uart[0].rx_enabled      = 1u;
+    config.uart[0].tx_enabled      = 1u;
 
     config.extension_data = HIL_Application_Byte_Span_T{ extension_data, extension_size };
     return message;
@@ -392,7 +381,6 @@ bool ApplicationConfigurationsEqual( const HIL_Application_Message_T& expected,
     for ( std::size_t i = 0u; i < HIL_APPLICATION_CAN_CHANNEL_COUNT; ++i )
     {
         if ( lhs.can[i].enabled != rhs.can[i].enabled || lhs.can[i].bit_rate != rhs.can[i].bit_rate
-             || lhs.can[i].capture_limit_bytes != rhs.can[i].capture_limit_bytes
              || lhs.can[i].filter_id != rhs.can[i].filter_id
              || lhs.can[i].filter_mask != rhs.can[i].filter_mask )
         {
@@ -405,8 +393,7 @@ bool ApplicationConfigurationsEqual( const HIL_Application_Message_T& expected,
              || lhs.spi[i].role != rhs.spi[i].role || lhs.spi[i].data_width != rhs.spi[i].data_width
              || lhs.spi[i].bit_order != rhs.spi[i].bit_order
              || lhs.spi[i].clock_polarity != rhs.spi[i].clock_polarity
-             || lhs.spi[i].clock_phase != rhs.spi[i].clock_phase
-             || lhs.spi[i].capture_limit_bytes != rhs.spi[i].capture_limit_bytes )
+             || lhs.spi[i].clock_phase != rhs.spi[i].clock_phase )
         {
             return false;
         }
@@ -420,8 +407,7 @@ bool ApplicationConfigurationsEqual( const HIL_Application_Message_T& expected,
              || lhs.uart[i].parity != rhs.uart[i].parity
              || lhs.uart[i].stop_bits != rhs.uart[i].stop_bits
              || lhs.uart[i].rx_enabled != rhs.uart[i].rx_enabled
-             || lhs.uart[i].tx_enabled != rhs.uart[i].tx_enabled
-             || lhs.uart[i].capture_limit_bytes != rhs.uart[i].capture_limit_bytes )
+             || lhs.uart[i].tx_enabled != rhs.uart[i].tx_enabled )
         {
             return false;
         }
@@ -432,8 +418,7 @@ bool ApplicationConfigurationsEqual( const HIL_Application_Message_T& expected,
              || lhs.i2c[i].role != rhs.i2c[i].role
              || lhs.i2c[i].own_address_7bit != rhs.i2c[i].own_address_7bit
              || lhs.i2c[i].voltage_level != rhs.i2c[i].voltage_level
-             || lhs.i2c[i].pull_up != rhs.i2c[i].pull_up
-             || lhs.i2c[i].capture_limit_bytes != rhs.i2c[i].capture_limit_bytes )
+             || lhs.i2c[i].pull_up != rhs.i2c[i].pull_up )
         {
             return false;
         }

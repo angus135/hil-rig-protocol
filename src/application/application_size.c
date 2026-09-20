@@ -239,6 +239,29 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_size(
     return HIL_APPLICATION_STATUS_OK;
 }
 
+HIL_Application_Status_T HIL_APPLICATION_Finalize_Test_Upload_size(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Finalize_Test_Upload_T* data,
+    size_t* encoded_size )
+{
+    ( void )sub_type;
+    ( void )test_id;
+    if ( data == NULL || encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    {
+        const HIL_Application_Status_T status =
+            HIL_APPLICATION_Finalize_Test_Upload_validate( context, data );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    *encoded_size = HIL_APPLICATION_WIRE_U32_SIZE;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
 HIL_Application_Status_T
 HIL_APPLICATION_Test_Result_size( const HIL_Application_Context_T*         context,
                                   const HIL_Application_Message_Subtype_T* sub_type,

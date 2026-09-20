@@ -25,7 +25,7 @@ def codec():
 @pytest.mark.parametrize(
     "factory,family,size",
     [
-        (configuration, "configuration", 226),
+        (configuration, "configuration", 194),
         (instruction, "instruction", 73),
         (result, "result", 62),
     ],
@@ -45,7 +45,7 @@ def test_populated_round_trip_matches_independent_native_fixture(codec, factory,
 def test_configuration_extension_round_trip(codec, size):
     public = configuration(bytes(range(size)))
     encoded = codec.encode(public)
-    assert len(encoded) == 226 + size
+    assert len(encoded) == 194 + size
     assert codec.decode(encoded) == public
     native, owner = message("configuration", public.extension_data)
     wire, count = encode(context(), native)
@@ -83,7 +83,7 @@ def test_native_rejects_eleven_bit_can_filter_overflow(codec):
 
 @pytest.mark.parametrize(
     "field,value",
-    [("bit_rate", 1), ("capture_limit_bytes", 1), ("filter_id", 1), ("filter_mask", 1)],
+    [("bit_rate", 1), ("filter_id", 1), ("filter_mask", 1)],
 )
 def test_disabled_can_requires_all_remaining_fields_zero(codec, field, value):
     disabled = p.CANConfig(**{field: value})
@@ -124,7 +124,7 @@ def test_defaults_direction_neutrality_and_statelessness(codec):
     "config,status",
     [
         (p.ApplicationConfig(max_encoded_message_size=0), p.ApplicationStatus.BUFFER_TOO_SMALL),
-        (p.ApplicationConfig(max_encoded_message_size=65559), p.ApplicationStatus.INVALID_LENGTH),
+        (p.ApplicationConfig(max_encoded_message_size=513), p.ApplicationStatus.INVALID_LENGTH),
         (p.ApplicationConfig(max_variable_data_size=256), p.ApplicationStatus.INVALID_COUNT),
         (p.ApplicationConfig(max_expected_tick_count=1000001), p.ApplicationStatus.INVALID_LENGTH),
     ],
@@ -184,7 +184,6 @@ def change(value, path, replacement):
         ("pwm_out.1.initial_period_nanoseconds", 0),
         ("pwm_out.1.initial_duty_cycle_permyriad", 10001),
         ("can.1.bit_rate", 0),
-        ("can.1.capture_limit_bytes", 256),
         ("can.1.filter_id", 0x800),
         ("can.1.filter_mask", 0x800),
         ("spi.1.role", p.BusRole.RESERVED),
@@ -356,6 +355,90 @@ def test_discovery_controls_and_exact_version_gate(codec):
         assert invalid.value.status is p.ApplicationStatus.VALIDATION_FAILED
 
 
+def test_finalize_test_upload_has_exact_type22_wire_vector_and_zero_storage(codec):
+    value = p.FinalizeTestUpload(p.TestId(bytes(range(16))))
+    expected = bytes((0, 3, 1)) + bytes(range(16)) + bytes((22, 0, 4, 0, 0, 0, 0, 0))
+    wire = codec.encode(value)
+    assert len(wire) == 27
+    assert wire == expected
+    assert codec.decode(wire) == value
+
+    required = ffi.new("size_t *")
+    assert (
+        lib.HIL_APPLICATION_Decode_Storage_Size(context(), wire, len(wire), required)
+        == p.ApplicationStatus.OK
+    )
+    assert required[0] == 0
+    assert (
+        lib.HIL_APPLICATION_Validate_Encoded_Message(context(), wire, len(wire), required)
+        == p.ApplicationStatus.OK
+    )
+    assert required[0] == 0
+
+
+def test_finalize_test_upload_requires_zero_flags_and_a_test_id(codec):
+    with pytest.raises(TypeError):
+        p.FinalizeTestUpload(None)
+    with pytest.raises(p.ApplicationEncodeError) as caught:
+        codec.encode(p.FinalizeTestUpload(p.TestId(bytes(16)), flags=1))
+    assert caught.value.status is p.ApplicationStatus.VALIDATION_FAILED
+
+
+@pytest.mark.parametrize("length", range(27))
+def test_finalize_test_upload_truncation_is_rejected(codec, length):
+    wire = codec.encode(p.FinalizeTestUpload(p.TestId(bytes(16))))
+    with pytest.raises(p.ApplicationDecodeError) as caught:
+        codec.decode(wire[:length])
+    assert caught.value.status is p.ApplicationStatus.TRUNCATED_MESSAGE
+
+
+def test_finalize_test_upload_trailing_bytes_and_invalid_encoded_flags(codec):
+    wire = codec.encode(p.FinalizeTestUpload(p.TestId(bytes(16))))
+    with pytest.raises(p.ApplicationDecodeError) as caught:
+        codec.decode(wire + b"\0")
+    assert caught.value.status is p.ApplicationStatus.MALFORMED_MESSAGE
+
+    invalid = bytearray(wire)
+    invalid[-1] = 1
+    with pytest.raises(p.ApplicationDecodeError) as caught:
+        codec.decode(invalid)
+    assert caught.value.status is p.ApplicationStatus.VALIDATION_FAILED
+
+
+@pytest.mark.parametrize("role", [p.BusRole.MASTER, p.BusRole.SLAVE])
+def test_enabled_i2c_configuration_is_not_implemented(codec, role):
+    i2c = replace(
+        configuration().i2c[0],
+        enabled=True,
+        bit_rate=400000,
+        role=role,
+        own_address_7bit=1 if role is p.BusRole.SLAVE else 0,
+        voltage_level=p.I2CVoltage.V_3V3,
+        pull_up=p.I2CPullUp.OHM_4K7,
+    )
+    public = replace(configuration(), i2c=(i2c, configuration().i2c[1]))
+    with pytest.raises(p.ApplicationEncodeError) as caught:
+        codec.encode(public)
+    assert caught.value.status is p.ApplicationStatus.NOT_IMPLEMENTED
+
+    wire = bytearray(codec.encode(configuration()))
+    wire[23 + 150] = 1
+    with pytest.raises(p.ApplicationDecodeError) as caught:
+        codec.decode(wire)
+    assert caught.value.status is p.ApplicationStatus.NOT_IMPLEMENTED
+
+
+def test_capture_overflow_result_uses_partial_and_stable_detail(codec):
+    value = p.VariableTestResult(
+        p.TestId(bytes(range(16))),
+        tick_number=3,
+        condition=p.ResultCondition.PARTIAL,
+        problem_detail=p.RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW,
+        records=(p.CapturedRecord(p.PeripheralType.UART, 0, b"prefix"),),
+    )
+    assert codec.decode(codec.encode(value)) == value
+
+
 @pytest.mark.parametrize("component", ["major", "minor", "patch"])
 @pytest.mark.parametrize("family", ["request", "response"])
 def test_outbound_discovery_requires_the_exact_compiled_version(codec, family, component):
@@ -377,24 +460,19 @@ def test_outbound_discovery_requires_the_exact_compiled_version(codec, family, c
 
 
 def test_maximum_discovery_response_owns_both_native_storage_spans():
-    codec = p.ApplicationCodec(p.ApplicationConfig(max_encoded_message_size=547))
+    codec = p.ApplicationCodec(p.ApplicationConfig())
     response = p.SystemInfoResponse(
         protocol_version=p.PROTOCOL_VERSION,
         firmware_version=p.ProtocolVersion(65535, 65535, 65535),
         diagnostic_data=bytes(range(255)),
-        firmware_git_hash=bytes(reversed(range(255))),
+        firmware_git_hash=bytes(reversed(range(220))),
     )
     wire = codec.encode(response)
-    assert len(wire) == 547
+    assert len(wire) == 512
     decoded = codec.decode(wire)
     del wire
     gc.collect()
     assert decoded == response
-
-    default_codec = p.ApplicationCodec(p.ApplicationConfig())
-    with pytest.raises(p.ApplicationEncodeError) as caught:
-        default_codec.encode(response)
-    assert caught.value.status is p.ApplicationStatus.BUFFER_TOO_SMALL
 
 
 def test_foreign_discovery_decodes_before_explicit_compatibility_failure(codec):

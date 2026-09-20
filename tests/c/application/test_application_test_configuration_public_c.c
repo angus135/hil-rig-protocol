@@ -11,6 +11,9 @@ _Static_assert( HIL_APPLICATION_UART_ELECTRICAL_MODE_RS232 == 3, "wire enum valu
 _Static_assert( HIL_APPLICATION_I2C_PULL_UP_10K == 4, "wire enum value" );
 _Static_assert( HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE == 28u, "control minimum" );
 _Static_assert( HIL_APPLICATION_STATUS_VERSION_MISMATCH == 17, "stable status value" );
+_Static_assert( HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD == 22,
+                "finalize upload wire type" );
+_Static_assert( HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK == 8u, "fixed v0.3.0 chunk ceiling" );
 
 int main( void )
 {
@@ -43,6 +46,7 @@ int main( void )
     HIL_Application_System_Info_Response_T  system_info_response = { 0 };
     HIL_Application_Execution_Control_T     execution_control    = { 0 };
     HIL_Application_Global_Control_T        global_control       = { 0 };
+    HIL_Application_Finalize_Test_Upload_T  finalize_upload      = { 0 };
 
     ( void )voltage;
     ( void )role;
@@ -62,16 +66,16 @@ int main( void )
     ( void )analog_output;
     ( void )pwm_input;
     ( void )pwm_output;
-    can.enabled             = 1u;
-    can.bit_rate            = 500000u;
-    can.capture_limit_bytes = 64u;
-    can.filter_id           = 0x123u;
-    can.filter_mask         = 0x7f0u;
+    can.enabled     = 1u;
+    can.bit_rate    = 500000u;
+    can.filter_id   = 0x123u;
+    can.filter_mask = 0x7f0u;
     ( void )can;
     ( void )spi;
     ( void )uart;
     ( void )i2c;
     ( void )configuration;
+    ( void )finalize_upload;
     system_info_request.query                       = HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC;
     system_info_request.application_protocol_major  = HIL_RIG_PROTOCOL_VERSION_MAJOR;
     system_info_request.application_protocol_minor  = HIL_RIG_PROTOCOL_VERSION_MINOR;

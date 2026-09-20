@@ -92,6 +92,7 @@ std::vector<std::uint8_t> FixedBodyEnvelope( HIL_Application_Message_Type_T type
     bytes[21] = static_cast<std::uint8_t>( payload_size & 0xffu );
     bytes[22] = static_cast<std::uint8_t>( ( payload_size >> 8u ) & 0xffu );
     if ( type == HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION
+         || type == HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD
          || type == HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL
          || type == HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT
          || type == HIL_APPLICATION_MESSAGE_TYPE_RESPONSE )
@@ -119,12 +120,13 @@ struct FixedBodyWidthCase
     std::size_t                    payload_size;
 };
 
-constexpr std::array<FixedBodyWidthCase, 6u> kFixedBodyWidths = {
+constexpr std::array<FixedBodyWidthCase, 7u> kFixedBodyWidths = {
     FixedBodyWidthCase{ HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST, 8u },
     FixedBodyWidthCase{ HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION, 50u },
     FixedBodyWidthCase{ HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL, 5u },
     FixedBodyWidthCase{ HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL, 5u },
     FixedBodyWidthCase{ HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT, 39u },
+    FixedBodyWidthCase{ HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD, 4u },
     FixedBodyWidthCase{ HIL_APPLICATION_MESSAGE_TYPE_RESPONSE, 13u },
 };
 
@@ -152,7 +154,8 @@ void ExpectDecodeFailurePublishesNothing(
 }  // namespace
 
 static_assert( HIL_APPLICATION_HEADER_SIZE_BYTES == 23u );
-static_assert( HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE == 23u + UINT16_MAX );
+static_assert( HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE == 512u );
+static_assert( HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK == 8u );
 static_assert( HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE == 28u );
 static_assert( HIL_RIG_PROTOCOL_VERSION_MAJOR == 0u );
 static_assert( HIL_RIG_PROTOCOL_VERSION_MINOR == 3u );
@@ -162,12 +165,138 @@ static_assert( HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION == 17 );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL == 19 );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL == 20 );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION == 21 );
+static_assert( HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD == 22 );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT == 32 );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT == 34 );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_RESPONSE == 48 );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_ERROR == 49 );
 static_assert( HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC == 1 );
 static_assert( HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC == 1 );
+
+TEST( ApplicationFinalizeTestUpload, EncodesAndDecodesExactGoldenVector )
+{
+    const auto                context = MakeCodecContext();
+    HIL_Application_Message_T message{};
+    message.type        = HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD;
+    message.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    message.has_test_id = 1u;
+    for ( std::size_t i = 0u; i < HIL_APPLICATION_TEST_ID_SIZE; ++i )
+    {
+        message.test_id.bytes[i] = static_cast<std::uint8_t>( 0x80u + i );
+    }
+    message.body.finalize_test_upload.flags = 0u;
+
+    const std::array<std::uint8_t, 27u> expected{
+        static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MAJOR ),
+        static_cast<std::uint8_t>( HIL_RIG_PROTOCOL_VERSION_MINOR ),
+        1u,
+        0x80u,
+        0x81u,
+        0x82u,
+        0x83u,
+        0x84u,
+        0x85u,
+        0x86u,
+        0x87u,
+        0x88u,
+        0x89u,
+        0x8au,
+        0x8bu,
+        0x8cu,
+        0x8du,
+        0x8eu,
+        0x8fu,
+        22u,
+        0u,
+        4u,
+        0u,
+        0u,
+        0u,
+        0u,
+    };
+    std::array<std::uint8_t, expected.size()> encoded{};
+    std::size_t                               encoded_size = 99u;
+    ASSERT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &encoded_size ),
+               HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( encoded_size, expected.size() );
+    ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, encoded.data(), encoded.size(),
+                                               &encoded_size ),
+               HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( encoded, expected );
+
+    std::size_t required_storage = 99u;
+    EXPECT_EQ( HIL_APPLICATION_Decode_Storage_Size( &context, encoded.data(), encoded.size(),
+                                                    &required_storage ),
+               HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( required_storage, 0u );
+    std::size_t validation_storage = 99u;
+    EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &context, encoded.data(), encoded.size(),
+                                                         &validation_storage ),
+               HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( validation_storage, 0u );
+
+    HIL_Application_Message_T decoded{};
+    std::size_t               used = 99u;
+    ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), encoded.size(), &decoded,
+                                               nullptr, 0u, &used ),
+               HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( used, 0u );
+    EXPECT_EQ( decoded.type, HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD );
+    EXPECT_EQ( decoded.subtype, HIL_APPLICATION_MESSAGE_SUBTYPE_NONE );
+    EXPECT_EQ( decoded.has_test_id, 1u );
+    EXPECT_EQ( decoded.body.finalize_test_upload.flags, 0u );
+}
+
+TEST( ApplicationFinalizeTestUpload, EnforcesTestIdSubtypeFlagsAndBodyBoundaries )
+{
+    const auto                context = MakeCodecContext();
+    HIL_Application_Message_T message{};
+    message.type                            = HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD;
+    message.subtype                         = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    message.has_test_id                     = 1u;
+    message.body.finalize_test_upload.flags = 0u;
+    std::array<std::uint8_t, 27u> encoded{};
+    std::size_t                   encoded_size = 0u;
+    ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, encoded.data(), encoded.size(),
+                                               &encoded_size ),
+               HIL_APPLICATION_STATUS_OK );
+
+    message.has_test_id = 0u;
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
+               HIL_APPLICATION_STATUS_INCONSISTENT_TEST_ID );
+    message.has_test_id = 1u;
+    message.subtype     = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
+               HIL_APPLICATION_STATUS_INVALID_SUBTYPE );
+
+    message.subtype                         = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
+    message.body.finalize_test_upload.flags = 1u;
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+    EXPECT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &encoded_size ),
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+
+    auto nonzero_flags             = encoded;
+    nonzero_flags[23]              = 1u;
+    std::size_t validation_storage = 99u;
+    EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message(
+                   &context, nonzero_flags.data(), nonzero_flags.size(), &validation_storage ),
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+
+    std::vector<std::uint8_t> truncated( encoded.begin(), encoded.end() );
+    truncated[21] = 3u;
+    truncated.resize( 26u );
+    EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &context, truncated.data(),
+                                                         truncated.size(), &validation_storage ),
+               HIL_APPLICATION_STATUS_MALFORMED_MESSAGE );
+
+    std::vector<std::uint8_t> trailing( encoded.begin(), encoded.end() );
+    trailing.push_back( 0u );
+    trailing[21] = 5u;
+    EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &context, trailing.data(), trailing.size(),
+                                                         &validation_storage ),
+               HIL_APPLICATION_STATUS_MALFORMED_MESSAGE );
+}
 
 TEST( ApplicationCodecEnvelope, LiteralVectorWithoutTestIdUsesOverallVersionAndZeroIdBytes )
 {
@@ -395,7 +524,7 @@ TEST( ApplicationCodecEnvelope, RejectsRetiredVariableMessageTypes )
 
 TEST( ApplicationCodecEnvelope, PayloadLengthIsLiteralLittleEndianUint16BeyondOneByte )
 {
-    const auto                     context = MakeCodecContext( 1024u );
+    const auto                     context = MakeCodecContext();
     std::array<std::uint8_t, 250u> diagnostic{};
     std::array<std::uint8_t, 10u>  git_hash{};
     HIL_Application_Message_T      message{};
@@ -549,7 +678,7 @@ TEST( ApplicationCodecDecode, Uint16PayloadLimitDoesNotOverflowLengthArithmetic 
     bytes[23] = 1u;
     bytes[24] = static_cast<std::uint8_t>( HIL_APPLICATION_SYSTEM_INFO_QUERY_BASIC );
     ExpectDecodeFailurePublishesNothing( context, bytes.data(), bytes.size(),
-                                         HIL_APPLICATION_STATUS_MALFORMED_MESSAGE, true );
+                                         HIL_APPLICATION_STATUS_TRUNCATED_MESSAGE, true );
 }
 
 TEST( ApplicationCodecEncode, CapacityBoundariesPublishSizeOnlyOnSuccess )

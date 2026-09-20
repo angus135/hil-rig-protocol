@@ -12,8 +12,8 @@
 
 namespace {
 constexpr std::size_t kHeaderSize            = 23u;
-constexpr std::size_t kFixedPayloadSize      = 203u;
-constexpr std::size_t kEmptyCompleteSize     = 226u;
+constexpr std::size_t kFixedPayloadSize      = 171u;
+constexpr std::size_t kEmptyCompleteSize     = 194u;
 constexpr std::size_t kDigitalInputOffset    = 12u;
 constexpr std::size_t kDigitalOutputOffset   = 32u;
 constexpr std::size_t kAnalogInputOffset     = 62u;
@@ -21,11 +21,11 @@ constexpr std::size_t kAnalogOutputOffset    = 64u;
 constexpr std::size_t kPwmInputOffset        = 70u;
 constexpr std::size_t kPwmOutputOffset       = 74u;
 constexpr std::size_t kCanOffset             = 90u;
-constexpr std::size_t kSpiOffset             = 116u;
-constexpr std::size_t kUartOffset            = 144u;
-constexpr std::size_t kI2cOffset             = 174u;
-constexpr std::size_t kExtensionLengthOffset = 202u;
-constexpr std::size_t kExtensionDataOffset   = 203u;
+constexpr std::size_t kSpiOffset             = 108u;
+constexpr std::size_t kUartOffset            = 128u;
+constexpr std::size_t kI2cOffset             = 150u;
+constexpr std::size_t kExtensionLengthOffset = 170u;
+constexpr std::size_t kExtensionDataOffset   = 171u;
 constexpr std::size_t kPayloadLengthOffset   = 21u;
 
 void PutU16Le( std::vector<std::uint8_t>& bytes, std::size_t offset, std::uint16_t value )
@@ -102,38 +102,27 @@ RepresentativeConfiguration( const std::uint8_t* extension_data = nullptr,
     config.pwm_out[0].initial_period_nanoseconds   = 0x11223344u;
     config.pwm_out[0].initial_duty_cycle_permyriad = 10000u;
 
-    config.can[1].enabled             = 1u;
-    config.can[1].bit_rate            = 500000u;
-    config.can[1].capture_limit_bytes = 0x5au;
-    config.can[1].filter_id           = 0x0321u;
-    config.can[1].filter_mask         = 0x07f0u;
+    config.can[1].enabled     = 1u;
+    config.can[1].bit_rate    = 500000u;
+    config.can[1].filter_id   = 0x0321u;
+    config.can[1].filter_mask = 0x07f0u;
 
-    config.spi[0].enabled             = 1u;
-    config.spi[0].bit_rate            = 0x01020304u;
-    config.spi[0].role                = HIL_APPLICATION_BUS_ROLE_SLAVE;
-    config.spi[0].data_width          = HIL_APPLICATION_SPI_DATA_WIDTH_16_BITS;
-    config.spi[0].bit_order           = HIL_APPLICATION_SPI_BIT_ORDER_LSB_FIRST;
-    config.spi[0].clock_polarity      = HIL_APPLICATION_SPI_CLOCK_POLARITY_IDLE_HIGH;
-    config.spi[0].clock_phase         = HIL_APPLICATION_SPI_CLOCK_PHASE_SECOND_EDGE;
-    config.spi[0].capture_limit_bytes = 0x22u;
+    config.spi[0].enabled        = 1u;
+    config.spi[0].bit_rate       = 0x01020304u;
+    config.spi[0].role           = HIL_APPLICATION_BUS_ROLE_SLAVE;
+    config.spi[0].data_width     = HIL_APPLICATION_SPI_DATA_WIDTH_16_BITS;
+    config.spi[0].bit_order      = HIL_APPLICATION_SPI_BIT_ORDER_LSB_FIRST;
+    config.spi[0].clock_polarity = HIL_APPLICATION_SPI_CLOCK_POLARITY_IDLE_HIGH;
+    config.spi[0].clock_phase    = HIL_APPLICATION_SPI_CLOCK_PHASE_SECOND_EDGE;
 
-    config.uart[1].enabled             = 1u;
-    config.uart[1].baud_rate           = 115200u;
-    config.uart[1].electrical_mode     = HIL_APPLICATION_UART_ELECTRICAL_MODE_RS232;
-    config.uart[1].word_length         = HIL_APPLICATION_UART_WORD_LENGTH_9_BITS;
-    config.uart[1].parity              = HIL_APPLICATION_UART_PARITY_ODD;
-    config.uart[1].stop_bits           = HIL_APPLICATION_UART_STOP_BITS_2;
-    config.uart[1].rx_enabled          = 1u;
-    config.uart[1].tx_enabled          = 0u;
-    config.uart[1].capture_limit_bytes = 0x44u;
-
-    config.i2c[0].enabled             = 1u;
-    config.i2c[0].bit_rate            = 400000u;
-    config.i2c[0].role                = HIL_APPLICATION_BUS_ROLE_SLAVE;
-    config.i2c[0].own_address_7bit    = 0x52u;
-    config.i2c[0].voltage_level       = HIL_APPLICATION_I2C_VOLTAGE_5V;
-    config.i2c[0].pull_up             = HIL_APPLICATION_I2C_PULL_UP_4K7;
-    config.i2c[0].capture_limit_bytes = 0x33u;
+    config.uart[1].enabled         = 1u;
+    config.uart[1].baud_rate       = 115200u;
+    config.uart[1].electrical_mode = HIL_APPLICATION_UART_ELECTRICAL_MODE_RS232;
+    config.uart[1].word_length     = HIL_APPLICATION_UART_WORD_LENGTH_9_BITS;
+    config.uart[1].parity          = HIL_APPLICATION_UART_PARITY_ODD;
+    config.uart[1].stop_bits       = HIL_APPLICATION_UART_STOP_BITS_2;
+    config.uart[1].rx_enabled      = 1u;
+    config.uart[1].tx_enabled      = 0u;
 
     config.extension_data = HIL_Application_Byte_Span_T{ extension_data, extension_size };
     return config;
@@ -175,11 +164,10 @@ HIL_Application_Test_Configuration_T AllChannelsEnabledConfiguration()
     config.pwm_out[1].initial_duty_cycle_permyriad = 10000u;
     for ( std::size_t i = 0u; i < HIL_APPLICATION_CAN_CHANNEL_COUNT; ++i )
     {
-        config.can[i].enabled             = 1u;
-        config.can[i].bit_rate            = UINT32_MAX;
-        config.can[i].capture_limit_bytes = 255u;
-        config.can[i].filter_id           = i == 0u ? 0x000u : 0x07ffu;
-        config.can[i].filter_mask         = i == 0u ? 0x000u : 0x07ffu;
+        config.can[i].enabled     = 1u;
+        config.can[i].bit_rate    = UINT32_MAX;
+        config.can[i].filter_id   = i == 0u ? 0x000u : 0x07ffu;
+        config.can[i].filter_mask = i == 0u ? 0x000u : 0x07ffu;
     }
     for ( std::size_t i = 0u; i < HIL_APPLICATION_SPI_CHANNEL_COUNT; ++i )
     {
@@ -187,15 +175,14 @@ HIL_Application_Test_Configuration_T AllChannelsEnabledConfiguration()
         config.spi[i].bit_rate = UINT32_MAX;
         config.spi[i].role =
             i == 0u ? HIL_APPLICATION_BUS_ROLE_MASTER : HIL_APPLICATION_BUS_ROLE_SLAVE;
-        config.spi[i].data_width          = i == 0u ? HIL_APPLICATION_SPI_DATA_WIDTH_8_BITS
-                                                    : HIL_APPLICATION_SPI_DATA_WIDTH_16_BITS;
-        config.spi[i].bit_order           = i == 0u ? HIL_APPLICATION_SPI_BIT_ORDER_MSB_FIRST
-                                                    : HIL_APPLICATION_SPI_BIT_ORDER_LSB_FIRST;
-        config.spi[i].clock_polarity      = i == 0u ? HIL_APPLICATION_SPI_CLOCK_POLARITY_IDLE_LOW
-                                                    : HIL_APPLICATION_SPI_CLOCK_POLARITY_IDLE_HIGH;
-        config.spi[i].clock_phase         = i == 0u ? HIL_APPLICATION_SPI_CLOCK_PHASE_FIRST_EDGE
-                                                    : HIL_APPLICATION_SPI_CLOCK_PHASE_SECOND_EDGE;
-        config.spi[i].capture_limit_bytes = 255u;
+        config.spi[i].data_width     = i == 0u ? HIL_APPLICATION_SPI_DATA_WIDTH_8_BITS
+                                               : HIL_APPLICATION_SPI_DATA_WIDTH_16_BITS;
+        config.spi[i].bit_order      = i == 0u ? HIL_APPLICATION_SPI_BIT_ORDER_MSB_FIRST
+                                               : HIL_APPLICATION_SPI_BIT_ORDER_LSB_FIRST;
+        config.spi[i].clock_polarity = i == 0u ? HIL_APPLICATION_SPI_CLOCK_POLARITY_IDLE_LOW
+                                               : HIL_APPLICATION_SPI_CLOCK_POLARITY_IDLE_HIGH;
+        config.spi[i].clock_phase    = i == 0u ? HIL_APPLICATION_SPI_CLOCK_PHASE_FIRST_EDGE
+                                               : HIL_APPLICATION_SPI_CLOCK_PHASE_SECOND_EDGE;
     }
     for ( std::size_t i = 0u; i < HIL_APPLICATION_UART_CHANNEL_COUNT; ++i )
     {
@@ -209,24 +196,9 @@ HIL_Application_Test_Configuration_T AllChannelsEnabledConfiguration()
             i == 0u ? HIL_APPLICATION_UART_PARITY_NONE : HIL_APPLICATION_UART_PARITY_EVEN;
         config.uart[i].stop_bits =
             i == 0u ? HIL_APPLICATION_UART_STOP_BITS_1 : HIL_APPLICATION_UART_STOP_BITS_2;
-        config.uart[i].rx_enabled          = i == 0u ? 0u : 1u;
-        config.uart[i].tx_enabled          = 1u;
-        config.uart[i].capture_limit_bytes = i == 0u ? 0u : 255u;
+        config.uart[i].rx_enabled = i == 0u ? 0u : 1u;
+        config.uart[i].tx_enabled = 1u;
     }
-    config.i2c[0].enabled             = 1u;
-    config.i2c[0].bit_rate            = UINT32_MAX;
-    config.i2c[0].role                = HIL_APPLICATION_BUS_ROLE_MASTER;
-    config.i2c[0].own_address_7bit    = 0u;
-    config.i2c[0].voltage_level       = HIL_APPLICATION_I2C_VOLTAGE_3V3;
-    config.i2c[0].pull_up             = HIL_APPLICATION_I2C_PULL_UP_1K;
-    config.i2c[0].capture_limit_bytes = 255u;
-    config.i2c[1].enabled             = 1u;
-    config.i2c[1].bit_rate            = UINT32_MAX;
-    config.i2c[1].role                = HIL_APPLICATION_BUS_ROLE_SLAVE;
-    config.i2c[1].own_address_7bit    = 0x7fu;
-    config.i2c[1].voltage_level       = HIL_APPLICATION_I2C_VOLTAGE_5V;
-    config.i2c[1].pull_up             = HIL_APPLICATION_I2C_PULL_UP_10K;
-    config.i2c[1].capture_limit_bytes = 255u;
     return config;
 }
 
@@ -264,7 +236,7 @@ std::vector<std::uint8_t> EmptyGolden()
         expected[3u + i] = static_cast<std::uint8_t>( 0xa0u + i );
     expected[19] = 0x10u;
     expected[20] = 0x00u;
-    expected[21] = 0xcbu;
+    expected[21] = 0xabu;
     expected[22] = 0x00u;
     PutU32Le( expected, kHeaderSize + 0u, 1000u );
     PutU32Le( expected, kHeaderSize + 4u, 1u );
@@ -298,30 +270,22 @@ std::vector<std::uint8_t> RepresentativeGolden( const std::array<std::uint8_t, 3
     PutU32Le( expected, pwm + 2u, 0x11223344u );
     PutU16Le( expected, pwm + 6u, 10000u );
 
-    const std::size_t can = p + kCanOffset + 13u;
+    const std::size_t can = p + kCanOffset + 9u;
     expected[can + 0u]    = 1u;
     PutU32Le( expected, can + 1u, 500000u );
-    PutU32Le( expected, can + 5u, 0x5au );
-    PutU16Le( expected, can + 9u, 0x0321u );
-    PutU16Le( expected, can + 11u, 0x07f0u );
+    PutU16Le( expected, can + 5u, 0x0321u );
+    PutU16Le( expected, can + 7u, 0x07f0u );
 
     const std::size_t                   spi = p + kSpiOffset;
-    const std::array<std::uint8_t, 14u> spi_bytes{ 1u, 4u, 3u, 2u,    1u, 2u, 2u,
-                                                   2u, 2u, 2u, 0x22u, 0u, 0u, 0u };
+    const std::array<std::uint8_t, 10u> spi_bytes{ 1u, 4u, 3u, 2u, 1u, 2u, 2u, 2u, 2u, 2u };
     for ( std::size_t i = 0u; i < spi_bytes.size(); ++i )
         expected[spi + i] = spi_bytes[i];
 
-    const std::size_t                   uart = p + kUartOffset + 15u;
-    const std::array<std::uint8_t, 15u> uart_bytes{ 1u, 0x00u, 0xc2u, 0x01u, 0x00u, 3u, 2u, 3u,
-                                                    2u, 1u,    0u,    0x44u, 0u,    0u, 0u };
+    const std::size_t                   uart = p + kUartOffset + 11u;
+    const std::array<std::uint8_t, 11u> uart_bytes{ 1u, 0x00u, 0xc2u, 0x01u, 0x00u, 3u,
+                                                    2u, 3u,    2u,    1u,    0u };
     for ( std::size_t i = 0u; i < uart_bytes.size(); ++i )
         expected[uart + i] = uart_bytes[i];
-
-    const std::size_t                   i2c = p + kI2cOffset;
-    const std::array<std::uint8_t, 14u> i2c_bytes{ 1u,    0x80u, 0x1au, 0x06u, 0x00u, 2u, 0x52u,
-                                                   0x00u, 2u,    3u,    0x33u, 0u,    0u, 0u };
-    for ( std::size_t i = 0u; i < i2c_bytes.size(); ++i )
-        expected[i2c + i] = i2c_bytes[i];
 
     expected[p + kExtensionLengthOffset] = static_cast<std::uint8_t>( extension.size() );
     for ( std::size_t i = 0u; i < extension.size(); ++i )
@@ -368,7 +332,6 @@ void ExpectConfigurationEqual( const HIL_Application_Test_Configuration_T& expec
     {
         EXPECT_EQ( actual.can[i].enabled, expected.can[i].enabled );
         EXPECT_EQ( actual.can[i].bit_rate, expected.can[i].bit_rate );
-        EXPECT_EQ( actual.can[i].capture_limit_bytes, expected.can[i].capture_limit_bytes );
         EXPECT_EQ( actual.can[i].filter_id, expected.can[i].filter_id );
         EXPECT_EQ( actual.can[i].filter_mask, expected.can[i].filter_mask );
     }
@@ -381,7 +344,6 @@ void ExpectConfigurationEqual( const HIL_Application_Test_Configuration_T& expec
         EXPECT_EQ( actual.spi[i].bit_order, expected.spi[i].bit_order );
         EXPECT_EQ( actual.spi[i].clock_polarity, expected.spi[i].clock_polarity );
         EXPECT_EQ( actual.spi[i].clock_phase, expected.spi[i].clock_phase );
-        EXPECT_EQ( actual.spi[i].capture_limit_bytes, expected.spi[i].capture_limit_bytes );
     }
     for ( std::size_t i = 0u; i < HIL_APPLICATION_UART_CHANNEL_COUNT; ++i )
     {
@@ -393,7 +355,6 @@ void ExpectConfigurationEqual( const HIL_Application_Test_Configuration_T& expec
         EXPECT_EQ( actual.uart[i].stop_bits, expected.uart[i].stop_bits );
         EXPECT_EQ( actual.uart[i].rx_enabled, expected.uart[i].rx_enabled );
         EXPECT_EQ( actual.uart[i].tx_enabled, expected.uart[i].tx_enabled );
-        EXPECT_EQ( actual.uart[i].capture_limit_bytes, expected.uart[i].capture_limit_bytes );
     }
     for ( std::size_t i = 0u; i < HIL_APPLICATION_I2C_CHANNEL_COUNT; ++i )
     {
@@ -403,7 +364,6 @@ void ExpectConfigurationEqual( const HIL_Application_Test_Configuration_T& expec
         EXPECT_EQ( actual.i2c[i].own_address_7bit, expected.i2c[i].own_address_7bit );
         EXPECT_EQ( actual.i2c[i].voltage_level, expected.i2c[i].voltage_level );
         EXPECT_EQ( actual.i2c[i].pull_up, expected.i2c[i].pull_up );
-        EXPECT_EQ( actual.i2c[i].capture_limit_bytes, expected.i2c[i].capture_limit_bytes );
     }
     EXPECT_EQ( actual.extension_data.size, expected.extension_data.size );
     for ( std::size_t i = 0u; i < expected.extension_data.size; ++i )
@@ -489,42 +449,39 @@ TEST( ApplicationTestConfigurationGolden, RepresentativeEnabledRecordsHaveExactO
     EXPECT_EQ( actual[p + kAnalogOutputOffset + 5u], 1u );
     EXPECT_EQ( actual[p + kPwmInputOffset + 2u], 1u );
     EXPECT_EQ( actual[p + kPwmOutputOffset], 1u );
-    EXPECT_EQ( actual[p + kCanOffset + 13u], 1u );
+    EXPECT_EQ( actual[p + kCanOffset + 9u], 1u );
     EXPECT_EQ( actual[p + kSpiOffset], 1u );
-    EXPECT_EQ( actual[p + kUartOffset + 15u], 1u );
-    EXPECT_EQ( actual[p + kI2cOffset], 1u );
+    EXPECT_EQ( actual[p + kUartOffset + 11u], 1u );
     EXPECT_EQ( actual[p + kExtensionLengthOffset], extension.size() );
 }
 
 TEST( ApplicationTestConfigurationCan,
       ExactRecordLayoutUsesLittleEndianFiltersAndNoTerminationByte )
 {
-    const auto context                = MakeContext();
-    auto       config                 = CanonicalConfiguration();
-    config.can[0].enabled             = 1u;
-    config.can[0].bit_rate            = 0x11223344u;
-    config.can[0].capture_limit_bytes = 0x88u;
-    config.can[0].filter_id           = 0x0321u;
-    config.can[0].filter_mask         = 0x07f0u;
-    config.can[1].enabled             = 1u;
-    config.can[1].bit_rate            = 500000u;
-    config.can[1].capture_limit_bytes = 0x5au;
-    config.can[1].filter_id           = 0x0456u;
-    config.can[1].filter_mask         = 0x0700u;
+    const auto context        = MakeContext();
+    auto       config         = CanonicalConfiguration();
+    config.can[0].enabled     = 1u;
+    config.can[0].bit_rate    = 0x11223344u;
+    config.can[0].filter_id   = 0x0321u;
+    config.can[0].filter_mask = 0x07f0u;
+    config.can[1].enabled     = 1u;
+    config.can[1].bit_rate    = 500000u;
+    config.can[1].filter_id   = 0x0456u;
+    config.can[1].filter_mask = 0x0700u;
 
-    const auto                          actual = EncodeConfiguration( context, config );
-    const std::size_t                   first  = kHeaderSize + kCanOffset;
-    const std::array<std::uint8_t, 13u> expected_first{
-        0x01u, 0x44u, 0x33u, 0x22u, 0x11u, 0x88u, 0x00u, 0x00u, 0x00u, 0x21u, 0x03u, 0xf0u, 0x07u };
+    const auto                         actual = EncodeConfiguration( context, config );
+    const std::size_t                  first  = kHeaderSize + kCanOffset;
+    const std::array<std::uint8_t, 9u> expected_first{ 0x01u, 0x44u, 0x33u, 0x22u, 0x11u,
+                                                       0x21u, 0x03u, 0xf0u, 0x07u };
     EXPECT_TRUE(
         std::equal( expected_first.begin(), expected_first.end(), actual.begin() + first ) );
 
-    const std::size_t second = first + 13u;
+    const std::size_t second = first + 9u;
     EXPECT_EQ( actual[second], 1u );
-    EXPECT_EQ( actual[second + 9u], 0x56u );
-    EXPECT_EQ( actual[second + 10u], 0x04u );
-    EXPECT_EQ( actual[second + 11u], 0x00u );
-    EXPECT_EQ( actual[second + 12u], 0x07u );
+    EXPECT_EQ( actual[second + 5u], 0x56u );
+    EXPECT_EQ( actual[second + 6u], 0x04u );
+    EXPECT_EQ( actual[second + 7u], 0x00u );
+    EXPECT_EQ( actual[second + 8u], 0x07u );
     EXPECT_EQ( actual[kHeaderSize + kSpiOffset], 0u );
     ExpectRoundTrip( context, config );
 }
@@ -787,9 +744,9 @@ TEST( ApplicationTestConfigurationExtensionLimit, Maximum255ByteExtensionWorksEn
     std::size_t encoded_size = 99u;
     ASSERT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &encoded_size ),
                HIL_APPLICATION_STATUS_OK );
-    ASSERT_EQ( encoded_size, 481u );
+    ASSERT_EQ( encoded_size, 449u );
 
-    std::array<std::uint8_t, 481u> encoded{};
+    std::array<std::uint8_t, 449u> encoded{};
     ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, encoded.data(), encoded.size(),
                                                &encoded_size ),
                HIL_APPLICATION_STATUS_OK );
@@ -853,7 +810,6 @@ TEST( ApplicationTestConfigurationValidation, RejectsInvalidEnableAndNoncanonica
     reject( []( auto& c ) { c.pwm_out[0].initial_duty_cycle_permyriad = 1u; } );
 
     reject( []( auto& c ) { c.can[0].bit_rate = 1u; } );
-    reject( []( auto& c ) { c.can[0].capture_limit_bytes = 1u; } );
     reject( []( auto& c ) { c.can[0].filter_id = 1u; } );
     reject( []( auto& c ) { c.can[0].filter_mask = 1u; } );
 
@@ -864,7 +820,6 @@ TEST( ApplicationTestConfigurationValidation, RejectsInvalidEnableAndNoncanonica
     reject(
         []( auto& c ) { c.spi[0].clock_polarity = HIL_APPLICATION_SPI_CLOCK_POLARITY_IDLE_LOW; } );
     reject( []( auto& c ) { c.spi[0].clock_phase = HIL_APPLICATION_SPI_CLOCK_PHASE_FIRST_EDGE; } );
-    reject( []( auto& c ) { c.spi[0].capture_limit_bytes = 1u; } );
 
     reject( []( auto& c ) { c.uart[0].baud_rate = 1u; } );
     reject( []( auto& c ) {
@@ -875,14 +830,12 @@ TEST( ApplicationTestConfigurationValidation, RejectsInvalidEnableAndNoncanonica
     reject( []( auto& c ) { c.uart[0].stop_bits = HIL_APPLICATION_UART_STOP_BITS_1; } );
     reject( []( auto& c ) { c.uart[0].rx_enabled = 1u; } );
     reject( []( auto& c ) { c.uart[0].tx_enabled = 1u; } );
-    reject( []( auto& c ) { c.uart[0].capture_limit_bytes = 1u; } );
 
     reject( []( auto& c ) { c.i2c[0].bit_rate = 1u; } );
     reject( []( auto& c ) { c.i2c[0].role = HIL_APPLICATION_BUS_ROLE_MASTER; } );
     reject( []( auto& c ) { c.i2c[0].own_address_7bit = 1u; } );
     reject( []( auto& c ) { c.i2c[0].voltage_level = HIL_APPLICATION_I2C_VOLTAGE_3V3; } );
     reject( []( auto& c ) { c.i2c[0].pull_up = HIL_APPLICATION_I2C_PULL_UP_1K; } );
-    reject( []( auto& c ) { c.i2c[0].capture_limit_bytes = 1u; } );
 }
 
 TEST( ApplicationTestConfigurationValidation, RejectsInvalidAndReservedEnums )
@@ -942,12 +895,6 @@ TEST( ApplicationTestConfigurationValidation, RejectsInvalidAndReservedEnums )
     reject( []( auto& c ) { c.uart[1].parity = HIL_APPLICATION_UART_PARITY_RESERVED; } );
     reject( []( auto& c ) { c.uart[1].stop_bits = HIL_APPLICATION_UART_STOP_BITS_INVALID; } );
     reject( []( auto& c ) { c.uart[1].stop_bits = HIL_APPLICATION_UART_STOP_BITS_RESERVED; } );
-    reject( []( auto& c ) { c.i2c[0].role = HIL_APPLICATION_BUS_ROLE_INVALID; } );
-    reject( []( auto& c ) { c.i2c[0].role = HIL_APPLICATION_BUS_ROLE_RESERVED; } );
-    reject( []( auto& c ) { c.i2c[0].voltage_level = HIL_APPLICATION_I2C_VOLTAGE_INVALID; } );
-    reject( []( auto& c ) { c.i2c[0].voltage_level = HIL_APPLICATION_I2C_VOLTAGE_RESERVED; } );
-    reject( []( auto& c ) { c.i2c[0].pull_up = HIL_APPLICATION_I2C_PULL_UP_INVALID; } );
-    reject( []( auto& c ) { c.i2c[0].pull_up = HIL_APPLICATION_I2C_PULL_UP_RESERVED; } );
 }
 
 TEST( ApplicationTestConfigurationValidation, RejectsInvalidTickFlagsAndExtension )
@@ -990,47 +937,26 @@ TEST( ApplicationTestConfigurationValidation, RejectsInvalidDigitalAndPwmState )
 }
 
 TEST( ApplicationTestConfigurationValidation,
-      RejectsInvalidCommunicationRatesBooleansAndCaptureLimits )
+      RejectsInvalidCommunicationRatesBooleansAndFilterValues )
 {
     const auto context     = MakeContext( 512u, 90u );
     auto       config      = RepresentativeConfiguration();
     config.can[1].bit_rate = 0u;
     ExpectValidationFailure( context, config );
-    config                            = RepresentativeConfiguration();
-    config.can[1].capture_limit_bytes = 91u;
-    ExpectValidationFailure( context, config );
     config                 = RepresentativeConfiguration();
     config.spi[0].bit_rate = 0u;
     ExpectValidationFailure( context, config );
-    config                            = RepresentativeConfiguration();
-    config.spi[0].capture_limit_bytes = 91u;
-    ExpectValidationFailure( context, config );
     config                   = RepresentativeConfiguration();
     config.uart[1].baud_rate = 0u;
-    ExpectValidationFailure( context, config );
-    config                             = RepresentativeConfiguration();
-    config.uart[1].capture_limit_bytes = 91u;
-    ExpectValidationFailure( context, config );
-    config                 = RepresentativeConfiguration();
-    config.i2c[0].bit_rate = 0u;
-    ExpectValidationFailure( context, config );
-    config                            = RepresentativeConfiguration();
-    config.i2c[0].capture_limit_bytes = 91u;
     ExpectValidationFailure( context, config );
 }
 
 TEST( ApplicationTestConfigurationValidation, RejectsInvalidUartDirectionCombinations )
 {
-    const auto context                 = MakeContext();
-    auto       config                  = RepresentativeConfiguration();
-    config.uart[1].rx_enabled          = 0u;
-    config.uart[1].tx_enabled          = 0u;
-    config.uart[1].capture_limit_bytes = 0u;
-    ExpectValidationFailure( context, config );
-    config                             = RepresentativeConfiguration();
-    config.uart[1].rx_enabled          = 0u;
-    config.uart[1].tx_enabled          = 1u;
-    config.uart[1].capture_limit_bytes = 1u;
+    const auto context        = MakeContext();
+    auto       config         = RepresentativeConfiguration();
+    config.uart[1].rx_enabled = 0u;
+    config.uart[1].tx_enabled = 0u;
     ExpectValidationFailure( context, config );
     config                    = RepresentativeConfiguration();
     config.uart[1].rx_enabled = 2u;
@@ -1040,21 +966,50 @@ TEST( ApplicationTestConfigurationValidation, RejectsInvalidUartDirectionCombina
     ExpectValidationFailure( context, config );
 }
 
-TEST( ApplicationTestConfigurationValidation, RejectsInvalidI2cRoleAndAddressCombinations )
+TEST( ApplicationTestConfigurationValidation, EnabledI2cIsNotImplemented )
 {
-    const auto context = MakeContext();
-    auto       config  = RepresentativeConfiguration();
-    config.i2c[0].role = HIL_APPLICATION_BUS_ROLE_MASTER;
-    ExpectValidationFailure( context, config );
-    config                         = RepresentativeConfiguration();
-    config.i2c[0].own_address_7bit = 0u;
-    ExpectValidationFailure( context, config );
-    config                         = RepresentativeConfiguration();
-    config.i2c[0].own_address_7bit = 0x80u;
-    ExpectValidationFailure( context, config );
-    config             = RepresentativeConfiguration();
-    config.i2c[0].role = HIL_APPLICATION_BUS_ROLE_RESERVED;
-    ExpectValidationFailure( context, config );
+    const auto context   = MakeContext();
+    const auto canonical = EncodeConfiguration( context, CanonicalConfiguration() );
+    for ( const auto role : { HIL_APPLICATION_BUS_ROLE_MASTER, HIL_APPLICATION_BUS_ROLE_SLAVE } )
+    {
+        auto config                 = CanonicalConfiguration();
+        config.i2c[0].enabled       = 1u;
+        config.i2c[0].role          = role;
+        config.i2c[0].bit_rate      = 400000u;
+        config.i2c[0].pull_up       = HIL_APPLICATION_I2C_PULL_UP_4K7;
+        config.i2c[0].voltage_level = HIL_APPLICATION_I2C_VOLTAGE_3V3;
+        const auto message          = ConfigurationMessage( config );
+        EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
+                   HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
+        std::size_t encoded_size = 99u;
+        EXPECT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &encoded_size ),
+                   HIL_APPLICATION_STATUS_OK );
+        std::array<std::uint8_t, 512u> encoded{};
+        EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, encoded.data(),
+                                                   encoded.size(), &encoded_size ),
+                   HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
+
+        auto              wire = canonical;
+        const std::size_t i2c  = kHeaderSize + kI2cOffset;
+        wire[i2c]              = 1u;
+        PutU32Le( wire, i2c + 1u, 400000u );
+        wire[i2c + 5u] = static_cast<std::uint8_t>( role );
+        if ( role == HIL_APPLICATION_BUS_ROLE_SLAVE )
+        {
+            PutU16Le( wire, i2c + 6u, 1u );
+        }
+        std::size_t required = 99u;
+        EXPECT_EQ(
+            HIL_APPLICATION_Decode_Storage_Size( &context, wire.data(), wire.size(), &required ),
+            HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
+        EXPECT_EQ( required, 0u );
+        required = 99u;
+        EXPECT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &context, wire.data(), wire.size(),
+                                                             &required ),
+                   HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
+        EXPECT_EQ( required, 0u );
+        ExpectDecodeFailure( context, wire, HIL_APPLICATION_STATUS_NOT_IMPLEMENTED );
+    }
 }
 
 TEST( ApplicationTestConfigurationMalformed, TruncationAtMajorFamilyBoundariesIsBounded )
@@ -1062,7 +1017,7 @@ TEST( ApplicationTestConfigurationMalformed, TruncationAtMajorFamilyBoundariesIs
     const auto context  = MakeContext();
     const auto complete = EncodeConfiguration( context, CanonicalConfiguration() );
     const std::array<std::size_t, 11u> boundaries{ 12u, 32u,  62u,  64u,  70u, 74u,
-                                                   90u, 116u, 144u, 174u, 202u };
+                                                   90u, 108u, 128u, 150u, 170u };
     for ( const auto payload_length : boundaries )
     {
         SCOPED_TRACE( payload_length );

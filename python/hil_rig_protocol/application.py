@@ -12,6 +12,7 @@ from ._application_conversion import (
     _build_native_config,
     _read_error,
     _read_execution_control,
+    _read_finalize_test_upload,
     _read_global_control,
     _read_response,
     _read_system_info_request,
@@ -23,6 +24,7 @@ from ._application_conversion import (
     _read_variable_test_result,
     _write_error,
     _write_execution_control,
+    _write_finalize_test_upload,
     _write_global_control,
     _write_response,
     _write_system_info_request,
@@ -41,6 +43,7 @@ from .application_types import (
     ApplicationResponse,
     ApplicationStatus,
     ExecutionControl,
+    FinalizeTestUpload,
     GlobalControl,
     ProtocolVersion,
     SystemInfoRequest,
@@ -162,6 +165,12 @@ def _build_message(message: ApplicationMessage) -> tuple[Any, list[Any]]:
         native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
         native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL
         owners = _write_execution_control(message, native.body.execution_control)
+    elif type(message) is FinalizeTestUpload:
+        native.has_test_id = 1
+        native.test_id.bytes[0:16] = message.test_id.bytes
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
+        native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD
+        owners = _write_finalize_test_upload(message, native.body.finalize_test_upload)
     elif type(message) is TestConfiguration:
         native.has_test_id = 1
         native.test_id.bytes[0:16] = message.test_id.bytes
@@ -246,6 +255,7 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
         lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION,
         lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION,
         lib.HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD,
         lib.HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL,
         lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT,
         lib.HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION,
@@ -324,6 +334,10 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
         if capacity != 0:
             raise ApplicationBindingError("native fixed message unexpectedly used decode storage")
         return _read_execution_control(test_id, native.body.execution_control)
+    if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD:
+        if capacity != 0:
+            raise ApplicationBindingError("native fixed message unexpectedly used decode storage")
+        return _read_finalize_test_upload(test_id, native.body.finalize_test_upload)
     if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
         span = native.body.test_configuration.extension_data
         # Check ownership before dereferencing any native pointer.
@@ -382,6 +396,7 @@ class ApplicationCodec:
             TestConfiguration,
             TestInstruction,
             ExecutionControl,
+            FinalizeTestUpload,
             GlobalControl,
             TestResult,
             UpdateInstruction,

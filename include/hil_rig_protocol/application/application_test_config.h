@@ -214,8 +214,7 @@ typedef struct
  * (filter_id & filter_mask)`. A zero mask accepts every standard identifier.
  * Filter-bank allocation is firmware-internal and CAN-FD is not exposed. CAN bus
  * termination is not software-configurable through the Application protocol.
- * When disabled, bit_rate, capture_limit_bytes, filter_id and filter_mask must all
- * be zero.
+ * When disabled, bit_rate, filter_id and filter_mask must all be zero.
  */
 typedef struct
 {
@@ -223,9 +222,6 @@ typedef struct
     uint8_t enabled;
     /** Standard-CAN nominal bit rate in bits per second; nonzero when enabled. */
     uint32_t bit_rate;
-    /** Maximum captured receive bytes; bounded by context max_variable_data_size; zero when
-     * disabled. */
-    uint32_t capture_limit_bytes;
     /** Host-selected standard CAN receive filter identifier, 0x000..0x7FF. */
     uint16_t filter_id;
     /** Host-selected standard CAN receive filter mask, 0x000..0x7FF; zero accepts all IDs. */
@@ -253,17 +249,14 @@ typedef struct
     HIL_Application_Spi_Clock_Polarity_T clock_polarity;
     /** First-edge or second-edge sampling phase; INVALID/zero when disabled. */
     HIL_Application_Spi_Clock_Phase_T clock_phase;
-    /** Maximum captured receive bytes; bounded by context max_variable_data_size; zero when
-     * disabled. */
-    uint32_t capture_limit_bytes;
 } HIL_Application_Spi_Config_T;
 
 /**
  * @brief Fixed UART configuration.
  *
  * @details At least one of rx_enabled and tx_enabled must be one when enabled.
- * capture_limit_bytes must be zero when RX is disabled. When the record is
- * disabled, every field after enabled must use its zero value.
+ * When the record is disabled, every field after enabled must use its zero
+ * value. At least one of RX or TX must be enabled when the record is enabled.
  */
 typedef struct
 {
@@ -283,8 +276,6 @@ typedef struct
     uint8_t rx_enabled;
     /** Transmit direction flag, exactly 0 or 1; zero when the record is disabled. */
     uint8_t tx_enabled;
-    /** Maximum captured RX bytes; zero when RX is disabled and bounded by context policy. */
-    uint32_t capture_limit_bytes;
 } HIL_Application_Uart_Config_T;
 
 /**
@@ -308,9 +299,6 @@ typedef struct
     HIL_Application_I2c_Voltage_Level_T voltage_level;
     /** Pull-up selection of 1 kOhm, 2.2 kOhm, 4.7 kOhm or 10 kOhm; zero when disabled. */
     HIL_Application_I2c_Pull_Up_T pull_up;
-    /** Maximum captured receive bytes; bounded by context max_variable_data_size; zero when
-     * disabled. */
-    uint32_t capture_limit_bytes;
 } HIL_Application_I2c_Config_T;
 
 /**
@@ -325,7 +313,7 @@ typedef struct
  *
  * The wire order is global fields, Digital Input, Digital Output, Analogue Input,
  * Analogue Output, PWM Input, PWM Output, CAN, SPI, UART, I2C, then a one-byte
- * extension length and extension bytes. The fixed payload is 203 bytes.
+ * extension length and extension bytes. The fixed payload is 171 bytes.
  */
 typedef struct
 {

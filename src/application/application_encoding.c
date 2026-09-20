@@ -313,8 +313,6 @@ HIL_APPLICATION_Can_Config_encode( const HIL_Application_Can_Config_T* data, uin
     size_t running_total     = 0u;
     payload[running_total++] = data->enabled;
     HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->bit_rate, &running_total );
-    HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->capture_limit_bytes,
-                                   &running_total );
     HIL_APPLICATION_Encode_U16_Le( &payload[running_total], data->filter_id, &running_total );
     HIL_APPLICATION_Encode_U16_Le( &payload[running_total], data->filter_mask, &running_total );
     if ( running_total != HIL_APPLICATION_TEST_CONFIG_CAN_RECORD_SIZE )
@@ -352,8 +350,6 @@ HIL_APPLICATION_Spi_Config_encode( const HIL_Application_Spi_Config_T* data, uin
         HIL_APPLICATION_Config_Enum_encode( ( int )data->clock_phase, &payload[running_total++] );
     if ( status != HIL_APPLICATION_STATUS_OK )
         return status;
-    HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->capture_limit_bytes,
-                                   &running_total );
     if ( running_total != HIL_APPLICATION_TEST_CONFIG_SPI_RECORD_SIZE )
     {
         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
@@ -386,8 +382,6 @@ HIL_APPLICATION_Uart_Config_encode( const HIL_Application_Uart_Config_T* data, u
         return status;
     payload[running_total++] = data->rx_enabled;
     payload[running_total++] = data->tx_enabled;
-    HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->capture_limit_bytes,
-                                   &running_total );
     if ( running_total != HIL_APPLICATION_TEST_CONFIG_UART_RECORD_SIZE )
     {
         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
@@ -416,8 +410,6 @@ HIL_APPLICATION_I2c_Config_encode( const HIL_Application_I2c_Config_T* data, uin
     status = HIL_APPLICATION_Config_Enum_encode( ( int )data->pull_up, &payload[running_total++] );
     if ( status != HIL_APPLICATION_STATUS_OK )
         return status;
-    HIL_APPLICATION_Encode_U32_Le( &payload[running_total], data->capture_limit_bytes,
-                                   &running_total );
     if ( running_total != HIL_APPLICATION_TEST_CONFIG_I2C_RECORD_SIZE )
     {
         return HIL_APPLICATION_STATUS_INTERNAL_ERROR;
@@ -721,6 +713,35 @@ HIL_Application_Status_T HIL_APPLICATION_Global_Control_encode(
     size_t running_total = HIL_APPLICATION_WIRE_ENUM_SIZE;
     HIL_APPLICATION_Encode_U32_Le( &( payload[running_total] ), data->flags, &running_total );
     *used_size = running_total;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Finalize_Test_Upload_encode(
+    const HIL_Application_Context_T* context, const HIL_Application_Message_Subtype_T* sub_type,
+    const HIL_Application_Test_Id_T test_id, const HIL_Application_Finalize_Test_Upload_T* data,
+    size_t max_payload_size, uint8_t* payload, size_t* used_size )
+{
+    ( void )sub_type;
+    ( void )test_id;
+    if ( data == NULL || payload == NULL || used_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *used_size = 0u;
+    if ( max_payload_size < HIL_APPLICATION_WIRE_U32_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+    {
+        const HIL_Application_Status_T status =
+            HIL_APPLICATION_Finalize_Test_Upload_validate( context, data );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    HIL_APPLICATION_Write_U32_Le( payload, data->flags );
+    *used_size = HIL_APPLICATION_WIRE_U32_SIZE;
     return HIL_APPLICATION_STATUS_OK;
 }
 

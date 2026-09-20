@@ -476,7 +476,6 @@ typedef struct
 {
     uint8_t enabled;
     uint32_t bit_rate;
-    uint32_t capture_limit_bytes;
     uint16_t filter_id;
     uint16_t filter_mask;
 } HIL_Application_Can_Config_T;
@@ -490,7 +489,6 @@ typedef struct
     HIL_Application_Spi_Bit_Order_T bit_order;
     HIL_Application_Spi_Clock_Polarity_T clock_polarity;
     HIL_Application_Spi_Clock_Phase_T clock_phase;
-    uint32_t capture_limit_bytes;
 } HIL_Application_Spi_Config_T;
 
 typedef struct
@@ -503,7 +501,6 @@ typedef struct
     HIL_Application_Uart_Stop_Bits_T stop_bits;
     uint8_t rx_enabled;
     uint8_t tx_enabled;
-    uint32_t capture_limit_bytes;
 } HIL_Application_Uart_Config_T;
 
 typedef struct
@@ -514,7 +511,6 @@ typedef struct
     uint16_t own_address_7bit;
     HIL_Application_I2c_Voltage_Level_T voltage_level;
     HIL_Application_I2c_Pull_Up_T pull_up;
-    uint32_t capture_limit_bytes;
 } HIL_Application_I2c_Config_T;
 
 typedef struct
@@ -627,6 +623,11 @@ typedef struct
     HIL_Application_Global_Control_Command_T command;
     uint32_t flags;
 } HIL_Application_Global_Control_T;
+
+typedef struct
+{
+    uint32_t flags;
+} HIL_Application_Finalize_Test_Upload_T;
 
 /* application_response.h */
 
@@ -742,19 +743,20 @@ typedef struct {
 
 typedef enum
 {
-    HIL_APPLICATION_MESSAGE_TYPE_INVALID,
-    HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST,
-    HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE,
-    HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION,
-    HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION,
-    HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION,
-    HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL,
-    HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL,
-    HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT,
-    HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT,
-    HIL_APPLICATION_MESSAGE_TYPE_RESPONSE,
-    HIL_APPLICATION_MESSAGE_TYPE_ERROR,
-    HIL_APPLICATION_MESSAGE_TYPE_RESERVED,
+    HIL_APPLICATION_MESSAGE_TYPE_INVALID = 0,
+    HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST = 1,
+    HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE = 2,
+    HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION = 16,
+    HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION = 17,
+    HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION = 21,
+    HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD = 22,
+    HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL = 19,
+    HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL = 20,
+    HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT = 32,
+    HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT = 34,
+    HIL_APPLICATION_MESSAGE_TYPE_RESPONSE = 48,
+    HIL_APPLICATION_MESSAGE_TYPE_ERROR = 49,
+    HIL_APPLICATION_MESSAGE_TYPE_RESERVED = 255,
     ...
 } HIL_Application_Message_Type_T;
 
@@ -778,6 +780,7 @@ typedef struct
         HIL_Application_Test_Configuration_T test_configuration;
         HIL_Application_Test_Instruction_T test_instruction;
         HIL_Application_Update_Instruction_T update_instruction;
+        HIL_Application_Finalize_Test_Upload_T finalize_test_upload;
         HIL_Application_Execution_Control_T execution_control;
         HIL_Application_Global_Control_T global_control;
         HIL_Application_Test_Result_T test_result;
@@ -791,6 +794,7 @@ typedef struct
 #define HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE ...
 #define HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE ...
 #define HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT ...
+#define HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK ...
 #define HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE ...
 #define HIL_APPLICATION_PROTOCOL_MAJOR_SIZE_BYTES ...
 #define HIL_APPLICATION_PROTOCOL_MINOR_SIZE_BYTES ...
@@ -801,6 +805,7 @@ typedef struct
 #define HIL_APPLICATION_HEADER_SIZE_BYTES ...
 #define HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE ...
 #define HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE ...
+#define HIL_APPLICATION_RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW ...
 
 /* version.h */
 

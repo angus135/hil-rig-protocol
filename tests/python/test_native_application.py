@@ -57,7 +57,6 @@ def message(family, extension=b"", condition=None):
         for i, channel in enumerate(body.can):
             channel.enabled = 1
             channel.bit_rate = 125000 * (i + 1)
-            channel.capture_limit_bytes = 71 + i
             channel.filter_id = (0x123, 0x456)[i]
             channel.filter_mask = (0x7F0, 0x700)[i]
         for i, channel in enumerate(body.spi):
@@ -83,7 +82,6 @@ def message(family, extension=b"", condition=None):
                 lib.HIL_APPLICATION_SPI_CLOCK_PHASE_FIRST_EDGE,
                 lib.HIL_APPLICATION_SPI_CLOCK_PHASE_SECOND_EDGE,
             )[i]
-            channel.capture_limit_bytes = 81 + i
         for i, channel in enumerate(body.uart):
             channel.enabled = 1
             channel.baud_rate = 57600 * (i + 1)
@@ -105,24 +103,6 @@ def message(family, extension=b"", condition=None):
             )[i]
             channel.rx_enabled = 1
             channel.tx_enabled = i
-            channel.capture_limit_bytes = 91 + i
-        for i, channel in enumerate(body.i2c):
-            channel.enabled = 1
-            channel.bit_rate = 100000 * (i + 1)
-            channel.role = (
-                lib.HIL_APPLICATION_BUS_ROLE_MASTER,
-                lib.HIL_APPLICATION_BUS_ROLE_SLAVE,
-            )[i]
-            channel.own_address_7bit = 0 if i == 0 else 0x53
-            channel.voltage_level = (
-                lib.HIL_APPLICATION_I2C_VOLTAGE_3V3,
-                lib.HIL_APPLICATION_I2C_VOLTAGE_5V,
-            )[i]
-            channel.pull_up = (
-                lib.HIL_APPLICATION_I2C_PULL_UP_2K2,
-                lib.HIL_APPLICATION_I2C_PULL_UP_10K,
-            )[i]
-            channel.capture_limit_bytes = 101 + i
         if extension:
             owner = ffi.new("uint8_t[]", extension)
             body.extension_data.data = owner
@@ -222,9 +202,9 @@ def test_configuration_round_trip(extension_size):
     extension = bytes((i * 37 + 11) % 256 for i in range(extension_size))
     msg, source_owner = message("configuration", extension)
     wire, size = encode(ctx, msg)
-    assert size == 226 + extension_size
+    assert size == 194 + extension_size
     if extension_size == 255:
-        assert size == 481
+        assert size == 449
     decoded, owner, used = decode(ctx, wire, size)
     assert used == extension_size
     assert_message_equal(msg, decoded, "configuration")
@@ -293,7 +273,7 @@ def test_defaults_and_smaller_limits():
     "field,value,status",
     [
         ("max_encoded_message_size", 24, lib.HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL),
-        ("max_encoded_message_size", 65559, lib.HIL_APPLICATION_STATUS_INVALID_LENGTH),
+        ("max_encoded_message_size", 513, lib.HIL_APPLICATION_STATUS_INVALID_LENGTH),
         ("max_variable_data_size", 256, lib.HIL_APPLICATION_STATUS_INVALID_COUNT),
         ("max_expected_tick_count", 1000001, lib.HIL_APPLICATION_STATUS_INVALID_LENGTH),
     ],
@@ -481,7 +461,6 @@ def assert_typed_failure(ctx, msg, status):
         ("can.1.bit_rate", 0),
         ("can.1.filter_id", 0x800),
         ("can.1.filter_mask", 0x800),
-        ("can.1.capture_limit_bytes", 256),
         ("spi.1.bit_rate", 0),
         ("spi.1.role", 255),
         ("spi.1.data_width", 255),
@@ -495,11 +474,6 @@ def assert_typed_failure(ctx, msg, status):
         ("uart.1.stop_bits", 255),
         ("uart.1.rx_enabled", 2),
         ("uart.1.tx_enabled", 2),
-        ("i2c.1.bit_rate", 0),
-        ("i2c.1.role", 255),
-        ("i2c.1.own_address_7bit", 128),
-        ("i2c.1.voltage_level", 255),
-        ("i2c.1.pull_up", 255),
         ("extension_data.size", 1),  # Nonempty span with a NULL pointer.
     ],
 )
@@ -736,6 +710,8 @@ def test_enum_values(name, value):
         ("HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE", 255),
         ("HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT", 1000000),
         ("HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE", 512),
+        ("HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK", 8),
+        ("HIL_APPLICATION_RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW", 1),
         ("HIL_APPLICATION_PROTOCOL_MAJOR_SIZE_BYTES", 1),
         ("HIL_APPLICATION_PROTOCOL_MINOR_SIZE_BYTES", 1),
         ("HIL_APPLICATION_MESSAGE_HAS_ID_SIZE_BYTES", 1),
@@ -743,7 +719,7 @@ def test_enum_values(name, value):
         ("HIL_APPLICATION_MESSAGE_SUB_TYPE_SIZE_BYTES", 1),
         ("HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES", 2),
         ("HIL_APPLICATION_HEADER_SIZE_BYTES", 23),
-        ("HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE", 65558),
+        ("HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE", 512),
         ("HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE", 28),
     ],
 )
