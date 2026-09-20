@@ -80,7 +80,7 @@ Firmware and bindings include:
 | `HIL_APPLICATION_Decode_Storage_Size` | Bounded-parse one complete message, validate supported bodies, scan bounded System Information spans and Test Configuration extension storage, and report required storage. |
 | `HIL_APPLICATION_Decode_Message` | Decode exactly one complete message; body decoders see only the declared payload extent. |
 | `HIL_APPLICATION_Validate_Message` | Perform common typed validation and existing message-specific validation. |
-| `HIL_APPLICATION_Validate_Encoded_Message` | Reuse the bounded decode path without publishing caller output. |
+| `HIL_APPLICATION_Validate_Encoded_Message` | Validate one complete message directly from encoded bytes without a private full-message decode buffer. |
 
 ### Current message-family implementation status
 
@@ -108,13 +108,13 @@ choice is appropriate in the current workflow.
 
 The public C integration suite now carries the currently supported fixed
 Application subset through the existing Transport pair harness. Complete Test
-Configuration messages are 226 through 481 bytes for extension lengths 0 through
+Configuration messages are 194 through 449 bytes for extension lengths 0 through
 255, fixed Test Instructions are 73 bytes, and fixed Test Results are 62 bytes.
 The default maximum complete Application message and default Transport maximum
 Application-message payload are both 512 bytes.
 
 The integration tests include only public Application and Transport headers and
-exercise exact opaque-byte preservation, the 481-byte capacity boundary,
+exercise exact opaque-byte preservation, the 449-byte capacity boundary,
 byte-stream chunking, reliable retry, Transport-valid malformed/invalid
 Application input, and Transport corruption before Application exposure. The
 Application codec remains stateless and direction-neutral. Any configuration,
@@ -190,12 +190,13 @@ configuration list. These values reserve no test storage and do not mean the
 codec can retain or track the configured number of ticks. Endpoint integration
 separately decides whether retention and hardware capacity are available.
 
-`max_variable_data_size` bounds the Test Configuration extension byte span,
-each Test Configuration communication-capture limit, and the byte spans used by
-variable Application families and System Information Responses. The extension
-and each System Information span still have an absolute 255-byte wire maximum
-because each encoded length is one byte.
-`max_encoded_message_size` bounds each complete encoded Application message.
+`max_variable_data_size` bounds the Test Configuration extension byte span and
+the byte spans used by variable Application families and System Information
+Responses. The extension and each System Information span still have an
+absolute 255-byte wire maximum because each encoded length is one byte.
+`max_encoded_message_size` bounds each complete encoded Application message and
+cannot exceed 512 bytes. `HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK` is the
+fixed v0.3.0 cross-message ceiling of eight and is not a configuration field.
 They do not describe one monolithic test or tick package. Integration must
 configure Transport's maximum Application-message size to be at least the
 Application Layer's `max_encoded_message_size`; the codec does not inspect or
@@ -206,13 +207,14 @@ the existing structural maxima for the other fields.
 `HIL_APPLICATION_Init` accepts any complete-message maximum from
 `HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE` (28 bytes: the 23-byte envelope plus
 the five-byte control payload) through
-`HIL_APPLICATION_HEADER_SIZE_BYTES + UINT16_MAX`, validates the other configured
-limits, and copies the configuration without allocation or pointer retention.
+`HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE` (512 bytes), validates the other
+configured limits, and copies the configuration without allocation or pointer
+retention.
 
 Test Configuration validation enforces a nonzero `expected_tick_count` not
 greater than `context->config.max_expected_tick_count`, the supported tick
 durations, zero test-wide flags, canonical disabled records, valid protocol
-enums/Booleans, PWM structural limits, communication rate/capture constraints,
+enums/Booleans, PWM structural limits, communication rate constraints,
 11-bit standard CAN filter ID/mask bounds, and the UART/I2C structural
 combinations defined by the wire protocol. CAN receive filters are host-selected
 protocol fields; mask zero accepts every standard identifier. CAN termination is
@@ -264,7 +266,10 @@ that tick and the executor retains the preceding output state.
 Within an assembled instruction tick, fixed-state DIGITAL_OUTPUT, ANALOG_OUTPUT
 and PWM_OUTPUT peripheral/channel pairs occur at most once. UART, SPI and CAN
 operations may repeat across chunks when needed, with message and record order
-preserved. Successful Tick Response is sent only after final-chunk assembly,
+preserved. I2C operation records are not implemented and are rejected. Each
+tick has a maximum of `HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK` (eight)
+Type 21 messages; a ninth chunk causes a negative Tick Response and invalidates
+the upload. Successful Tick Response is sent only after final-chunk assembly,
 cross-chunk checks, semantic validation, and accepted retention responsibility.
 An endpoint may send a negative Tick Response as soon as rejection is known.
 Rejection discards partial assembly and uses the existing upload-recovery
@@ -280,6 +285,13 @@ and tick. `condition` and `problem_detail` are identical in every chunk.
 ANALOG_INPUT and PWM_INPUT peripheral/channel pairs occur at most once across
 the assembled tick. UART, SPI and CAN captured records may repeat across
 chunks, with message and record order preserved.
+
+Firmware must never emit a ninth Type 34 chunk for one tick. Receiving one is a
+protocol-state failure and enters recovery. I2C captured records are not
+implemented and are rejected. Eight messages of at most 512 bytes bound one
+chunked tick to at most 4096 complete encoded bytes; no aggregate byte-count or
+record-count field is added, and the existing one-byte operation/record counts
+remain.
 
 No next result tick begins before the current tick reaches `COMPLETE_TICK`.
 Variable result ticks are sent in increasing order. Every configured tick from
@@ -303,6 +315,7 @@ The initial protocol directions are exact:
 | System Information Request | System Information Response |
 | Test Configuration | Test Result or Variable Test Result |
 | Test Instruction or Update Instruction | Application Response |
+| FINALIZE_TEST_UPLOAD | Application Response with Complete Test scope |
 | Execution Control | Application Error |
 | Global Control | |
 
@@ -404,10 +417,9 @@ outstanding tick operation; the existing tick-level stop-and-wait rules remain
 mandatory.
 
 While awaiting a Response, Python must not repeat an indistinguishable System
-Information Request, Test Configuration, START, ABORT, or RESET_APPLICATION
-request. Upload finalisation after sparse instruction ticks is not finalised by
-this version. Result chunks do not require Responses and are governed separately
-by their deterministic ordering contract.
+Information Request, Test Configuration, FINALIZE_TEST_UPLOAD, START, ABORT, or
+RESET_APPLICATION request. Result chunks do not require Responses and are
+governed separately by their deterministic ordering contract.
 
 If Transport/session failure makes an operation's outcome uncertain, Python
 enters recovery rather than blindly retrying it. After explicitly abandoning
@@ -425,7 +437,7 @@ The following table replaces any shared protocol-phase or firmware-state model.
 | --- | --- | --- | --- | --- | --- | --- |
 | Test Configuration | Python -> firmware | Fresh Test ID; no tick | No active upload being continued; exactly one configuration starts a new upload attempt | Configuration `ACCEPTED` creates the active upload transaction for that Test ID | `REJECTED`/`FAILED` creates no transaction; host starts a new upload from Test Configuration with a fresh Test ID | Hardware support, safety, timing, and retention capacity |
 | Test Instruction or Update Instruction | Python -> firmware | Active Test ID and zero-based tick | Configuration accepted; family selected for the Test ID; Type 21 continuations remain contiguous | Tick `ACCEPTED` means the assembled tick passed endpoint checks and retention responsibility was accepted; the host may submit a later tick | Rejection discards partial assembly and uses upload recovery; no later tick may be submitted before positive acceptance | Active-ID/tick tracking, family selection, chunk completeness, duplicate fixed-state detection, retention, and cleanup |
-| Automatic whole-test validation | Firmware -> Python Response | Active Test ID; Complete Test scope; no tick | Upload policy accepts the submitted instruction stream | Complete Test `ACCEPTED` means the endpoint retained and validated the upload for later START; exact sparse finalisation remains version work | `REJECTED`/`FAILED` invalidates the transaction; restart from Test Configuration | Whole-test consistency and release of invalid retained data |
+| FINALIZE_TEST_UPLOAD | Python -> firmware | Active Test ID; Complete Test scope; no tick | Every submitted tick has a positive Tick Response, or accepted sparse configuration has no instruction messages; no incomplete chunk | Complete Test `ACCEPTED` commits the retained upload and makes it eligible for START | `REJECTED`/`FAILED` invalidates the upload; restart from Test Configuration | Whole-test consistency, storage completion, and release of invalid retained data |
 | START | Python -> firmware | Accepted test's Test ID and START command | Complete Test `ACCEPTED` was received for that Test ID | Execution Control START `COMPLETED` means firmware performed the start request | `REJECTED` means execution did not start; `FAILED` requires recovery and the host must not assume execution status | Execution-manager permission, hardware readiness, actual firmware transitions, and whether retry is safe |
 | ABORT | Python -> firmware | Identified active Test ID and ABORT command | A matching upload, accepted test, execution, or result transaction exists | Execution Control ABORT `COMPLETED` means safe stop/abandonment was performed and the previous transaction cannot continue normally; a new upload starts from Test Configuration | `REJECTED` means abort was not performed; `FAILED` requires firmware-specific recovery and no assumed cleanup | Execution-manager transitions, safe stop, retained-data cleanup, and firmware recovery |
 | Test Result or Variable Test Result | Firmware -> Python | Accepted Test ID and zero-based tick | START completed; result family selected; Type 34 chunks remain contiguous | Every configured tick has a final result message; Python completes a Type 34 tick only at `COMPLETE_TICK` | Reset, disconnect, or session loss discards incomplete assembly and reports recovery required | Capture validity, storage/retention mechanics, Transport handoff, and release policy |
@@ -454,23 +466,26 @@ The initial contract is:
 8. The host may omit an instruction tick; the executor retains the preceding
    output state. Submitted instruction ticks are strictly increasing but need
    not be contiguous.
-9. After upload policy accepts the instruction stream, firmware may perform
-   whole-test validation.
-10. Complete Test `ACCEPTED` means the test was retained, validated, and is
-   available for a subsequent START request.
-11. The host sends START separately.
-12. Firmware asks its execution manager whether execution can begin, performs
+9. After every submitted tick receives a positive Tick Response, the host sends
+   `FINALIZE_TEST_UPLOAD`. It may send it immediately after accepted Test
+   Configuration when no instruction messages were submitted.
+10. Firmware rejects finalisation for an incomplete chunk, wrong Test ID,
+   invalid upload, incomplete storage, or failed whole-test validation.
+11. Complete Test `ACCEPTED` commits the retained upload and makes it available
+   for a subsequent START request. A rejection invalidates the upload.
+12. The host sends START separately.
+13. Firmware asks its execution manager whether execution can begin, performs
     the request if allowed, and reports the actual outcome.
-13. The host or firmware selects either the fixed Test Result family or the Type
+14. The host or firmware selects either the fixed Test Result family or the Type
     34 Variable Test Result family for the result stream.
-14. For Type 34, firmware sends contiguous chunks for each result tick with
+15. For Type 34, firmware sends contiguous chunks for each result tick with
     identical `condition` and `problem_detail`, ending each tick with
     `COMPLETE_TICK`. It sends ticks in increasing order, with a final message
     for every configured tick; the final message may contain zero records.
 
-There is no Begin Upload, ARM, or FINALIZE_TEST command. Test Configuration
-acceptance starts upload; Complete Test acceptance is endpoint policy; START is
-a separate request whose success is never predicted by the codec or host.
+There is no Begin Upload or ARM command. `FINALIZE_TEST_UPLOAD` is the explicit
+upload-finalisation request; Complete Test acceptance is endpoint policy; START
+is a separate request whose success is never predicted by the codec or host.
 
 Only one instruction tick may await semantic acceptance. Transport delivery and
 Application semantic acceptance remain independent: a Transport ACK confirms
@@ -540,12 +555,12 @@ Transport responsibilities. Fragmentation/reassembly is outside the Transport
 MVP.
 
 If execution stops or fails before all ticks execute, firmware still produces
-    the remaining result ticks. Each tick without valid execution/capture data uses
-    `HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM`; all fixed captured-value
-    fields remain present for structural consistency but are semantically invalid
-    and Python ignores them. A Type 34 fault-only final chunk may contain zero
-    records. An Application Error may be sent when the problem is detected, but
-    it does not replace any result tick.
+the remaining result ticks. Each tick without valid execution/capture data uses
+`HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM`; all fixed captured-value
+fields remain present for structural consistency but are semantically invalid
+and Python ignores them. A Type 34 fault-only final chunk may contain zero
+records. An Application Error may be sent when the problem is detected, but
+it does not replace any result tick.
 
 Result conditions have exact MVP meanings:
 
@@ -564,6 +579,15 @@ by Python. Their presence alone causes neither `PARTIAL` nor
 sample per fixed result at the test tick rate. There is no independent analogue
 sample rate, multi-sample result, validity mask, result-finalization message, or
 result-summary message in the MVP.
+
+Capture capacity is an internal firmware property and is not configured,
+advertised, or negotiated by Application. On capture overflow, firmware keeps
+the bounded prefix, emits it in normal Type 34 records, discards data that does
+not fit, marks the affected tick `PARTIAL`, and sets `problem_detail` to
+`HIL_APPLICATION_RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW` (1). The tick and
+overall result stream still terminate normally. Overflow adds no Application
+Error, acknowledgement, or finalisation message; a more serious failure that
+prevents tick completion takes precedence as `EXECUTION_PROBLEM`.
 
 The host correlates result chunks by Test ID and tick. No shared phase transition
 or simultaneous endpoint state change is implied by completion.
@@ -655,16 +679,25 @@ readiness or execution-manager state; firmware Responses are authoritative.
 The Python codec binding is implemented. Serial/USB integration, asynchronous
 behavior, and a stateful transaction controller remain consuming-project work.
 
-## Remaining conformance work
+## v0.3.0 completion boundary
 
 Public C integration now executes the supported fixed discovery, control,
 Configuration, Instruction, and Result paths through
 Transport. The ordered fixed-subset scenario uses test-owned semantic checkpoints
 rather than Responses and does not represent a complete production transaction.
 
-Remaining incomplete v0.3.0 work is: upload-finalisation behaviour for every
-sparse-instruction edge case; firmware assembly capacities; Python and firmware
-state-machine implementation; maximum aggregate operations or bytes across all
-chunks for one tick; streaming validation or memory-efficient firmware decoding;
-I2C variable records; result resumption or range requests; and multi-version
-negotiation or compatibility. These items are outside this repository change.
+The shared v0.3.0 protocol is complete here: Type 22 upload finalisation,
+512-byte complete-message and eight-chunk ceilings, 255-byte spans, capture
+overflow reporting, Type 21/34 bounded records, allocation-free encoded
+validation, exact version matching, and explicit I2C exclusion are defined and
+implemented by the stateless codec and its bindings.
+
+Intentional v0.3.0 non-features are result resumption, range requests, result
+acknowledgements or finalisation messages, version negotiation, capabilities
+discovery, configurable capture limits, aggregate count fields, and I2C
+operation/result records.
+
+Production state-machine work remains in `hil-rig-mcu-firmware` and
+`hil-rig-python-api`: firmware retention, hardware execution, endpoint state
+transitions, Python USB/Transport orchestration, and cross-message transaction
+bookkeeping. This repository does not claim to implement those integrations.

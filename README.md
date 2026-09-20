@@ -13,7 +13,9 @@ The current design has two public layers:
   results, responses, and errors. Its stateless C codec converts between typed
   data and one complete, architecture-independent Application message. Update
   Instruction and Variable Test Result messages carry bounded chunks; endpoint
-  integrations assemble those chunks across messages.
+  integrations assemble those chunks across messages. v0.3.0 adds explicit
+  `FINALIZE_TEST_UPLOAD` (Type 22), a 512-byte complete-message ceiling, an
+  eight-chunk per-tick ceiling, and exact version matching without negotiation.
 - **Transport Layer** — carries each complete, opaque Application message over
   a caller-owned byte stream. Its facade is designed to own framing, integrity,
   session establishment, ordered reliable delivery, and recovery without
@@ -65,7 +67,8 @@ The Application layer now has a fixed 23-byte architecture-independent common
 envelope, bounded encode/decode paths, structural validation, exact System
 Information discovery, and complete codec support for Execution Control,
 Global Control, Test Configuration, Test Instruction, Update Instruction,
-Test Result, Variable Test Result, Application Response, and Application Error.
+Finalize Test Upload, Test Result, Variable Test Result, Application Response,
+and Application Error.
 Fixed Instruction/Result payloads are 50/39 bytes respectively, with Boolean Digital,
 PWM, configured tick-ceiling, and result-condition validation. Variable Update
 Instruction (Type 21) and Variable Test Result (Type 34) provide sparse peripheral
@@ -74,7 +77,10 @@ operation and event streaming using 4-byte-aligned TLV framing, streaming chunk 
 Discovery uses an explicit exact-version gate before a test conversation. Retired
 variable-message identifiers remain reserved and must not be reused; analogue
 hardware ranges and stateful production conversation orchestration remain
-integration work.
+integration work. Test Configuration has no capture-limit fields; disabled I2C
+configuration is canonical but enabled I2C operation/configuration records are
+explicitly not implemented in v0.3.0. Capture overflow is reported with
+`PARTIAL` and the stable overflow problem detail.
 
 Public C Application-to-Transport integration now exercises representative and
 maximum Test Configuration messages, fixed Test Instructions from host to rig and Test Results

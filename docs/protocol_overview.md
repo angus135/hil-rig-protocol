@@ -12,10 +12,12 @@ encoding/decoding, structural validation, and a deliberately partial set of
 message-family bodies. The exact common envelope and currently encoded body
 layouts are summarized in the
 [Application wire-format reference](application_layer/application_wire_format.md).
-Only variable instruction/result data messages remain
-`HIL_APPLICATION_STATUS_NOT_IMPLEMENTED`. The Python codec directly uses the
-public C Application codec for discovery, controls, Test Configuration, fixed
-instruction/result messages, Application Response, and Application Error.
+Type 21 and Type 34 variable instruction/result messages are implemented as
+bounded per-message codecs; cross-message assembly remains endpoint-owned.
+Enabled I2C configuration and I2C operation/result records are the intentional
+v0.3.0 `HIL_APPLICATION_STATUS_NOT_IMPLEMENTED` boundary. Type 22 explicit
+upload finalisation, fixed 512-byte messages, eight chunks per tick, and exact
+version matching are part of the shared protocol.
 
 The MVP Transport path has broad deterministic verification at the public
 boundary. The repository includes C unit/integration suites, a Python wrapper
@@ -31,5 +33,6 @@ Remaining verification work is mainly outside the deterministic in-process host
 matrix: real hardware/physical-driver testing, cross-process C/Python
 interoperability, broader installed C-consumer packaging validation, embedded
 target-toolchain builds, randomized/fuzz testing, and long-running soak tests.
-Overall IDC readiness also depends on completing the deliberately deferred
-Application message families and endpoint integration.
+Overall IDC readiness still depends on production endpoint integration in the
+firmware and Python API projects; this repository does not implement firmware
+retention, hardware execution, USB orchestration, or endpoint state machines.

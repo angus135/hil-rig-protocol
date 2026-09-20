@@ -36,7 +36,8 @@ These defaults match `HIL_APPLICATION_Default_Config`. `max_encoded_message_size
 and `max_variable_data_size` are native `size_t`; `max_expected_tick_count` is
 `uint32_t`. Python permits their full unsigned representation ranges; native
 initialization decides whether a policy is usable.
-`max_variable_data_size` bounds extension bytes and communication capture limits.
+`max_variable_data_size` bounds extension bytes and variable record spans;
+capture capacity is an internal firmware property and is not configured here.
 `max_expected_tick_count` limits configuration tick counts and is the exclusive
 upper bound for fixed-message tick numbers. These limits reserve no tick storage.
 
@@ -146,6 +147,13 @@ abandons that operation, and RESET_APPLICATION clears Application state while
 preserving Transport. The codec only represents these controls; endpoint
 lifecycle enforcement remains consuming-application work.
 
+`FinalizeTestUpload(test_id, flags=0)` is the explicit Type 22 upload-finalisation
+request. Send it only after every submitted tick has a positive Tick Response,
+or immediately after accepted sparse Test Configuration when no instruction
+messages were submitted. It declares that no more instruction chunks will be
+sent. Firmware returns the existing Complete Test Response scope; only an
+accepted response makes START valid. There is no result-finalisation message.
+
 `ApplicationResponse` carries an optional `TestId`, `ResponseScope`,
 `ResponseOutcome`, `ResponseReason`, tick, command-correlation fields and detail.
 Global Control scope requires `test_id=None`; every other scope requires a Test
@@ -179,7 +187,6 @@ without filtering them.
 | PWM `duty_cycle_permyriad`, `initial_duty_cycle_permyriad` | unsigned 16-bit; 10000 means 100% |
 | `bit_rate` | unsigned 32-bit bits per second |
 | `baud_rate` | unsigned 32-bit symbols per second |
-| `capture_limit_bytes` | unsigned 32-bit bytes |
 | `own_address_7bit` | unsigned 16-bit container; native C checks the address rules |
 | `filter_id`, `filter_mask` | unsigned 16-bit containers; native C checks the standard 11-bit `0x000..0x7FF` protocol range |
 | `enabled`, `high`, `initial_high`, `rx_enabled`, `tx_enabled` | exact `bool` |
@@ -192,7 +199,7 @@ without filtering them.
 | Analog output | `analog_out` / 6 | instruction `analog_outputs` / 6 |
 | PWM input | `pwm_in` / 2 | result `pwm_inputs` / 2 |
 | PWM output | `pwm_out` / 2 | instruction `pwm_outputs` / 2 |
-| CAN, SPI, UART, I2C | `can`, `spi`, `uart`, `i2c` / 2 each | deferred |
+| CAN, SPI, UART, I2C | `can`, `spi`, `uart`, `i2c` / 2 each | Type 21/34 records |
 
 The ten configuration record types preserve all native fields:
 
@@ -203,10 +210,10 @@ The ten configuration record types preserve all native fields:
 | `AnalogInputConfig`, `AnalogOutputConfig` | none |
 | `PWMInputConfig` | `voltage_level` |
 | `PWMOutputConfig` | `voltage_level`, `initial_period_nanoseconds`, `initial_duty_cycle_permyriad` |
-| `CANConfig` | `bit_rate`, `capture_limit_bytes`, `filter_id`, `filter_mask` |
-| `SPIConfig` | `bit_rate`, `role`, `data_width`, `bit_order`, `clock_polarity`, `clock_phase`, `capture_limit_bytes` |
-| `UARTConfig` | `baud_rate`, `electrical_mode`, `word_length`, `parity`, `stop_bits`, `rx_enabled`, `tx_enabled`, `capture_limit_bytes` |
-| `I2CConfig` | `bit_rate`, `role`, `own_address_7bit`, `voltage_level`, `pull_up`, `capture_limit_bytes` |
+| `CANConfig` | `bit_rate`, `filter_id`, `filter_mask` |
+| `SPIConfig` | `bit_rate`, `role`, `data_width`, `bit_order`, `clock_polarity`, `clock_phase` |
+| `UARTConfig` | `baud_rate`, `electrical_mode`, `word_length`, `parity`, `stop_bits`, `rx_enabled`, `tx_enabled` |
+| `I2CConfig` | `bit_rate`, `role`, `own_address_7bit`, `voltage_level`, `pull_up` |
 
 Use the exact `PeripheralVoltage`, `BusRole`, `SPIDataWidth`, `SPIBitOrder`,
 `SPIClockPolarity`, `SPIClockPhase`, `UARTElectricalMode`, `UARTWordLength`,
@@ -222,8 +229,8 @@ protocol, so physical termination must be fixed or managed outside Application
 configuration.
 
 Extensions are immutable `bytes` of length 0 through 255, subject to native policy.
-Complete encoded sizes are 226 bytes for a configuration without extensions,
-481 with a 255-byte extension, 73 for an instruction and 62 for a result.
+Complete encoded sizes are 194 bytes for a configuration without extensions,
+449 with a 255-byte extension, 73 for an instruction and 62 for a result.
 
 ## Validation and errors
 
@@ -237,8 +244,10 @@ Native C validates protocol semantics during initialization/encoding/decoding.
 For example, `TickDuration(999)` and `PWMOutputValue(0, 65535)` are representable
 Python values but fail native message encoding. Python does not duplicate tick
 duration rules, disabled-record canonical values, the CAN 11-bit filter bound,
-PWM relationships, UART direction rules, I2C address/role rules or cross-field
-limits. `CANConfig.filter_id` and `filter_mask` therefore accept Python integers
+PWM relationships, UART direction rules, canonical disabled I2C or cross-field
+limits. Enabled I2C configuration and I2C operation/result records are not
+implemented in v0.3.0 and return `ApplicationStatus.NOT_IMPLEMENTED` from the
+native boundary. `CANConfig.filter_id` and `filter_mask` therefore accept Python integers
 through `0xFFFF`; native encoding rejects values above `0x7FF`. Hardware-only
 choices such as CAN filter-bank allocation, analogue-input sampling frequency,
 analogue-output reference selection, peripheral instances, and timer/register
@@ -297,7 +306,7 @@ if encoded is not None:
 ```
 
 Configure Transport to accept the Application sizes you intend to exchange. A
-maximum 481-byte configuration fits the default 512-byte Transport configuration.
+maximum 449-byte configuration fits the default 512-byte Transport configuration.
 Neither codec inspects the other's configuration. Transport delivers opaque bytes
 unchanged, and `DELIVERY_CONFIRMED` acknowledges byte delivery only. A malformed
 Application payload can be delivered and acknowledged normally, then rejected by
@@ -348,10 +357,15 @@ assert codec.decode(codec.encode(result)) == result
 ```
 
 Flags `0` completes the tick; flags `1` means more chunks follow for that tick.
-The caller splits streams into payloads of at most 255 bytes and messages within
-the configured message size. The codec preserves flags and tick numbers; it does
-not split, accumulate, order, or execute chunks. Duplicate peripheral/channel
-pairs within one message are rejected by C.
+The caller splits streams into payloads of at most 255 bytes and no more than
+`MAX_VARIABLE_CHUNKS_PER_TICK` (8) messages per tick. Eight 512-byte messages
+bound a chunked tick to 4096 complete encoded bytes. The ninth Type 21 chunk
+gets a negative Tick Response and invalidates the upload; firmware must never
+emit a ninth Type 34 chunk, and receiving one enters recovery. The codec
+preserves flags and tick numbers; it does not split, accumulate, order, or
+execute chunks. Duplicate fixed peripheral/channel pairs across an assembled
+tick are rejected by endpoint integration, while UART/SPI/CAN records may
+repeat in message and record order. I2C records are not implemented.
 
 For one Test ID, select either fixed Test Instruction or Type 21 for the
 instruction stream, and either fixed Test Result or Type 34 for the result
@@ -360,6 +374,11 @@ contiguous and retain Test ID and tick number. For Type 34, continuations are
 contiguous, retain Test ID and tick number, and repeat `condition` and
 `problem_detail`. Python considers a Type 34 tick complete only after its
 `COMPLETE_TICK` chunk. These are integration rules, not codec state.
+
+On capture overflow, firmware emits the retained prefix as normal Type 34
+records with `ResultCondition.PARTIAL` and
+`RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW`, then completes the tick normally.
+`EXECUTION_PROBLEM` takes precedence if completion is prevented.
 
 SPI update payloads contain a packet count, one nonzero size byte per packet,
 then the concatenated packet data. SPI result payloads are raw received bytes.

@@ -45,6 +45,7 @@ There is no Application sequence number. Transport delivery acknowledgement rema
 | `EXECUTION_CONTROL` | 19 |
 | `GLOBAL_CONTROL` | 20 |
 | `UPDATE_INSTRUCTION` | 21 |
+| `FINALIZE_TEST_UPLOAD` | 22 |
 | `TEST_RESULT` | 32 |
 | Retired/reserved | 33 |
 | `VARIABLE_TEST_RESULT` | 34 |
@@ -85,6 +86,7 @@ Presence rules:
 | Test Configuration | required |
 | Test Instruction | required |
 | Update Instruction | required |
+| Finalize Test Upload | required |
 | Execution Control | required |
 | Global Control | forbidden |
 | Test Result | required |
@@ -104,6 +106,7 @@ do not retain a transaction and therefore do not enforce it.
 | Test Configuration | Python | Firmware | Fresh Test ID | Starts a new upload attempt | Configuration Response; `ACCEPTED` creates active upload transaction |
 | Test Instruction | Python | Firmware | Active Test ID and tick | Configuration accepted; tick T is the expected next tick and T - 1 was accepted when T > 0 | Tick Response after all declared data; no later tick is yet submitted |
 | Update Instruction | Python | Firmware | Active Test ID and tick | Configuration accepted; tick T is the expected next tick | Tick Response |
+| Finalize Test Upload | Python | Firmware | Active Test ID; Complete Test scope | Every submitted tick has a positive Tick Response, or no instruction messages were submitted | Complete Test Response; `ACCEPTED` commits the upload |
 | Execution Control START | Python | Firmware | Accepted Test ID and START | Complete Test `ACCEPTED` | Execution-Control Response reports actual operation outcome |
 | Execution Control ABORT | Python | Firmware | Identified active Test ID and ABORT | Matching active transaction/operation | `COMPLETED` prevents previous transaction continuing normally |
 | Global Control RESET_APPLICATION | Python | Firmware | No Test ID | None | `COMPLETED` clears active Application transaction data/conditions; Transport unchanged |
@@ -126,12 +129,12 @@ public typed object placed in decode storage. The size query reports usable byte
 
 ```c
 _Alignas(HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT)
-static uint8_t decode_storage[2048u];
+static uint8_t decode_storage[512u];
 ```
 
 ```cpp
 alignas(HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT)
-static uint8_t decode_storage[2048u];
+static uint8_t decode_storage[512u];
 ```
 
 ## Test upload as individual messages
@@ -190,9 +193,10 @@ These are external logical channels, not MCU pins or peripheral registers.
 Firmware owns hardware mapping. Test Configuration uses the same fixed index
 identity: records contain no peripheral or channel identifier. Fixed arrays are
 always complete, with no sparse entries, duplicates, omitted-channel defaults,
-or implicit retention from a prior configuration. Variable UART/SPI/I2C/CAN
+or implicit retention from a prior configuration. Variable UART/SPI/CAN
 operation and capture payloads are carried by the Type 21 and Type 34 records
-described below, not by these fixed configuration arrays.
+described below, not by these fixed configuration arrays. I2C operation and
+capture records are explicitly not implemented in v0.3.0.
 
 Each fixed result contains exactly one analogue input element per physical
 analogue input channel. For a configured channel, that element is its one sample
@@ -268,9 +272,9 @@ fixed record carries a redundant channel or peripheral identifier.
 The arrays are encoded in this order: Digital Input, Digital Output, Analogue
 Input, Analogue Output, PWM Input, PWM Output, CAN, SPI, UART, then I2C. Their
 physical extents are 10, 10, 2, 6, 2, 2, 2, 2, 2, and 2 records respectively.
-The fixed payload, including the one-byte extension length, is 203 bytes. With
-the 23-byte common envelope an empty-extension configuration is 226 bytes; an
-extension of N bytes is `226 + N`, up to 481 bytes for N = 255. The one-byte
+The fixed payload, including the one-byte extension length, is 171 bytes. With
+the 23-byte common envelope an empty-extension configuration is 194 bytes; an
+extension of N bytes is `194 + N`, up to 449 bytes for N = 255. The one-byte
 wire field therefore permits at most 255 extension bytes, while each initialized
 codec context may impose a smaller local limit through
 `context->config.max_variable_data_size`. The exact record offsets and byte
@@ -292,27 +296,27 @@ The public records are:
 - PWM Input: enabled, voltage level.
 - PWM Output: enabled, voltage level, initial period in nanoseconds, initial duty
   cycle in permyriad.
-- CAN: enabled, bit rate, capture limit in bytes, standard receive filter ID,
+- CAN: enabled, bit rate, standard receive filter ID,
   and standard receive filter mask. Only 11-bit standard identifiers are
   supported. A zero mask accepts all standard identifiers; filter-bank allocation
   remains firmware-internal. CAN termination is not software-configurable through
   the protocol and physical termination must be fixed or handled outside the
   Application configuration.
 - SPI: enabled, bit rate, master/slave role, 8/16-bit data width, bit order,
-  clock polarity, clock phase, capture limit in bytes.
+  clock polarity, clock phase.
 - UART: enabled, baud rate, electrical mode, word length, parity, stop bits, RX
-  enabled, TX enabled, capture limit in bytes.
+  enabled, TX enabled.
 - I2C: enabled, bit rate, master/slave role, own 7-bit address, 3.3/5 V voltage
-  level, pull-up selection, capture limit in bytes.
+  level, and pull-up selection. Disabled I2C is canonical; enabled I2C is not
+  implemented in v0.3.0 and returns `NOT_IMPLEMENTED`.
 
 The codec validates the supported tick-duration set of `10000`, `1000`, `100`,
 or `10` microseconds; nonzero `expected_tick_count` within the configured limit;
 zero test-wide flags; the extension pointer/length invariant and extension
 length against `context->config.max_variable_data_size`; Booleans; canonical
 disabled records; recognized enums; PWM duty/period combinations; nonzero rates
-for enabled communications; communication capture limits against the same
-configured variable-data limit; UART RX/TX constraints; and I2C
-role/address constraints, plus 11-bit CAN filter ID/mask bounds. Analogue
+for enabled communications; UART RX/TX constraints; canonical disabled I2C;
+and 11-bit CAN filter ID/mask bounds. Analogue
 input/output deliberately have no protocol-selectable electrical parameters in
 this version.
 
@@ -412,19 +416,30 @@ host must not submit a later instruction tick before the completed tick receives
 its positive Tick Response. A Transport ACK confirms delivery only; it does not
 accept the tick semantically.
 
-## Automatic Complete Test Response
+## Finalize Test Upload
 
-There is no Finalize Test message in the codec. After the endpoint accepts the
-upload according to its instruction-family and tick policy, firmware integration
-may perform whole-test validation and create a Complete Test Response. The exact
-upload-finalisation behaviour for sparse instructions remains open work for this
-version.
+- Type: `FINALIZE_TEST_UPLOAD` (Type 22)
+- Subtype: `NONE`
+- Test ID: required
+- Direction: Python to firmware
 
-Complete Test `ACCEPTED` means the whole test was retained, validated, and is
-available for a subsequent START request. It does not itself begin execution.
-A rejected or failed whole-test validation invalidates the transaction and
-requires a new upload from Test Configuration. There is no ARM command or public
-phase/state value between upload completion and START.
+The body is one little-endian `uint32_t flags` field. `flags` must be zero in
+v0.3.0, so the payload is four bytes, the complete message is 27 bytes, and
+decoding requires zero storage. The response uses the existing Complete Test
+Response scope; no new Response scope or subtype is introduced.
+
+The host sends finalisation only after every submitted instruction tick has a
+positive Tick Response. It may send it immediately after accepted Test
+Configuration when the sparse upload contains no instruction messages. The
+request declares that no more instruction ticks or chunks will be submitted.
+Firmware rejects it for an incomplete chunked tick, wrong Test ID, invalid
+upload, incomplete storage, or failed whole-test validation. An accepted
+Complete Test Response commits the retained upload and makes it eligible for
+START; a rejected response invalidates the upload. No instruction is valid
+after successful finalisation, and START is invalid before that accepted
+response. Only one response-requiring operation may be outstanding. If session
+loss makes the outcome uncertain, the host enters recovery and does not blindly
+resend the request.
 
 ## Execution Control
 
@@ -449,8 +464,8 @@ failure.
 After ABORT `COMPLETED`, any new upload begins from Test Configuration with a
 fresh Test ID. There is no resumable behavior in the initial protocol.
 
-There is no `ARM`, `FINALIZE_TEST`, or command whose sole purpose is forcing a
-named firmware state.
+There is no `ARM` command or named firmware-state command. `FINALIZE_TEST_UPLOAD`
+is the explicit upload-finalisation request documented above.
 
 ## Global Control
 
@@ -548,6 +563,13 @@ fixed-state DIGITAL_INPUT, ANALOG_INPUT and PWM_INPUT peripheral/channel pair
 may occur at most once. UART, SPI and CAN captured records may repeat across
 chunks, with message and record order preserved.
 
+Firmware emits at most eight Type 34 chunks for a tick. A ninth received chunk
+is a protocol-state failure and enters recovery. I2C captured records are not
+implemented and are rejected. Each Type 21 and Type 34 chunk remains at most
+512 complete bytes; eight chunks therefore bound one tick to 4096 complete
+encoded bytes. No aggregate byte or record count is added, and the existing
+one-byte operation and record counts remain.
+
 No next result tick begins before the current tick reaches `COMPLETE_TICK`.
 Variable result ticks are sent in increasing order. Every configured tick from
 `0` through `expected_tick_count - 1` has a final Type 34 message. The final
@@ -560,6 +582,14 @@ The stateless codec validates each message and does not enforce cross-message
 assembly, ordering, or family selection. Incomplete result assembly is
 discarded on reset, disconnect, or session loss. Result resumption and range
 requests remain deferred.
+
+Capture capacity is an internal firmware property. On overflow, firmware
+retains the bounded prefix, emits it in normal Type 34 records, discards data
+that cannot fit, uses `PARTIAL`, and sets `problem_detail` to
+`HIL_APPLICATION_RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW` (1). The tick and
+result stream still terminate normally; overflow adds no Error, acknowledgement,
+or finalisation message. `EXECUTION_PROBLEM` takes precedence if a more serious
+failure prevents completion.
 
 ## Application Response
 
@@ -700,7 +730,7 @@ These sequences specify endpoint agreement. Codec tests exercise implemented com
 
 ```text
 Python creates fresh random Test ID A
-Python -> Firmware: Test Configuration(A, expected_tick_count 2)
+Python -> Firmware: Test Configuration(A, expected_tick_count 3)
 Firmware -> Python: Response(Configuration, ACCEPTED, A)
 Active upload transaction A now exists
 Python -> Firmware: Update Instruction(A, tick 0, UART0 record, HAS_MORE_CHUNKS)
@@ -709,7 +739,7 @@ Firmware -> Python: Response(Tick 0, ACCEPTED, A)
 No update is submitted for omitted tick 1; output state is retained
 Python -> Firmware: Update Instruction(A, tick 2, COMPLETE_TICK)
 Firmware -> Python: Response(Tick 2, ACCEPTED, A)
-Firmware automatically validates the whole test
+Python -> Firmware: FINALIZE_TEST_UPLOAD(A, flags 0)
 Firmware -> Python: Response(Complete Test, ACCEPTED, A)
 Test A is available for a subsequent START request
 ```
@@ -913,18 +943,20 @@ The current C foundation now defines and tests:
 These items are no longer open design decisions. Later protocol versions may
 extend them only through the documented versioning process.
 
-## Remaining incomplete v0.3.0 work
+## v0.3.0 completion boundary
 
-This version does not finalise:
+The shared v0.3.0 protocol is complete here: Type 22 upload finalisation,
+512-byte complete-message and eight-chunk ceilings, 255-byte spans, capture
+overflow reporting, Type 21/34 bounded records, allocation-free encoded
+validation, exact version matching, and explicit I2C exclusion are defined and
+implemented by the stateless codec and its bindings.
 
-- upload-finalisation behaviour for every sparse-instruction edge case;
-- firmware assembly capacities;
-- Python and firmware state-machine implementation;
-- maximum aggregate operations or bytes across all chunks for one tick;
-- streaming validation or memory-efficient firmware decoding;
-- I2C variable records;
-- result resumption or range requests; and
-- multi-version negotiation or compatibility.
+Intentional v0.3.0 non-features are result resumption, range requests, result
+acknowledgements or finalisation messages, version negotiation, capabilities
+discovery, configurable capture limits, aggregate count fields, and I2C
+operation/result records.
 
-Cross-endpoint firmware/Python conformance remains required before those endpoint
-implementations can be considered protocol-conformant.
+Production state-machine work remains in `hil-rig-mcu-firmware` and
+`hil-rig-python-api`: firmware retention, hardware execution, endpoint state
+transitions, Python USB/Transport orchestration, and cross-message transaction
+bookkeeping. This repository does not claim to implement those integrations.
