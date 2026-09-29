@@ -113,8 +113,8 @@ class SystemInfoResponse:
     def __post_init__(self) -> None:
         _exact("protocol_version", self.protocol_version, ProtocolVersion)
         _exact("firmware_version", self.firmware_version, ProtocolVersion)
-        _bytes("diagnostic_data", self.diagnostic_data)
-        _bytes("firmware_git_hash", self.firmware_git_hash)
+        _bytes("diagnostic_data", self.diagnostic_data, maximum=255)
+        _bytes("firmware_git_hash", self.firmware_git_hash, maximum=255)
 
 
 class ControlCommand(IntEnum):
@@ -323,12 +323,14 @@ def _fixed(name: str, value: object, element: type, count: int) -> None:
         _exact(name, item, element)
 
 
-def _bytes(name: str, value: bytes, *, exact: int | None = None) -> None:
+def _bytes(
+    name: str, value: bytes, *, exact: int | None = None, maximum: int = _UINT16_MAX
+) -> None:
     _exact(name, value, bytes)
     if exact is not None and len(value) != exact:
         raise ValueError(f"{name} must contain exactly {exact} bytes")
-    if exact is None and len(value) > 255:
-        raise ValueError(f"{name} must contain at most 255 bytes")
+    if exact is None and len(value) > maximum:
+        raise ValueError(f"{name} must contain at most {maximum} bytes")
 
 
 @dataclass(frozen=True, slots=True)
@@ -579,8 +581,8 @@ class I2CConfig:
 class ApplicationConfig:
     """Immutable native codec limits; initialization validates protocol constraints."""
 
-    max_encoded_message_size: int = 512
-    max_variable_data_size: int = 255
+    max_encoded_message_size: int = 4096
+    max_variable_data_size: int = 4096
     max_expected_tick_count: int = 1_000_000
 
     def __post_init__(self) -> None:
@@ -654,7 +656,7 @@ class TestConfiguration:
         _fixed("spi", self.spi, SPIConfig, int(_binding.lib.HIL_APPLICATION_SPI_CHANNEL_COUNT))
         _fixed("uart", self.uart, UARTConfig, int(_binding.lib.HIL_APPLICATION_UART_CHANNEL_COUNT))
         _fixed("i2c", self.i2c, I2CConfig, int(_binding.lib.HIL_APPLICATION_I2C_CHANNEL_COUNT))
-        _bytes("extension_data", self.extension_data)
+        _bytes("extension_data", self.extension_data, maximum=255)
 
 
 @dataclass(frozen=True, slots=True)
@@ -882,7 +884,7 @@ class ApplicationErrorMessage:
         if self.tick_number is not None:
             _validate_integer("tick_number", self.tick_number, 0, _UINT32_MAX)
         _validate_integer("detail", self.detail, 0, _UINT32_MAX)
-        _bytes("diagnostic_data", self.diagnostic_data)
+        _bytes("diagnostic_data", self.diagnostic_data, maximum=255)
 
 
 type ApplicationMessage = (

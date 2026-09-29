@@ -154,7 +154,7 @@ void ExpectDecodeFailurePublishesNothing(
 }  // namespace
 
 static_assert( HIL_APPLICATION_HEADER_SIZE_BYTES == 23u );
-static_assert( HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE == 512u );
+static_assert( HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE == 65535u );
 static_assert( HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK == 8u );
 static_assert( HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE == 28u );
 static_assert( HIL_RIG_PROTOCOL_VERSION_MAJOR == 0u );

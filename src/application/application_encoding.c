@@ -84,8 +84,12 @@ HIL_Application_Status_T HIL_APPLICATION_Byte_Span_encode( const HIL_Application
     {
         return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
     }
+    if ( data->size > UINT8_MAX )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
     /* Publish the one-byte wire length only after the complete span is known to fit. */
-    payload[0] = data->size;
+    payload[0] = ( uint8_t )data->size;
     if ( data->size != 0u )
     {
         memcpy( &payload[HIL_APPLICATION_BYTE_SPAN_LENGTH_SIZE], data->data, data->size );

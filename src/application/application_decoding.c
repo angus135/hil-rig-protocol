@@ -191,7 +191,7 @@ static HIL_Application_Status_T HIL_APPLICATION_Aligned_Records_Scan(
         const uint16_t record_payload_len = HIL_APPLICATION_Read_U16_Le( &payload[offset + 2u] );
         offset += HIL_APPLICATION_RECORD_HEADER_SIZE;
 
-        if ( record_payload_len == 0u || record_payload_len > ( uint16_t )UINT8_MAX )
+        if ( record_payload_len == 0u )
         {
             return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
         }
@@ -203,8 +203,7 @@ static HIL_Application_Status_T HIL_APPLICATION_Aligned_Records_Scan(
         {
             return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
         }
-        HIL_Application_Byte_Span_T record_span = { &payload[offset],
-                                                    ( uint8_t )record_payload_len };
+        HIL_Application_Byte_Span_T record_span = { &payload[offset], record_payload_len };
         HIL_Application_Status_T    status      = HIL_APPLICATION_Record_Pair_Mark(
             seen_peripheral_channels, HIL_APPLICATION_PERIPHERAL_CAN + 1u, peripheral_type,
             channel );
@@ -1018,7 +1017,7 @@ HIL_Application_Status_T HIL_APPLICATION_Update_Instruction_decode(
         const uint16_t op_payload_len = HIL_APPLICATION_Read_U16_Le( &payload[running_payload] );
         running_payload += HIL_APPLICATION_WIRE_U16_SIZE;
 
-        operations[i].payload.size = ( uint8_t )op_payload_len;
+        operations[i].payload.size = op_payload_len;
         operations[i].payload.data = &payload_pool[payload_bytes_copied];
 
         memcpy( &payload_pool[payload_bytes_copied], &payload[running_payload],
@@ -1252,7 +1251,7 @@ HIL_Application_Status_T HIL_APPLICATION_Variable_Test_Result_decode(
         const uint16_t rec_data_len = HIL_APPLICATION_Read_U16_Le( &payload[running_payload] );
         running_payload += HIL_APPLICATION_WIRE_U16_SIZE;
 
-        records[i].data.size = ( uint8_t )rec_data_len;
+        records[i].data.size = rec_data_len;
         records[i].data.data = &payload_pool[payload_bytes_copied];
 
         memcpy( &payload_pool[payload_bytes_copied], &payload[running_payload],
