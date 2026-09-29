@@ -252,7 +252,7 @@ def test_all_truncated_prefixes_and_trailing_data(codec, factory):
         codec.decode(wire + b"\x00")
     assert caught.value.status is p.ApplicationStatus.MALFORMED_MESSAGE
     with pytest.raises(p.ApplicationDecodeError) as caught:
-        codec.decode(wire + bytes(512))
+        codec.decode(wire + bytes(p.ApplicationConfig().max_encoded_message_size))
     assert caught.value.status is p.ApplicationStatus.INVALID_LENGTH
 
 

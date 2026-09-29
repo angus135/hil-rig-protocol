@@ -582,7 +582,7 @@ class ApplicationConfig:
     """Immutable native codec limits; initialization validates protocol constraints."""
 
     max_encoded_message_size: int = 4096
-    max_variable_data_size: int = 4096
+    max_variable_data_size: int = 65535
     max_expected_tick_count: int = 1_000_000
 
     def __post_init__(self) -> None:

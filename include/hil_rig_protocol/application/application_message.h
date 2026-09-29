@@ -61,7 +61,10 @@ extern "C"
       + HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES )
 /** @} */
 
-/** Profile ceiling for one complete Application message natively bounded by 16-bit payload length. */
+/**
+ * Profile ceiling for one complete Application message natively bounded by
+ * 16-bit payload length.
+ */
 #define HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE 65535u
 
 /**
