@@ -230,7 +230,7 @@ typedef struct
 typedef struct
 {
     const uint8_t* data;
-    uint8_t size;
+    uint16_t size;
 } HIL_Application_Byte_Span_T;
 
 typedef enum

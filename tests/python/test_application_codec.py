@@ -124,8 +124,8 @@ def test_defaults_direction_neutrality_and_statelessness(codec):
     "config,status",
     [
         (p.ApplicationConfig(max_encoded_message_size=0), p.ApplicationStatus.BUFFER_TOO_SMALL),
-        (p.ApplicationConfig(max_encoded_message_size=513), p.ApplicationStatus.INVALID_LENGTH),
-        (p.ApplicationConfig(max_variable_data_size=256), p.ApplicationStatus.INVALID_COUNT),
+        (p.ApplicationConfig(max_encoded_message_size=65536), p.ApplicationStatus.INVALID_LENGTH),
+        (p.ApplicationConfig(max_variable_data_size=65536), p.ApplicationStatus.INVALID_COUNT),
         (p.ApplicationConfig(max_expected_tick_count=1000001), p.ApplicationStatus.INVALID_LENGTH),
     ],
 )
