@@ -126,11 +126,13 @@ TEST( ApplicationDiscovery, RequestUsesApprovedEightByteLayoutAndExactVersionGat
                                                        HIL_RIG_PROTOCOL_VERSION_PATCH ),
                HIL_APPLICATION_STATUS_VERSION_MISMATCH );
     EXPECT_EQ( HIL_APPLICATION_Check_Protocol_Version( HIL_RIG_PROTOCOL_VERSION_MAJOR,
-                                                       HIL_RIG_PROTOCOL_VERSION_MINOR, 1u ),
+                                                       HIL_RIG_PROTOCOL_VERSION_MINOR,
+                                                       HIL_RIG_PROTOCOL_VERSION_PATCH + 1u ),
                HIL_APPLICATION_STATUS_VERSION_MISMATCH );
 
     auto inconsistent                                                = request;
-    inconsistent.body.system_info_request.application_protocol_patch = 1u;
+    inconsistent.body.system_info_request.application_protocol_patch =
+        static_cast<uint16_t>( HIL_RIG_PROTOCOL_VERSION_PATCH + 1u );
     output_size                                                      = 99u;
     EXPECT_EQ( HIL_APPLICATION_Encoded_Size( &context, &inconsistent, &output_size ),
                HIL_APPLICATION_STATUS_VERSION_MISMATCH );
