@@ -335,7 +335,9 @@ def test_discovery_controls_and_exact_version_gate(codec):
         assert codec.decode(codec.encode(control)) == control
 
     p.check_protocol_version(p.PROTOCOL_VERSION)
-    foreign = p.ProtocolVersion(p.PROTOCOL_VERSION.major, p.PROTOCOL_VERSION.minor, 1)
+    foreign = p.ProtocolVersion(
+        p.PROTOCOL_VERSION.major, p.PROTOCOL_VERSION.minor, p.PROTOCOL_VERSION.patch + 1
+    )
     with pytest.raises(p.ApplicationVersionMismatchError) as caught:
         p.check_protocol_version(foreign)
     assert caught.value.local_version is p.PROTOCOL_VERSION
