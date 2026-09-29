@@ -273,8 +273,8 @@ def test_defaults_and_smaller_limits():
     "field,value,status",
     [
         ("max_encoded_message_size", 24, lib.HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL),
-        ("max_encoded_message_size", 513, lib.HIL_APPLICATION_STATUS_INVALID_LENGTH),
-        ("max_variable_data_size", 256, lib.HIL_APPLICATION_STATUS_INVALID_COUNT),
+        ("max_encoded_message_size", 65536, lib.HIL_APPLICATION_STATUS_INVALID_LENGTH),
+        ("max_variable_data_size", 65536, lib.HIL_APPLICATION_STATUS_INVALID_COUNT),
         ("max_expected_tick_count", 1000001, lib.HIL_APPLICATION_STATUS_INVALID_LENGTH),
     ],
 )

@@ -426,8 +426,8 @@ def test_empty_result_pointer_invariant(codec, monkeypatch):
     "factory,field", [(p.LogicalOperation, "payload"), (p.CapturedRecord, "data")]
 )
 def test_record_representation(factory, field):
-    value = factory(p.PeripheralType.UART, 255, bytes(255))
-    assert len(getattr(value, field)) == 255
+    value = factory(p.PeripheralType.UART, 255, bytes(65535))
+    assert len(getattr(value, field)) == 65535
     for invalid in [bytearray(b"x"), memoryview(b"x"), "x", None]:
         with pytest.raises(TypeError):
             factory(p.PeripheralType.UART, 0, invalid)
@@ -440,7 +440,7 @@ def test_record_representation(factory, field):
     with pytest.raises(TypeError):
         factory(16, 0, b"x")
     with pytest.raises(ValueError):
-        factory(p.PeripheralType.UART, 0, bytes(256))
+        factory(p.PeripheralType.UART, 0, bytes(65536))
 
 
 def test_message_representation(result_family):
