@@ -6,4 +6,5 @@ target_sources(hil_rig_protocol
         application_decoding.c
         application_validation.c
         application_size.c
+        application_arbitrary.c
 )

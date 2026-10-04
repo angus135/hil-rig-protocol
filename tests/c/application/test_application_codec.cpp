@@ -158,8 +158,8 @@ static_assert( HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE == 65535u );
 static_assert( HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK == 8u );
 static_assert( HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE == 28u );
 static_assert( HIL_RIG_PROTOCOL_VERSION_MAJOR == 0u );
-static_assert( HIL_RIG_PROTOCOL_VERSION_MINOR == 3u );
-static_assert( HIL_RIG_PROTOCOL_VERSION_PATCH == 1u );
+static_assert( HIL_RIG_PROTOCOL_VERSION_MINOR == 4u );
+static_assert( HIL_RIG_PROTOCOL_VERSION_PATCH == 0u );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST == 1 );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION == 17 );
 static_assert( HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL == 19 );
@@ -928,7 +928,7 @@ TEST( ApplicationCodecValidation,
     std::array<std::uint8_t, 37u> mismatched_wire_version{};
     std::copy_n( valid.begin(), 35u, mismatched_wire_version.begin() );
     mismatched_wire_version[kPayloadLengthOffset] = 14u;
-    mismatched_wire_version[25]                   = 4u;
+    mismatched_wire_version[25]                   = HIL_RIG_PROTOCOL_VERSION_MINOR + 1u;
     mismatched_wire_version[35]                   = 0u;
     mismatched_wire_version[36]                   = 0u;
     ExpectDecodeFailurePublishesNothing( context, mismatched_wire_version.data(),

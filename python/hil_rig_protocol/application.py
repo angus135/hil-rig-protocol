@@ -10,6 +10,8 @@ from typing import Any, NoReturn, SupportsIndex
 from . import _binding
 from ._application_conversion import (
     _build_native_config,
+    _read_arbitrary_control,
+    _read_arbitrary_data,
     _read_error,
     _read_execution_control,
     _read_finalize_test_upload,
@@ -22,6 +24,8 @@ from ._application_conversion import (
     _read_test_result,
     _read_update_instruction,
     _read_variable_test_result,
+    _write_arbitrary_control,
+    _write_arbitrary_data,
     _write_error,
     _write_execution_control,
     _write_finalize_test_upload,
@@ -42,6 +46,8 @@ from .application_types import (
     ApplicationMessage,
     ApplicationResponse,
     ApplicationStatus,
+    ArbitraryControl,
+    ArbitraryData,
     ExecutionControl,
     FinalizeTestUpload,
     GlobalControl,
@@ -215,6 +221,20 @@ def _build_message(message: ApplicationMessage) -> tuple[Any, list[Any]]:
         native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
         native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_ERROR
         owners = _write_error(message, native.body.error)
+    elif type(message) is ArbitraryControl:
+        native.has_test_id = int(message.test_id is not None)
+        if message.test_id is not None:
+            native.test_id.bytes[0:16] = message.test_id.bytes
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
+        native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL
+        owners = _write_arbitrary_control(message, native.body.arbitrary_control)
+    elif type(message) is ArbitraryData:
+        native.has_test_id = int(message.test_id is not None)
+        if message.test_id is not None:
+            native.test_id.bytes[0:16] = message.test_id.bytes
+        native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
+        native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA
+        owners = _write_arbitrary_data(message, native.body.arbitrary_data)
     else:
         raise TypeError("message is not a supported Application message value")
     return native, owners
@@ -262,6 +282,8 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
         lib.HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT,
         lib.HIL_APPLICATION_MESSAGE_TYPE_RESPONSE,
         lib.HIL_APPLICATION_MESSAGE_TYPE_ERROR,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA,
     )
     if native.type not in supported:
         raise ApplicationBindingError("native decoder returned an impossible message type")
@@ -321,6 +343,44 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
         if capacity != 0:
             raise ApplicationBindingError("native fixed message unexpectedly used decode storage")
         return _read_global_control(native.body.global_control)
+    if native.type in (
+        lib.HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA,
+    ):
+        if (
+            native.has_test_id not in (0, 1)
+            or native.subtype != lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
+        ):
+            raise ApplicationBindingError(
+                "native decoder returned an inconsistent arbitrary envelope"
+            )
+        test_id = (
+            TestId(bytes(_binding.ffi.buffer(native.test_id.bytes, 16)))
+            if native.has_test_id
+            else None
+        )
+        if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL:
+            if capacity != 0:
+                raise ApplicationBindingError(
+                    "native fixed message unexpectedly used decode storage"
+                )
+            return _read_arbitrary_control(test_id, native.body.arbitrary_control)
+        span = native.body.arbitrary_data.payload
+        if span.size != capacity:
+            raise ApplicationBindingError(
+                "native arbitrary data size disagrees with decode storage"
+            )
+        if capacity:
+            if span.data != storage:
+                raise ApplicationBindingError(
+                    "native arbitrary data does not start at decode storage"
+                )
+            payload = bytes(_binding.ffi.buffer(span.data, capacity))
+        else:
+            if span.data != _binding.ffi.NULL:
+                raise ApplicationBindingError("native empty arbitrary data has a pointer")
+            payload = b""
+        return _read_arbitrary_data(test_id, native.body.arbitrary_data, payload)
     if native.has_test_id != 1 or native.subtype != lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE:
         raise ApplicationBindingError("native decoder returned an inconsistent message envelope")
     test_id = TestId(bytes(_binding.ffi.buffer(native.test_id.bytes, 16)))
@@ -403,6 +463,8 @@ class ApplicationCodec:
             VariableTestResult,
             ApplicationResponse,
             ApplicationErrorMessage,
+            ArbitraryControl,
+            ArbitraryData,
         ):
             raise TypeError("message is not a supported Application message value")
         with _binding_boundary():

@@ -13,6 +13,12 @@ _Static_assert( HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE == 28u, "control minim
 _Static_assert( HIL_APPLICATION_STATUS_VERSION_MISMATCH == 17, "stable status value" );
 _Static_assert( HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD == 22,
                 "finalize upload wire type" );
+_Static_assert( HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL == 64, "arbitrary control type" );
+_Static_assert( HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA == 65, "arbitrary data type" );
+_Static_assert( sizeof( ( ( HIL_Application_Arbitrary_Control_T ){ 0 } ).control_id ) == 4u,
+                "arbitrary control ID width" );
+_Static_assert( sizeof( ( ( HIL_Application_Arbitrary_Data_T ){ 0 } ).data_id ) == 4u,
+                "arbitrary data ID width" );
 _Static_assert( HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK == 8u, "fixed v0.3.0 chunk ceiling" );
 
 int main( void )

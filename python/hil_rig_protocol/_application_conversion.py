@@ -15,6 +15,8 @@ from .application_types import (
     ApplicationConfig,
     ApplicationErrorMessage,
     ApplicationResponse,
+    ArbitraryControl,
+    ArbitraryData,
     BusRole,
     CANConfig,
     CapturedRecord,
@@ -362,6 +364,30 @@ def _read_error(
         detail=int(native.detail),
         diagnostic_data=diagnostic_data,
     )
+
+
+def _write_arbitrary_control(value: ArbitraryControl, native: Any) -> list[Any]:
+    native.control_id = value.control_id
+    native.value = value.value
+    return []
+
+
+def _read_arbitrary_control(test_id: TestId | None, native: Any) -> ArbitraryControl:
+    return ArbitraryControl(int(native.control_id), int(native.value), test_id)
+
+
+def _write_arbitrary_data(value: ArbitraryData, native: Any) -> list[Any]:
+    native.data_id = value.data_id
+    native.payload.size = len(value.payload)
+    if value.payload:
+        owner = _binding.ffi.new("uint8_t[]", value.payload)
+        native.payload.data = owner
+        return [owner]
+    return []
+
+
+def _read_arbitrary_data(test_id: TestId | None, native: Any, payload: bytes) -> ArbitraryData:
+    return ArbitraryData(int(native.data_id), payload, test_id)
 
 
 def _read_digital_output_value(native: Any) -> DigitalOutputValue:

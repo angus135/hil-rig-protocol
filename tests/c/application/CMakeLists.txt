@@ -9,6 +9,7 @@ add_executable(hil_rig_protocol_application_tests
     test_application_update_instruction.cpp
     test_application_variable_result.cpp
     test_application_aligned_records.cpp
+    test_application_arbitrary.cpp
 )
 
 target_compile_features(hil_rig_protocol_application_tests PRIVATE cxx_std_17)
