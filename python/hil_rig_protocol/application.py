@@ -18,6 +18,7 @@ from ._application_conversion import (
     _read_global_control,
     _read_response,
     _read_rig_status,
+    _read_run_report,
     _read_system_info_request,
     _read_system_info_response,
     _read_test_configuration,
@@ -33,6 +34,7 @@ from ._application_conversion import (
     _write_global_control,
     _write_response,
     _write_rig_status,
+    _write_run_report,
     _write_system_info_request,
     _write_system_info_response,
     _write_test_configuration,
@@ -55,6 +57,7 @@ from .application_types import (
     GlobalControl,
     ProtocolVersion,
     RigStatus,
+    RunReport,
     SystemInfoRequest,
     SystemInfoResponse,
     TestConfiguration,
@@ -224,6 +227,11 @@ def _build_message(message: ApplicationMessage) -> tuple[Any, list[Any]]:
         native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
         native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_ERROR
         owners = _write_error(message, native.body.error)
+    elif type(message) is RunReport:
+        native.has_test_id = 1
+        native.test_id.bytes = message.test_id.bytes
+        native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT
+        owners = _write_run_report(message, native.body.run_report)
     elif type(message) is RigStatus:
         if message.test_id is not None:
             native.has_test_id = 1
@@ -291,6 +299,7 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
         lib.HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT,
         lib.HIL_APPLICATION_MESSAGE_TYPE_RESPONSE,
         lib.HIL_APPLICATION_MESSAGE_TYPE_ERROR,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT,
         lib.HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS,
         lib.HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL,
         lib.HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA,
@@ -422,6 +431,21 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
         if capacity != 0:
             raise ApplicationBindingError("native fixed message unexpectedly used decode storage")
         return _read_finalize_test_upload(test_id, native.body.finalize_test_upload)
+    if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT:
+        span = native.body.run_report.extension_data
+        if span.size != capacity:
+            raise ApplicationBindingError("native report extension disagrees with decode storage")
+        if capacity:
+            if span.data != storage:
+                raise ApplicationBindingError(
+                    "native report extension does not start at decode storage"
+                )
+            extension = bytes(_binding.ffi.buffer(span.data, capacity))
+        else:
+            if span.data != _binding.ffi.NULL:
+                raise ApplicationBindingError("native empty report extension has a pointer")
+            extension = b""
+        return _read_run_report(test_id, native.body.run_report, extension)
     if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_TEST_CONFIGURATION:
         span = native.body.test_configuration.extension_data
         # Check ownership before dereferencing any native pointer.
@@ -490,6 +514,7 @@ class ApplicationCodec:
             ArbitraryControl,
             ArbitraryData,
             RigStatus,
+            RunReport,
         ):
             raise TypeError("message is not a supported Application message value")
         with _binding_boundary():

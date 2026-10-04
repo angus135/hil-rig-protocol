@@ -67,6 +67,7 @@ HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_Application_Message_Type_T type, s
             return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE:
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
+        case HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT:
         case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA:
             return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
@@ -1396,5 +1397,147 @@ HIL_Application_Status_T HIL_APPLICATION_Rig_Status_decode( HIL_Application_Rig_
         ( HIL_Application_Failure_Reason_T )HIL_APPLICATION_Read_U16_Le( &payload[10] );
     *consumed_size = payload_size;
     *used_storage  = 0u;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Run_Report_scan( const HIL_Application_Context_T* context,
+                                                          const uint8_t*                   payload,
+                                                          size_t  payload_size,
+                                                          size_t* required_storage )
+{
+    if ( context == NULL || payload == NULL || required_storage == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    *required_storage = 0u;
+    if ( context->initialized == 0u )
+    {
+        return HIL_APPLICATION_STATUS_UNINITIALIZED;
+    }
+    if ( payload_size < HIL_APPLICATION_RUN_REPORT_FIXED_PAYLOAD_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    const uint8_t extension_size = payload[HIL_APPLICATION_RUN_REPORT_EXTENSION_LENGTH_OFFSET];
+    size_t        total          = 0u;
+    if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_RUN_REPORT_FIXED_PAYLOAD_SIZE,
+                                            extension_size, &total )
+         || payload_size != total )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    if ( HIL_APPLICATION_Read_U16_Le( payload ) != 1u )
+    {
+        return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
+    }
+    if ( extension_size > context->config.max_variable_data_size )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    *required_storage = extension_size;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Run_Report_parse( const HIL_Application_Context_T* context,
+                                                           HIL_Application_Run_Report_T*    data,
+                                                           const uint8_t*                   payload,
+                                                           size_t payload_size )
+{
+    if ( data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    size_t                   extension_size = 0u;
+    HIL_Application_Status_T status =
+        HIL_APPLICATION_Run_Report_scan( context, payload, payload_size, &extension_size );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    if ( payload[7] != 0u || HIL_APPLICATION_Read_U16_Le( &payload[10] ) != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    data->schema_version    = HIL_APPLICATION_Read_U16_Le( &payload[0] );
+    data->run_outcome       = ( HIL_Application_Run_Outcome_T )payload[2];
+    data->execution_outcome = ( HIL_Application_Execution_Outcome_T )payload[3];
+    data->result_status     = ( HIL_Application_Run_Result_Status_T )payload[4];
+    data->failure_source    = ( HIL_Application_Failure_Source_T )payload[5];
+    data->failure_stage     = ( HIL_Application_Failure_Stage_T )payload[6];
+    data->failure_reason =
+        ( HIL_Application_Failure_Reason_T )HIL_APPLICATION_Read_U16_Le( &payload[8] );
+    data->valid_sections                           = HIL_APPLICATION_Read_U32_Le( &payload[12] );
+    data->expected_tick_count                      = HIL_APPLICATION_Read_U32_Le( &payload[16] );
+    data->tick_period_us                           = HIL_APPLICATION_Read_U32_Le( &payload[20] );
+    data->last_completed_boundary                  = HIL_APPLICATION_Read_U32_Le( &payload[24] );
+    data->result_ticks_emitted                     = HIL_APPLICATION_Read_U32_Le( &payload[28] );
+    data->isr_timing.sample_count                  = HIL_APPLICATION_Read_U32_Le( &payload[32] );
+    data->isr_timing.total_cycles                  = HIL_APPLICATION_Read_U64_Le( &payload[36] );
+    data->isr_timing.minimum_cycles                = HIL_APPLICATION_Read_U32_Le( &payload[44] );
+    data->isr_timing.maximum_cycles                = HIL_APPLICATION_Read_U32_Le( &payload[48] );
+    data->isr_timing.maximum_boundary              = HIL_APPLICATION_Read_U32_Le( &payload[52] );
+    data->instruction_buffer.sample_count          = HIL_APPLICATION_Read_U32_Le( &payload[56] );
+    data->instruction_buffer.minimum_unread_bytes  = HIL_APPLICATION_Read_U32_Le( &payload[60] );
+    data->instruction_buffer.minimum_boundary      = HIL_APPLICATION_Read_U32_Le( &payload[64] );
+    data->result_buffer.committed_record_count     = HIL_APPLICATION_Read_U32_Le( &payload[68] );
+    data->result_buffer.committed_bytes            = HIL_APPLICATION_Read_U32_Le( &payload[72] );
+    data->result_buffer.peak_pending_bytes         = HIL_APPLICATION_Read_U32_Le( &payload[76] );
+    data->result_buffer.peak_pending_boundary      = HIL_APPLICATION_Read_U32_Le( &payload[80] );
+    data->result_buffer.reserve_failure_count      = HIL_APPLICATION_Read_U32_Le( &payload[84] );
+    data->result_buffer.commit_failure_count       = HIL_APPLICATION_Read_U32_Le( &payload[88] );
+    data->flash.result_pages_drained               = HIL_APPLICATION_Read_U32_Le( &payload[92] );
+    data->flash.result_bytes_drained               = HIL_APPLICATION_Read_U64_Le( &payload[96] );
+    data->flash.result_drain_total_cycles          = HIL_APPLICATION_Read_U64_Le( &payload[104] );
+    data->flash.result_drain_maximum_cycles        = HIL_APPLICATION_Read_U32_Le( &payload[112] );
+    data->flash.instruction_pages_refilled         = HIL_APPLICATION_Read_U32_Le( &payload[116] );
+    data->flash.instruction_bytes_refilled         = HIL_APPLICATION_Read_U64_Le( &payload[120] );
+    data->flash.instruction_refill_total_cycles    = HIL_APPLICATION_Read_U64_Le( &payload[128] );
+    data->flash.instruction_refill_maximum_cycles  = HIL_APPLICATION_Read_U32_Le( &payload[136] );
+    data->flash.instruction_publish_sample_count   = HIL_APPLICATION_Read_U32_Le( &payload[140] );
+    data->flash.instruction_publish_total_cycles   = HIL_APPLICATION_Read_U64_Le( &payload[144] );
+    data->flash.instruction_publish_maximum_cycles = HIL_APPLICATION_Read_U32_Le( &payload[152] );
+    data->flash.service_gap_sample_count           = HIL_APPLICATION_Read_U32_Le( &payload[156] );
+    data->flash.service_gap_total_cycles           = HIL_APPLICATION_Read_U64_Le( &payload[160] );
+    data->flash.service_gap_maximum_cycles         = HIL_APPLICATION_Read_U32_Le( &payload[168] );
+    data->flash.refill_drain_contention_count      = HIL_APPLICATION_Read_U32_Le( &payload[172] );
+    data->extension_data.size = payload[HIL_APPLICATION_RUN_REPORT_EXTENSION_LENGTH_OFFSET];
+    data->extension_data.data =
+        extension_size == 0u ? NULL : &payload[HIL_APPLICATION_RUN_REPORT_FIXED_PAYLOAD_SIZE];
+    return HIL_APPLICATION_Run_Report_validate( context, data );
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Run_Report_decode( const HIL_Application_Context_T* context,
+                                   HIL_Application_Run_Report_T* data, const uint8_t* payload,
+                                   size_t payload_size, size_t* consumed_size, uint8_t* storage,
+                                   size_t capacity, size_t* used_storage )
+{
+    if ( data == NULL || consumed_size == NULL || used_storage == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    size_t                   required = 0u;
+    HIL_Application_Status_T status =
+        HIL_APPLICATION_Run_Report_scan( context, payload, payload_size, &required );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    if ( required > capacity || ( required != 0u && storage == NULL ) )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+    status = HIL_APPLICATION_Run_Report_parse( context, data, payload, payload_size );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    if ( required != 0u )
+    {
+        memcpy( storage, data->extension_data.data, required );
+    }
+    data->extension_data.data = required == 0u ? NULL : storage;
+    *consumed_size            = payload_size;
+    *used_storage             = required;
     return HIL_APPLICATION_STATUS_OK;
 }

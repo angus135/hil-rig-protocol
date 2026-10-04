@@ -24,6 +24,7 @@
 #include "hil_rig_protocol/application/application_response.h"
 #include "hil_rig_protocol/application/application_result.h"
 #include "hil_rig_protocol/application/application_rig_status.h"
+#include "hil_rig_protocol/application/application_run_report.h"
 #include "hil_rig_protocol/application/application_system_info.h"
 #include "hil_rig_protocol/application/application_test_config.h"
 
@@ -113,6 +114,8 @@ typedef enum
     HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT = 32,
     /** Firmware-to-Python variable-length captured result for one tick. */
     HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT = 34,
+    /** Firmware-to-host terminal report closing one admitted run's result stream. */
+    HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT = 35,
     /** Firmware-to-Python acceptance/rejection/completion outcome. */
     HIL_APPLICATION_MESSAGE_TYPE_RESPONSE = 48,
     /** Firmware-to-Python broader Application fault report. */
@@ -202,6 +205,8 @@ typedef struct
         HIL_Application_Error_T error;
         /** Body for RIG_STATUS; optional active Test ID, absent when ready. */
         HIL_Application_Rig_Status_T rig_status;
+        /** Body for RUN_REPORT; envelope Test ID required. */
+        HIL_Application_Run_Report_T run_report;
         /** Body for ARBITRARY_CONTROL. */
         HIL_Application_Arbitrary_Control_T arbitrary_control;
         /** Body for ARBITRARY_DATA. */

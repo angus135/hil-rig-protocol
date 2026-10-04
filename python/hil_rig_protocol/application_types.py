@@ -10,6 +10,7 @@ from .transport_types import _validate_integer
 
 _SIZE_MAX = (1 << (8 * _binding.ffi.sizeof("size_t"))) - 1
 _UINT32_MAX = (1 << 32) - 1
+_UINT64_MAX = (1 << 64) - 1
 _UINT16_MAX = (1 << 16) - 1
 
 
@@ -983,6 +984,169 @@ class ArbitraryData:
             _exact("test_id", self.test_id, TestId)
 
 
+class RunOutcome(IntEnum):
+    """Schema-1 RunOutcome assignments; C validates semantic combinations."""
+
+    INVALID = 0x0
+    SUCCESS = 0x1
+    FAILED = 0x2
+    ABORTED = 0x3
+
+
+class ExecutionOutcome(IntEnum):
+    """Schema-1 ExecutionOutcome assignments; C validates semantic combinations."""
+
+    INVALID = 0x0
+    NOT_STARTED = 0x1
+    COMPLETE = 0x2
+    FAILED = 0x3
+    ABORTED = 0x4
+
+
+class RunResultStatus(IntEnum):
+    """Schema-1 RunResultStatus assignments; C validates semantic combinations."""
+
+    INVALID = 0x0
+    COMPLETE = 0x1
+    PARTIAL = 0x2
+    UNAVAILABLE = 0x3
+
+
+class RunReportSection(IntEnum):
+    """Schema-1 RunReportSection assignments; C validates semantic combinations."""
+
+    TERMINAL = 0x1
+    LAST_COMPLETED_BOUNDARY = 0x2
+    ISR_TIMING = 0x4
+    INSTRUCTION_BUFFER = 0x8
+    RESULT_BUFFER = 0x10
+    FLASH_THROUGHPUT = 0x20
+
+
+@dataclass(frozen=True, slots=True)
+class RunIsrTiming:
+    """Executed-boundary IRQ work; zero samples require zero measurements."""
+
+    sample_count: int = 0
+    total_cycles: int = 0
+    minimum_cycles: int = 0
+    maximum_cycles: int = 0
+    maximum_boundary: int = 0
+
+    def __post_init__(self) -> None:
+        _validate_integer("sample_count", self.sample_count, 0, _UINT32_MAX)
+        _validate_integer("total_cycles", self.total_cycles, 0, _UINT64_MAX)
+        _validate_integer("minimum_cycles", self.minimum_cycles, 0, _UINT32_MAX)
+        _validate_integer("maximum_cycles", self.maximum_cycles, 0, _UINT32_MAX)
+        _validate_integer("maximum_boundary", self.maximum_boundary, 0, _UINT32_MAX)
+
+
+@dataclass(frozen=True, slots=True)
+class RunInstructionBuffer:
+    """Unread instruction minima; boundary zero is valid."""
+
+    sample_count: int = 0
+    minimum_unread_bytes: int = 0
+    minimum_boundary: int = 0
+
+    def __post_init__(self) -> None:
+        _validate_integer("sample_count", self.sample_count, 0, _UINT32_MAX)
+        _validate_integer("minimum_unread_bytes", self.minimum_unread_bytes, 0, _UINT32_MAX)
+        _validate_integer("minimum_boundary", self.minimum_boundary, 0, _UINT32_MAX)
+
+
+@dataclass(frozen=True, slots=True)
+class RunResultBuffer:
+    """Record bytes and pending drain pressure, independent of result tick count."""
+
+    committed_record_count: int = 0
+    committed_bytes: int = 0
+    peak_pending_bytes: int = 0
+    peak_pending_boundary: int = 0
+    reserve_failure_count: int = 0
+    commit_failure_count: int = 0
+
+    def __post_init__(self) -> None:
+        _validate_integer("committed_record_count", self.committed_record_count, 0, _UINT32_MAX)
+        _validate_integer("committed_bytes", self.committed_bytes, 0, _UINT32_MAX)
+        _validate_integer("peak_pending_bytes", self.peak_pending_bytes, 0, _UINT32_MAX)
+        _validate_integer("peak_pending_boundary", self.peak_pending_boundary, 0, _UINT32_MAX)
+        _validate_integer("reserve_failure_count", self.reserve_failure_count, 0, _UINT32_MAX)
+        _validate_integer("commit_failure_count", self.commit_failure_count, 0, _UINT32_MAX)
+
+
+@dataclass(frozen=True, slots=True)
+class RunFlashStatistics:
+    """Execution-phase flash diagnostics; durations are cycles and may overlap."""
+
+    result_pages_drained: int = 0
+    result_bytes_drained: int = 0
+    result_drain_total_cycles: int = 0
+    result_drain_maximum_cycles: int = 0
+    instruction_pages_refilled: int = 0
+    instruction_bytes_refilled: int = 0
+    instruction_refill_total_cycles: int = 0
+    instruction_refill_maximum_cycles: int = 0
+    instruction_publish_sample_count: int = 0
+    instruction_publish_total_cycles: int = 0
+    instruction_publish_maximum_cycles: int = 0
+    service_gap_sample_count: int = 0
+    service_gap_total_cycles: int = 0
+    service_gap_maximum_cycles: int = 0
+    refill_drain_contention_count: int = 0
+
+    def __post_init__(self) -> None:
+        _validate_integer("result_pages_drained", self.result_pages_drained, 0, _UINT32_MAX)
+        _validate_integer("result_bytes_drained", self.result_bytes_drained, 0, _UINT64_MAX)
+        _validate_integer(
+            "result_drain_total_cycles", self.result_drain_total_cycles, 0, _UINT64_MAX
+        )
+        _validate_integer(
+            "result_drain_maximum_cycles", self.result_drain_maximum_cycles, 0, _UINT32_MAX
+        )
+        _validate_integer(
+            "instruction_pages_refilled", self.instruction_pages_refilled, 0, _UINT32_MAX
+        )
+        _validate_integer(
+            "instruction_bytes_refilled", self.instruction_bytes_refilled, 0, _UINT64_MAX
+        )
+        _validate_integer(
+            "instruction_refill_total_cycles", self.instruction_refill_total_cycles, 0, _UINT64_MAX
+        )
+        _validate_integer(
+            "instruction_refill_maximum_cycles",
+            self.instruction_refill_maximum_cycles,
+            0,
+            _UINT32_MAX,
+        )
+        _validate_integer(
+            "instruction_publish_sample_count",
+            self.instruction_publish_sample_count,
+            0,
+            _UINT32_MAX,
+        )
+        _validate_integer(
+            "instruction_publish_total_cycles",
+            self.instruction_publish_total_cycles,
+            0,
+            _UINT64_MAX,
+        )
+        _validate_integer(
+            "instruction_publish_maximum_cycles",
+            self.instruction_publish_maximum_cycles,
+            0,
+            _UINT32_MAX,
+        )
+        _validate_integer("service_gap_sample_count", self.service_gap_sample_count, 0, _UINT32_MAX)
+        _validate_integer("service_gap_total_cycles", self.service_gap_total_cycles, 0, _UINT64_MAX)
+        _validate_integer(
+            "service_gap_maximum_cycles", self.service_gap_maximum_cycles, 0, _UINT32_MAX
+        )
+        _validate_integer(
+            "refill_drain_contention_count", self.refill_drain_contention_count, 0, _UINT32_MAX
+        )
+
+
 class StatusOrigin(IntEnum):
     """Whether this snapshot completes GET_STATUS or is an unsolicited notification."""
 
@@ -1042,6 +1206,53 @@ class RigStatus:
         _exact("failure_reason", self.failure_reason, FailureReason)
 
 
+@dataclass(frozen=True, slots=True)
+class RunReport:
+    """Terminal run outcome and statistics; only the opaque extension uses decode storage."""
+
+    test_id: TestId
+    run_outcome: RunOutcome
+    execution_outcome: ExecutionOutcome
+    result_status: RunResultStatus
+    expected_tick_count: int
+    tick_period_us: int
+    schema_version: int = 1
+    valid_sections: int = 1
+    last_completed_boundary: int = 0
+    result_ticks_emitted: int = 0
+    failure_source: FailureSource = FailureSource.NONE
+    failure_stage: FailureStage = FailureStage.NONE
+    failure_reason: FailureReason = FailureReason.NONE
+    isr_timing: RunIsrTiming = RunIsrTiming()
+    instruction_buffer: RunInstructionBuffer = RunInstructionBuffer()
+    result_buffer: RunResultBuffer = RunResultBuffer()
+    flash: RunFlashStatistics = RunFlashStatistics()
+    extension_data: bytes = b""
+
+    def __post_init__(self) -> None:
+        _exact("test_id", self.test_id, TestId)
+        _exact("run_outcome", self.run_outcome, RunOutcome)
+        _exact("execution_outcome", self.execution_outcome, ExecutionOutcome)
+        _exact("result_status", self.result_status, RunResultStatus)
+        _validate_integer("schema_version", self.schema_version, 0, _UINT16_MAX)
+        for name in (
+            "valid_sections",
+            "expected_tick_count",
+            "tick_period_us",
+            "last_completed_boundary",
+            "result_ticks_emitted",
+        ):
+            _validate_integer(name, getattr(self, name), 0, _UINT32_MAX)
+        _exact("failure_source", self.failure_source, FailureSource)
+        _exact("failure_stage", self.failure_stage, FailureStage)
+        _exact("failure_reason", self.failure_reason, FailureReason)
+        _exact("isr_timing", self.isr_timing, RunIsrTiming)
+        _exact("instruction_buffer", self.instruction_buffer, RunInstructionBuffer)
+        _exact("result_buffer", self.result_buffer, RunResultBuffer)
+        _exact("flash", self.flash, RunFlashStatistics)
+        _bytes("extension_data", self.extension_data, maximum=255)
+
+
 type ApplicationMessage = (
     SystemInfoRequest
     | SystemInfoResponse
@@ -1058,10 +1269,20 @@ type ApplicationMessage = (
     | ArbitraryControl
     | ArbitraryData
     | RigStatus
+    | RunReport
 )
 
 
 __all__ = [
+    "RunReport",
+    "RunOutcome",
+    "ExecutionOutcome",
+    "RunResultStatus",
+    "RunReportSection",
+    "RunIsrTiming",
+    "RunInstructionBuffer",
+    "RunResultBuffer",
+    "RunFlashStatistics",
     "RigStatus",
     "StatusOrigin",
     "RigState",

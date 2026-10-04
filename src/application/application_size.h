@@ -208,6 +208,11 @@ HIL_Application_Status_T HIL_APPLICATION_Rig_Status_size( const HIL_Application_
                                                           const HIL_Application_Rig_Status_T* data,
                                                           size_t* encoded_size );
 
+/** Validate and calculate the 177 + E byte report payload. */
+HIL_Application_Status_T HIL_APPLICATION_Run_Report_size( const HIL_Application_Context_T* context,
+                                                          const HIL_Application_Run_Report_T* data,
+                                                          size_t* encoded_size );
+
 #ifdef __cplusplus
 }
 #endif

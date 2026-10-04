@@ -11,6 +11,7 @@ add_executable(hil_rig_protocol_application_tests
     test_application_aligned_records.cpp
     test_application_arbitrary.cpp
     test_application_rig_status.cpp
+    test_application_run_report.cpp
 )
 
 target_compile_features(hil_rig_protocol_application_tests PRIVATE cxx_std_17)

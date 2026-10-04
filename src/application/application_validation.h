@@ -179,6 +179,11 @@ HIL_Application_Status_T
 HIL_APPLICATION_Rig_Status_validate( const HIL_Application_Context_T*    context,
                                      const HIL_Application_Rig_Status_T* data );
 
+/** Validate terminal outcomes, canonical validity sections, boundaries and extension policy. */
+HIL_Application_Status_T
+HIL_APPLICATION_Run_Report_validate( const HIL_Application_Context_T*    context,
+                                     const HIL_Application_Run_Report_T* data );
+
 #ifdef __cplusplus
 }
 #endif

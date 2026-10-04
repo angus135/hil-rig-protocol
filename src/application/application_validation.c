@@ -1054,3 +1054,189 @@ HIL_Application_Status_T HIL_APPLICATION_Failure_validate( HIL_Application_Failu
                ? HIL_APPLICATION_STATUS_OK
                : HIL_APPLICATION_STATUS_VALIDATION_FAILED;
 }
+
+HIL_Application_Status_T
+HIL_APPLICATION_Run_Report_validate( const HIL_Application_Context_T*    context,
+                                     const HIL_Application_Run_Report_T* data )
+{
+    if ( context == NULL || data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( context->initialized == 0u )
+    {
+        return HIL_APPLICATION_STATUS_UNINITIALIZED;
+    }
+    if ( data->schema_version != 1u )
+    {
+        return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
+    }
+    if ( data->run_outcome < HIL_APPLICATION_RUN_OUTCOME_SUCCESS
+         || data->run_outcome > HIL_APPLICATION_RUN_OUTCOME_ABORTED
+         || data->execution_outcome < HIL_APPLICATION_EXECUTION_OUTCOME_NOT_STARTED
+         || data->execution_outcome > HIL_APPLICATION_EXECUTION_OUTCOME_ABORTED
+         || data->result_status < HIL_APPLICATION_RUN_RESULT_STATUS_COMPLETE
+         || data->result_status > HIL_APPLICATION_RUN_RESULT_STATUS_UNAVAILABLE
+         || ( data->valid_sections & ~UINT32_C( 0x3f ) ) != 0u
+         || ( data->valid_sections & HIL_APPLICATION_RUN_REPORT_VALID_TERMINAL ) == 0u
+         || data->expected_tick_count == 0u
+         || data->expected_tick_count > HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT
+         || data->result_ticks_emitted > data->expected_tick_count )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    static const uint32_t periods[]    = HIL_APPLICATION_VALID_TICK_PERIODS_US;
+    int                   valid_period = 0;
+    for ( size_t i = 0u; i < sizeof( periods ) / sizeof( periods[0] ); ++i )
+    {
+        if ( data->tick_period_us == periods[i] )
+        {
+            valid_period = 1;
+            break;
+        }
+    }
+    if ( !valid_period )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    HIL_Application_Status_T status = HIL_APPLICATION_Failure_validate(
+        data->failure_source, data->failure_stage, data->failure_reason );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    if ( data->run_outcome == HIL_APPLICATION_RUN_OUTCOME_SUCCESS )
+    {
+        if ( data->execution_outcome != HIL_APPLICATION_EXECUTION_OUTCOME_COMPLETE
+             || data->result_status != HIL_APPLICATION_RUN_RESULT_STATUS_COMPLETE
+             || data->result_ticks_emitted != data->expected_tick_count
+             || data->failure_reason != HIL_APPLICATION_FAILURE_REASON_NONE )
+        {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+    }
+    else if ( data->failure_reason == HIL_APPLICATION_FAILURE_REASON_NONE )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( ( data->result_status == HIL_APPLICATION_RUN_RESULT_STATUS_COMPLETE
+           && data->result_ticks_emitted != data->expected_tick_count )
+         || ( data->result_status == HIL_APPLICATION_RUN_RESULT_STATUS_PARTIAL
+              && ( data->result_ticks_emitted == 0u
+                   || data->result_ticks_emitted >= data->expected_tick_count ) ) )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->execution_outcome == HIL_APPLICATION_EXECUTION_OUTCOME_NOT_STARTED
+         && ( data->valid_sections != HIL_APPLICATION_RUN_REPORT_VALID_TERMINAL
+              || data->result_ticks_emitted != 0u ) )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( ( data->valid_sections & HIL_APPLICATION_RUN_REPORT_VALID_LAST_COMPLETED_BOUNDARY ) == 0u )
+    {
+        if ( data->last_completed_boundary != 0u )
+        {
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+        }
+    }
+    else if ( data->last_completed_boundary > data->expected_tick_count
+              || ( data->execution_outcome == HIL_APPLICATION_EXECUTION_OUTCOME_COMPLETE
+                   && data->last_completed_boundary != data->expected_tick_count ) )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( ( data->valid_sections & HIL_APPLICATION_RUN_REPORT_VALID_ISR_TIMING ) == 0u
+         && ( data->isr_timing.sample_count | data->isr_timing.total_cycles
+              | data->isr_timing.minimum_cycles | data->isr_timing.maximum_cycles
+              | data->isr_timing.maximum_boundary )
+                != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->isr_timing.maximum_boundary > data->expected_tick_count )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( ( data->valid_sections & HIL_APPLICATION_RUN_REPORT_VALID_INSTRUCTION_BUFFER ) == 0u
+         && ( data->instruction_buffer.sample_count | data->instruction_buffer.minimum_unread_bytes
+              | data->instruction_buffer.minimum_boundary )
+                != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->instruction_buffer.minimum_boundary > data->expected_tick_count )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( ( data->valid_sections & HIL_APPLICATION_RUN_REPORT_VALID_RESULT_BUFFER ) == 0u
+         && ( data->result_buffer.committed_record_count | data->result_buffer.committed_bytes
+              | data->result_buffer.peak_pending_bytes | data->result_buffer.peak_pending_boundary
+              | data->result_buffer.reserve_failure_count
+              | data->result_buffer.commit_failure_count )
+                != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->result_buffer.peak_pending_boundary > data->expected_tick_count )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( ( data->valid_sections & HIL_APPLICATION_RUN_REPORT_VALID_FLASH_THROUGHPUT ) == 0u
+         && ( data->flash.result_pages_drained | data->flash.result_bytes_drained
+              | data->flash.result_drain_total_cycles | data->flash.result_drain_maximum_cycles
+              | data->flash.instruction_pages_refilled | data->flash.instruction_bytes_refilled
+              | data->flash.instruction_refill_total_cycles
+              | data->flash.instruction_refill_maximum_cycles
+              | data->flash.instruction_publish_sample_count
+              | data->flash.instruction_publish_total_cycles
+              | data->flash.instruction_publish_maximum_cycles
+              | data->flash.service_gap_sample_count | data->flash.service_gap_total_cycles
+              | data->flash.service_gap_maximum_cycles | data->flash.refill_drain_contention_count )
+                != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->isr_timing.sample_count == 0u
+         && ( data->isr_timing.total_cycles | data->isr_timing.minimum_cycles
+              | data->isr_timing.maximum_cycles | data->isr_timing.maximum_boundary )
+                != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->instruction_buffer.sample_count == 0u
+         && ( data->instruction_buffer.minimum_unread_bytes
+              | data->instruction_buffer.minimum_boundary )
+                != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->flash.result_pages_drained == 0u
+         && ( data->flash.result_bytes_drained | data->flash.result_drain_total_cycles
+              | data->flash.result_drain_maximum_cycles )
+                != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->flash.instruction_pages_refilled == 0u
+         && ( data->flash.instruction_bytes_refilled | data->flash.instruction_refill_total_cycles
+              | data->flash.instruction_refill_maximum_cycles )
+                != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->flash.instruction_publish_sample_count == 0u
+         && ( data->flash.instruction_publish_total_cycles
+              | data->flash.instruction_publish_maximum_cycles )
+                != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->flash.service_gap_sample_count == 0u
+         && ( data->flash.service_gap_total_cycles | data->flash.service_gap_maximum_cycles )
+                != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    return HIL_APPLICATION_Byte_Span_U8_validate( context, &data->extension_data );
+}

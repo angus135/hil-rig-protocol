@@ -333,6 +333,23 @@ HIL_Application_Status_T HIL_APPLICATION_Rig_Status_decode( HIL_Application_Rig_
                                                             size_t* consumed_size,
                                                             size_t* used_storage );
 
+/** Check schema, exact internal length and extension policy; return only E storage bytes. */
+HIL_Application_Status_T HIL_APPLICATION_Run_Report_scan( const HIL_Application_Context_T* context,
+                                                          const uint8_t*                   payload,
+                                                          size_t  payload_size,
+                                                          size_t* required_storage );
+/** Parse and validate fixed scalars; extension is borrowed for this synchronous call only. */
+HIL_Application_Status_T HIL_APPLICATION_Run_Report_parse( const HIL_Application_Context_T* context,
+                                                           HIL_Application_Run_Report_T*    data,
+                                                           const uint8_t*                   payload,
+                                                           size_t payload_size );
+/** Decode a report, copying only extension bytes into caller-owned storage. */
+HIL_Application_Status_T
+HIL_APPLICATION_Run_Report_decode( const HIL_Application_Context_T* context,
+                                   HIL_Application_Run_Report_T* data, const uint8_t* payload,
+                                   size_t payload_size, size_t* consumed_size, uint8_t* storage,
+                                   size_t capacity, size_t* used_storage );
+
 #ifdef __cplusplus
 }
 #endif

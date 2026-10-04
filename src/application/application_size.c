@@ -383,3 +383,24 @@ HIL_Application_Status_T HIL_APPLICATION_Rig_Status_size( const HIL_Application_
     *encoded_size = HIL_APPLICATION_RIG_STATUS_PAYLOAD_SIZE;
     return HIL_APPLICATION_STATUS_OK;
 }
+
+HIL_Application_Status_T HIL_APPLICATION_Run_Report_size( const HIL_Application_Context_T* context,
+                                                          const HIL_Application_Run_Report_T* data,
+                                                          size_t* encoded_size )
+{
+    if ( encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    HIL_Application_Status_T status = HIL_APPLICATION_Run_Report_validate( context, data );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_RUN_REPORT_FIXED_PAYLOAD_SIZE,
+                                            data->extension_data.size, encoded_size ) )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_LENGTH;
+    }
+    return HIL_APPLICATION_STATUS_OK;
+}

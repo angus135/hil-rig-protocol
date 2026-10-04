@@ -828,6 +828,107 @@ typedef struct
     HIL_Application_Failure_Reason_T failure_reason;
 } HIL_Application_Rig_Status_T;
 
+typedef enum
+{
+    HIL_APPLICATION_RUN_OUTCOME_INVALID = 0x0,
+    HIL_APPLICATION_RUN_OUTCOME_SUCCESS = 0x1,
+    HIL_APPLICATION_RUN_OUTCOME_FAILED = 0x2,
+    HIL_APPLICATION_RUN_OUTCOME_ABORTED = 0x3,
+} HIL_Application_Run_Outcome_T;
+
+typedef enum
+{
+    HIL_APPLICATION_EXECUTION_OUTCOME_INVALID = 0x0,
+    HIL_APPLICATION_EXECUTION_OUTCOME_NOT_STARTED = 0x1,
+    HIL_APPLICATION_EXECUTION_OUTCOME_COMPLETE = 0x2,
+    HIL_APPLICATION_EXECUTION_OUTCOME_FAILED = 0x3,
+    HIL_APPLICATION_EXECUTION_OUTCOME_ABORTED = 0x4,
+} HIL_Application_Execution_Outcome_T;
+
+typedef enum
+{
+    HIL_APPLICATION_RUN_RESULT_STATUS_INVALID = 0x0,
+    HIL_APPLICATION_RUN_RESULT_STATUS_COMPLETE = 0x1,
+    HIL_APPLICATION_RUN_RESULT_STATUS_PARTIAL = 0x2,
+    HIL_APPLICATION_RUN_RESULT_STATUS_UNAVAILABLE = 0x3,
+} HIL_Application_Run_Result_Status_T;
+
+typedef enum
+{
+    HIL_APPLICATION_RUN_REPORT_VALID_TERMINAL = 0x1,
+    HIL_APPLICATION_RUN_REPORT_VALID_LAST_COMPLETED_BOUNDARY = 0x2,
+    HIL_APPLICATION_RUN_REPORT_VALID_ISR_TIMING = 0x4,
+    HIL_APPLICATION_RUN_REPORT_VALID_INSTRUCTION_BUFFER = 0x8,
+    HIL_APPLICATION_RUN_REPORT_VALID_RESULT_BUFFER = 0x10,
+    HIL_APPLICATION_RUN_REPORT_VALID_FLASH_THROUGHPUT = 0x20,
+} HIL_Application_Run_Report_Section_T;
+
+typedef struct
+{
+    uint32_t sample_count;
+    uint64_t total_cycles;
+    uint32_t minimum_cycles;
+    uint32_t maximum_cycles;
+    uint32_t maximum_boundary;
+} HIL_Application_Run_Isr_Timing_T;
+
+typedef struct
+{
+    uint32_t sample_count;
+    uint32_t minimum_unread_bytes;
+    uint32_t minimum_boundary;
+} HIL_Application_Run_Instruction_Buffer_T;
+
+typedef struct
+{
+    uint32_t committed_record_count;
+    uint32_t committed_bytes;
+    uint32_t peak_pending_bytes;
+    uint32_t peak_pending_boundary;
+    uint32_t reserve_failure_count;
+    uint32_t commit_failure_count;
+} HIL_Application_Run_Result_Buffer_T;
+
+typedef struct
+{
+    uint32_t result_pages_drained;
+    uint64_t result_bytes_drained;
+    uint64_t result_drain_total_cycles;
+    uint32_t result_drain_maximum_cycles;
+    uint32_t instruction_pages_refilled;
+    uint64_t instruction_bytes_refilled;
+    uint64_t instruction_refill_total_cycles;
+    uint32_t instruction_refill_maximum_cycles;
+    uint32_t instruction_publish_sample_count;
+    uint64_t instruction_publish_total_cycles;
+    uint32_t instruction_publish_maximum_cycles;
+    uint32_t service_gap_sample_count;
+    uint64_t service_gap_total_cycles;
+    uint32_t service_gap_maximum_cycles;
+    uint32_t refill_drain_contention_count;
+} HIL_Application_Run_Flash_Statistics_T;
+
+typedef struct
+{
+    uint16_t schema_version;
+    HIL_Application_Run_Outcome_T run_outcome;
+    HIL_Application_Execution_Outcome_T execution_outcome;
+    HIL_Application_Run_Result_Status_T result_status;
+    HIL_Application_Failure_Source_T failure_source;
+    HIL_Application_Failure_Stage_T failure_stage;
+    HIL_Application_Failure_Reason_T failure_reason;
+    uint32_t valid_sections;
+    uint32_t expected_tick_count;
+    uint32_t tick_period_us;
+    uint32_t last_completed_boundary;
+    uint32_t result_ticks_emitted;
+    HIL_Application_Run_Isr_Timing_T isr_timing;
+    HIL_Application_Run_Instruction_Buffer_T instruction_buffer;
+    HIL_Application_Run_Result_Buffer_T result_buffer;
+    HIL_Application_Run_Flash_Statistics_T flash;
+    HIL_Application_Byte_Span_T extension_data;
+} HIL_Application_Run_Report_T;
+
 /* application_message.h */
 
 #define HIL_APPLICATION_INSTRUCTION_FLAG_COMPLETE_TICK ...
@@ -876,6 +977,7 @@ typedef enum
     HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL = 20,
     HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT = 32,
     HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT = 34,
+    HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT = 35,
     HIL_APPLICATION_MESSAGE_TYPE_RESPONSE = 48,
     HIL_APPLICATION_MESSAGE_TYPE_ERROR = 49,
     HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS = 50,
@@ -913,6 +1015,7 @@ typedef struct
         HIL_Application_Response_T response;
         HIL_Application_Error_T error;
         HIL_Application_Rig_Status_T rig_status;
+        HIL_Application_Run_Report_T run_report;
         HIL_Application_Arbitrary_Control_T arbitrary_control;
         HIL_Application_Arbitrary_Data_T arbitrary_data;
     } body;

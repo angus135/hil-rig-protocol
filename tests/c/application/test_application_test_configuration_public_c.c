@@ -16,6 +16,9 @@ _Static_assert( HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD == 22,
 _Static_assert( HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL == 64, "arbitrary control type" );
 _Static_assert( HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA == 65, "arbitrary data type" );
 _Static_assert( HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS == 50, "status wire type" );
+_Static_assert( HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT == 35, "report wire type" );
+_Static_assert( sizeof( ( ( HIL_Application_Run_Isr_Timing_T ){ 0 } ).total_cycles ) == 8u,
+                "report total cycle width" );
 _Static_assert( HIL_APPLICATION_GLOBAL_CONTROL_GET_STATUS == 2, "status query command" );
 _Static_assert( sizeof( ( ( HIL_Application_Rig_Status_T ){ 0 } ).schema_version ) == 2u,
                 "status schema width" );

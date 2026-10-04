@@ -21,6 +21,7 @@ from hil_rig_protocol import (
     DigitalInputValue,
     DigitalOutputConfig,
     DigitalOutputValue,
+    ExecutionOutcome,
     GlobalControl,
     GlobalControlCommand,
     PeripheralVoltage,
@@ -32,6 +33,9 @@ from hil_rig_protocol import (
     RigState,
     RigStatus,
     Role,
+    RunOutcome,
+    RunReport,
+    RunResultStatus,
     StatusOrigin,
     TestConfiguration,
     TestId,
@@ -106,6 +110,19 @@ def main() -> None:
         encoded = application_codec.encode(status_message)
         assert application_codec.decode(encoded) == status_message
         print(f"{type(status_message).__name__}: {len(encoded)} bytes, round trip OK")
+
+    report = RunReport(
+        configuration.test_id,
+        RunOutcome.SUCCESS,
+        ExecutionOutcome.COMPLETE,
+        RunResultStatus.COMPLETE,
+        configuration.expected_tick_count,
+        configuration.tick_duration_us.microseconds,
+        result_ticks_emitted=configuration.expected_tick_count,
+    )
+    encoded = application_codec.encode(report)
+    assert application_codec.decode(encoded) == report
+    print(f"RunReport: {len(encoded)} bytes, round trip OK")
 
     # These calls are also the composition boundary for a serviced, connected
     # Transport. Check its status and service delivery using the Transport guide.
