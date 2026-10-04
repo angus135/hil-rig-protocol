@@ -122,16 +122,19 @@ TEST( ApplicationDiscovery, RequestUsesApprovedEightByteLayoutAndExactVersionGat
     EXPECT_EQ( HIL_APPLICATION_Check_Protocol_Version( 1u, HIL_RIG_PROTOCOL_VERSION_MINOR,
                                                        HIL_RIG_PROTOCOL_VERSION_PATCH ),
                HIL_APPLICATION_STATUS_VERSION_MISMATCH );
-    EXPECT_EQ( HIL_APPLICATION_Check_Protocol_Version( HIL_RIG_PROTOCOL_VERSION_MAJOR, 4u,
+    EXPECT_EQ( HIL_APPLICATION_Check_Protocol_Version( HIL_RIG_PROTOCOL_VERSION_MAJOR,
+                                                       HIL_RIG_PROTOCOL_VERSION_MINOR + 1u,
                                                        HIL_RIG_PROTOCOL_VERSION_PATCH ),
                HIL_APPLICATION_STATUS_VERSION_MISMATCH );
     EXPECT_EQ( HIL_APPLICATION_Check_Protocol_Version( HIL_RIG_PROTOCOL_VERSION_MAJOR,
-                                                       HIL_RIG_PROTOCOL_VERSION_MINOR, 0u ),
+                                                       HIL_RIG_PROTOCOL_VERSION_MINOR,
+                                                       HIL_RIG_PROTOCOL_VERSION_PATCH + 1u ),
                HIL_APPLICATION_STATUS_VERSION_MISMATCH );
 
-    auto inconsistent                                                = request;
-    inconsistent.body.system_info_request.application_protocol_patch = 0u;
-    output_size                                                      = 99u;
+    auto inconsistent = request;
+    inconsistent.body.system_info_request.application_protocol_patch =
+        HIL_RIG_PROTOCOL_VERSION_PATCH + 1u;
+    output_size = 99u;
     EXPECT_EQ( HIL_APPLICATION_Encoded_Size( &context, &inconsistent, &output_size ),
                HIL_APPLICATION_STATUS_VERSION_MISMATCH );
     EXPECT_EQ( output_size, 0u );
@@ -154,12 +157,13 @@ TEST( ApplicationDiscovery, ForeignDiscoveryDecodesButBodyMustAgreeWithEnvelope 
     ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &request, encoded.data(), encoded.size(),
                                                &output_size ),
                HIL_APPLICATION_STATUS_OK );
-    encoded[1]  = 4u;
-    encoded[27] = 4u;
+    encoded[1]  = HIL_RIG_PROTOCOL_VERSION_MINOR + 1u;
+    encoded[27] = HIL_RIG_PROTOCOL_VERSION_MINOR + 1u;
     ASSERT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), output_size, &decoded,
                                                nullptr, 0u, &used_storage ),
                HIL_APPLICATION_STATUS_OK );
-    EXPECT_EQ( decoded.body.system_info_request.application_protocol_minor, 4u );
+    EXPECT_EQ( decoded.body.system_info_request.application_protocol_minor,
+               HIL_RIG_PROTOCOL_VERSION_MINOR + 1u );
     EXPECT_EQ( HIL_APPLICATION_Check_Protocol_Version(
                    decoded.body.system_info_request.application_protocol_major,
                    decoded.body.system_info_request.application_protocol_minor,
