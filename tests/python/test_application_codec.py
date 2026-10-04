@@ -5,8 +5,10 @@ from __future__ import annotations
 import copy
 import gc
 import pickle
+import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import fields, is_dataclass, replace
+from pathlib import Path
 
 import hil_rig_protocol as p
 import pytest
@@ -118,6 +120,21 @@ def test_defaults_direction_neutrality_and_statelessness(codec):
     assert codec.config is codec.config
     for name in ("context", "_context", "ffi", "lib", "close", "reset", "__enter__"):
         assert not hasattr(codec, name)
+
+
+def test_documented_construction_matches_native_defaults():
+    """The public setup example must describe the configuration the codec returns."""
+    documentation = (Path(__file__).parents[2] / "docs/python/application.md").read_text()
+    example = documentation.split("```python", 1)[1].split("```", 1)[0]
+    values = {
+        name: int(value.replace("_", ""))
+        for name, value in re.findall(r"(max_\w+)=(\d[\d_]*)", example)
+    }
+    assert p.ApplicationCodec(p.ApplicationConfig(**values)).config == p.ApplicationConfig()
+    native = ffi.new("HIL_Application_Config_T *")
+    assert lib.HIL_APPLICATION_Default_Config(native) == lib.HIL_APPLICATION_STATUS_OK
+    for name, value in values.items():
+        assert getattr(native, name) == value
 
 
 @pytest.mark.parametrize(
