@@ -31,7 +31,9 @@ end
 
 subgraph Integration["Endpoint Protocol Handling"]
     N["Examine the typed message and apply<br/>the Application transaction contract"]
-    O["When required, construct the typed<br/>Response, Error, or next protocol message"]
+    O["Construct Response, Error, Rig Status<br/>or terminal Run Report as required"]
+    Pending["Host correlates one pending standard operation<br/>QUERY_RESPONSE completes GET_STATUS only<br/>NOTIFICATION updates readiness only"]
+    Terminal["Endpoint sends final results, then Run Report<br/>before clearing identity or reporting reset completion"]
 end
 
 Status["For any codec call, handle HIL_Application_Status_T locally<br/>Structural failures are not Application Responses"]
@@ -58,6 +60,8 @@ K --> L
 L --> M
 M --> N
 N --> O
+N --> Pending
+N --> Terminal
 O --> F
 
 Caller -.-> Status
@@ -66,6 +70,6 @@ classDef endpointOwned fill:#e8f1ff,stroke:#2b6cb0,stroke-width:2px,color:#1a365
 classDef applicationOwned fill:#e6fffa,stroke:#2c7a7b,stroke-width:2px,color:#234e52
 classDef transportOwned fill:#fff5f5,stroke:#c53030,stroke-width:2px,color:#742a2a
 
-class Caller,A,C,E,G,L,N,O,Status,OwnerEndpoint endpointOwned
+class Caller,A,C,E,G,L,N,O,Pending,Terminal,Status,OwnerEndpoint endpointOwned
 class B,D,F,H,K,M,OwnerApplication applicationOwned
 class I,Wire,J,OwnerTransport transportOwned

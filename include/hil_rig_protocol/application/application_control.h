@@ -37,8 +37,9 @@ typedef enum
     /**
      * Request execution of a previously accepted complete test.
      *
-     * A COMPLETED Response means firmware performed the start request. Firmware
-     * still owns execution-manager permission and hardware readiness.
+     * Admission establishes one attempt owing a terminal RUN_REPORT, even if
+     * preparation fails before execution. A COMPLETED Response means firmware
+     * performed the start request; rejected START does not establish an attempt.
      */
     HIL_APPLICATION_CONTROL_START = 1,
     /**
@@ -47,6 +48,8 @@ typedef enum
      * A COMPLETED Response means the previous transaction cannot continue
      * normally. A later upload must restart from Test Configuration unless a
      * future protocol version defines resumption.
+     * A wrong Test ID is rejected before acting. For an admitted attempt, any
+     * remaining results and its terminal report precede ABORT COMPLETED.
      */
     HIL_APPLICATION_CONTROL_ABORT = 2,
     /** Reserved sentinel. */
@@ -82,9 +85,11 @@ typedef enum
     /**
      * Clear active Application transaction data and recoverable conditions.
      *
-     * A COMPLETED Response means the requested Application cleanup was
-     * performed. Firmware decides how this maps to internal cleanup and state
-     * changes. Transport is not reset, reconnected, or reinitialized.
+     * COMPLETED means cleanup finished and the rig is ready for a new test.
+     * During execution, reject with OPERATION_NOT_ALLOWED; during a pending
+     * transition, reject with HARDWARE_NOT_READY. Preserve any owed terminal
+     * report before destructive cleanup; enqueue it before RESET COMPLETED,
+     * then notify readiness. Transport remains connected and initialized.
      */
     HIL_APPLICATION_GLOBAL_CONTROL_RESET_APPLICATION = 1,
     /**

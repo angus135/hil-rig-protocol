@@ -1,5 +1,13 @@
 # Examples
 
+[`c/application_codec.c`](c/application_codec.c) demonstrates caller-owned C11
+encode/decode storage for Arbitrary Control/Data, Rig Status and Run Report.
+Build with `HIL_RIG_PROTOCOL_BUILD_EXAMPLES=ON` and run
+`hil_rig_protocol_application_example`. Its byte round trips exercise the
+stateless codec; ping replies, status collection and run execution remain
+endpoint work. The Python equivalent is
+[`python/application_codec.py`](python/application_codec.py).
+
 [`python/transport_servicing.py`](python/transport_servicing.py) demonstrates
 the public Python Transport caller boundary: explicit monotonic time, exact
 receive-prefix consumption, event and opaque Application-data draining, partial

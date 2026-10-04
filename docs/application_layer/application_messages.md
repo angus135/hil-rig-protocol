@@ -487,9 +487,9 @@ is the explicit upload-finalisation request documented above.
 data and recoverable Application protocol conditions. It is available when no
 Test ID is known. Decoding does not perform recovery.
 
-Global Control `COMPLETED` means firmware performed the requested Application
-cleanup. Firmware decides how cleanup maps to its internal state, storage, and
-execution manager. `REJECTED` or `FAILED` means the host cannot assume cleanup.
+Global Control RESET `COMPLETED` means cleanup has finished and the rig is ready
+to accept a new Test Configuration. Firmware owns its internal state, storage,
+and execution manager. `REJECTED` or `FAILED` means the host cannot assume cleanup.
 The command never resets, reconnects, or reinitializes Transport.
 
 ## Rig Status and GET_STATUS
@@ -885,10 +885,11 @@ No codec or Transport failure is implied
 
 ```text
 Python -> Firmware: Execution Control(ABORT, A)
-Firmware performs safe stop/abandonment and cleanup according to its own modules
+Firmware safely stops the admitted attempt and sends any remaining result output
+Firmware -> Python: optional Error(A), then Run Report(A, ABORTED)
 Firmware -> Python: Response(Execution Control ABORT, COMPLETED, A)
 Transaction A cannot continue normally
-Any new upload starts with Test Configuration and a fresh Test ID
+After cleanup/readiness, any new upload uses Configuration and a fresh Test ID
 ```
 
 ### Global reset without Test ID
@@ -913,8 +914,9 @@ Firmware -> Python: Variable Test Result(A, tick 1, OK, zero records,
                                           COMPLETE_TICK)
 ...result ticks continue in increasing order through tick N-1...
 Python successfully completes each tick at its COMPLETE_TICK chunk
-Python considers result transfer complete after tick N-1 completes
-Firmware releases retained results according to its Transport/storage policy
+Firmware -> Python: Run Report(A, SUCCESS, execution COMPLETE, results COMPLETE)
+Python closes the result stream at this report
+Firmware releases retained results, completes cleanup, and notifies readiness
 ```
 
 No Application Response is sent for result chunks. Transport ACKs do not change
@@ -1054,3 +1056,95 @@ start at 1, so maximum_boundary = max_sample_number - 1; first and last boundari
 are covered by codec vectors. Hardware collectors must establish the source
 sample and reject overflow rather than publishing wrapped statistics as valid.
 See the wire table for sampling windows and endpoint provenance mapping.
+
+## Endpoint lifecycle and recovery
+
+These conversations specify firmware/host integration, not operations performed
+by the stateless codec. On a live connection, an admitted START owes exactly one
+logical Run Report. A rejected START owes none. Preserve its Test ID and metadata
+until the report has been retained for output. No result may follow that report.
+Failure after it may produce Error/status with readiness false, never a second
+report. No durable replay or application-level report acknowledgement is added;
+physical loss can prevent delivery. Reconnect requires discovery, status/recovery
+and a fresh upload/ID; do not infer retained data from Transport recovery.
+
+### Terminal ordering
+
+| Scenario | Required rig output and action order |
+| --- | --- |
+| Success | START COMPLETED → ordered results → SUCCESS/COMPLETE Run Report → discard/cleanup → ready NOTIFICATION. |
+| Failure after START admission during preparation | START FAILED → optional Error → FAILED/NOT_STARTED/UNAVAILABLE report with execution sections invalid → fault status. |
+| Execution failure | Any usable prefix results → optional Error → FAILED report with FAILED execution → fault status. |
+| Finalisation or transfer failure | Already emitted results → optional Error → FAILED report, even when execution COMPLETE → fault status. Result availability reflects trustworthiness. |
+| Active host abort | Safe stop → any already committed output → optional Error → ABORTED report → ABORT COMPLETED. Readiness follows cleanup/reset. |
+| Reset during result transfer | Stop admitting new results; preserve in-flight output → owed terminal report → cleanup → RESET COMPLETED → ready NOTIFICATION. |
+
+Normal START admission is distinct from preparation succeeding. Configuration
+rejection, incomplete upload, or a rejected START must not reuse an earlier
+sealed snapshot. Abandoning an upload/armed test before admitted START owes no
+Run Report. The first relevant failure source/reason/stage remains stable;
+subsequent errors do not replace it.
+
+### Reset admission and completion
+
+| Authoritative endpoint condition | RESET_APPLICATION result |
+| --- | --- |
+| Idle and ready | Idempotent COMPLETED. |
+| Stable upload or armed, cleanup can proceed | Discard retained transaction, clean up, then COMPLETED. |
+| Execution active | REJECTED / OPERATION_NOT_ALLOWED; use identified ABORT first. |
+| Transition or cleanup already pending | REJECTED / HARDWARE_NOT_READY; query/retry after progress. |
+| Result transfer, execution stopped | Admit only with terminal-report preservation and ordering above. |
+| Recoverable fault, cleanup complete and flash idle | Admit recovery; COMPLETED only after ready for a new test. |
+| Fault cleanup incomplete or hardware temporarily busy | REJECTED / HARDWARE_NOT_READY; query progress and retry. |
+| Admitted cleanup/recovery later fails | FAILED with a defined Response reason; remain not ready. |
+
+A status snapshot or TRANSPORT ACK cannot prove reset completion. RESET
+COMPLETED is tied to actual ability to admit Configuration immediately: no
+active retained transaction, pending cleanup, flash work or owed terminal/control
+output preventing admission. Execute firmware cleanup through existing endpoint
+mechanisms; no hardware state machine is introduced into this library.
+
+### Recovery conversation examples
+
+```text
+Fault recovery:
+  Rig -> Host: Error(A), Run Report(A, FAILED), Rig Status(NOTIFICATION, FAULT)
+  Host -> Rig: GET_STATUS
+  Rig -> Host: Rig Status(QUERY_RESPONSE, FAULT, RESET_PERMITTED)
+  Host -> Rig: RESET_APPLICATION
+  Rig: recover, discard and finish cleanup
+  Rig -> Host: Response(RESET_APPLICATION, COMPLETED)
+  Rig -> Host: Rig Status(NOTIFICATION, IDLE, READY_FOR_NEW_TEST|RESET_PERMITTED)
+
+Refused reset:
+  Host -> Rig: RESET_APPLICATION during execution
+  Rig -> Host: Response(RESET_APPLICATION, REJECTED, OPERATION_NOT_ALLOWED)
+  Host -> Rig: ABORT(A)
+  Rig -> Host: remaining output, Run Report(A, ABORTED), Response(ABORT, COMPLETED)
+  Host: query readiness and reset when permitted
+
+Wrong identity:
+  Active admitted attempt is A; Host -> Rig: ABORT(B)
+  Rig -> Host: Response(ABORT, REJECTED, INCONSISTENT_TEST_ID, B)
+  Rig: makes no change to A; no report is emitted under B
+
+Late status:
+  Host -> Rig: GET_STATUS; its local wait expires
+  Host: abandon the query before admitting the next standard operation
+  Host -> Rig: RESET_APPLICATION
+  Rig -> Host: late Rig Status(QUERY_RESPONSE)
+  Host: may update displayed state, but does not complete RESET
+  Rig -> Host: Response(RESET_APPLICATION, COMPLETED)
+
+Sequential runs:
+  Complete upload A; START(A); results(A); Run Report(A); cleanup; ready status
+  Fresh upload with B != A; START(B); results(B); Run Report(B); cleanup; ready
+  Neither endpoint attaches retained A measurements to B
+```
+
+Only one standard response-requiring operation is outstanding. A notification
+never completes a query, and arbitrary traffic completes no standard operation.
+Do not issue a new indistinguishable GET_STATUS while an earlier query outcome
+remains ambiguous: abandon/recover first rather than interpreting its late reply
+as a newer query's answer. A caller may use a finite reset deadline while keeping
+Transport serviced; elapsed time does not establish completion or readiness.

@@ -13,9 +13,11 @@ The current design has two public layers:
   results, responses, and errors. Its stateless C codec converts between typed
   data and one complete, architecture-independent Application message. Update
   Instruction and Variable Test Result messages carry bounded chunks; endpoint
-  integrations assemble those chunks across messages. v0.3.0 adds explicit
-  `FINALIZE_TEST_UPLOAD` (Type 22), a 512-byte complete-message ceiling, an
-  eight-chunk per-tick ceiling, and exact version matching without negotiation.
+  integrations assemble those chunks across messages. v0.4.0 retains explicit
+  `FINALIZE_TEST_UPLOAD` (Type 22) and eight chunks per tick, with a 4096-byte
+  default complete-message ceiling, 65535-byte absolute ceiling, u16 record
+  lengths, and exact version matching without negotiation. Terminal Run Reports,
+  queryable Rig Status and arbitrary extension messages complete the codec surface.
 - **Transport Layer** — carries each complete, opaque Application message over
   a caller-owned byte stream. Its facade is designed to own framing, integrity,
   session establishment, ordered reliable delivery, and recovery without
@@ -68,7 +70,7 @@ envelope, bounded encode/decode paths, structural validation, exact System
 Information discovery, and complete codec support for Execution Control,
 Global Control, Test Configuration, Test Instruction, Update Instruction,
 Finalize Test Upload, Test Result, Variable Test Result, Application Response,
-and Application Error.
+Application Error, Run Report, Rig Status, Arbitrary Control and Arbitrary Data.
 Fixed Instruction/Result payloads are 50/39 bytes respectively, with Boolean Digital,
 PWM, configured tick-ceiling, and result-condition validation. Variable Update
 Instruction (Type 21) and Variable Test Result (Type 34) provide sparse peripheral
@@ -79,8 +81,14 @@ variable-message identifiers remain reserved and must not be reused; analogue
 hardware ranges and stateful production conversation orchestration remain
 integration work. Test Configuration has no capture-limit fields; disabled I2C
 configuration is canonical but enabled I2C operation/configuration records are
-explicitly not implemented in v0.3.0. Capture overflow is reported with
+explicitly not implemented in v0.4.0. Capture overflow is reported with
 `PARTIAL` and the stable overflow problem detail.
+
+Run Report terminates each admitted attempt's result stream, including an early
+failure or abort with fewer than N result ticks. Rig Status communicates readiness
+and GET_STATUS query responses. Reset/abort execution and truthful status remain
+endpoint integration duties. This release does not establish MCU support.
+See [v0.4.0 migration and integration handoff](docs/releases/v0.4.0.md).
 
 Public C Application-to-Transport integration now exercises representative and
 maximum Test Configuration messages, fixed Test Instructions from host to rig and Test Results

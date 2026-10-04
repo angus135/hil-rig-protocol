@@ -541,7 +541,9 @@ No additional command exists solely to force firmware into a named state.
 Global `RESET_APPLICATION` remains test-independent and carries no Test ID. It
 requests clearing active Application transaction data and recoverable protocol
 conditions, but never resets or reconnects Transport. Firmware decides how
-reset maps to its own internal state and whether it can be completed.
+reset maps to its own internal state and whether it can be completed. COMPLETED
+requires finished cleanup and readiness for a new test; any owed terminal
+report precedes it. See [reset admission and ordering](application_messages.md#endpoint-lifecycle-and-recovery).
 
 ## Result-transfer completion
 
@@ -621,9 +623,11 @@ reconnect.
 If session loss interrupts result transfer, terminal-report delivery cannot be
 guaranteed and resumption is not defined by this version. The client reports recovery
 is required rather than assuming which results firmware retained.
-`RESET_APPLICATION` likewise ends any guarantee that a pending complete result
-set can be communicated; it remains an Application request and does not reset or
-reconnect Transport.
+`RESET_APPLICATION` may truncate result transfer, but on a live connection any
+owed terminal report must be retained and enqueued before destructive cleanup
+and RESET COMPLETED. Completion means ready for a new test. It remains an
+Application request and does not reset or reconnect Transport. See the
+[endpoint recovery contract](application_messages.md#endpoint-lifecycle-and-recovery).
 
 ## Future firmware integration
 
