@@ -21,6 +21,8 @@ from .application_types import (
     ApplicationMessage,
     ApplicationResponse,
     ApplicationStatus,
+    ArbitraryControl,
+    ArbitraryData,
     BusRole,
     CANConfig,
     CapturedRecord,
@@ -104,6 +106,8 @@ from .transport_types import (
 )
 
 __all__ = [
+    "ArbitraryControl",
+    "ArbitraryData",
     "PeripheralType",
     "LogicalOperation",
     "CapturedRecord",

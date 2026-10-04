@@ -404,6 +404,31 @@ python -m pytest tests/python
 The package build generates CFFI source and compiles it through CMake;
 `bindings/python/build_ffi.py` alone generates C source and does not build the extension.
 
+## Arbitrary endpoint messages
+
+The same immutable records work in both directions. `control_id`, `value` and
+`data_id` are exact unsigned 32-bit Python integers, with no shared enum or
+handler list. `payload` is exact immutable `bytes`; decoded bytes are detached
+from native storage. The optional `test_id` is context for the endpoint handler.
+
+```python
+from hil_rig_protocol import ArbitraryControl, ArbitraryData
+
+ping = ArbitraryControl(control_id=1, value=42)
+reply = ArbitraryData(data_id=1, payload=b"\x2a\x00\x00\x00")
+echo = ArbitraryData(data_id=2, payload=b"\x00\xffhello")
+for message in (ping, reply, echo):
+    assert application_codec.decode(application_codec.encode(message)) == message
+```
+
+The ping and echo IDs are local examples, not protocol assignments. Define
+their meaning, any reply, and correlation in the consuming endpoint code.
+Unknown IDs cause no implicit codec error, reset or standard Application
+Response. Arbitrary replies cannot satisfy START, ABORT, RESET or GET_STATUS.
+Data lengths are limited by the configured complete-message capacity as well
+as the 16-bit payload length. With defaults, a data payload can contain at
+most 4067 bytes; the inspected firmware Application buffer permits 2273.
+
 ## Deferred scope
 
 No test lifecycle, active-test state, role enforcement, tick sequencing,

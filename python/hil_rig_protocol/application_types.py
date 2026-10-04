@@ -887,6 +887,36 @@ class ApplicationErrorMessage:
         _bytes("diagnostic_data", self.diagnostic_data, maximum=255)
 
 
+@dataclass(frozen=True, slots=True)
+class ArbitraryControl:
+    """Endpoint-defined u32 control and value, with optional Test ID context."""
+
+    control_id: int
+    value: int
+    test_id: TestId | None = None
+
+    def __post_init__(self) -> None:
+        _validate_integer("control_id", self.control_id, 0, _UINT32_MAX)
+        _validate_integer("value", self.value, 0, _UINT32_MAX)
+        if self.test_id is not None:
+            _exact("test_id", self.test_id, TestId)
+
+
+@dataclass(frozen=True, slots=True)
+class ArbitraryData:
+    """Endpoint-defined u32 data ID and detached opaque bytes."""
+
+    data_id: int
+    payload: bytes
+    test_id: TestId | None = None
+
+    def __post_init__(self) -> None:
+        _validate_integer("data_id", self.data_id, 0, _UINT32_MAX)
+        _bytes("payload", self.payload)
+        if self.test_id is not None:
+            _exact("test_id", self.test_id, TestId)
+
+
 type ApplicationMessage = (
     SystemInfoRequest
     | SystemInfoResponse
@@ -900,10 +930,14 @@ type ApplicationMessage = (
     | VariableTestResult
     | ApplicationResponse
     | ApplicationErrorMessage
+    | ArbitraryControl
+    | ArbitraryData
 )
 
 
 __all__ = [
+    "ArbitraryControl",
+    "ArbitraryData",
     "PeripheralType",
     "LogicalOperation",
     "CapturedRecord",

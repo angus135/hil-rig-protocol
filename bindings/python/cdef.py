@@ -706,6 +706,19 @@ typedef struct
     HIL_Application_Byte_Span_T diagnostic_data;
 } HIL_Application_Error_T;
 
+/* application_arbitrary.h */
+typedef struct
+{
+    uint32_t control_id;
+    uint32_t value;
+} HIL_Application_Arbitrary_Control_T;
+
+typedef struct
+{
+    uint32_t data_id;
+    HIL_Application_Byte_Span_T payload;
+} HIL_Application_Arbitrary_Data_T;
+
 /* application_message.h */
 
 #define HIL_APPLICATION_INSTRUCTION_FLAG_COMPLETE_TICK ...
@@ -756,6 +769,8 @@ typedef enum
     HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT = 34,
     HIL_APPLICATION_MESSAGE_TYPE_RESPONSE = 48,
     HIL_APPLICATION_MESSAGE_TYPE_ERROR = 49,
+    HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL = 64,
+    HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA = 65,
     HIL_APPLICATION_MESSAGE_TYPE_RESERVED = 255,
     ...
 } HIL_Application_Message_Type_T;
@@ -787,6 +802,8 @@ typedef struct
         HIL_Application_Variable_Test_Result_T variable_test_result;
         HIL_Application_Response_T response;
         HIL_Application_Error_T error;
+        HIL_Application_Arbitrary_Control_T arbitrary_control;
+        HIL_Application_Arbitrary_Data_T arbitrary_data;
     } body;
     ...;
 } HIL_Application_Message_T;

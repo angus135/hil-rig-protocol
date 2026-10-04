@@ -540,6 +540,33 @@ Padding bytes must strictly be zero on the wire. No duplicate `(peripheral_type,
 - **`SPI`**: Channel must be `< 2`. Payload length must be `1..65535` bytes raw captured data, subject to message capacity.
 - **`CAN`**: Channel must be `< 2`. Payload length must be a non-zero multiple of 12 bytes ($12 \times K$). Each frame is 2B `can_id` ($\le 0x7FF$) + 1B `dlc` ($\le 8$) + 8B data + 1B reserved zero.
 
+## Arbitrary endpoint messages
+
+Both families permit an optional envelope Test ID and require subtype `NONE`.
+They work in either direction. Identifiers and values are ordinary unsigned
+integers with no protocol whitelist.
+
+| Type | Payload offset | Width | Field |
+| --- | ---: | ---: | --- |
+| `ARBITRARY_CONTROL` (64) | 0 | 4 | `control_id`, little-endian `uint32_t` |
+| | 4 | 4 | `value`, little-endian `uint32_t` |
+| `ARBITRARY_DATA` (65) | 0 | 4 | `data_id`, little-endian `uint32_t` |
+| | 4 | 2 | `data_length` N, little-endian `uint16_t` |
+| | 6 | N | opaque payload, exactly N bytes |
+
+Control has an eight-byte payload and a 31-byte complete message; it needs no
+decode storage. Data has a `6 + N` byte payload and a `29 + N` byte complete
+message; decoding needs N caller-owned bytes, copied from the input. N may be
+zero. The exact internal length is checked before local policy. N must not
+exceed `max_variable_data_size`, and `29 + N` must fit the context's complete
+message limit and the protocol's 65535-byte absolute ceiling. Thus the
+absolute maximum N is 65506, the default 4096-byte profile permits 4067, and
+an inspected 2302-byte firmware Application buffer permits 2273. The direct
+USB prefix is separate from this Application size.
+
+No payload encoding, alignment, reply, or custom-ID version field is imposed.
+An unknown ID is a valid encoded container and is handled by endpoint code.
+
 ## Application Response
 
 Application Response was introduced in v0.2.0 and remains supported as type 48, subtype `NONE`. Its body
