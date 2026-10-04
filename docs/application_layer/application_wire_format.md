@@ -728,3 +728,116 @@ Define `FailureReason` as explicit values encoded in u16. The table is a semanti
 All other values are reserved in schema 1. NONE requires source/stage NONE. A nonzero reason requires nonzero source/stage. Capture stage at first failure; querying the RSM later when it is already in FAULT cannot recover that stage reliably.
 
 The generic RSM EXTERNAL_REQUEST value does not prove that a Python host sent ABORT. Preserve validated command provenance in the host control state. Use INTERNAL_FAILURE for an unclassified external fault rather than inventing a host action.
+
+## Run Report
+
+
+### Purpose and size
+
+One report closes the result stream of one admitted execution. It describes execution, result delivery by the rig, and the measurements associated with that execution. It is not a per-tick result or a receipt proving that Python stored the data.
+
+The payload consists of a 32-byte header, 144 bytes of fixed statistic fields, and a one-byte extension length followed by 0–255 bytes. Statistic fields are always physically present; validity flags determine whether they mean anything.
+
+- Payload length: **177 + E bytes**.
+- Complete Application message: **200 + E bytes**, maximum **455 bytes**.
+- Additional caller-owned decode storage: **E bytes**, solely for the extension.
+- New messages therefore fit the existing 2302-byte firmware Application capacity without increasing it.
+
+### Header layout
+
+Offsets in this and subsequent report tables are relative to the start of the payload.
+
+| Offset | Width | Field | Meaning |
+|---:|---:|---|---|
+| 0 | 2 | `schema_version` | Exactly 1. |
+| 2 | 1 | `run_outcome` | Overall execution/result outcome through report construction. |
+| 3 | 1 | `execution_outcome` | Whether execution started and how execution ended. |
+| 4 | 1 | `result_status` | COMPLETE, PARTIAL or UNAVAILABLE as defined below. |
+| 5 | 1 | `failure_source` | Stable protocol subsystem identifier. |
+| 6 | 1 | `failure_stage` | Lifecycle stage of the first failure or cancellation. |
+| 7 | 1 | Reserved | Zero. |
+| 8 | 2 | `failure_reason` | Stable reason from the stable failure representation. |
+| 10 | 2 | Reserved | Zero. |
+| 12 | 4 | `valid_sections` | Validity bits from the validity rules below. |
+| 16 | 4 | `expected_tick_count` | Number of requested measurement intervals, N. |
+| 20 | 4 | `tick_period_us` | Nominal configured period for this run; not a calibrated measurement. |
+| 24 | 4 | `last_completed_boundary` | Last fully successful execution boundary, when valid. |
+| 28 | 4 | `result_ticks_emitted` | Number of complete logical result ticks accepted by the rig's ordered output path. |
+
+Enums use these explicit values:
+
+| Enum | Values |
+|---|---|
+| `RunOutcome` | INVALID=0, SUCCESS=1, FAILED=2, ABORTED=3 |
+| `ExecutionOutcome` | INVALID=0, NOT_STARTED=1, COMPLETE=2, FAILED=3, ABORTED=4 |
+| `RunResultStatus` | INVALID=0, COMPLETE=1, PARTIAL=2, UNAVAILABLE=3 |
+
+There is no wire PENDING outcome. A rejected START creates no report. A START admitted by the RSM that subsequently fails during preparation does create a report with `execution_outcome=NOT_STARTED`.
+
+Validate `1 <= expected_tick_count <= HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT`, `result_ticks_emitted <= expected_tick_count`, and a nominal period from the existing supported protocol period set. A valid last boundary must be at most N and must equal N when execution is COMPLETE. NOT_STARTED forbids measurement/last-boundary validity and requires zero emitted ticks. The codec checks widths and these explicit relationships; it does not attempt to prove physical consistency between independently supplied statistics, such as recomputing total cycles from a minimum and maximum.
+
+`SUCCESS` requires execution COMPLETE, result status COMPLETE, `result_ticks_emitted=N`, and no failure. A non-success report carries a nonzero source, stage and reason. An intentional host abort/reset uses the cancellation reason, unless an earlier actual fault already determines the run outcome.
+
+`result_status` describes the usable stream preceding this report:
+
+- **COMPLETE:** N complete logical result ticks were emitted and their stream is trustworthy. Individual ticks may still have the existing per-tick PARTIAL/capture-overflow condition.
+- **PARTIAL:** a trustworthy, contiguous prefix of 1 through N−1 complete result ticks was emitted. Discard an unfinished trailing variable-result tick. Firmware is not required to salvage such a prefix in this implementation.
+- **UNAVAILABLE:** no trustworthy usable stream can be promised. Previously received results may be retained for diagnostics but must not be treated as a valid experiment dataset. `result_ticks_emitted` can be nonzero because it records transmission progress, not trustworthiness.
+
+Increment `result_ticks_emitted` once per fixed result or final variable-result chunk accepted by the output path. Do not increment for an intermediate chunk, staging attempt or retry. Never count records as ticks. A later physical-link failure can still prevent host receipt.
+
+### Statistic layout
+
+| Offset | Width | Field | Existing native source |
+|---:|---:|---|---|
+| 32 | 4 | `isr_timing.sample_count` | Same field in `RunMetadataSnapshot_T`. |
+| 36 | 8 | `isr_timing.total_cycles` | Same field. |
+| 44 | 4 | `isr_timing.minimum_cycles` | Same field. |
+| 48 | 4 | `isr_timing.maximum_cycles` | Same field. |
+| 52 | 4 | `isr_timing.maximum_boundary` | Corrected maximum-sample-to-boundary mapping. |
+| 56 | 4 | `instruction_buffer.sample_count` | Same field. |
+| 60 | 4 | `instruction_buffer.minimum_unread_bytes` | Same field. |
+| 64 | 4 | `instruction_buffer.minimum_boundary` | Same field. |
+| 68 | 4 | `result_buffer.committed_record_count` | Same field. |
+| 72 | 4 | `result_buffer.committed_bytes` | Same field; native record headers plus payload bytes. |
+| 76 | 4 | `result_buffer.peak_pending_bytes` | Same field; committed bytes awaiting NAND drain. |
+| 80 | 4 | `result_buffer.peak_pending_boundary` | Native execution timestamp associated with the peak. |
+| 84 | 4 | `result_buffer.reserve_failure_count` | Same field. |
+| 88 | 4 | `result_buffer.commit_failure_count` | Same field. |
+| 92 | 4 | `flash.result_pages_drained` | `flash_throughput.result_pages_drained`. |
+| 96 | 8 | `flash.result_bytes_drained` | Same native field name. |
+| 104 | 8 | `flash.result_drain_total_cycles` | Same native field name. |
+| 112 | 4 | `flash.result_drain_maximum_cycles` | Same native field name. |
+| 116 | 4 | `flash.instruction_pages_refilled` | Same native field name. |
+| 120 | 8 | `flash.instruction_bytes_refilled` | Same native field name. |
+| 128 | 8 | `flash.instruction_refill_total_cycles` | Same native field name. |
+| 136 | 4 | `flash.instruction_refill_maximum_cycles` | Same native field name. |
+| 140 | 4 | `flash.instruction_publish_sample_count` | Same native field name. |
+| 144 | 8 | `flash.instruction_publish_total_cycles` | Same native field name. |
+| 152 | 4 | `flash.instruction_publish_maximum_cycles` | Same native field name. |
+| 156 | 4 | `flash.service_gap_sample_count` | Same native field name. |
+| 160 | 8 | `flash.service_gap_total_cycles` | Same native field name. |
+| 168 | 4 | `flash.service_gap_maximum_cycles` | Same native field name. |
+| 172 | 4 | `flash.refill_drain_contention_count` | Same native field name. |
+| 176 | 1 | `extension_length` | E, 0–255. |
+| 177 | E | `extension_data` | Opaque bytes; empty in the initial firmware integration. |
+
+Keep full 64-bit totals through CFFI and Python integers. This layout does not include mean values, floating-point durations, host timestamps, calibrated clock estimates, peripheral-specific test scores or duplicate per-tick samples. Hosts can derive those quantities from the supplied data and experiment context.
+
+### Validity, boundaries and sampling windows
+
+Use bits 0–5 respectively for TERMINAL, LAST_COMPLETED_BOUNDARY, ISR_TIMING, INSTRUCTION_BUFFER, RESULT_BUFFER and FLASH_THROUGHPUT. Mask `0x3f` is the complete v1 mask. TERMINAL is mandatory; unknown bits are rejected. Invalid sections and an invalid last boundary must contain all-zero scalar fields, enforced by typed and encoded validation.
+
+Zero is a valid sample value. For a valid ISR section with zero samples, total/minimum/maximum/boundary must be zero. For a valid instruction-buffer section with zero samples, minimum bytes and boundary must be zero. For flash subgroups with zero completed samples/pages, their associated totals and maxima are zero. Do not calculate a mean with a zero divisor.
+
+Boundaries and result ticks are deliberately different:
+
+- N requested intervals execute boundaries **0 through N**.
+- Boundary 0 primes outputs and has no preceding measurement interval.
+- Results use ticks **0 through N−1**, with result tick t associated with measurement boundary t+1.
+- All report fields named `boundary` use the native boundary convention, including `last_completed_boundary=N` on a successful N-interval run when this field is valid.
+- The timer numbers samples starting at 1. Its guarded IRQ records one timing sample per executed boundary, so the current mapping is `maximum_boundary = max_sample_number − 1`, with a nonzero sample number required. Add a regression for the first and last boundary. Guard-rejected IRQs must not increment the sample count.
+
+ISR timing includes the boundary-zero sample and the measured IRQ work before the final context-switch request. It is neither interrupt latency nor a complete jitter distribution. Flash statistics are the execution-phase diagnostic snapshot captured after stopping the execution timer, before later finalisation drains; they are not lifetime NAND totals. Publication timings are components of flash service and must not be summed as independent work without accounting for overlap. Instruction-buffer minima are sampled while unread instructions remain. Keep these definitions in public documentation.
+
+Take statistics only from the admitted execution generation. For NOT_STARTED, clear all measurement validity bits and fields, even if old hardware diagnostic counters are still nonzero. Document and verify collector bounds. If a native counter can overflow within a supported run, detect the overflow and mark its whole section invalid; do not silently wrap or truncate a value and publish it as a valid measurement. Collector overflow detection and hardware sampling are endpoint integration responsibilities; the protocol library does not collect these values.

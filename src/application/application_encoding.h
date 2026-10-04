@@ -232,6 +232,12 @@ HIL_APPLICATION_Rig_Status_encode( const HIL_Application_Context_T*    context,
                                    const HIL_Application_Rig_Status_T* data, size_t capacity,
                                    uint8_t* payload, size_t* used_size );
 
+/** Encode the fixed wire table, zero reserved fields and bounded opaque extension. */
+HIL_Application_Status_T
+HIL_APPLICATION_Run_Report_encode( const HIL_Application_Context_T*    context,
+                                   const HIL_Application_Run_Report_T* data, size_t capacity,
+                                   uint8_t* payload, size_t* used_size );
+
 #ifdef __cplusplus
 }
 #endif

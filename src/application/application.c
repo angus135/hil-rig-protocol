@@ -28,6 +28,9 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Size( const HIL_Application
 {
     switch ( message->type )
     {
+        case HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT:
+            return HIL_APPLICATION_Run_Report_size( context, &message->body.run_report,
+                                                    payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS:
             return HIL_APPLICATION_Rig_Status_size( context, &message->body.rig_status,
                                                     payload_size );
@@ -95,6 +98,9 @@ HIL_APPLICATION_Body_Encode( const HIL_Application_Context_T* context,
 {
     switch ( message->type )
     {
+        case HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT:
+            return HIL_APPLICATION_Run_Report_encode( context, &message->body.run_report,
+                                                      payload_capacity, payload, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS:
             return HIL_APPLICATION_Rig_Status_encode( context, &message->body.rig_status,
                                                       payload_capacity, payload, payload_size );
@@ -164,6 +170,10 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Decode(
 {
     switch ( message->type )
     {
+        case HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT:
+            return HIL_APPLICATION_Run_Report_decode(
+                context, &message->body.run_report, payload, payload_size, consumed_payload_size,
+                decoded_data, max_decoded_data_size, used_decoded_size );
         case HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS:
             return HIL_APPLICATION_Rig_Status_decode( &message->body.rig_status, payload,
                                                       payload_size, consumed_payload_size,
@@ -573,6 +583,10 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
 
     switch ( envelope.type )
     {
+        case HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT:
+            return HIL_APPLICATION_Run_Report_scan(
+                context, &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES], payload_size,
+                required_storage_size );
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
             status = HIL_APPLICATION_Fixed_Body_Validate_Size( envelope.type, payload_size );
             if ( status != HIL_APPLICATION_STATUS_OK )
@@ -748,6 +762,8 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
 
     switch ( message->type )
     {
+        case HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT:
+            return HIL_APPLICATION_Run_Report_validate( context, &message->body.run_report );
         case HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS:
             return HIL_APPLICATION_Rig_Status_validate( context, &message->body.rig_status );
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
@@ -919,6 +935,16 @@ HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
     {
         status = HIL_APPLICATION_Validate_Encoded_System_Info_Response( context, &envelope, payload,
                                                                         payload_size );
+        if ( status != HIL_APPLICATION_STATUS_OK )
+        {
+            *required_decode_storage = 0u;
+        }
+        return status;
+    }
+    if ( envelope.type == HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT )
+    {
+        HIL_Application_Run_Report_T report = { 0 };
+        status = HIL_APPLICATION_Run_Report_parse( context, &report, payload, payload_size );
         if ( status != HIL_APPLICATION_STATUS_OK )
         {
             *required_decode_storage = 0u;

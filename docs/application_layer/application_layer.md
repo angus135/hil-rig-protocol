@@ -95,6 +95,7 @@ This foundation deliberately does not complete every message family. The current
 | Execution Control | Fully supported fixed 5-byte START/ABORT body, including zero reserved flags and required Test ID. |
 | Global Control | Fixed 5-byte RESET_APPLICATION or GET_STATUS body, zero reserved flags, forbidden Test ID. |
 | Rig Status | Fixed 12-byte schema-1 body; optional active Test ID, readiness/failure validation, no decode storage. |
+| Run Report | Schema-1 terminal run/result outcome and statistics, 177 + E payload, required Test ID; only E opaque extension bytes need storage. |
 | Test Result | Fully supported fixed codec family: 39-byte payload / 62-byte complete message, fixed sizing, encode/decode, zero decode storage, Digital/PWM/tick/condition structural validation, and encoded-message validation are implemented. |
 | Update Instruction | Fully supported bounded variable-length chunk family: Type 21 operation records, chunk flags, per-message duplicate checks, sizing, encode/decode, and decode-storage scanning are implemented. |
 | Variable Test Result | Fully supported bounded variable-length chunk family: Type 34 captured records, chunk flags, per-message duplicate checks, sizing, encode/decode, and decode-storage scanning are implemented. |
@@ -297,13 +298,13 @@ record-count field is added, and the existing one-byte operation/record counts
 remain.
 
 No next result tick begins before the current tick reaches `COMPLETE_TICK`.
-Variable result ticks are sent in increasing order. Every configured tick from
-`0` through `expected_tick_count - 1` has a final Type 34 message, and the final
+Variable result ticks are sent in increasing order. A COMPLETE stream contains
+every configured tick from `0` through `expected_tick_count - 1`, and each final
 message may contain zero records for an empty or fault-only result. No
 Application Response is sent for result chunks. Python considers a result tick
-complete only after its `COMPLETE_TICK` chunk; the result stream ends only after
-the final configured tick is complete. Reset, disconnect, or session loss
-discards incomplete result assembly.
+complete only after its `COMPLETE_TICK` chunk. RUN_REPORT closes the result
+stream, including a failed/aborted stream with fewer than N complete ticks.
+Discard an unfinished trailing tick. No results follow the terminal report.
 
 These are endpoint integration rules. The codec remains stateless and enforces
 only per-message validation; it does not assemble chunks or enforce family
@@ -444,7 +445,7 @@ The following table replaces any shared protocol-phase or firmware-state model.
 | FINALIZE_TEST_UPLOAD | Python -> firmware | Active Test ID; Complete Test scope; no tick | Every submitted tick has a positive Tick Response, or accepted sparse configuration has no instruction messages; no incomplete chunk | Complete Test `ACCEPTED` commits the retained upload and makes it eligible for START | `REJECTED`/`FAILED` invalidates the upload; restart from Test Configuration | Whole-test consistency, storage completion, and release of invalid retained data |
 | START | Python -> firmware | Accepted test's Test ID and START command | Complete Test `ACCEPTED` was received for that Test ID | Execution Control START `COMPLETED` means firmware performed the start request | `REJECTED` means execution did not start; `FAILED` requires recovery and the host must not assume execution status | Execution-manager permission, hardware readiness, actual firmware transitions, and whether retry is safe |
 | ABORT | Python -> firmware | Identified active Test ID and ABORT command | A matching upload, accepted test, execution, or result transaction exists | Execution Control ABORT `COMPLETED` means safe stop/abandonment was performed and the previous transaction cannot continue normally; a new upload starts from Test Configuration | `REJECTED` means abort was not performed; `FAILED` requires firmware-specific recovery and no assumed cleanup | Execution-manager transitions, safe stop, retained-data cleanup, and firmware recovery |
-| Test Result or Variable Test Result | Firmware -> Python | Accepted Test ID and zero-based tick | START completed; result family selected; Type 34 chunks remain contiguous | Every configured tick has a final result message; Python completes a Type 34 tick only at `COMPLETE_TICK` | Reset, disconnect, or session loss discards incomplete assembly and reports recovery required | Capture validity, storage/retention mechanics, Transport handoff, and release policy |
+| Test Result or Variable Test Result | Firmware -> Python | Accepted Test ID and zero-based tick | START completed; result family selected; Type 34 chunks remain contiguous | RUN_REPORT closes the complete/partial/unavailable stream; Python completes a Type 34 tick only at `COMPLETE_TICK` | Reset, disconnect, or session loss discards incomplete assembly and reports recovery required | Capture validity, storage/retention mechanics, Transport handoff, and release policy |
 | RESET_APPLICATION | Python -> firmware | No Test ID; Global Control scope | May be requested independently of a known test | Global Control `COMPLETED` means active Application transaction data and recoverable Application protocol conditions were cleared | `REJECTED`/`FAILED` means the host cannot assume cleanup and must follow firmware recovery policy | Mapping to internal firmware state, cleanup, and whether reset can be completed |
 | Application Error | Firmware -> Python | Test ID/tick present only when known and relevant | A broader fault exists rather than rejection of one request | No implicit transaction success; integration interprets category/recoverability | Host chooses recovery from endpoint context and may use ABORT or RESET_APPLICATION; error category and recoverability do not prescribe an action | Error generation, firmware state, hardware response, and diagnostics |
 
@@ -485,7 +486,8 @@ The initial contract is:
 15. For Type 34, firmware sends contiguous chunks for each result tick with
     identical `condition` and `problem_detail`, ending each tick with
     `COMPLETE_TICK`. It sends ticks in increasing order, with a final message
-    for every configured tick; the final message may contain zero records.
+    for every emitted tick; RUN_REPORT then closes the stream and declares its
+    result status. A failed or aborted run may emit fewer than N complete ticks.
 
 There is no Begin Upload or ARM command. `FINALIZE_TEST_UPLOAD` is the explicit
 upload-finalisation request; Complete Test acceptance is endpoint policy; START
@@ -558,13 +560,11 @@ is sent for result chunks; Transport acknowledgement and retransmission remain
 Transport responsibilities. Fragmentation/reassembly is outside the Transport
 MVP.
 
-If execution stops or fails before all ticks execute, firmware still produces
-the remaining result ticks. Each tick without valid execution/capture data uses
-`HIL_APPLICATION_RESULT_CONDITION_EXECUTION_PROBLEM`; all fixed captured-value
-fields remain present for structural consistency but are semantically invalid
-and Python ignores them. A Type 34 fault-only final chunk may contain zero
-records. An Application Error may be sent when the problem is detected, but
-it does not replace any result tick.
+A failed or aborted run may emit fewer than N complete ticks and terminate with
+RUN_REPORT. No synthetic remaining ticks are required. A transmitted tick with
+untrustworthy fixed captures uses EXECUTION_PROBLEM; a fault-only final Type 34
+chunk may have zero records. Errors are diagnostics and never replace the
+terminal report. RUN_REPORT states whether the preceding stream is usable.
 
 Result conditions have exact MVP meanings:
 
@@ -603,11 +603,11 @@ acknowledgement before releasing retained results is Transport and firmware
 policy, not an Application codec rule. The Application design has no per-result
 Response or result-chunk acknowledgement.
 
-Early execution failure does not change result ordering. An Application Error
-may report a problem when detected, but it does not replace or reorder the
-required result set. Incomplete result assembly is discarded on reset,
-disconnect, or session loss; integration reports recovery is required rather
-than claiming normal completion.
+Early failure preserves ordering. RUN_REPORT follows all emitted results and
+closes the stream; no results follow it. Error diagnostics do not replace the
+report. For PARTIAL, retain only complete ticks in the trustworthy prefix and
+discard an unfinished trailing tick. Connection loss gives no report delivery
+guarantee or durable replay; recovery starts with discovery and a status query.
 
 ## Transport session loss
 
@@ -618,8 +618,8 @@ active upload and discards any incomplete instruction chunk assembly; the Python
 host starts a new upload from Test Configuration with a fresh Test ID after
 reconnect.
 
-If session loss interrupts result transfer, the N-result guarantee cannot be
-met and resumption is not defined by this version. The client reports recovery
+If session loss interrupts result transfer, terminal-report delivery cannot be
+guaranteed and resumption is not defined by this version. The client reports recovery
 is required rather than assuming which results firmware retained.
 `RESET_APPLICATION` likewise ends any guarantee that a pending complete result
 set can be communicated; it remains an Application request and does not reset or
@@ -647,9 +647,9 @@ execution manager's authoritative firmware state. This repository must not add
 execution-manager headers, callbacks, state enums, or firmware-specific
 dependencies.
 
-For a successfully started N-tick test, that handler also ensures the selected
-result stream contains a final message for every configured tick, including
-fault-only messages with zero records. For Type 34 it enforces increasing ticks,
+For an admitted run, that handler emits exactly one logical terminal report
+after all results on a live connection. COMPLETE requires N emitted ticks; a
+failed or aborted report may close a shorter stream. For Type 34 it enforces increasing ticks,
 contiguous same-tick chunks, identical condition/problem detail, fixed-state
 pair uniqueness across an assembled tick, and message/record order for repeated
 communication records. Storage, hardware capture, retention, and Transport

@@ -50,22 +50,24 @@ typedef enum
 /**
  * @brief One fixed firmware-to-Python Test Result body.
  *
- * @details The enclosing message carries the test ID. After a successfully
- * started test configured with expected_tick_count N, firmware produces exactly
- * one fixed Test Result for every tick 0 through N - 1. If execution stops or
- * fails early, every remaining tick still has a fixed result with condition
- * EXECUTION_PROBLEM. An Application Error may report the problem when detected,
- * but never replaces this complete fixed result set. Transport/session loss,
- * reset, or inability to communicate is the exception: integration cannot
- * guarantee completion and reports that recovery is required. The codec
- * documents but does not enforce these transaction rules.
+ * @details The enclosing message carries the test ID. A COMPLETE run result
+ * stream has one fixed
+ * result for every tick 0 through N - 1. Failed/aborted
+ * runs may emit fewer complete ticks and
+ * close with RUN_REPORT; no results
+ * follow that report. Its result status declares stream
+ * trustworthiness.
+ * Errors are diagnostics and never replace the terminal report. Session loss
  *
- * digital_inputs, analog_inputs, and pwm_inputs are inline fixed-size arrays.
- * Index i maps deterministically to logical input channel i; no channel IDs,
- * counts, sparse entries, duplicates, or omitted-channel structures exist.
- * The analogue array has exactly one value slot per physical analogue input;
- * each configured input contributes one sample in this fixed result at the test
- * tick rate. Multi-sample/higher-rate analogue capture is deferred.
+ * prevents a delivery guarantee and requires discovery/status/recovery before
+ * a fresh upload.
+ * The codec does not enforce these endpoint ordering rules.
+ * digital_inputs, analog_inputs, and
+ * pwm_inputs are inline fixed-size arrays. Index i maps deterministically to logical input channel
+ * i; no channel IDs, counts, sparse entries, duplicates, or omitted-channel structures exist. The
+ * analogue array has exactly one value slot per physical analogue input; each configured input
+ * contributes one sample in this fixed result at the test tick rate. Multi-sample/higher-rate
+ * analogue capture is deferred.
  *
  * @par Fixed wire layout
  * The fixed payload is exactly 39 bytes: tick_number at offset 0 as uint32_t
@@ -104,8 +106,8 @@ typedef enum
  * stop-and-wait acknowledgement. Transport owns delivery acknowledgement and
  * retransmission. Future pipelining, interleaving, ranges, declaration-based
  * variable-result delivery, or out-of-order result delivery require a versioned
- * extension. The initial protocol has no result-finalization or result-summary
- * message.
+ * extension. RUN_REPORT closes the result stream, with no per-result Response.
+ * Failed/aborted runs may terminate with fewer than N complete result ticks.
  */
 typedef struct
 {
