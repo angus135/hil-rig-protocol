@@ -87,6 +87,12 @@ typedef enum
      * changes. Transport is not reset, reconnected, or reinitialized.
      */
     HIL_APPLICATION_GLOBAL_CONTROL_RESET_APPLICATION = 1,
+    /**
+     * Read readiness without changing endpoint state, after compatible discovery.
+     * Success produces one RIG_STATUS with QUERY_RESPONSE origin, with no extra
+     * success Response. Failure uses a Global Control Response echoing GET_STATUS.
+     */
+    HIL_APPLICATION_GLOBAL_CONTROL_GET_STATUS = 2,
     /** Reserved sentinel. */
     HIL_APPLICATION_GLOBAL_CONTROL_RESERVED = 255
 } HIL_Application_Global_Control_Command_T;

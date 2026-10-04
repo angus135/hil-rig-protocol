@@ -997,3 +997,40 @@ HIL_Application_Status_T HIL_APPLICATION_Error_encode( const HIL_Application_Con
     *used_size = payload_size;
     return HIL_APPLICATION_STATUS_OK;
 }
+
+HIL_Application_Status_T
+HIL_APPLICATION_Rig_Status_encode( const HIL_Application_Context_T*    context,
+                                   const HIL_Application_Rig_Status_T* data, size_t capacity,
+                                   uint8_t* payload, size_t* used_size )
+{
+    if ( payload == NULL || used_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    HIL_Application_Status_T status = HIL_APPLICATION_Rig_Status_validate( context, data );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    if ( capacity < HIL_APPLICATION_RIG_STATUS_PAYLOAD_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+    uint8_t origin, state, source, stage;
+    if ( !HIL_APPLICATION_Enum_To_U8( data->origin, &origin )
+         || !HIL_APPLICATION_Enum_To_U8( data->state, &state )
+         || !HIL_APPLICATION_Enum_To_U8( data->failure_source, &source )
+         || !HIL_APPLICATION_Enum_To_U8( data->failure_stage, &stage ) )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    HIL_APPLICATION_Write_U16_Le( payload, data->schema_version );
+    payload[2] = origin;
+    payload[3] = state;
+    HIL_APPLICATION_Write_U32_Le( &payload[4], data->flags );
+    payload[8] = source;
+    payload[9] = stage;
+    HIL_APPLICATION_Write_U16_Le( &payload[10], ( uint16_t )data->failure_reason );
+    *used_size = HIL_APPLICATION_RIG_STATUS_PAYLOAD_SIZE;
+    return HIL_APPLICATION_STATUS_OK;
+}

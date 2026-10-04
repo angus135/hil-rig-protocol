@@ -17,6 +17,7 @@ from ._application_conversion import (
     _read_finalize_test_upload,
     _read_global_control,
     _read_response,
+    _read_rig_status,
     _read_system_info_request,
     _read_system_info_response,
     _read_test_configuration,
@@ -31,6 +32,7 @@ from ._application_conversion import (
     _write_finalize_test_upload,
     _write_global_control,
     _write_response,
+    _write_rig_status,
     _write_system_info_request,
     _write_system_info_response,
     _write_test_configuration,
@@ -52,6 +54,7 @@ from .application_types import (
     FinalizeTestUpload,
     GlobalControl,
     ProtocolVersion,
+    RigStatus,
     SystemInfoRequest,
     SystemInfoResponse,
     TestConfiguration,
@@ -221,6 +224,12 @@ def _build_message(message: ApplicationMessage) -> tuple[Any, list[Any]]:
         native.subtype = _binding.lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
         native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_ERROR
         owners = _write_error(message, native.body.error)
+    elif type(message) is RigStatus:
+        if message.test_id is not None:
+            native.has_test_id = 1
+            native.test_id.bytes = message.test_id.bytes
+        native.type = _binding.lib.HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS
+        owners = _write_rig_status(message, native.body.rig_status)
     elif type(message) is ArbitraryControl:
         native.has_test_id = int(message.test_id is not None)
         if message.test_id is not None:
@@ -282,6 +291,7 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
         lib.HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT,
         lib.HIL_APPLICATION_MESSAGE_TYPE_RESPONSE,
         lib.HIL_APPLICATION_MESSAGE_TYPE_ERROR,
+        lib.HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS,
         lib.HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL,
         lib.HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA,
     )
@@ -343,6 +353,20 @@ def _read_message(native: Any, storage: Any, capacity: int) -> ApplicationMessag
         if capacity != 0:
             raise ApplicationBindingError("native fixed message unexpectedly used decode storage")
         return _read_global_control(native.body.global_control)
+    if native.type == lib.HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS:
+        if (
+            native.has_test_id not in (0, 1)
+            or native.subtype != lib.HIL_APPLICATION_MESSAGE_SUBTYPE_NONE
+        ):
+            raise ApplicationBindingError("native decoder returned an inconsistent status envelope")
+        if capacity != 0:
+            raise ApplicationBindingError("native fixed message unexpectedly used decode storage")
+        test_id = (
+            TestId(bytes(_binding.ffi.buffer(native.test_id.bytes, 16)))
+            if native.has_test_id
+            else None
+        )
+        return _read_rig_status(test_id, native.body.rig_status)
     if native.type in (
         lib.HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL,
         lib.HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA,
@@ -465,6 +489,7 @@ class ApplicationCodec:
             ApplicationErrorMessage,
             ArbitraryControl,
             ArbitraryData,
+            RigStatus,
         ):
             raise TypeError("message is not a supported Application message value")
         with _binding_boundary():

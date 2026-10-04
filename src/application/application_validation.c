@@ -749,7 +749,8 @@ HIL_APPLICATION_Global_Control_validate( const HIL_Application_Context_T*       
     {
         return HIL_APPLICATION_STATUS_UNINITIALIZED;
     }
-    if ( data->command != HIL_APPLICATION_GLOBAL_CONTROL_RESET_APPLICATION )
+    if ( data->command != HIL_APPLICATION_GLOBAL_CONTROL_RESET_APPLICATION
+         && data->command != HIL_APPLICATION_GLOBAL_CONTROL_GET_STATUS )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
@@ -759,6 +760,43 @@ HIL_APPLICATION_Global_Control_validate( const HIL_Application_Context_T*       
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
     return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T
+HIL_APPLICATION_Rig_Status_validate( const HIL_Application_Context_T*    context,
+                                     const HIL_Application_Rig_Status_T* data )
+{
+    if ( context == NULL || data == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( context->initialized == 0u )
+    {
+        return HIL_APPLICATION_STATUS_UNINITIALIZED;
+    }
+    if ( data->schema_version != 1u )
+    {
+        return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
+    }
+    if ( ( data->origin != HIL_APPLICATION_STATUS_ORIGIN_QUERY_RESPONSE
+           && data->origin != HIL_APPLICATION_STATUS_ORIGIN_NOTIFICATION )
+         || data->state < HIL_APPLICATION_RIG_STATE_INITIALISING
+         || data->state > HIL_APPLICATION_RIG_STATE_FAULT
+         || ( data->flags & ~UINT32_C( 0x0f ) ) != 0u )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( ( data->flags & HIL_APPLICATION_RIG_STATUS_READY_FOR_NEW_TEST ) != 0u
+         && ( data->state != HIL_APPLICATION_RIG_STATE_IDLE
+              || data->flags
+                     != ( HIL_APPLICATION_RIG_STATUS_READY_FOR_NEW_TEST
+                          | HIL_APPLICATION_RIG_STATUS_RESET_PERMITTED )
+              || data->failure_reason != HIL_APPLICATION_FAILURE_REASON_NONE ) )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    return HIL_APPLICATION_Failure_validate( data->failure_source, data->failure_stage,
+                                             data->failure_reason );
 }
 
 HIL_Application_Status_T
@@ -912,7 +950,8 @@ HIL_APPLICATION_Response_validate( const HIL_Application_Context_T*  context,
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
     if ( data->global_control_command != HIL_APPLICATION_GLOBAL_CONTROL_INVALID
-         && data->global_control_command != HIL_APPLICATION_GLOBAL_CONTROL_RESET_APPLICATION )
+         && data->global_control_command != HIL_APPLICATION_GLOBAL_CONTROL_RESET_APPLICATION
+         && data->global_control_command != HIL_APPLICATION_GLOBAL_CONTROL_GET_STATUS )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
@@ -947,4 +986,71 @@ HIL_Application_Status_T HIL_APPLICATION_Error_validate( const HIL_Application_C
         return HIL_APPLICATION_STATUS_INCONSISTENT_TICK;
     }
     return HIL_APPLICATION_Byte_Span_U8_validate( context, &data->diagnostic_data );
+}
+
+/** Validate defined schema-1 provenance without inferring endpoint state. */
+HIL_Application_Status_T HIL_APPLICATION_Failure_validate( HIL_Application_Failure_Source_T source,
+                                                           HIL_Application_Failure_Stage_T  stage,
+                                                           HIL_Application_Failure_Reason_T reason )
+{
+    if ( source < HIL_APPLICATION_FAILURE_SOURCE_NONE
+         || source > HIL_APPLICATION_FAILURE_SOURCE_EXECUTION_TIMER
+         || stage < HIL_APPLICATION_FAILURE_STAGE_NONE
+         || stage > HIL_APPLICATION_FAILURE_STAGE_CLEANUP )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    switch ( reason )
+    {
+        case HIL_APPLICATION_FAILURE_REASON_NONE:
+        case HIL_APPLICATION_FAILURE_REASON_HOST_ABORT:
+        case HIL_APPLICATION_FAILURE_REASON_APPLICATION_RESET:
+        case HIL_APPLICATION_FAILURE_REASON_INVALID_LIFECYCLE_STATE:
+        case HIL_APPLICATION_FAILURE_REASON_HARDWARE_NOT_READY:
+        case HIL_APPLICATION_FAILURE_REASON_CONFIGURATION_UNAVAILABLE:
+        case HIL_APPLICATION_FAILURE_REASON_DRIVER_CONFIGURATION_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_DRIVER_CONFIGURATION_TIMEOUT:
+        case HIL_APPLICATION_FAILURE_REASON_DRIVER_START_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_DRIVER_START_TIMEOUT:
+        case HIL_APPLICATION_FAILURE_REASON_DRIVER_STOP_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_DRIVER_STOP_TIMEOUT:
+        case HIL_APPLICATION_FAILURE_REASON_ACQUISITION_EPOCH_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_EXECUTION_TIMER_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_EXECUTION_NOT_PREPARED:
+        case HIL_APPLICATION_FAILURE_REASON_INSTRUCTION_UNDERRUN:
+        case HIL_APPLICATION_FAILURE_REASON_INSTRUCTION_CORRUPT:
+        case HIL_APPLICATION_FAILURE_REASON_INSTRUCTION_LATE:
+        case HIL_APPLICATION_FAILURE_REASON_OPERATION_REJECTED:
+        case HIL_APPLICATION_FAILURE_REASON_INSTRUCTION_CONSUME_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_MEASUREMENT_REJECTED:
+        case HIL_APPLICATION_FAILURE_REASON_INSTRUCTION_UNCONSUMED:
+        case HIL_APPLICATION_FAILURE_REASON_FLASH_PREPARATION_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_FLASH_PREPARATION_TIMEOUT:
+        case HIL_APPLICATION_FAILURE_REASON_FLASH_FINALISATION_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_FLASH_FINALISATION_TIMEOUT:
+        case HIL_APPLICATION_FAILURE_REASON_RESULT_TRANSFER_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_RESULT_DISPOSITION_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_FLASH_MANAGER_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_HOST_RESPONSE_BLOCKED:
+        case HIL_APPLICATION_FAILURE_REASON_INSTRUCTION_UPLOAD_TIMEOUT:
+        case HIL_APPLICATION_FAILURE_REASON_USB_INITIALISATION_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_CODEC_INITIALISATION_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_TRANSPORT_INITIALISATION_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_HOST_INTERFACE_FAILED:
+        case HIL_APPLICATION_FAILURE_REASON_INTERNAL_FAILURE:
+            break;
+        default:
+            return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( reason == HIL_APPLICATION_FAILURE_REASON_NONE )
+    {
+        return source == HIL_APPLICATION_FAILURE_SOURCE_NONE
+                       && stage == HIL_APPLICATION_FAILURE_STAGE_NONE
+                   ? HIL_APPLICATION_STATUS_OK
+                   : HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    return source != HIL_APPLICATION_FAILURE_SOURCE_NONE
+                   && stage != HIL_APPLICATION_FAILURE_STAGE_NONE
+               ? HIL_APPLICATION_STATUS_OK
+               : HIL_APPLICATION_STATUS_VALIDATION_FAILED;
 }

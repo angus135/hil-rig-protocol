@@ -586,7 +586,7 @@ TEST( ApplicationControls, RejectReservedCommandsAndNonzeroFlags )
     ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &global, encoded.data(), encoded.size(),
                                                &output_size ),
                HIL_APPLICATION_STATUS_OK );
-    encoded[23]  = 2u;
+    encoded[23]  = 3u;
     used_storage = 99u;
     EXPECT_EQ( HIL_APPLICATION_Decode_Message( &context, encoded.data(), output_size, &decoded,
                                                nullptr, 0u, &used_storage ),

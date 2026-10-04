@@ -53,6 +53,9 @@ HIL_APPLICATION_Fixed_Body_Validate_Size( HIL_Application_Message_Type_T type, s
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
             expected_size = HIL_APPLICATION_RESPONSE_FIXED_PAYLOAD_SIZE;
             break;
+        case HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS:
+            expected_size = HIL_APPLICATION_RIG_STATUS_PAYLOAD_SIZE;
+            break;
         case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL:
             expected_size = HIL_APPLICATION_ARBITRARY_CONTROL_PAYLOAD_SIZE;
             break;
@@ -1362,5 +1365,36 @@ HIL_APPLICATION_Error_decode( const HIL_Application_Context_T* context,
     }
     *payload_size      = max_payload_size;
     *used_decoded_size = span_decoded;
+    return HIL_APPLICATION_STATUS_OK;
+}
+
+HIL_Application_Status_T HIL_APPLICATION_Rig_Status_decode( HIL_Application_Rig_Status_T* data,
+                                                            const uint8_t*                payload,
+                                                            size_t  payload_size,
+                                                            size_t* consumed_size,
+                                                            size_t* used_storage )
+{
+    if ( data == NULL || payload == NULL || consumed_size == NULL || used_storage == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    if ( payload_size != HIL_APPLICATION_RIG_STATUS_PAYLOAD_SIZE )
+    {
+        return HIL_APPLICATION_STATUS_MALFORMED_MESSAGE;
+    }
+    data->schema_version = HIL_APPLICATION_Read_U16_Le( payload );
+    if ( data->schema_version != 1u )
+    {
+        return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
+    }
+    data->origin         = ( HIL_Application_Status_Origin_T )payload[2];
+    data->state          = ( HIL_Application_Rig_State_T )payload[3];
+    data->flags          = HIL_APPLICATION_Read_U32_Le( &payload[4] );
+    data->failure_source = ( HIL_Application_Failure_Source_T )payload[8];
+    data->failure_stage  = ( HIL_Application_Failure_Stage_T )payload[9];
+    data->failure_reason =
+        ( HIL_Application_Failure_Reason_T )HIL_APPLICATION_Read_U16_Le( &payload[10] );
+    *consumed_size = payload_size;
+    *used_storage  = 0u;
     return HIL_APPLICATION_STATUS_OK;
 }

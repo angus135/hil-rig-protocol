@@ -226,6 +226,12 @@ HIL_Application_Status_T HIL_APPLICATION_Error_encode( const HIL_Application_Con
                                                        size_t max_payload_size, uint8_t* payload,
                                                        size_t* used_size );
 
+/** Encode validated status fields explicitly, without native-layout dependence. */
+HIL_Application_Status_T
+HIL_APPLICATION_Rig_Status_encode( const HIL_Application_Context_T*    context,
+                                   const HIL_Application_Rig_Status_T* data, size_t capacity,
+                                   uint8_t* payload, size_t* used_size );
+
 #ifdef __cplusplus
 }
 #endif

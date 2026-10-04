@@ -15,6 +15,13 @@ from hil_rig_protocol import (
 EXPECTED_EXPORTS = {
     "ArbitraryControl",
     "ArbitraryData",
+    "RigStatus",
+    "StatusOrigin",
+    "RigState",
+    "RigStatusFlag",
+    "FailureSource",
+    "FailureStage",
+    "FailureReason",
     "PeripheralType",
     "LogicalOperation",
     "CapturedRecord",

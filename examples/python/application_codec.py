@@ -21,13 +21,18 @@ from hil_rig_protocol import (
     DigitalInputValue,
     DigitalOutputConfig,
     DigitalOutputValue,
+    GlobalControl,
+    GlobalControlCommand,
     PeripheralVoltage,
     PWMInputConfig,
     PWMInputValue,
     PWMOutputConfig,
     PWMOutputValue,
     ResultCondition,
+    RigState,
+    RigStatus,
     Role,
+    StatusOrigin,
     TestConfiguration,
     TestId,
     TestInstruction,
@@ -90,6 +95,17 @@ def main() -> None:
         encoded = application_codec.encode(arbitrary_message)
         assert application_codec.decode(encoded) == arbitrary_message
         print(f"{type(arbitrary_message).__name__}: {len(encoded)} bytes, round trip OK")
+
+    # Query replies and notifications have distinct origins; host matching is
+    # owned by the consuming application, which serializes pending operations.
+    for status_message in (
+        GlobalControl(GlobalControlCommand.GET_STATUS),
+        RigStatus(StatusOrigin.QUERY_RESPONSE, RigState.IDLE, flags=5),
+        RigStatus(StatusOrigin.NOTIFICATION, RigState.IDLE, flags=5),
+    ):
+        encoded = application_codec.encode(status_message)
+        assert application_codec.decode(encoded) == status_message
+        print(f"{type(status_message).__name__}: {len(encoded)} bytes, round trip OK")
 
     # These calls are also the composition boundary for a serviced, connected
     # Transport. Check its status and service delivery using the Transport guide.

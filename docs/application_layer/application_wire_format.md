@@ -450,7 +450,7 @@ Both current fixed control bodies are five bytes:
 
 The initial protocol requires `flags == 0`. Execution Control requires a Test ID; Global Control
 forbids one. `EXECUTION_CONTROL` is type 19 with subtype NONE: START is 1 and ABORT is 2.
-`GLOBAL_CONTROL` is type 20 with subtype NONE: RESET_APPLICATION is 1. Every control complete message
+`GLOBAL_CONTROL` is type 20 with subtype NONE: RESET_APPLICATION is 1 and GET_STATUS is 2. Every control complete message
 is 28 bytes. Decoding never performs a control. START requires an accepted complete test; ABORT abandons
 the identified operation; RESET_APPLICATION cleans Application state without resetting Transport. The
 actual lifecycle checks and decisions about Application Responses remain endpoint integration work.
@@ -585,7 +585,7 @@ is exactly 13 bytes and requires no decode storage.
 
 The five defined scopes, four defined outcomes, reasons `NONE` through
 `INTERNAL_FAILURE`, execution commands `INVALID`/`START`/`ABORT`, and global
-commands `INVALID`/`RESET_APPLICATION` are structurally valid. Global Control
+commands `INVALID`/`RESET_APPLICATION`/`GET_STATUS` are structurally valid. Global Control
 scope forbids a Test ID; every other scope requires one. The codec does not
 apply a scope/outcome/reason/command/tick compatibility matrix.
 
@@ -633,3 +633,98 @@ See the support
 table in
 [Application Layer codec and transaction design](application_layer.md#current-message-family-implementation-status)
 before treating a payload family as fully operational.
+
+## Rig Status and GET_STATUS
+
+
+`GET_STATUS` retains the existing five-byte Global Control body: command byte 2 followed by four zero flag bytes. Complete size is 28 bytes. A successful query produces exactly one `RIG_STATUS` with origin QUERY_RESPONSE; a failed query produces an existing Global Control Response echoing `GET_STATUS`. There is no additional success Response.
+
+`RIG_STATUS` has a fixed 12-byte payload and a **35-byte complete size**. It needs zero additional decode storage.
+
+| Offset | Width | Field | Definition |
+|---:|---:|---|---|
+| 0 | 2 | `schema_version` | 1. |
+| 2 | 1 | `origin` | QUERY_RESPONSE=1, NOTIFICATION=2; 0 invalid. |
+| 3 | 1 | `state` | Public state enum below. |
+| 4 | 4 | `flags` | Defined bits below; all other bits zero. |
+| 8 | 1 | `failure_source` | Current fault/cancellation source or NONE. |
+| 9 | 1 | `failure_stage` | Current fault/cancellation stage or NONE. |
+| 10 | 2 | `failure_reason` | Stable reason or NONE. |
+
+| State | Value | Meaning and firmware mapping |
+|---|---:|---|
+| INITIALISING | 1 | Host/RSM prerequisites have not been established. |
+| IDLE | 2 | RSM idle; host ownership/output checks still determine readiness. |
+| UPLOADING | 3 | Test package receive. |
+| CONFIGURING | 4 | Configuration and execution preparation before ARMED. |
+| ARMED | 5 | Uploaded test accepted for START. |
+| RUNNING | 6 | Execution active. |
+| FINALISING | 7 | Driver shutdown and result finalisation after execution. |
+| RESULTS_READY | 8 | Results available, transfer not yet started. |
+| TRANSFERRING | 9 | Results and terminal report are being sent. |
+| RECOVERING | 10 | Reset/discard cleanup is progressing. |
+| FAULT | 11 | Latched fault, including fault cleanup until reset. |
+
+State 0 and undefined values are invalid. Map states explicitly rather than casting `RunState_T`. Fault takes precedence; an accepted reset may be reported as RECOVERING while carrying the fault it is clearing.
+
+Flags are READY_FOR_NEW_TEST=`0x01`, TRANSITION_PENDING=`0x02`, RESET_PERMITTED=`0x04`, EXECUTION_ACTIVE=`0x08`. These flags describe the captured instant, not reservations against subsequent state changes.
+
+READY_FOR_NEW_TEST requires IDLE, no active Test ID, no execution/timer activity, no fault, RSM cleanup complete, flash idle, no owned configuration, and no pending terminal report/control completion/old-result output that prevents admitting a fresh upload. READY implies RESET_PERMITTED and excludes TRANSITION_PENDING and EXECUTION_ACTIVE. Enforce these message-local combinations in the codec; verify hardware readiness in firmware.
+
+Use the envelope Test ID only while a transaction remains active. A ready status has no ID. Unsolicited readiness notifications use origin NOTIFICATION, occur after compatible discovery and when readiness changes from false to true, and may be coalesced to the latest truthful status under backpressure. Query replies and terminal reports must not be coalesced away. A query remains authoritative if a notification was missed.
+
+
+## Stable failure representation
+
+
+Use shared failure enums for report and status:
+
+| Enum | Values |
+|---|---|
+| `FailureSource` | NONE=0, RUN_STATE_MANAGER=1, EXECUTION_MANAGER=2, FLASH_MANAGER=3, HOST_INTERFACE=4, DRIVER_LIFECYCLE=5, EXECUTION_TIMER=6 |
+| `FailureStage` | NONE=0, PREPARATION=1, EXECUTION=2, SHUTDOWN=3, FINALISATION=4, TRANSFER=5, CLEANUP=6 |
+
+Define `FailureReason` as explicit values encoded in u16. The table is a semantic mapping, never an enum cast. Prefixes below identify existing native symbols where relevant.
+
+| Wire value | Reason | Native origin / interpretation |
+|---:|---|---|
+| `0x0000` | NONE | No failure. |
+| `0x0001` | HOST_ABORT | Validated protocol ABORT; source HOST_INTERFACE. |
+| `0x0002` | APPLICATION_RESET | Reset cancels a still-open result transaction; source HOST_INTERFACE. |
+| `0x0010` | INVALID_LIFECYCLE_STATE | RSM INVALID_TRANSITION. |
+| `0x0011` | HARDWARE_NOT_READY | RSM LOGIC_EXPANDER_NOT_READY. |
+| `0x0012` | CONFIGURATION_UNAVAILABLE | Same RSM suffix. |
+| `0x0020` | DRIVER_CONFIGURATION_FAILED | RSM DRIVER_CONFIGURATION. |
+| `0x0021` | DRIVER_CONFIGURATION_TIMEOUT | Same RSM suffix. |
+| `0x0022` | DRIVER_START_FAILED | RSM DRIVER_START. |
+| `0x0023` | DRIVER_START_TIMEOUT | Same RSM suffix. |
+| `0x0024` | DRIVER_STOP_FAILED | RSM DRIVER_STOP. |
+| `0x0025` | DRIVER_STOP_TIMEOUT | Same RSM suffix. |
+| `0x0030` | ACQUISITION_EPOCH_FAILED | RSM ACQUISITION_EPOCH. |
+| `0x0031` | EXECUTION_TIMER_FAILED | RSM EXECUTION_TIMER. |
+| `0x0040` | EXECUTION_NOT_PREPARED | Execution Manager NOT_PREPARED. |
+| `0x0041` | INSTRUCTION_UNDERRUN | Same Execution Manager suffix. |
+| `0x0042` | INSTRUCTION_CORRUPT | Same Execution Manager suffix. |
+| `0x0043` | INSTRUCTION_LATE | Same Execution Manager suffix. |
+| `0x0044` | OPERATION_REJECTED | Same Execution Manager suffix. |
+| `0x0045` | INSTRUCTION_CONSUME_FAILED | Execution Manager INSTRUCTION_CONSUME. |
+| `0x0046` | MEASUREMENT_REJECTED | Same Execution Manager suffix. |
+| `0x0047` | INSTRUCTION_UNCONSUMED | Same Execution Manager suffix. |
+| `0x0050` | FLASH_PREPARATION_FAILED | RSM FLASH_EXECUTION_PREPARATION. |
+| `0x0051` | FLASH_PREPARATION_TIMEOUT | RSM FLASH_EXECUTION_PREPARATION_TIMEOUT. |
+| `0x0052` | FLASH_FINALISATION_FAILED | RSM FLASH_RESULT_FINALISATION. |
+| `0x0053` | FLASH_FINALISATION_TIMEOUT | RSM FLASH_RESULT_FINALISATION_TIMEOUT. |
+| `0x0054` | RESULT_TRANSFER_FAILED | RSM FLASH_RESULT_TRANSFER or result producer failure. |
+| `0x0055` | RESULT_DISPOSITION_FAILED | RSM FLASH_RESULT_DISPOSITION. |
+| `0x0056` | FLASH_MANAGER_FAILED | RSM FLASH_MANAGER. |
+| `0x0060` | HOST_RESPONSE_BLOCKED | RSM HOST_INTERFACE_RESPONSE_BLOCKED. |
+| `0x0061` | INSTRUCTION_UPLOAD_TIMEOUT | RSM HOST_INTERFACE_INSTRUCTION_UPLOAD_TIMEOUT. |
+| `0x0062` | USB_INITIALISATION_FAILED | RSM HOST_INTERFACE_USB_INIT. |
+| `0x0063` | CODEC_INITIALISATION_FAILED | RSM HOST_INTERFACE_CODEC_INIT. |
+| `0x0064` | TRANSPORT_INITIALISATION_FAILED | RSM HOST_INTERFACE_TRANSPORT_INIT. |
+| `0x0065` | HOST_INTERFACE_FAILED | RSM HOST_INTERFACE_ERROR. |
+| `0x0070` | INTERNAL_FAILURE | RSM INTERNAL, unmapped internal failure, or external fault without known cancellation provenance. |
+
+All other values are reserved in schema 1. NONE requires source/stage NONE. A nonzero reason requires nonzero source/stage. Capture stage at first failure; querying the RSM later when it is already in FAULT cannot recover that stage reliably.
+
+The generic RSM EXTERNAL_REQUEST value does not prove that a Python host sent ABORT. Preserve validated command provenance in the host control state. Use INTERNAL_FAILURE for an unclassified external fault rather than inventing a host action.
