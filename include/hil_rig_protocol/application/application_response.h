@@ -173,7 +173,12 @@ typedef struct
     uint32_t tick_number;
     /** Execution-command correlation value, including INVALID. */
     HIL_Application_Control_Command_T control_command;
-    /** Global-command correlation value, including INVALID. */
+    /**
+     * Global-command correlation, including INVALID and GET_STATUS.
+     * A failed GET_STATUS uses this Response; success uses one QUERY_RESPONSE
+     * Rig Status and no additional success Response. Notifications do not
+     * complete a query, and a query reply cannot complete RESET_APPLICATION.
+     */
     HIL_Application_Global_Control_Command_T global_control_command;
     /** Integration-defined diagnostic detail; zero when unused. */
     uint32_t detail;

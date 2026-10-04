@@ -51,6 +51,7 @@ There is no Application sequence number. Transport delivery acknowledgement rema
 | `VARIABLE_TEST_RESULT` | 34 |
 | `RESPONSE` | 48 |
 | `ERROR` | 49 |
+| `RIG_STATUS` | 50 |
 | `ARBITRARY_CONTROL` | 64 |
 | `ARBITRARY_DATA` | 65 |
 | `RESERVED` | 255 |
@@ -94,6 +95,7 @@ Presence rules:
 | Test Result | required |
 | Variable Test Result | required |
 | Application Response | required for test scopes; forbidden for Global Control scope |
+| Rig Status | optional active transaction ID; forbidden when READY_FOR_NEW_TEST |
 | Application Error | optional: present for a test-specific fault, absent for a global fault |
 | Arbitrary Control/Data | optional endpoint-defined context |
 
@@ -487,6 +489,30 @@ Global Control `COMPLETED` means firmware performed the requested Application
 cleanup. Firmware decides how cleanup maps to its internal state, storage, and
 execution manager. `REJECTED` or `FAILED` means the host cannot assume cleanup.
 The command never resets, reconnects, or reinitializes Transport.
+
+## Rig Status and GET_STATUS
+
+Rig Status (type 50, subtype NONE) is a captured rig-to-host snapshot, with an
+optional active Test ID. Its fixed 12-byte schema-1 body makes a 35-byte complete
+message and requires no decode storage. See the wire table for origin, public
+state, flags and stable failure provenance. The C codec checks message-local
+readiness combinations; the endpoint establishes hardware and ownership truth.
+
+Global Control GET_STATUS (command 2, zero flags, no Test ID) is a read-only query
+after compatible discovery, including while busy or faulted. Success produces
+exactly one Rig Status with QUERY_RESPONSE origin and no additional success
+Response. Rejection or failure uses the existing Global Control Response echoing
+GET_STATUS. Only one standard response-requiring operation may be outstanding;
+a query reply cannot complete RESET_APPLICATION, and a NOTIFICATION cannot
+complete GET_STATUS. Arbitrary messages do not complete either operation.
+
+READY_FOR_NEW_TEST implies IDLE, RESET_PERMITTED, no active Test ID, no failure,
+and no TRANSITION_PENDING or EXECUTION_ACTIVE flag. The endpoint also verifies
+cleanup complete, flash idle, no retained configuration, and no owed terminal or
+control output that prevents accepting a new upload. Notifications after
+discovery may coalesce to the latest truthful readiness snapshot; solicited query
+replies must be preserved. Query again if a notification was missed. Flags are
+observations at the captured instant, not reservations.
 
 ## Test Result
 

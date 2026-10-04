@@ -326,6 +326,13 @@ HIL_APPLICATION_Error_decode( const HIL_Application_Context_T* context,
                               size_t max_payload_size, size_t* payload_size, uint8_t* decoded_data,
                               size_t max_decoded_data_size, size_t* used_decoded_size );
 
+/** Decode exactly twelve status bytes; no additional storage is used. */
+HIL_Application_Status_T HIL_APPLICATION_Rig_Status_decode( HIL_Application_Rig_Status_T* data,
+                                                            const uint8_t*                payload,
+                                                            size_t  payload_size,
+                                                            size_t* consumed_size,
+                                                            size_t* used_storage );
+
 #ifdef __cplusplus
 }
 #endif

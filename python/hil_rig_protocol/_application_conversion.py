@@ -27,6 +27,9 @@ from .application_types import (
     DigitalOutputValue,
     ErrorCategory,
     ExecutionControl,
+    FailureReason,
+    FailureSource,
+    FailureStage,
     FinalizeTestUpload,
     GlobalControl,
     GlobalControlCommand,
@@ -45,11 +48,14 @@ from .application_types import (
     ResponseReason,
     ResponseScope,
     ResultCondition,
+    RigState,
+    RigStatus,
     SPIBitOrder,
     SPIClockPhase,
     SPIClockPolarity,
     SPIConfig,
     SPIDataWidth,
+    StatusOrigin,
     SystemInfoQuery,
     SystemInfoRequest,
     SystemInfoResponse,
@@ -605,4 +611,31 @@ def _read_test_result(test_id: TestId, native: Any) -> TestResult:
         pwm_inputs=_read_fixed(native.pwm_inputs, _read_pwm_input_value),
         condition=ResultCondition(native.condition),
         problem_detail=int(native.problem_detail),
+    )
+
+
+def _write_rig_status(value: RigStatus, native: Any) -> list[Any]:
+    for name in (
+        "schema_version",
+        "origin",
+        "state",
+        "flags",
+        "failure_source",
+        "failure_stage",
+        "failure_reason",
+    ):
+        setattr(native, name, int(getattr(value, name)))
+    return []
+
+
+def _read_rig_status(test_id: TestId | None, native: Any) -> RigStatus:
+    return RigStatus(
+        origin=StatusOrigin(native.origin),
+        state=RigState(native.state),
+        flags=int(native.flags),
+        test_id=test_id,
+        schema_version=int(native.schema_version),
+        failure_source=FailureSource(native.failure_source),
+        failure_stage=FailureStage(native.failure_stage),
+        failure_reason=FailureReason(native.failure_reason),
     )

@@ -37,6 +37,7 @@ static int HIL_APPLICATION_Message_Type_Is_Defined( HIL_Application_Message_Type
         case HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD:
         case HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT:
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
+        case HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS:
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
         case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL:
         case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA:
@@ -153,6 +154,14 @@ HIL_APPLICATION_Validate_Common_Message_Fields( const HIL_Application_Message_T*
 
     switch ( message->type )
     {
+        case HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS:
+            if ( ( message->body.rig_status.flags & HIL_APPLICATION_RIG_STATUS_READY_FOR_NEW_TEST )
+                     != 0u
+                 && message->has_test_id != 0u )
+            {
+                return HIL_APPLICATION_STATUS_INCONSISTENT_TEST_ID;
+            }
+            return HIL_APPLICATION_STATUS_OK;
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
             if ( message->has_test_id
                  != ( uint8_t )( message->body.response.scope

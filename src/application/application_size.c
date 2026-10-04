@@ -366,3 +366,20 @@ HIL_Application_Status_T HIL_APPLICATION_Error_size( const HIL_Application_Conte
     *encoded_size = total_size;
     return HIL_APPLICATION_STATUS_OK;
 }
+
+HIL_Application_Status_T HIL_APPLICATION_Rig_Status_size( const HIL_Application_Context_T* context,
+                                                          const HIL_Application_Rig_Status_T* data,
+                                                          size_t* encoded_size )
+{
+    if ( encoded_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    HIL_Application_Status_T status = HIL_APPLICATION_Rig_Status_validate( context, data );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    *encoded_size = HIL_APPLICATION_RIG_STATUS_PAYLOAD_SIZE;
+    return HIL_APPLICATION_STATUS_OK;
+}
