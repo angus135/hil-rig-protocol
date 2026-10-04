@@ -1034,3 +1034,85 @@ HIL_APPLICATION_Rig_Status_encode( const HIL_Application_Context_T*    context,
     *used_size = HIL_APPLICATION_RIG_STATUS_PAYLOAD_SIZE;
     return HIL_APPLICATION_STATUS_OK;
 }
+
+HIL_Application_Status_T
+HIL_APPLICATION_Run_Report_encode( const HIL_Application_Context_T*    context,
+                                   const HIL_Application_Run_Report_T* data, size_t capacity,
+                                   uint8_t* payload, size_t* used_size )
+{
+    if ( payload == NULL || used_size == NULL )
+    {
+        return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
+    }
+    size_t                   size   = 0u;
+    HIL_Application_Status_T status = HIL_APPLICATION_Run_Report_size( context, data, &size );
+    if ( status != HIL_APPLICATION_STATUS_OK )
+    {
+        return status;
+    }
+    if ( capacity < size )
+    {
+        return HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL;
+    }
+    uint8_t run_outcome, execution_outcome, result_status, failure_source, failure_stage;
+    if ( !HIL_APPLICATION_Enum_To_U8( data->run_outcome, &run_outcome )
+         || !HIL_APPLICATION_Enum_To_U8( data->execution_outcome, &execution_outcome )
+         || !HIL_APPLICATION_Enum_To_U8( data->result_status, &result_status )
+         || !HIL_APPLICATION_Enum_To_U8( data->failure_source, &failure_source )
+         || !HIL_APPLICATION_Enum_To_U8( data->failure_stage, &failure_stage ) )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    HIL_APPLICATION_Write_U16_Le( &payload[0], data->schema_version );
+    payload[2] = run_outcome;
+    payload[3] = execution_outcome;
+    payload[4] = result_status;
+    payload[5] = failure_source;
+    payload[6] = failure_stage;
+    HIL_APPLICATION_Write_U16_Le( &payload[8], ( uint16_t )data->failure_reason );
+    HIL_APPLICATION_Write_U32_Le( &payload[12], data->valid_sections );
+    HIL_APPLICATION_Write_U32_Le( &payload[16], data->expected_tick_count );
+    HIL_APPLICATION_Write_U32_Le( &payload[20], data->tick_period_us );
+    HIL_APPLICATION_Write_U32_Le( &payload[24], data->last_completed_boundary );
+    HIL_APPLICATION_Write_U32_Le( &payload[28], data->result_ticks_emitted );
+    HIL_APPLICATION_Write_U32_Le( &payload[32], data->isr_timing.sample_count );
+    HIL_APPLICATION_Write_U64_Le( &payload[36], data->isr_timing.total_cycles );
+    HIL_APPLICATION_Write_U32_Le( &payload[44], data->isr_timing.minimum_cycles );
+    HIL_APPLICATION_Write_U32_Le( &payload[48], data->isr_timing.maximum_cycles );
+    HIL_APPLICATION_Write_U32_Le( &payload[52], data->isr_timing.maximum_boundary );
+    HIL_APPLICATION_Write_U32_Le( &payload[56], data->instruction_buffer.sample_count );
+    HIL_APPLICATION_Write_U32_Le( &payload[60], data->instruction_buffer.minimum_unread_bytes );
+    HIL_APPLICATION_Write_U32_Le( &payload[64], data->instruction_buffer.minimum_boundary );
+    HIL_APPLICATION_Write_U32_Le( &payload[68], data->result_buffer.committed_record_count );
+    HIL_APPLICATION_Write_U32_Le( &payload[72], data->result_buffer.committed_bytes );
+    HIL_APPLICATION_Write_U32_Le( &payload[76], data->result_buffer.peak_pending_bytes );
+    HIL_APPLICATION_Write_U32_Le( &payload[80], data->result_buffer.peak_pending_boundary );
+    HIL_APPLICATION_Write_U32_Le( &payload[84], data->result_buffer.reserve_failure_count );
+    HIL_APPLICATION_Write_U32_Le( &payload[88], data->result_buffer.commit_failure_count );
+    HIL_APPLICATION_Write_U32_Le( &payload[92], data->flash.result_pages_drained );
+    HIL_APPLICATION_Write_U64_Le( &payload[96], data->flash.result_bytes_drained );
+    HIL_APPLICATION_Write_U64_Le( &payload[104], data->flash.result_drain_total_cycles );
+    HIL_APPLICATION_Write_U32_Le( &payload[112], data->flash.result_drain_maximum_cycles );
+    HIL_APPLICATION_Write_U32_Le( &payload[116], data->flash.instruction_pages_refilled );
+    HIL_APPLICATION_Write_U64_Le( &payload[120], data->flash.instruction_bytes_refilled );
+    HIL_APPLICATION_Write_U64_Le( &payload[128], data->flash.instruction_refill_total_cycles );
+    HIL_APPLICATION_Write_U32_Le( &payload[136], data->flash.instruction_refill_maximum_cycles );
+    HIL_APPLICATION_Write_U32_Le( &payload[140], data->flash.instruction_publish_sample_count );
+    HIL_APPLICATION_Write_U64_Le( &payload[144], data->flash.instruction_publish_total_cycles );
+    HIL_APPLICATION_Write_U32_Le( &payload[152], data->flash.instruction_publish_maximum_cycles );
+    HIL_APPLICATION_Write_U32_Le( &payload[156], data->flash.service_gap_sample_count );
+    HIL_APPLICATION_Write_U64_Le( &payload[160], data->flash.service_gap_total_cycles );
+    HIL_APPLICATION_Write_U32_Le( &payload[168], data->flash.service_gap_maximum_cycles );
+    HIL_APPLICATION_Write_U32_Le( &payload[172], data->flash.refill_drain_contention_count );
+    payload[7] = 0u;
+    HIL_APPLICATION_Write_U16_Le( &payload[10], 0u );
+    payload[HIL_APPLICATION_RUN_REPORT_EXTENSION_LENGTH_OFFSET] =
+        ( uint8_t )data->extension_data.size;
+    if ( data->extension_data.size != 0u )
+    {
+        memcpy( &payload[HIL_APPLICATION_RUN_REPORT_FIXED_PAYLOAD_SIZE], data->extension_data.data,
+                data->extension_data.size );
+    }
+    *used_size = size;
+    return HIL_APPLICATION_STATUS_OK;
+}

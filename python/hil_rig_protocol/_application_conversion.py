@@ -27,6 +27,7 @@ from .application_types import (
     DigitalOutputValue,
     ErrorCategory,
     ExecutionControl,
+    ExecutionOutcome,
     FailureReason,
     FailureSource,
     FailureStage,
@@ -50,6 +51,13 @@ from .application_types import (
     ResultCondition,
     RigState,
     RigStatus,
+    RunFlashStatistics,
+    RunInstructionBuffer,
+    RunIsrTiming,
+    RunOutcome,
+    RunReport,
+    RunResultBuffer,
+    RunResultStatus,
     SPIBitOrder,
     SPIClockPhase,
     SPIClockPolarity,
@@ -638,4 +646,85 @@ def _read_rig_status(test_id: TestId | None, native: Any) -> RigStatus:
         failure_source=FailureSource(native.failure_source),
         failure_stage=FailureStage(native.failure_stage),
         failure_reason=FailureReason(native.failure_reason),
+    )
+
+
+def _write_run_report(value: RunReport, native: Any) -> list[Any]:
+    native.schema_version = value.schema_version
+    native.run_outcome = value.run_outcome
+    native.execution_outcome = value.execution_outcome
+    native.result_status = value.result_status
+    native.failure_source = value.failure_source
+    native.failure_stage = value.failure_stage
+    native.failure_reason = value.failure_reason
+    native.valid_sections = value.valid_sections
+    native.expected_tick_count = value.expected_tick_count
+    native.tick_period_us = value.tick_period_us
+    native.last_completed_boundary = value.last_completed_boundary
+    native.result_ticks_emitted = value.result_ticks_emitted
+    _write_record(value.isr_timing, native.isr_timing)
+    _write_record(value.instruction_buffer, native.instruction_buffer)
+    _write_record(value.result_buffer, native.result_buffer)
+    _write_record(value.flash, native.flash)
+    native.extension_data.size = len(value.extension_data)
+    if not value.extension_data:
+        return []
+    owner = _binding.ffi.new("uint8_t[]", value.extension_data)
+    native.extension_data.data = owner
+    return [owner]
+
+
+def _read_run_report(test_id: TestId, native: Any, extension_data: bytes) -> RunReport:
+    return RunReport(
+        test_id=test_id,
+        extension_data=extension_data,
+        schema_version=int(native.schema_version),
+        run_outcome=RunOutcome(native.run_outcome),
+        execution_outcome=ExecutionOutcome(native.execution_outcome),
+        result_status=RunResultStatus(native.result_status),
+        failure_source=FailureSource(native.failure_source),
+        failure_stage=FailureStage(native.failure_stage),
+        failure_reason=FailureReason(native.failure_reason),
+        valid_sections=int(native.valid_sections),
+        expected_tick_count=int(native.expected_tick_count),
+        tick_period_us=int(native.tick_period_us),
+        last_completed_boundary=int(native.last_completed_boundary),
+        result_ticks_emitted=int(native.result_ticks_emitted),
+        isr_timing=RunIsrTiming(
+            sample_count=int(native.isr_timing.sample_count),
+            total_cycles=int(native.isr_timing.total_cycles),
+            minimum_cycles=int(native.isr_timing.minimum_cycles),
+            maximum_cycles=int(native.isr_timing.maximum_cycles),
+            maximum_boundary=int(native.isr_timing.maximum_boundary),
+        ),
+        instruction_buffer=RunInstructionBuffer(
+            sample_count=int(native.instruction_buffer.sample_count),
+            minimum_unread_bytes=int(native.instruction_buffer.minimum_unread_bytes),
+            minimum_boundary=int(native.instruction_buffer.minimum_boundary),
+        ),
+        result_buffer=RunResultBuffer(
+            committed_record_count=int(native.result_buffer.committed_record_count),
+            committed_bytes=int(native.result_buffer.committed_bytes),
+            peak_pending_bytes=int(native.result_buffer.peak_pending_bytes),
+            peak_pending_boundary=int(native.result_buffer.peak_pending_boundary),
+            reserve_failure_count=int(native.result_buffer.reserve_failure_count),
+            commit_failure_count=int(native.result_buffer.commit_failure_count),
+        ),
+        flash=RunFlashStatistics(
+            result_pages_drained=int(native.flash.result_pages_drained),
+            result_bytes_drained=int(native.flash.result_bytes_drained),
+            result_drain_total_cycles=int(native.flash.result_drain_total_cycles),
+            result_drain_maximum_cycles=int(native.flash.result_drain_maximum_cycles),
+            instruction_pages_refilled=int(native.flash.instruction_pages_refilled),
+            instruction_bytes_refilled=int(native.flash.instruction_bytes_refilled),
+            instruction_refill_total_cycles=int(native.flash.instruction_refill_total_cycles),
+            instruction_refill_maximum_cycles=int(native.flash.instruction_refill_maximum_cycles),
+            instruction_publish_sample_count=int(native.flash.instruction_publish_sample_count),
+            instruction_publish_total_cycles=int(native.flash.instruction_publish_total_cycles),
+            instruction_publish_maximum_cycles=int(native.flash.instruction_publish_maximum_cycles),
+            service_gap_sample_count=int(native.flash.service_gap_sample_count),
+            service_gap_total_cycles=int(native.flash.service_gap_total_cycles),
+            service_gap_maximum_cycles=int(native.flash.service_gap_maximum_cycles),
+            refill_drain_contention_count=int(native.flash.refill_drain_contention_count),
+        ),
     )

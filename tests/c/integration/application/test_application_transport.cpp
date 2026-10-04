@@ -130,6 +130,71 @@ TEST( ApplicationTransportIntegration, RepresentativeConfigurationEndToEndPreser
     EXPECT_EQ( pair.Host().ReadApplication().status, HIL_TRANSPORT_STATUS_NOT_READY );
 }
 
+/** A caller can close a trustworthy partial result stream with an ordered terminal report. */
+TEST( ApplicationTransportIntegration, PartialResultStreamEndsWithRunReport )
+{
+    TransportPairHarness pair{};
+    ASSERT_NO_FATAL_FAILURE( InitializeAndEstablish( pair ) );
+    HIL_Application_Config_T  config{};
+    HIL_Application_Context_T application{};
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+    ASSERT_EQ( HIL_APPLICATION_Init( &application, &config ), HIL_APPLICATION_STATUS_OK );
+    const auto                result = MakeApplicationResultMessage( 0u );
+    HIL_Application_Message_T report{};
+    report.type                            = HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT;
+    report.has_test_id                     = 1u;
+    report.test_id                         = result.test_id;
+    auto& body                             = report.body.run_report;
+    body.schema_version                    = 1u;
+    body.run_outcome                       = HIL_APPLICATION_RUN_OUTCOME_FAILED;
+    body.execution_outcome                 = HIL_APPLICATION_EXECUTION_OUTCOME_FAILED;
+    body.result_status                     = HIL_APPLICATION_RUN_RESULT_STATUS_PARTIAL;
+    body.failure_source                    = HIL_APPLICATION_FAILURE_SOURCE_EXECUTION_MANAGER;
+    body.failure_stage                     = HIL_APPLICATION_FAILURE_STAGE_EXECUTION;
+    body.failure_reason                    = HIL_APPLICATION_FAILURE_REASON_INSTRUCTION_UNDERRUN;
+    body.valid_sections                    = HIL_APPLICATION_RUN_REPORT_VALID_TERMINAL;
+    body.expected_tick_count               = 2u;
+    body.tick_period_us                    = 1000u;
+    body.result_ticks_emitted              = 1u;
+    const std::array<uint8_t, 3> extension = { 0u, 0xffu, 1u };
+    body.extension_data                    = { extension.data(), 3u };
+    const std::array<const HIL_Application_Message_T*, 2> messages = { &result, &report };
+    for ( const HIL_Application_Message_T* message : messages )
+    {
+        size_t size = 0u;
+        ASSERT_EQ( HIL_APPLICATION_Encoded_Size( &application, message, &size ),
+                   HIL_APPLICATION_STATUS_OK );
+        std::vector<uint8_t> wire( size );
+        ASSERT_EQ( HIL_APPLICATION_Encode_Message( &application, message, wire.data(), wire.size(),
+                                                   &size ),
+                   HIL_APPLICATION_STATUS_OK );
+        std::vector<uint8_t> delivered;
+        ASSERT_NO_FATAL_FAILURE( DeliverApplicationAndConfirm(
+            pair, TransportTestDirection::RigToHost, wire, delivered ) );
+        EXPECT_EQ( delivered, wire );
+        HIL_Application_Message_T decoded{};
+        size_t                    required = 0u, used = 0u;
+        ASSERT_EQ( HIL_APPLICATION_Validate_Encoded_Message( &application, delivered.data(),
+                                                             delivered.size(), &required ),
+                   HIL_APPLICATION_STATUS_OK );
+        std::vector<uint8_t> storage( required );
+        ASSERT_EQ( HIL_APPLICATION_Decode_Message(
+                       &application, delivered.data(), delivered.size(), &decoded,
+                       storage.empty() ? nullptr : storage.data(), storage.size(), &used ),
+                   HIL_APPLICATION_STATUS_OK );
+        EXPECT_EQ( decoded.type, message->type );
+        if ( decoded.type == HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT )
+        {
+            EXPECT_EQ( decoded.body.run_report.result_status,
+                       HIL_APPLICATION_RUN_RESULT_STATUS_PARTIAL );
+            EXPECT_EQ( decoded.body.run_report.result_ticks_emitted, 1u );
+            ASSERT_EQ( storage, std::vector<uint8_t>( extension.begin(), extension.end() ) );
+            delivered.assign( delivered.size(), 0u );
+            EXPECT_EQ( storage[1], 0xffu );
+        }
+    }
+}
+
 TEST( ApplicationTransportIntegration, ResponseAndErrorRoundTripStatelesslyOverTransport )
 {
     constexpr std::array<std::uint8_t, 5u> diagnostic{ 0x45u, 0x52u, 0x52u, 0x21u, 0x00u };

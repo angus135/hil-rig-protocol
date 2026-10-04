@@ -19,5 +19,6 @@ def test_application_example_round_trips_and_explicit_transport_calls(capsys):
         "GlobalControl: 28 bytes, round trip OK",
         "RigStatus: 35 bytes, round trip OK",
         "RigStatus: 35 bytes, round trip OK",
+        "RunReport: 200 bytes, round trip OK",
         "Disconnected Transport submission: NOT_READY",
     ]

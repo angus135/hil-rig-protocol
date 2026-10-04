@@ -49,6 +49,7 @@ There is no Application sequence number. Transport delivery acknowledgement rema
 | `TEST_RESULT` | 32 |
 | Retired/reserved | 33 |
 | `VARIABLE_TEST_RESULT` | 34 |
+| `RUN_REPORT` | 35 |
 | `RESPONSE` | 48 |
 | `ERROR` | 49 |
 | `RIG_STATUS` | 50 |
@@ -96,6 +97,7 @@ Presence rules:
 | Variable Test Result | required |
 | Application Response | required for test scopes; forbidden for Global Control scope |
 | Rig Status | optional active transaction ID; forbidden when READY_FOR_NEW_TEST |
+| Run Report | required admitted run ID |
 | Application Error | optional: present for a test-specific fault, absent for a global fault |
 | Arbitrary Control/Data | optional endpoint-defined context |
 
@@ -115,7 +117,7 @@ do not retain a transaction and therefore do not enforce it.
 | Execution Control START | Python | Firmware | Accepted Test ID and START | Complete Test `ACCEPTED` | Execution-Control Response reports actual operation outcome |
 | Execution Control ABORT | Python | Firmware | Identified active Test ID and ABORT | Matching active transaction/operation | `COMPLETED` prevents previous transaction continuing normally |
 | Global Control RESET_APPLICATION | Python | Firmware | No Test ID | None | `COMPLETED` clears active Application transaction data/conditions; Transport unchanged |
-| Test Result | Firmware | Python | Accepted Test ID and tick | START completed; execution completed or stopped early and result set is available | Exactly one fixed result for every configured tick in increasing order; no per-result Response |
+| Test Result | Firmware | Python | Accepted Test ID and tick | START completed; execution completed or stopped early and result set is available | Increasing complete ticks; RUN_REPORT closes the stream; no per-result Response |
 | Variable Test Result | Firmware | Python | Accepted Test ID and tick | START completed; execution completed or stopped early and sparse records produced | Sent in tick order; no per-result Response |
 | Application Response | Firmware | Python | Scope-dependent | A correlated request/data acceptance decision | Carries semantic outcome and transaction effect |
 | Application Error | Firmware | Python | Optional Test ID/tick | Broader fault rather than one request rejection | Integration-dependent recovery |
@@ -570,9 +572,9 @@ structurally representable by the fixed codec:
 
 If any configured fixed capture cannot be trusted, firmware uses
 `EXECUTION_PROBLEM`. The MVP cannot represent selective validity among fixed
-digital, analogue, or PWM fields. If execution stops or fails before all ticks
-execute, firmware still produces a fixed result for every remaining tick; ticks
-without valid fixed execution/capture data use `EXECUTION_PROBLEM`.
+digital, analogue, or PWM fields. Failed or aborted runs may emit fewer than N
+complete ticks and close with RUN_REPORT; they need not synthesize remaining
+ticks. RUN_REPORT declares whether the preceding stream is trustworthy.
 
 Fixed capture channels disabled or absent from configuration are encoded as
 deterministic zero and ignored by Python. Their presence alone causes neither
@@ -602,12 +604,12 @@ encoded bytes. No aggregate byte or record count is added, and the existing
 one-byte operation and record counts remain.
 
 No next result tick begins before the current tick reaches `COMPLETE_TICK`.
-Variable result ticks are sent in increasing order. Every configured tick from
-`0` through `expected_tick_count - 1` has a final Type 34 message. The final
+Variable result ticks are sent in increasing order. A COMPLETE stream contains
+every configured tick from `0` through `expected_tick_count - 1`. Each final
 message may contain zero records, allowing an empty or fault-only result. No
 Application Response is sent for result chunks. Python considers a result tick
-complete only after its `COMPLETE_TICK` chunk, and the complete result stream
-ends only after the final configured tick is complete.
+complete only after its `COMPLETE_TICK` chunk. RUN_REPORT closes the result stream,
+including failures and aborts with fewer complete ticks. No results follow it.
 
 The stateless codec validates each message and does not enforce cross-message
 assembly, ordering, or family selection. Incomplete result assembly is
@@ -929,22 +931,20 @@ Python treats every configured fixed capture as valid
 Python does not expect a record for the failed SPI capture
 ```
 
-### Early execution failure with deterministic remaining results
+### Early execution failure with a terminal partial stream
 
 ```text
 Test A has expected_tick_count 3 and START completed successfully
 Firmware -> Python: Test Result(A, tick 0, OK, one analogue sample per channel)
 Firmware detects an execution problem before tick 1 and may send Error(A, tick 1)
-Firmware -> Python: Variable Test Result(A, tick 1, EXECUTION_PROBLEM,
-                                          zero records, COMPLETE_TICK)
-Firmware -> Python: Variable Test Result(A, tick 2, EXECUTION_PROBLEM,
-                                          zero records, COMPLETE_TICK)
-Python completes all 3 result ticks despite the reported problem
-Python considers normal result transfer complete despite the reported problem
+Firmware -> Python: Run Report(A, FAILED, execution FAILED, results PARTIAL,
+                               result_ticks_emitted 1, failure provenance)
+Python closes the run with a trustworthy prefix of one complete result tick
+No later result tick for A is sent
 ```
 
-The optional Error does not replace a result chunk or permit tick 2 to be sent
-before tick 1 reaches `COMPLETE_TICK`.
+The optional Error never replaces the terminal report. The run closes without
+synthetic remaining ticks; a normal complete run would report N emitted ticks.
 
 ### Serialized response-requiring operations
 
@@ -1022,3 +1022,35 @@ Production state-machine work remains in `hil-rig-mcu-firmware` and
 `hil-rig-python-api`: firmware retention, hardware execution, endpoint state
 transitions, Python USB/Transport orchestration, and cross-message transaction
 bookkeeping. This repository does not claim to implement those integrations.
+
+## Run Report
+
+RUN_REPORT (type 35, subtype NONE, required admitted Test ID) closes one run's
+result stream. Schema 1 encodes 177 + E payload bytes, 200 + E complete bytes,
+and uses only E decode-storage bytes, E=0..255. Fixed statistics always occupy
+their wire slots; validity bits determine whether they are meaningful. All
+invalid sections and an invalid last boundary contain zero fields. Totals retain
+all 64 bits. Unknown extension bytes round-trip without interpretation.
+
+A rejected START creates no report. An admitted START followed by preparation
+failure produces NOT_STARTED and no execution measurements or emitted ticks.
+One logical terminal report follows the last result on a live connection, with
+no later results for that run. Errors are diagnostics and never replace it.
+Report construction uses the admitted generation's ID, N and nominal period;
+old statistics must not be attached to a new ID. The codec does not schedule
+reports or collect hardware statistics.
+
+SUCCESS requires execution COMPLETE, a trustworthy COMPLETE result stream of N
+logical ticks, and no failure. FAILED or ABORTED carries nonzero failure
+provenance. PARTIAL describes a trustworthy contiguous prefix of 1..N-1 complete
+logical ticks; discard an unfinished trailing variable-result tick. UNAVAILABLE
+promises no usable experiment dataset, even if emitted progress is nonzero.
+Per-tick PARTIAL/capture overflow remains distinct from a run-level PARTIAL
+stream. A report closes an incomplete failed/aborted stream without N ticks.
+
+Boundaries use 0..N, with boundary 0 priming outputs; result tick t measures
+boundary t+1. A valid successful last boundary equals N. Timer sample numbers
+start at 1, so maximum_boundary = max_sample_number - 1; first and last boundaries
+are covered by codec vectors. Hardware collectors must establish the source
+sample and reject overflow rather than publishing wrapped statistics as valid.
+See the wire table for sampling windows and endpoint provenance mapping.

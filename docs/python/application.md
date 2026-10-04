@@ -152,7 +152,8 @@ request. Send it only after every submitted tick has a positive Tick Response,
 or immediately after accepted sparse Test Configuration when no instruction
 messages were submitted. It declares that no more instruction chunks will be
 sent. Firmware returns the existing Complete Test Response scope; only an
-accepted response makes START valid. There is no result-finalisation message.
+accepted response makes START valid. RUN_REPORT closes the result stream after
+execution; no host result-finalisation request or acknowledgement is added.
 
 `ApplicationResponse` carries an optional `TestId`, `ResponseScope`,
 `ResponseOutcome`, `ResponseReason`, tick, command-correlation fields and detail.
@@ -461,3 +462,35 @@ No test lifecycle, active-test state, role enforcement, tick sequencing,
 every-tick/state-change translation, hardware I/O or consuming
 Python API/MCU integration is provided. These require separate future work; no
 typed Application methods are added to `Transport`.
+
+## Terminal run reports
+
+```python
+from hil_rig_protocol import RunReport, RunOutcome, ExecutionOutcome, RunResultStatus
+
+report = RunReport(
+    test_id,
+    RunOutcome.SUCCESS,
+    ExecutionOutcome.COMPLETE,
+    RunResultStatus.COMPLETE,
+    expected_tick_count=100,
+    tick_period_us=1000,
+    result_ticks_emitted=100,
+)
+assert len(codec.encode(report)) == 200
+assert codec.decode(codec.encode(report)) == report
+```
+
+`RunReport` requires a Test ID and uses schema 1. `RunIsrTiming`,
+`RunInstructionBuffer`, `RunResultBuffer` and `RunFlashStatistics` are frozen,
+slotted records with exact unsigned integer checks; cycle and byte totals retain
+all 64 bits. `RunReportSection` defines validity bits in the integer
+`valid_sections` field. Invalid sections are canonically zero; zero samples do
+not mean an invalid section. The opaque `extension_data` is immutable bytes of
+length 0..255 and decodes as a detached copy. Unknown extension content is preserved.
+
+Wait for RUN_REPORT to close the stream, including failures or aborts with fewer
+than N ticks. Distinguish the report's run result status from each tick's capture
+condition. Persist the report with the dataset and trust a PARTIAL stream only
+as a contiguous completed prefix; UNAVAILABLE results are diagnostic data.
+The host checks ordering and run identity; the codec remains stateless.

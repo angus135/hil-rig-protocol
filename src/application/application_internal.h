@@ -15,6 +15,11 @@
 
 /** Encoded status width; unrelated to the native struct size. */
 #define HIL_APPLICATION_RIG_STATUS_PAYLOAD_SIZE 12u
+/** Report fixed payload includes the extension-length byte. */
+#define HIL_APPLICATION_RUN_REPORT_FIXED_PAYLOAD_SIZE 177u
+/** Wire offset and limit for the retained one-byte extension length. */
+#define HIL_APPLICATION_RUN_REPORT_EXTENSION_LENGTH_OFFSET 176u
+#define HIL_APPLICATION_RUN_REPORT_MAX_EXTENSION_SIZE 255u
 
 #include "hil_rig_protocol/application/application_message.h"
 #include "hil_rig_protocol/application/application_status.h"
@@ -252,6 +257,20 @@ static inline uint32_t HIL_APPLICATION_Read_U32_Le( const uint8_t* src )
 {
     return ( ( uint32_t )src[0] ) | ( ( uint32_t )src[1] << 8 ) | ( ( uint32_t )src[2] << 16 )
            | ( ( uint32_t )src[3] << 24 );
+}
+
+/** Write all 64 bits in little-endian order, independently of host alignment. */
+static inline void HIL_APPLICATION_Write_U64_Le( uint8_t* dst, uint64_t value )
+{
+    HIL_APPLICATION_Write_U32_Le( dst, ( uint32_t )value );
+    HIL_APPLICATION_Write_U32_Le( &dst[4], ( uint32_t )( value >> 32 ) );
+}
+
+/** Read all 64 bits in little-endian order, independently of host alignment. */
+static inline uint64_t HIL_APPLICATION_Read_U64_Le( const uint8_t* src )
+{
+    return HIL_APPLICATION_Read_U32_Le( src )
+           | ( ( uint64_t )HIL_APPLICATION_Read_U32_Le( &src[4] ) << 32 );
 }
 
 /** Encode only the fixed 23-byte common envelope; payload length is patched later by the façade. */
