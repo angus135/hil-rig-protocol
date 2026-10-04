@@ -1,6 +1,6 @@
 """Run with ``python examples/python/application_codec.py`` after installation.
 
-All three messages round-trip without hardware. The final Transport is deliberately
+The messages round-trip without hardware. The final Transport is deliberately
 disconnected, so submission returns NOT_READY and reading returns None. A consuming
 project supplies link I/O and services Transport before exchanging these same bytes;
 see transport_servicing.py and docs/python/application.md.
@@ -15,6 +15,8 @@ from hil_rig_protocol import (
     AnalogOutputValue,
     ApplicationCodec,
     ApplicationConfig,
+    ArbitraryControl,
+    ArbitraryData,
     DigitalInputConfig,
     DigitalInputValue,
     DigitalOutputConfig,
@@ -78,6 +80,16 @@ def main() -> None:
         encoded = application_codec.encode(message)
         assert application_codec.decode(encoded) == message
         print(f"{type(message).__name__}: {len(encoded)} bytes, round trip OK")
+
+    # Endpoint handlers assign these IDs and their reply semantics locally.
+    for arbitrary_message in (
+        ArbitraryControl(control_id=1, value=42),
+        ArbitraryData(data_id=1, payload=b"\x2a\x00\x00\x00"),
+        ArbitraryData(data_id=2, payload=b"\x00\xffhello"),
+    ):
+        encoded = application_codec.encode(arbitrary_message)
+        assert application_codec.decode(encoded) == arbitrary_message
+        print(f"{type(arbitrary_message).__name__}: {len(encoded)} bytes, round trip OK")
 
     # These calls are also the composition boundary for a serviced, connected
     # Transport. Check its status and service delivery using the Transport guide.

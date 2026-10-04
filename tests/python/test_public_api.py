@@ -13,6 +13,8 @@ from hil_rig_protocol import (
 )
 
 EXPECTED_EXPORTS = {
+    "ArbitraryControl",
+    "ArbitraryData",
     "PeripheralType",
     "LogicalOperation",
     "CapturedRecord",

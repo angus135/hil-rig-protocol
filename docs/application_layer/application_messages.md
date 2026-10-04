@@ -51,6 +51,8 @@ There is no Application sequence number. Transport delivery acknowledgement rema
 | `VARIABLE_TEST_RESULT` | 34 |
 | `RESPONSE` | 48 |
 | `ERROR` | 49 |
+| `ARBITRARY_CONTROL` | 64 |
+| `ARBITRARY_DATA` | 65 |
 | `RESERVED` | 255 |
 
 The explicit values are stable one-byte wire identifiers. Changing an assigned value requires protocol-version compatibility review.
@@ -93,6 +95,7 @@ Presence rules:
 | Variable Test Result | required |
 | Application Response | required for test scopes; forbidden for Global Control scope |
 | Application Error | optional: present for a test-specific fault, absent for a global fault |
+| Arbitrary Control/Data | optional endpoint-defined context |
 
 ## Message matrix
 
@@ -114,6 +117,8 @@ do not retain a transaction and therefore do not enforce it.
 | Variable Test Result | Firmware | Python | Accepted Test ID and tick | START completed; execution completed or stopped early and sparse records produced | Sent in tick order; no per-result Response |
 | Application Response | Firmware | Python | Scope-dependent | A correlated request/data acceptance decision | Carries semantic outcome and transaction effect |
 | Application Error | Firmware | Python | Optional Test ID/tick | Broader fault rather than one request rejection | Integration-dependent recovery |
+| Arbitrary Control | Either | Either | Optional Test ID | Feature-specific handler | No implicit Response or lifecycle effect |
+| Arbitrary Data | Either | Either | Optional Test ID | Feature-specific handler | No implicit Response or lifecycle effect |
 
 These directions are normative. The codec remains direction-neutral and
 stateless: encoding or decoding a structurally valid message does not determine
@@ -590,6 +595,35 @@ that cannot fit, uses `PARTIAL`, and sets `problem_detail` to
 result stream still terminate normally; overflow adds no Error, acknowledgement,
 or finalisation message. `EXECUTION_PROBLEM` takes precedence if a more serious
 failure prevents completion.
+
+## Arbitrary endpoint messages
+
+Types 64 and 65 are stable, bidirectional containers. `ARBITRARY_CONTROL`
+contains a `uint32_t control_id` and `uint32_t value`; `ARBITRARY_DATA`
+contains a `uint32_t data_id`, a `uint16_t` byte count, and exactly that many
+opaque bytes. Every identifier and control value is structurally valid,
+including zero and `0xffffffff`. Neither identifier is a protocol enum.
+
+The optional envelope Test ID gives feature context. Its presence does not
+change transaction state, result tick counts, readiness, or a pending standard
+control operation. The codec validates only the container and configured
+capacity. Each endpoint feature documents its own ID, payload/value meaning,
+and any reply or correlation convention beside its handler. Unknown IDs have
+no implicit side effect or standard Response; endpoint dispatch should report
+unsupported handling locally. An arbitrary reply does not complete a standard
+control request or terminate a result stream.
+
+For example, an endpoint may interpret control ID 1 with value 42 as a ping,
+reply using data ID 1 with bytes `2a 00 00 00`, and use data ID 2 for binary
+echo. These IDs are example conventions only; adding another feature ID needs
+matching endpoint handlers, without rebuilding this shared codec.
+
+`ARBITRARY_DATA` can carry 0–65506 bytes within the absolute 65535-byte
+complete-message ceiling, or at most 4067 bytes with the default 4096-byte
+limit. The inspected firmware's 2302-byte Application buffer permits at most
+2273 bytes. The caller still supplies sufficient encode and decode storage.
+The two-byte direct-USB prefix is outside these sizes. No fragmentation,
+automatic acknowledgement, retry, or generic reassembly is provided.
 
 ## Application Response
 

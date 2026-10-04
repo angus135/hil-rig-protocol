@@ -11,6 +11,7 @@
 #include "hil_rig_protocol/application/application.h"
 
 #include "application_decoding.h"
+#include "application_arbitrary.h"
 #include "application_encoding.h"
 #include "application_internal.h"
 #include "application_test_config_internal.h"
@@ -70,6 +71,13 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Size( const HIL_Application
             return HIL_APPLICATION_Response_size( context, &message->body.response, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
             return HIL_APPLICATION_Error_size( context, &message->body.error, payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL:
+            *payload_size = HIL_APPLICATION_ARBITRARY_CONTROL_PAYLOAD_SIZE;
+            return HIL_APPLICATION_Arbitrary_Control_validate( context,
+                                                               &message->body.arbitrary_control );
+        case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA:
+            return HIL_APPLICATION_Arbitrary_Data_size( context, &message->body.arbitrary_data,
+                                                        payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
         default:
@@ -130,6 +138,12 @@ HIL_APPLICATION_Body_Encode( const HIL_Application_Context_T* context,
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
             return HIL_APPLICATION_Error_encode( context, &message->body.error, payload_capacity,
                                                  payload, payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL:
+            return HIL_APPLICATION_Arbitrary_Control_encode(
+                &message->body.arbitrary_control, payload, payload_capacity, payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA:
+            return HIL_APPLICATION_Arbitrary_Data_encode( context, &message->body.arbitrary_data,
+                                                          payload, payload_capacity, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
         default:
@@ -199,6 +213,14 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Decode(
             return HIL_APPLICATION_Error_decode( context, &message->body.error, payload,
                                                  payload_size, consumed_payload_size, decoded_data,
                                                  max_decoded_data_size, used_decoded_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL:
+            return HIL_APPLICATION_Arbitrary_Control_decode(
+                &message->body.arbitrary_control, payload, payload_size, consumed_payload_size,
+                used_decoded_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA:
+            return HIL_APPLICATION_Arbitrary_Data_decode(
+                context, &message->body.arbitrary_data, payload, payload_size,
+                consumed_payload_size, decoded_data, max_decoded_data_size, used_decoded_size );
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
         default:
@@ -554,6 +576,7 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
         case HIL_APPLICATION_MESSAGE_TYPE_FINALIZE_TEST_UPLOAD:
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT:
+        case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL:
             /* Share exact fixed-body width validation with normal body decoding. */
             return HIL_APPLICATION_Fixed_Body_Validate_Size( envelope.type, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_RESPONSE:
@@ -636,6 +659,10 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
             return HIL_APPLICATION_Error_Scan( context,
                                                &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES],
                                                payload_size, required_storage_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA:
+            return HIL_APPLICATION_Arbitrary_Data_scan(
+                context, &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES], payload_size,
+                required_storage_size );
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
         default:
@@ -743,6 +770,12 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
             return HIL_APPLICATION_Response_validate( context, &message->body.response );
         case HIL_APPLICATION_MESSAGE_TYPE_ERROR:
             return HIL_APPLICATION_Error_validate( context, &message->body.error );
+        case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL:
+            return HIL_APPLICATION_Arbitrary_Control_validate( context,
+                                                               &message->body.arbitrary_control );
+        case HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA:
+            return HIL_APPLICATION_Arbitrary_Data_validate( context,
+                                                            &message->body.arbitrary_data );
         case HIL_APPLICATION_MESSAGE_TYPE_INVALID:
         case HIL_APPLICATION_MESSAGE_TYPE_RESERVED:
         default:
@@ -890,7 +923,8 @@ HIL_Application_Status_T HIL_APPLICATION_Validate_Encoded_Message(
         return status;
     }
     if ( envelope.type == HIL_APPLICATION_MESSAGE_TYPE_UPDATE_INSTRUCTION
-         || envelope.type == HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT )
+         || envelope.type == HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT
+         || envelope.type == HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_DATA )
     {
         return HIL_APPLICATION_STATUS_OK;
     }
