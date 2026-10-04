@@ -566,7 +566,7 @@ chunks, with message and record order preserved.
 Firmware emits at most eight Type 34 chunks for a tick. A ninth received chunk
 is a protocol-state failure and enters recovery. I2C captured records are not
 implemented and are rejected. Each Type 21 and Type 34 chunk remains at most
-512 complete bytes; eight chunks therefore bound one tick to 4096 complete
+4096 complete bytes by default; eight chunks therefore bound one tick to 32768 complete
 encoded bytes. No aggregate byte or record count is added, and the existing
 one-byte operation and record counts remain.
 
