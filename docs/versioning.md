@@ -45,3 +45,28 @@ received triplet and permit test traffic only after it returns `OK`. It requires
 exact major, minor, and patch equality; it does not negotiate, select a codec,
 accept ranges, or provide fallback. Confirmation is per Transport session.
 Firmware without usable discovery is unconfirmed, never assumed compatible.
+
+## v0.4.0 native ABI migration
+
+The public byte-span length is now `uint16_t`. Rebuild all C/C++ consumers,
+static libraries and CFFI extensions together; an old compiled consumer cannot
+safely exchange native records with the new library. On a 64-bit target the span
+can keep the same total size and offsets while its length field changes width.
+Native struct layout is never the wire layout.
+
+Shared libraries use an ABI generation in both their filename and SONAME:
+`hil_rig_protocol-0.4`, version `0.4.0`, SONAME generation `0.4`. This avoids
+replacing the previous unversioned shared-library filename. Before 1.0, the
+generation is major.minor; from 1.0 it is major. The CMake target remains
+`hil_rig_protocol`; static library naming is unchanged. Manual shared-library
+link commands must use the new basename. Python wheels statically contain the
+core and must be rebuilt, rather than reusing an old native extension.
+
+Use `python scripts/check_application_abi.py --baseline <old-source-tree>
+--current . --cc cc --work-dir <temporary-directory>` with the same C11 compiler
+for both source trees. It compares actual public sizes, alignment, offsets and
+field widths and rejects changed layouts within the same ABI generation.
+
+v0.4.0 requires exact discovery triplet 0.4.0 on both endpoints. Older 0.3.x
+ordinary envelopes fail the version gate; discovery can still describe them.
+See [release preparation and migration](releases/v0.4.0.md).

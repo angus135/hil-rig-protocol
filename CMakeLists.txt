@@ -62,6 +62,22 @@ set(HIL_RIG_PROTOCOL_SOURCES
 add_library(hil_rig_protocol ${HIL_RIG_PROTOCOL_SOURCES})
 add_library(hil_rig_protocol::hil_rig_protocol ALIAS hil_rig_protocol)
 
+# Before 1.0, each minor release may change the public C ABI. A distinct shared
+# basename also protects consumers of the older, unversioned shared library.
+if(PROJECT_VERSION_MAJOR EQUAL 0)
+    set(HIL_RIG_PROTOCOL_ABI_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
+else()
+    set(HIL_RIG_PROTOCOL_ABI_VERSION "${PROJECT_VERSION_MAJOR}")
+endif()
+get_target_property(HIL_RIG_PROTOCOL_LIBRARY_TYPE hil_rig_protocol TYPE)
+if(HIL_RIG_PROTOCOL_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
+    set_target_properties(hil_rig_protocol PROPERTIES
+        OUTPUT_NAME "hil_rig_protocol-${HIL_RIG_PROTOCOL_ABI_VERSION}"
+        VERSION "${PROJECT_VERSION}"
+        SOVERSION "${HIL_RIG_PROTOCOL_ABI_VERSION}"
+    )
+endif()
+
 add_subdirectory(src/application)
 
 set(HIL_RIG_PROTOCOL_PUBLIC_VERSION_HEADER
