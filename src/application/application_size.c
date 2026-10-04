@@ -100,6 +100,10 @@ HIL_Application_Status_T HIL_APPLICATION_Test_Configuration_size(
     {
         return HIL_APPLICATION_STATUS_INVALID_ARGUMENT;
     }
+    if ( data->extension_data.size > UINT8_MAX )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
     if ( !HIL_APPLICATION_Checked_Add_Size( HIL_APPLICATION_TEST_CONFIG_FIXED_PAYLOAD_SIZE,
                                             ( size_t )data->extension_data.size, &total_size ) )
     {

@@ -114,7 +114,7 @@ typedef struct
     const uint8_t* data;
 
     /** Number of readable bytes at data. */
-    uint8_t size;
+    uint16_t size;
 } HIL_Application_Byte_Span_T;
 
 /**
@@ -298,9 +298,10 @@ typedef struct
      * Largest permitted variable byte span.
      *
      * This bounds Test Configuration extension_data and variable record spans.
-     * The one-byte span wire format imposes an absolute 255-byte maximum even
-     * when this configured policy limit is lower. Capture capacity is not a
-     * protocol configuration field.
+     * One-byte extension and diagnostic lengths retain a 255-byte wire maximum;
+     * variable records use 16-bit lengths. The complete-message limit also
+     * bounds usable span sizes. Capture capacity is not a protocol configuration
+     * field.
      */
     size_t max_variable_data_size;
 

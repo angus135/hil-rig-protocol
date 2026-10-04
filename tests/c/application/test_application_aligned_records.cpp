@@ -40,7 +40,7 @@ protected:
         message.has_test_id                    = 1u;
         message.subtype                        = HIL_APPLICATION_MESSAGE_SUBTYPE_NONE;
         const HIL_Application_Byte_Span_T span = { payload.data(),
-                                                   static_cast<std::uint8_t>( payload.size() ) };
+                                                   static_cast<std::uint16_t>( payload.size() ) };
         if ( GetParam() )
         {
             record       = { static_cast<HIL_Application_Peripheral_Type_T>( type ),
@@ -576,7 +576,7 @@ TEST_P( ApplicationAlignedRecords, SpiPacketBoundariesAndZeroLengthPackets )
                                                        { 255u, 1u, 0xabu },
                                                        { 1u, 1u, 0xabu, 0xcdu } } )
         CheckValue( 17u, 0u, payload, false );
-    // The packet table and data together must fit the 255-byte span.
+    // Packet sizes remain one byte each even though the complete record span is wider.
     for ( const unsigned packets : { 1u, 2u, 127u } )
     {
         std::vector<std::uint8_t> payload( 255u, 0xabu );
@@ -586,6 +586,15 @@ TEST_P( ApplicationAlignedRecords, SpiPacketBoundariesAndZeroLengthPackets )
         payload[1] = static_cast<std::uint8_t>( 255u - 2u * packets );
         CheckValue( 17u, 1u, payload, true );
     }
+}
+
+TEST_P( ApplicationAlignedRecords, WidenedUartRecordHasExactTwoByteLengthAndRoundTrips )
+{
+    const std::vector<std::uint8_t> payload( 256u, 0xa5u );
+    const auto                      wire = Wire( HIL_APPLICATION_PERIPHERAL_UART, 0u, payload );
+    EXPECT_EQ( wire[23u + HeaderSize() + 2u], 0u );
+    EXPECT_EQ( wire[23u + HeaderSize() + 3u], 1u );
+    CheckValue( HIL_APPLICATION_PERIPHERAL_UART, 0u, payload, true );
 }
 
 TEST_P( ApplicationAlignedRecords, ExactEncodeCapacityAndEveryShortDecodeCapacity )

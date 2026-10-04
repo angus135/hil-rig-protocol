@@ -74,11 +74,12 @@ A correctly shaped Test Configuration whose extension exceeds the initialized
 structural policy bound. `BUFFER_TOO_SMALL` is reserved for insufficient caller-provided encode
 capacity or decoded-data storage.
 
-The v0.3.0 profile limits every complete Application message to 512 bytes. A
-context may select a smaller `max_encoded_message_size`, but initialization
-rejects values above 512. The one-byte variable span remains limited to 255
-bytes. A single Type 21 or Type 34 tick may contain at most eight messages, so
-eight maximum-size messages bound a chunked tick to 4096 complete encoded
+The default profile limits every complete Application message to 4096 bytes. A
+context may select a smaller or larger `max_encoded_message_size`, up to the
+65535-byte absolute ceiling. Legacy one-byte spans remain limited to 255
+bytes; aligned variable records carry a two-byte length. A single Type 21 or
+Type 34 tick may contain at most eight messages, so eight default-size messages
+bound a chunked tick to 32768 complete encoded
 bytes. These cross-message limits are enforced by endpoint integrations, not by
 the stateless codec; no aggregate byte or record count is encoded.
 
@@ -91,10 +92,11 @@ the stateless codec; no aggregate byte or record count is encoded.
 | `uint16_t` | 2 bytes | little-endian |
 | `uint32_t` | 4 bytes | little-endian |
 | `uint64_t` | 8 bytes | little-endian |
-| byte span | `1 + N` bytes | one-byte length followed by exactly N bytes |
+| legacy byte span | `1 + N` bytes | one-byte length followed by exactly N bytes |
+| aligned variable record span | `2 + N` bytes before padding | two-byte length followed by exactly N bytes |
 | channel ID | 3 bytes | peripheral `uint8_t`, then channel `uint16_t` little-endian |
 
-A byte span therefore has a wire maximum of 255 data bytes:
+Legacy extension and diagnostic spans have a wire maximum of 255 data bytes:
 
 ```text
 +----------+-------------------------------------+
@@ -174,7 +176,7 @@ The response payload uses the following wire layout. All six public codec paths 
 needs `D + G` caller decode-storage bytes, where D and G are diagnostic and Git-hash lengths. Each span
 is bounded by `max_variable_data_size` and 255 wire bytes. Both spans may be 255 bytes, requiring 510
 storage bytes and a 547-byte complete message when the configured complete-message limit permits it;
-the default 512-byte complete limit may reject that larger message. Encoded sizing and encoding require
+the default 4096-byte complete limit permits that message. Encoded sizing and encoding require
 the response protocol triplet to equal the compiled library version; decode may accept a consistent
 foreign discovery triplet for the explicit compatibility check.
 
@@ -223,7 +225,7 @@ The fixed payload, through and including the extension-length byte, is exactly
 **171 bytes**. An empty-extension complete message is therefore `23 + 171 =
 194` bytes. Extension length N produces `194 + N` complete bytes. The maximum
 255-byte extension produces a 426-byte payload and a **449-byte complete
-message**, which fits the 512-byte default `max_encoded_message_size`. The
+message**, which fits the 4096-byte default `max_encoded_message_size`. The
 one-byte extension field sets the absolute wire maximum at 255 data bytes, but
 encoding, decoding, decode-storage queries, and encoded-message validation also
 enforce the initialized context's `max_variable_data_size`. A context may
@@ -420,7 +422,7 @@ The header is immediately followed by `operation_count` records. Each record has
 | ---: | ---: | --- | --- |
 | 0 | 1 | `peripheral_type` | enum identifier (`DIGITAL_OUTPUT`, `ANALOG_OUTPUT`, `PWM_OUTPUT`, `UART`, `SPI`, `CAN`) |
 | 1 | 1 | `channel` | logical channel index within peripheral family |
-| 2 | 2 | `payload_length` | little-endian `uint16_t`, valid range `1..255` |
+| 2 | 2 | `payload_length` | little-endian `uint16_t`, valid range `1..65535`, further limited by complete-message size and alignment |
 | 4 | N | payload data | exactly `payload_length` bytes |
 | 4 + N | 0..3 | zero padding | `(4 - (N % 4)) % 4` zero bytes to align to a 4-byte boundary |
 
@@ -430,7 +432,7 @@ Padding bytes must strictly be zero on the wire. No duplicate `(peripheral_type,
 - **`DIGITAL_OUTPUT`**: Channel must be 0 (bank 0). Payload length must be exactly 2 bytes (16-bit mask, bits 10..15 reserved zero).
 - **`ANALOG_OUTPUT`**: Channel must be `< 6`. Payload length must be exactly 4 bytes (`uint32_t` little-endian microvolts).
 - **`PWM_OUTPUT`**: Channel must be `< 2`. Payload length must be exactly 6 bytes (`uint32_t` period ns + `uint16_t` duty permyriad). Duty $\le 10000$, and zero period requires zero duty.
-- **`UART`**: Channel must be `< 2`. Payload length must be `1..255` bytes raw communication data.
+- **`UART`**: Channel must be `< 2`. Payload length must be `1..65535` bytes raw communication data, subject to message capacity.
 - **`SPI`**: Channel must be `< 2`. Payload framing: `num_packets (1B)` + `packet_sizes (P bytes)` + `data (M bytes)`, where each packet size $\ge 1$ and $\sum \text{sizes} == M$.
 - **`CAN`**: Channel must be `< 2`. Payload length must be a non-zero multiple of 12 bytes ($12 \times K$). Each frame is 2B `can_id` ($\le 0x7FF$) + 1B `dlc` ($\le 8$) + 8B data + 1B reserved zero.
 
@@ -525,7 +527,7 @@ When `record_count > 0`, the header is followed by `record_count` records using 
 | ---: | ---: | --- | --- |
 | 0 | 1 | `peripheral_type` | enum identifier (`DIGITAL_INPUT`, `ANALOG_INPUT`, `PWM_INPUT`, `UART`, `SPI`, `CAN`) |
 | 1 | 1 | `channel` | logical channel index within peripheral family |
-| 2 | 2 | `payload_length` | little-endian `uint16_t`, valid range `1..255` |
+| 2 | 2 | `payload_length` | little-endian `uint16_t`, valid range `1..65535`, further limited by complete-message size and alignment |
 | 4 | N | captured data | exactly `payload_length` bytes |
 | 4 + N | 0..3 | zero padding | `(4 - (N % 4)) % 4` zero bytes to align to a 4-byte boundary |
 
@@ -535,8 +537,8 @@ Padding bytes must strictly be zero on the wire. No duplicate `(peripheral_type,
 - **`DIGITAL_INPUT`**: Channel must be 0 (bank 0). Payload length must be exactly 2 bytes (16-bit mask, bits 10..15 reserved zero).
 - **`ANALOG_INPUT`**: Channel must be `< 2`. Payload length must be exactly 4 bytes (`uint32_t` little-endian microvolts).
 - **`PWM_INPUT`**: Channel must be `< 2`. Payload length must be exactly 6 bytes (`uint32_t` period ns + `uint16_t` duty permyriad). Duty $\le 10000$, zero period requires zero duty.
-- **`UART`**: Channel must be `< 2`. Payload length must be `1..255` bytes raw captured data.
-- **`SPI`**: Channel must be `< 2`. Payload length must be `1..255` bytes raw captured data.
+- **`UART`**: Channel must be `< 2`. Payload length must be `1..65535` bytes raw captured data, subject to message capacity.
+- **`SPI`**: Channel must be `< 2`. Payload length must be `1..65535` bytes raw captured data, subject to message capacity.
 - **`CAN`**: Channel must be `< 2`. Payload length must be a non-zero multiple of 12 bytes ($12 \times K$). Each frame is 2B `can_id` ($\le 0x7FF$) + 1B `dlc` ($\le 8$) + 8B data + 1B reserved zero.
 
 ## Application Response

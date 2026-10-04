@@ -246,8 +246,8 @@ def test_defaults_and_smaller_limits():
     config = ffi.new("HIL_Application_Config_T *")
     assert lib.HIL_APPLICATION_Default_Config(config) == lib.HIL_APPLICATION_STATUS_OK
     assert native_value(config[0]) == {
-        "max_encoded_message_size": 512,
-        "max_variable_data_size": 255,
+        "max_encoded_message_size": 4096,
+        "max_variable_data_size": 65535,
         "max_expected_tick_count": 1000000,
     }
     context()
@@ -273,8 +273,8 @@ def test_defaults_and_smaller_limits():
     "field,value,status",
     [
         ("max_encoded_message_size", 24, lib.HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL),
-        ("max_encoded_message_size", 513, lib.HIL_APPLICATION_STATUS_INVALID_LENGTH),
-        ("max_variable_data_size", 256, lib.HIL_APPLICATION_STATUS_INVALID_COUNT),
+        ("max_encoded_message_size", 65536, lib.HIL_APPLICATION_STATUS_INVALID_LENGTH),
+        ("max_variable_data_size", 65536, lib.HIL_APPLICATION_STATUS_INVALID_COUNT),
         ("max_expected_tick_count", 1000001, lib.HIL_APPLICATION_STATUS_INVALID_LENGTH),
     ],
 )
@@ -706,10 +706,10 @@ def test_enum_values(name, value):
         ("HIL_APPLICATION_UART_CHANNEL_COUNT", 2),
         ("HIL_APPLICATION_SPI_CHANNEL_COUNT", 2),
         ("HIL_APPLICATION_I2C_CHANNEL_COUNT", 2),
-        ("HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE", 255),
-        ("HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE", 255),
+        ("HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE", 65535),
+        ("HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE", 65535),
         ("HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT", 1000000),
-        ("HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE", 512),
+        ("HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE", 4096),
         ("HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK", 8),
         ("HIL_APPLICATION_RESULT_PROBLEM_DETAIL_CAPTURE_OVERFLOW", 1),
         ("HIL_APPLICATION_PROTOCOL_MAJOR_SIZE_BYTES", 1),
@@ -719,7 +719,7 @@ def test_enum_values(name, value):
         ("HIL_APPLICATION_MESSAGE_SUB_TYPE_SIZE_BYTES", 1),
         ("HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES", 2),
         ("HIL_APPLICATION_HEADER_SIZE_BYTES", 23),
-        ("HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE", 512),
+        ("HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE", 65535),
         ("HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE", 28),
     ],
 )

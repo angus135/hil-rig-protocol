@@ -41,6 +41,17 @@ HIL_APPLICATION_Byte_Span_validate( const HIL_Application_Byte_Span_T* span,
     return HIL_APPLICATION_STATUS_OK;
 }
 
+/** One-byte length fields retain their wire limit after widening the public span size. */
+static HIL_Application_Status_T
+HIL_APPLICATION_Byte_Span_U8_validate( const HIL_Application_Context_T*   context,
+                                       const HIL_Application_Byte_Span_T* span )
+{
+    const size_t limit = context->config.max_variable_data_size < UINT8_MAX
+                             ? context->config.max_variable_data_size
+                             : UINT8_MAX;
+    return HIL_APPLICATION_Byte_Span_validate( span, limit );
+}
+
 static int HIL_APPLICATION_Boolean_Is_Valid( uint8_t value )
 {
     return value <= 1u;
@@ -321,14 +332,12 @@ HIL_APPLICATION_System_Info_Response_validate( const HIL_Application_Context_T* 
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
-    status = HIL_APPLICATION_Byte_Span_validate( &data->firmware_git_hash,
-                                                 context->config.max_variable_data_size );
+    status = HIL_APPLICATION_Byte_Span_U8_validate( context, &data->firmware_git_hash );
     if ( status != HIL_APPLICATION_STATUS_OK )
     {
         return status;
     }
-    return HIL_APPLICATION_Byte_Span_validate( &data->diagnostic_data,
-                                               context->config.max_variable_data_size );
+    return HIL_APPLICATION_Byte_Span_U8_validate( context, &data->diagnostic_data );
 }
 
 HIL_Application_Status_T
@@ -365,8 +374,7 @@ HIL_APPLICATION_Test_Configuration_validate( const HIL_Application_Context_T*   
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }
-    status = HIL_APPLICATION_Byte_Span_validate( &data->extension_data,
-                                                 context->config.max_variable_data_size );
+    status = HIL_APPLICATION_Byte_Span_U8_validate( context, &data->extension_data );
     if ( status != HIL_APPLICATION_STATUS_OK )
     {
         return status == HIL_APPLICATION_STATUS_INVALID_ARGUMENT
@@ -938,6 +946,5 @@ HIL_Application_Status_T HIL_APPLICATION_Error_validate( const HIL_Application_C
     {
         return HIL_APPLICATION_STATUS_INCONSISTENT_TICK;
     }
-    return HIL_APPLICATION_Byte_Span_validate( &data->diagnostic_data,
-                                               context->config.max_variable_data_size );
+    return HIL_APPLICATION_Byte_Span_U8_validate( context, &data->diagnostic_data );
 }

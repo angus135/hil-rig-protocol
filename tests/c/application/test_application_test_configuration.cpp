@@ -690,6 +690,28 @@ TEST( ApplicationTestConfigurationExtensionLimit, OneByteOverConfiguredLimitFail
     EXPECT_EQ( encoded_size, 0u );
 }
 
+TEST( ApplicationTestConfigurationExtensionLimit, Rejects256BytesAtOneByteWireBoundary )
+{
+    const auto context = MakeContext( HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE, 65535u );
+    std::array<std::uint8_t, 256u> extension{};
+    auto                           config = CanonicalConfiguration();
+    config.extension_data                 = { extension.data(), 256u };
+    const auto message                    = ConfigurationMessage( config );
+
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+    std::size_t size = 99u;
+    EXPECT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &size ),
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+    EXPECT_EQ( size, 0u );
+    std::array<std::uint8_t, 512u> encoded{};
+    size = 99u;
+    EXPECT_EQ(
+        HIL_APPLICATION_Encode_Message( &context, &message, encoded.data(), encoded.size(), &size ),
+        HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+    EXPECT_EQ( size, 0u );
+}
+
 TEST( ApplicationTestConfigurationExtensionLimit,
       RestrictiveContextRejectsMessageEncodedByPermissiveContext )
 {

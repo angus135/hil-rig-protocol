@@ -126,11 +126,11 @@ TEST( ApplicationDiscovery, RequestUsesApprovedEightByteLayoutAndExactVersionGat
                                                        HIL_RIG_PROTOCOL_VERSION_PATCH ),
                HIL_APPLICATION_STATUS_VERSION_MISMATCH );
     EXPECT_EQ( HIL_APPLICATION_Check_Protocol_Version( HIL_RIG_PROTOCOL_VERSION_MAJOR,
-                                                       HIL_RIG_PROTOCOL_VERSION_MINOR, 1u ),
+                                                       HIL_RIG_PROTOCOL_VERSION_MINOR, 0u ),
                HIL_APPLICATION_STATUS_VERSION_MISMATCH );
 
     auto inconsistent                                                = request;
-    inconsistent.body.system_info_request.application_protocol_patch = 1u;
+    inconsistent.body.system_info_request.application_protocol_patch = 0u;
     output_size                                                      = 99u;
     EXPECT_EQ( HIL_APPLICATION_Encoded_Size( &context, &inconsistent, &output_size ),
                HIL_APPLICATION_STATUS_VERSION_MISMATCH );
@@ -232,6 +232,41 @@ TEST( ApplicationDiscovery, ResponseScansBothMaximumSpansWithoutAllocation )
     EXPECT_EQ( used_storage, storage.size() );
     EXPECT_EQ( decoded.body.system_info_response.diagnostic_data.data, storage.data() );
     EXPECT_EQ( decoded.body.system_info_response.firmware_git_hash.data, storage.data() + 255u );
+}
+
+TEST( ApplicationDiscovery, RejectsWidenedSpanBeyondOneByteWireLength )
+{
+    const auto                     context = MakeContext();
+    std::array<std::uint8_t, 256u> diagnostic{};
+    HIL_Application_Message_T      message{};
+    message.type    = HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_RESPONSE;
+    message.subtype = HIL_APPLICATION_MESSAGE_SUBTYPE_BASIC;
+    message.body.system_info_response.application_protocol_major = HIL_RIG_PROTOCOL_VERSION_MAJOR;
+    message.body.system_info_response.application_protocol_minor = HIL_RIG_PROTOCOL_VERSION_MINOR;
+    message.body.system_info_response.application_protocol_patch = HIL_RIG_PROTOCOL_VERSION_PATCH;
+    message.body.system_info_response.diagnostic_data            = { diagnostic.data(), 256u };
+
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+    std::size_t size = 99u;
+    EXPECT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &size ),
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+    EXPECT_EQ( size, 0u );
+    std::array<std::uint8_t, 512u> encoded{};
+    size = 99u;
+    EXPECT_EQ(
+        HIL_APPLICATION_Encode_Message( &context, &message, encoded.data(), encoded.size(), &size ),
+        HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+    EXPECT_EQ( size, 0u );
+
+    message.body.system_info_response.diagnostic_data   = { nullptr, 0u };
+    message.body.system_info_response.firmware_git_hash = { diagnostic.data(), 256u };
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+    size = 99u;
+    EXPECT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &size ),
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+    EXPECT_EQ( size, 0u );
 }
 
 TEST( ApplicationDiscovery, ResponseScannerRejectsEveryMalformedSpanBoundary )

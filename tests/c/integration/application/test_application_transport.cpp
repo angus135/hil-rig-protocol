@@ -339,14 +339,16 @@ TEST( ApplicationTransportIntegration, MaximumConfigurationUsesExactLimitsAndChu
     ASSERT_EQ( undersized.used_storage_size, 0u );
     ASSERT_EQ( rig_codec.DecodedMessage().type, HIL_APPLICATION_MESSAGE_TYPE_INVALID );
 
-    const auto oversized = rig_codec.DecodeMessage( received.bytes, 511u );
+    constexpr std::size_t oversized_capacity =
+        2u * HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE + 1u;
+    const auto oversized = rig_codec.DecodeMessage( received.bytes, oversized_capacity );
     ASSERT_FALSE( oversized.storage_capacity_valid );
     ASSERT_FALSE( oversized.decode_status.has_value() );
     ASSERT_EQ( oversized.storage_status, HIL_APPLICATION_STATUS_OK );
     ASSERT_EQ( oversized.required_storage_size, 255u );
     ASSERT_EQ( oversized.encoded_validation_status, HIL_APPLICATION_STATUS_OK );
     ASSERT_EQ( oversized.validation_storage_size, 255u );
-    ASSERT_EQ( oversized.supplied_storage_size, 511u );
+    ASSERT_EQ( oversized.supplied_storage_size, oversized_capacity );
     ASSERT_EQ( oversized.used_storage_size, 0u );
     ASSERT_EQ( rig_codec.DecodedMessage().type, HIL_APPLICATION_MESSAGE_TYPE_INVALID );
 

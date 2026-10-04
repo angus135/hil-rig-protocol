@@ -64,13 +64,10 @@ struct ApplicationDecodeResult
  * @brief Stateless public Application codec wrapper for black-box integration tests.
  *
  * @details Decode storage is aligned to HIL_APPLICATION_DECODE_STORAGE_ALIGNMENT
- * and has capacity for both absolute 255-byte System Information response spans. The last decoded
-
- * * message and its backing storage remain owned together by this object, keeping
- * decoded Test
- * Configuration extension pointers valid until the next decode or initialization of
- * this
- * object.
+ * and has capacity for two maximum-sized variable-data spans. The last decoded
+ * message and its backing storage remain owned together by this object, keeping
+ * decoded Test Configuration extension pointers valid until the next decode or
+ * initialization of this object.
  */
 class ApplicationTestCodec
 {
@@ -110,13 +107,10 @@ public:
      * @param encoded_message Complete Application bytes.
      * @param storage_capacity Optional caller-selected decode capacity. When omitted,
      *        exactly the successfully reported required storage size is supplied.
-     * @details Capacity must not exceed the owned decode array (510 bytes).
-     * Oversized
-     * capacity is rejected without calling the decoder: storage_capacity_valid
-     * is false and
-     * decode_status is absent. Sizing and encoded validation still report
-     * their actual
-     * public statuses. The previous decoded message is invalidated.
+     * @details Capacity must not exceed the owned decode array. Oversized capacity
+     * is rejected without calling the decoder: storage_capacity_valid is false and
+     * decode_status is absent. Sizing and encoded validation still report their
+     * actual public statuses. The previous decoded message is invalidated.
      */
     ApplicationDecodeResult
     DecodeMessage( const std::vector<std::uint8_t>& encoded_message,

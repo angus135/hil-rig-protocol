@@ -73,7 +73,7 @@ Firmware and bindings include:
 
 | Operation | Current codec contract |
 | --- | --- |
-| `HIL_APPLICATION_Default_Config` | Populate a configuration accepted by `Init`, using a 512-byte default complete-message profile. |
+| `HIL_APPLICATION_Default_Config` | Populate a configuration accepted by `Init`, using a 4096-byte default complete-message profile. |
 | `HIL_APPLICATION_Init` | Validate/copy local structural limits; reduced valid complete-message maxima are accepted, and `config` may alias `context->config`. |
 | `HIL_APPLICATION_Encoded_Size` | Clear output, validate the common envelope fields, dispatch existing body sizing, add the fixed header with checked arithmetic. |
 | `HIL_APPLICATION_Encode_Message` | Encode the bounded common header and selected existing body; publish a nonzero size only after complete success. |
@@ -110,8 +110,10 @@ The public C integration suite now carries the currently supported fixed
 Application subset through the existing Transport pair harness. Complete Test
 Configuration messages are 194 through 449 bytes for extension lengths 0 through
 255, fixed Test Instructions are 73 bytes, and fixed Test Results are 62 bytes.
-The default maximum complete Application message and default Transport maximum
-Application-message payload are both 512 bytes.
+The default maximum complete Application message is 4096 bytes; Transport's
+default maximum Application-message payload remains 512 bytes. Integration must
+raise the Transport limit or lower the Application limit to exchange larger
+messages. Neither layer changes the other's configuration.
 
 The integration tests include only public Application and Transport headers and
 exercise exact opaque-byte preservation, the 449-byte capacity boundary,
@@ -195,19 +197,19 @@ the byte spans used by variable Application families and System Information
 Responses. The extension and each System Information span still have an
 absolute 255-byte wire maximum because each encoded length is one byte.
 `max_encoded_message_size` bounds each complete encoded Application message and
-cannot exceed 512 bytes. `HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK` is the
+cannot exceed 65535 bytes. `HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK` is the
 fixed v0.3.0 cross-message ceiling of eight and is not a configuration field.
 They do not describe one monolithic test or tick package. Integration must
 configure Transport's maximum Application-message size to be at least the
 Application Layer's `max_encoded_message_size`; the codec does not inspect or
 change Transport configuration.
 
-`HIL_APPLICATION_Default_Config` uses a 512-byte complete-message profile and
-the existing structural maxima for the other fields.
+`HIL_APPLICATION_Default_Config` uses a 4096-byte complete-message profile,
+65535 for the variable-span policy, and the existing structural tick maximum.
 `HIL_APPLICATION_Init` accepts any complete-message maximum from
 `HIL_APPLICATION_MIN_COMPLETE_MESSAGE_SIZE` (28 bytes: the 23-byte envelope plus
 the five-byte control payload) through
-`HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE` (512 bytes), validates the other
+`HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE` (65535 bytes), validates the other
 configured limits, and copies the configuration without allocation or pointer
 retention.
 
@@ -288,8 +290,8 @@ chunks, with message and record order preserved.
 
 Firmware must never emit a ninth Type 34 chunk for one tick. Receiving one is a
 protocol-state failure and enters recovery. I2C captured records are not
-implemented and are rejected. Eight messages of at most 512 bytes bound one
-chunked tick to at most 4096 complete encoded bytes; no aggregate byte-count or
+implemented and are rejected. Eight messages of at most the default 4096 bytes
+bound one chunked tick to at most 32768 complete encoded bytes; no aggregate byte-count or
 record-count field is added, and the existing one-byte operation/record counts
 remain.
 
@@ -686,11 +688,13 @@ Configuration, Instruction, and Result paths through
 Transport. The ordered fixed-subset scenario uses test-owned semantic checkpoints
 rather than Responses and does not represent a complete production transaction.
 
-The shared v0.3.0 protocol is complete here: Type 22 upload finalisation,
+The v0.3.0 release established Type 22 upload finalisation,
 512-byte complete-message and eight-chunk ceilings, 255-byte spans, capture
 overflow reporting, Type 21/34 bounded records, allocation-free encoded
 validation, exact version matching, and explicit I2C exclusion are defined and
-implemented by the stateless codec and its bindings.
+implemented by the stateless codec and its bindings. The current size profile
+raises the default complete-message limit to 4096, the absolute limit to 65535,
+and variable record spans to 16-bit lengths; legacy spans remain one byte.
 
 Intentional v0.3.0 non-features are result resumption, range requests, result
 acknowledgements or finalisation messages, version negotiation, capabilities

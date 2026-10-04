@@ -35,13 +35,13 @@ extern "C"
         10000u, 1000u, 100u, 10u                                                                   \
     } /* 100 Hz, 1 kHz, 10 kHz, 100 kHz */
 
-#define HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE 255u
+#define HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE 65535u
 #define HIL_APPLICATION_ABSOLUTE_MAX_VARIABLE_DATA_SIZE HIL_APPLICATION_ABSOLUTE_BYTE_SPAN_SIZE
 #define HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT 1000000u
 #define HIL_APPLICATION_MAX_VARIABLE_CHUNKS_PER_TICK ( 8u )
 
 /** Default operational maximum complete Application message size. */
-#define HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE 512u
+#define HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE 4096u
 
 /**
  * @name Fixed common-envelope wire widths
@@ -61,8 +61,11 @@ extern "C"
       + HIL_APPLICATION_HEADER_PAYLOAD_SIZE_BYTES )
 /** @} */
 
-/** Fixed v0.3.0 profile ceiling for one complete Application message. */
-#define HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE
+/**
+ * Profile ceiling for one complete Application message natively bounded by
+ * 16-bit payload length.
+ */
+#define HIL_APPLICATION_ABSOLUTE_MAX_MESSAGE_SIZE 65535u
 
 /**
  * Smallest complete message supported by the current codec.

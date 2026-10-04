@@ -5,8 +5,10 @@ from __future__ import annotations
 import copy
 import gc
 import pickle
+import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import fields, is_dataclass, replace
+from pathlib import Path
 
 import hil_rig_protocol as p
 import pytest
@@ -120,12 +122,27 @@ def test_defaults_direction_neutrality_and_statelessness(codec):
         assert not hasattr(codec, name)
 
 
+def test_documented_construction_matches_native_defaults():
+    """The public setup example must describe the configuration the codec returns."""
+    documentation = (Path(__file__).parents[2] / "docs/python/application.md").read_text()
+    example = documentation.split("```python", 1)[1].split("```", 1)[0]
+    values = {
+        name: int(value.replace("_", ""))
+        for name, value in re.findall(r"(max_\w+)=(\d[\d_]*)", example)
+    }
+    assert p.ApplicationCodec(p.ApplicationConfig(**values)).config == p.ApplicationConfig()
+    native = ffi.new("HIL_Application_Config_T *")
+    assert lib.HIL_APPLICATION_Default_Config(native) == lib.HIL_APPLICATION_STATUS_OK
+    for name, value in values.items():
+        assert getattr(native, name) == value
+
+
 @pytest.mark.parametrize(
     "config,status",
     [
         (p.ApplicationConfig(max_encoded_message_size=0), p.ApplicationStatus.BUFFER_TOO_SMALL),
-        (p.ApplicationConfig(max_encoded_message_size=513), p.ApplicationStatus.INVALID_LENGTH),
-        (p.ApplicationConfig(max_variable_data_size=256), p.ApplicationStatus.INVALID_COUNT),
+        (p.ApplicationConfig(max_encoded_message_size=65536), p.ApplicationStatus.INVALID_LENGTH),
+        (p.ApplicationConfig(max_variable_data_size=65536), p.ApplicationStatus.INVALID_COUNT),
         (p.ApplicationConfig(max_expected_tick_count=1000001), p.ApplicationStatus.INVALID_LENGTH),
     ],
 )
@@ -252,7 +269,7 @@ def test_all_truncated_prefixes_and_trailing_data(codec, factory):
         codec.decode(wire + b"\x00")
     assert caught.value.status is p.ApplicationStatus.MALFORMED_MESSAGE
     with pytest.raises(p.ApplicationDecodeError) as caught:
-        codec.decode(wire + bytes(512))
+        codec.decode(wire + bytes(p.ApplicationConfig().max_encoded_message_size))
     assert caught.value.status is p.ApplicationStatus.INVALID_LENGTH
 
 
@@ -335,7 +352,9 @@ def test_discovery_controls_and_exact_version_gate(codec):
         assert codec.decode(codec.encode(control)) == control
 
     p.check_protocol_version(p.PROTOCOL_VERSION)
-    foreign = p.ProtocolVersion(p.PROTOCOL_VERSION.major, p.PROTOCOL_VERSION.minor, 1)
+    foreign = p.ProtocolVersion(
+        p.PROTOCOL_VERSION.major, p.PROTOCOL_VERSION.minor, p.PROTOCOL_VERSION.patch + 1
+    )
     with pytest.raises(p.ApplicationVersionMismatchError) as caught:
         p.check_protocol_version(foreign)
     assert caught.value.local_version is p.PROTOCOL_VERSION

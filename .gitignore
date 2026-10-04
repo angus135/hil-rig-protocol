@@ -6,6 +6,8 @@ build/
 
 build*/
 cmake-build*/
+CMakeCache.txt
+CMakeFiles/
 
 # Python package/build outputs
 .venv/
