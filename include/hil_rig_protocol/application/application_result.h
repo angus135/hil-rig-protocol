@@ -176,7 +176,8 @@ typedef struct
  * When record_count > 0, the header is followed by record_count 4-byte-aligned TLV records:
  * - peripheral_type at offset 0 as uint8_t (1 byte).
  * - channel at offset 1 as uint8_t (1 byte).
- * - payload_length at offset 2 as uint16_t little-endian (2 bytes, 1..255).
+ * - payload_length at offset 2 as uint16_t little-endian (2 bytes, 1..65535),
+ *   further bounded by the complete-message limit and record alignment.
  * - data bytes at offset 4 (payload_length bytes).
  * - padding bytes (0 to 3 zero bytes to align the record to a 4-byte boundary).
  *
