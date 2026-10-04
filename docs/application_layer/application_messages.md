@@ -945,11 +945,13 @@ extend them only through the documented versioning process.
 
 ## v0.3.0 completion boundary
 
-The shared v0.3.0 protocol is complete here: Type 22 upload finalisation,
+The v0.3.0 release established Type 22 upload finalisation,
 512-byte complete-message and eight-chunk ceilings, 255-byte spans, capture
 overflow reporting, Type 21/34 bounded records, allocation-free encoded
 validation, exact version matching, and explicit I2C exclusion are defined and
-implemented by the stateless codec and its bindings.
+implemented by the stateless codec and its bindings. The current size profile
+raises the default complete-message limit to 4096, the absolute limit to 65535,
+and variable record spans to 16-bit lengths; legacy spans remain one byte.
 
 Intentional v0.3.0 non-features are result resumption, range requests, result
 acknowledgements or finalisation messages, version negotiation, capabilities

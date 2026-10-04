@@ -35,7 +35,7 @@ extern "C"
  * @brief Populate the default stateless codec configuration.
  *
  * @details The default complete-message limit is
- * HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE (512 bytes). The returned
+ * HIL_APPLICATION_DEFAULT_MAX_MESSAGE_SIZE (4096 bytes). The returned
  * configuration is accepted by HIL_APPLICATION_Init().
  *
  * @param[out] config Configuration to populate.
