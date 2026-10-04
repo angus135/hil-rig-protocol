@@ -92,10 +92,11 @@ the stateless codec; no aggregate byte or record count is encoded.
 | `uint16_t` | 2 bytes | little-endian |
 | `uint32_t` | 4 bytes | little-endian |
 | `uint64_t` | 8 bytes | little-endian |
-| byte span | `1 + N` bytes | one-byte length followed by exactly N bytes |
+| legacy byte span | `1 + N` bytes | one-byte length followed by exactly N bytes |
+| aligned variable record span | `2 + N` bytes before padding | two-byte length followed by exactly N bytes |
 | channel ID | 3 bytes | peripheral `uint8_t`, then channel `uint16_t` little-endian |
 
-A byte span therefore has a wire maximum of 255 data bytes:
+Legacy extension and diagnostic spans have a wire maximum of 255 data bytes:
 
 ```text
 +----------+-------------------------------------+
@@ -224,7 +225,7 @@ The fixed payload, through and including the extension-length byte, is exactly
 **171 bytes**. An empty-extension complete message is therefore `23 + 171 =
 194` bytes. Extension length N produces `194 + N` complete bytes. The maximum
 255-byte extension produces a 426-byte payload and a **449-byte complete
-message**, which fits the 512-byte default `max_encoded_message_size`. The
+message**, which fits the 4096-byte default `max_encoded_message_size`. The
 one-byte extension field sets the absolute wire maximum at 255 data bytes, but
 encoding, decoding, decode-storage queries, and encoded-message validation also
 enforce the initialized context's `max_variable_data_size`. A context may

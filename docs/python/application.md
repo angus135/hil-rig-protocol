@@ -24,8 +24,8 @@ from hil_rig_protocol import ApplicationCodec, ApplicationConfig
 
 application_codec = ApplicationCodec(
     ApplicationConfig(
-        max_encoded_message_size=512,
-        max_variable_data_size=255,
+        max_encoded_message_size=4096,
+        max_variable_data_size=65535,
         max_expected_tick_count=1_000_000,
     )
 )
@@ -305,8 +305,10 @@ if encoded is not None:
     message = application_codec.decode(encoded)
 ```
 
-Configure Transport to accept the Application sizes you intend to exchange. A
-maximum 449-byte configuration fits the default 512-byte Transport configuration.
+Configure Transport to accept the Application sizes you intend to exchange.
+Application defaults to 4096 bytes while Transport defaults to 512 bytes; raise
+Transport's maximum Application-message size or lower the Application limit.
+A maximum 449-byte configuration fits the default Transport configuration.
 Neither codec inspects the other's configuration. Transport delivers opaque bytes
 unchanged, and `DELIVERY_CONFIRMED` acknowledges byte delivery only. A malformed
 Application payload can be delivered and acknowledged normally, then rejected by
@@ -357,9 +359,12 @@ assert codec.decode(codec.encode(result)) == result
 ```
 
 Flags `0` completes the tick; flags `1` means more chunks follow for that tick.
-The caller splits streams into payloads of at most 255 bytes and no more than
-`MAX_VARIABLE_CHUNKS_PER_TICK` (8) messages per tick. Eight 512-byte messages
-bound a chunked tick to 4096 complete encoded bytes. The ninth Type 21 chunk
+The caller splits streams into records that fit the configured complete-message
+limit, including headers and alignment, and no more than
+`MAX_VARIABLE_CHUNKS_PER_TICK` (8) messages per tick. Record lengths are unsigned
+16-bit values; one-byte extension and diagnostic lengths retain their 255-byte
+limit. Eight default 4096-byte messages bound a chunked tick to 32768 complete
+encoded bytes. The ninth Type 21 chunk
 gets a negative Tick Response and invalidates the upload; firmware must never
 emit a ninth Type 34 chunk, and receiving one enters recovery. The codec
 preserves flags and tick numbers; it does not split, accumulate, order, or
