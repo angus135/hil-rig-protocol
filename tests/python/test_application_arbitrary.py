@@ -32,6 +32,26 @@ def test_control_reference_bytes_and_optional_id(codec: p.ApplicationCodec) -> N
     )
 
 
+def test_previous_release_fails_discovery_and_ordinary_envelope(codec: p.ApplicationCodec) -> None:
+    previous = p.ProtocolVersion(0, 3, 1)
+    peer_wire = bytearray(
+        codec.encode(p.SystemInfoResponse(p.PROTOCOL_VERSION, p.ProtocolVersion(1, 0, 0)))
+    )
+    peer_wire[1] = previous.minor
+    peer_wire[25] = previous.minor
+    peer_wire[27] = previous.patch
+    peer = codec.decode(peer_wire)
+    assert type(peer) is p.SystemInfoResponse
+    assert peer.protocol_version == previous
+    with pytest.raises(p.ApplicationVersionMismatchError):
+        p.check_protocol_version(peer.protocol_version)
+    wire = bytearray(codec.encode(p.ArbitraryControl(1234, 42)))
+    wire[1] = previous.minor
+    with pytest.raises(p.ApplicationDecodeError) as caught:
+        codec.decode(wire)
+    assert caught.value.status is p.ApplicationStatus.VERSION_MISMATCH
+
+
 @pytest.mark.parametrize("size", [0, 1, 255, 256, 4067])
 def test_binary_data_round_trip_and_detached_copy(codec: p.ApplicationCodec, size: int) -> None:
     payload = bytes(i % 256 for i in range(size))

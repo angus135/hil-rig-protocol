@@ -376,7 +376,7 @@ def test_discovery_controls_and_exact_version_gate(codec):
 
 def test_finalize_test_upload_has_exact_type22_wire_vector_and_zero_storage(codec):
     value = p.FinalizeTestUpload(p.TestId(bytes(range(16))))
-    expected = bytes((0, 3, 1)) + bytes(range(16)) + bytes((22, 0, 4, 0, 0, 0, 0, 0))
+    expected = bytes((0, 4, 1)) + bytes(range(16)) + bytes((22, 0, 4, 0, 0, 0, 0, 0))
     wire = codec.encode(value)
     assert len(wire) == 27
     assert wire == expected
@@ -496,11 +496,11 @@ def test_maximum_discovery_response_owns_both_native_storage_spans():
 
 def test_foreign_discovery_decodes_before_explicit_compatibility_failure(codec):
     wire = bytearray(codec.encode(p.SystemInfoRequest()))
-    wire[1] = 4
-    wire[27] = 4
+    wire[1] = p.PROTOCOL_VERSION.minor + 1
+    wire[27] = p.PROTOCOL_VERSION.minor + 1
     peer = codec.decode(wire)
     assert isinstance(peer, p.SystemInfoRequest)
-    assert peer.protocol_version.minor == 4
+    assert peer.protocol_version.minor == p.PROTOCOL_VERSION.minor + 1
     with pytest.raises(p.ApplicationVersionMismatchError):
         p.check_protocol_version(peer.protocol_version)
 
