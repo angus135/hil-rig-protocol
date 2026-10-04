@@ -25,6 +25,30 @@ def codec():
     return p.ApplicationCodec(p.ApplicationConfig())
 
 
+def test_absolute_record_limit_accounts_for_envelope_alignment_and_detached_copy(result_family):
+    """The last encodable span is smaller than u16's maximum in both families."""
+    codec = p.ApplicationCodec(p.ApplicationConfig(max_encoded_message_size=65535))
+    maximum = 65496 if result_family else 65500
+    for length in (maximum - 1, maximum):
+        entries = ((p.PeripheralType.UART, 0, b"\xa5" * length),)
+        value = message(result_family, entries)
+        wire = codec.encode(value)
+        assert wire == golden(result_family, entries)
+        assert len(wire) == 65535
+        source = bytearray(wire)
+        decoded = codec.decode(source)
+        source[:] = bytes(len(source))
+        assert decoded == value
+    for length, status in (
+        (maximum + 1, p.ApplicationStatus.BUFFER_TOO_SMALL),
+        (65535, p.ApplicationStatus.INVALID_LENGTH),
+    ):
+        value = message(result_family, ((p.PeripheralType.UART, 0, b"\xa5" * length),))
+        with pytest.raises(p.ApplicationEncodeError) as caught:
+            codec.encode(value)
+        assert caught.value.status is status
+
+
 def message(result_family, entries=((p.PeripheralType.UART, 0, b"\x00\xff\x80"),), **kwargs):
     if result_family:
         return p.VariableTestResult(

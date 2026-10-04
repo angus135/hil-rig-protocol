@@ -629,6 +629,65 @@ TEST_P( ApplicationAlignedRecords, ExactEncodeCapacityAndEveryShortDecodeCapacit
     }
 }
 
+/** Complete-message overhead and alignment bound otherwise representable u16 spans. */
+TEST_P( ApplicationAlignedRecords, AbsoluteMessageLimitIncludesRecordHeaderAndPadding )
+{
+    HIL_Application_Config_T config{};
+    ASSERT_EQ( HIL_APPLICATION_Default_Config( &config ), HIL_APPLICATION_STATUS_OK );
+    config.max_encoded_message_size = 65535u;
+    config.max_variable_data_size   = 65535u;
+    ASSERT_EQ( HIL_APPLICATION_Init( &context, &config ), HIL_APPLICATION_STATUS_OK );
+    const std::size_t maximum = GetParam() ? 65496u : 65500u;
+    for ( const std::size_t length :
+          std::array<std::size_t, 4u>{ maximum - 1u, maximum, maximum + 1u, 65535u } )
+    {
+        SCOPED_TRACE( length );
+        const std::vector<std::uint8_t> payload( length, 0xa5u );
+        const auto  message  = Message( HIL_APPLICATION_PERIPHERAL_UART, 0u, payload );
+        std::size_t required = 99u;
+        if ( length > maximum )
+        {
+            EXPECT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &required ),
+                       length == 65535u ? HIL_APPLICATION_STATUS_INVALID_LENGTH
+                                        : HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL );
+            EXPECT_EQ( required, 0u );
+            std::vector<std::uint8_t> output( 65535u );
+            std::size_t               used = 99u;
+            EXPECT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, output.data(),
+                                                       output.size(), &used ),
+                       HIL_APPLICATION_STATUS_BUFFER_TOO_SMALL );
+            EXPECT_EQ( used, 0u );
+            continue;
+        }
+        const auto wire = Wire( HIL_APPLICATION_PERIPHERAL_UART, 0u, payload );
+        ASSERT_EQ( wire.size(), 65535u );
+        ASSERT_EQ( HIL_APPLICATION_Encoded_Size( &context, &message, &required ),
+                   HIL_APPLICATION_STATUS_OK );
+        EXPECT_EQ( required, wire.size() );
+        std::vector<std::uint8_t> output( required );
+        std::size_t               used = 99u;
+        ASSERT_EQ( HIL_APPLICATION_Encode_Message( &context, &message, output.data(), output.size(),
+                                                   &used ),
+                   HIL_APPLICATION_STATUS_OK );
+        EXPECT_EQ( used, wire.size() );
+        EXPECT_EQ( output, wire );
+        ASSERT_EQ(
+            HIL_APPLICATION_Decode_Storage_Size( &context, wire.data(), wire.size(), &required ),
+            HIL_APPLICATION_STATUS_OK );
+        std::vector<std::max_align_t> workspace( ( required + sizeof( std::max_align_t ) - 1u )
+                                                 / sizeof( std::max_align_t ) );
+        HIL_Application_Message_T     decoded{};
+        ASSERT_EQ( HIL_APPLICATION_Decode_Message(
+                       &context, wire.data(), wire.size(), &decoded,
+                       reinterpret_cast<std::uint8_t*>( workspace.data() ), required, &used ),
+                   HIL_APPLICATION_STATUS_OK );
+        const auto& span = GetParam() ? decoded.body.variable_test_result.records[0].data
+                                      : decoded.body.update_instruction.operations[0].payload;
+        EXPECT_EQ( span.size, length );
+        EXPECT_TRUE( std::equal( payload.begin(), payload.end(), span.data ) );
+    }
+}
+
 INSTANTIATE_TEST_SUITE_P( UpdateAndResult, ApplicationAlignedRecords, ::testing::Bool() );
 
 }  // namespace

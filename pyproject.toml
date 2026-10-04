@@ -74,6 +74,7 @@ sdist.include = [
     "bindings/python/README.md",
     "docs/python/*.md",
     "examples/CMakeLists.txt",
+    "examples/c/*.c",
     "examples/README.md",
     "examples/python/*.py",
     "include",

@@ -1,3 +1,10 @@
-# The caller-owned Python servicing example is interpreted and has no CMake
-# target. This directory remains a normal opt-in extension point for future C
-# examples without changing firmware library-only builds.
+# Caller-owned C11 codec example; Python servicing examples are interpreted.
+add_executable(hil_rig_protocol_application_example c/application_codec.c)
+target_compile_features(hil_rig_protocol_application_example PRIVATE c_std_11)
+target_link_libraries(hil_rig_protocol_application_example PRIVATE hil_rig_protocol::hil_rig_protocol)
+hil_rig_protocol_apply_warnings(hil_rig_protocol_application_example)
+hil_rig_protocol_apply_sanitizers(hil_rig_protocol_application_example)
+hil_rig_protocol_apply_coverage(hil_rig_protocol_application_example)
+if(HIL_RIG_PROTOCOL_BUILD_TESTS)
+    add_test(NAME hil_rig_protocol_application_example COMMAND hil_rig_protocol_application_example)
+endif()
