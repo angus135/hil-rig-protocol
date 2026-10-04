@@ -131,7 +131,73 @@ class GlobalControlCommand(IntEnum):
 
     INVALID = 0
     RESET_APPLICATION = 1
+    GET_STATUS = 2
     RESERVED = 255
+
+
+class FailureSource(IntEnum):
+    """Stable schema-1 failure source, mapped explicitly by endpoints."""
+
+    NONE = 0x0
+    RUN_STATE_MANAGER = 0x1
+    EXECUTION_MANAGER = 0x2
+    FLASH_MANAGER = 0x3
+    HOST_INTERFACE = 0x4
+    DRIVER_LIFECYCLE = 0x5
+    EXECUTION_TIMER = 0x6
+
+
+class FailureStage(IntEnum):
+    """Stable schema-1 failure stage, mapped explicitly by endpoints."""
+
+    NONE = 0x0
+    PREPARATION = 0x1
+    EXECUTION = 0x2
+    SHUTDOWN = 0x3
+    FINALISATION = 0x4
+    TRANSFER = 0x5
+    CLEANUP = 0x6
+
+
+class FailureReason(IntEnum):
+    """Stable schema-1 failure reason, mapped explicitly by endpoints."""
+
+    NONE = 0x0
+    HOST_ABORT = 0x1
+    APPLICATION_RESET = 0x2
+    INVALID_LIFECYCLE_STATE = 0x10
+    HARDWARE_NOT_READY = 0x11
+    CONFIGURATION_UNAVAILABLE = 0x12
+    DRIVER_CONFIGURATION_FAILED = 0x20
+    DRIVER_CONFIGURATION_TIMEOUT = 0x21
+    DRIVER_START_FAILED = 0x22
+    DRIVER_START_TIMEOUT = 0x23
+    DRIVER_STOP_FAILED = 0x24
+    DRIVER_STOP_TIMEOUT = 0x25
+    ACQUISITION_EPOCH_FAILED = 0x30
+    EXECUTION_TIMER_FAILED = 0x31
+    EXECUTION_NOT_PREPARED = 0x40
+    INSTRUCTION_UNDERRUN = 0x41
+    INSTRUCTION_CORRUPT = 0x42
+    INSTRUCTION_LATE = 0x43
+    OPERATION_REJECTED = 0x44
+    INSTRUCTION_CONSUME_FAILED = 0x45
+    MEASUREMENT_REJECTED = 0x46
+    INSTRUCTION_UNCONSUMED = 0x47
+    FLASH_PREPARATION_FAILED = 0x50
+    FLASH_PREPARATION_TIMEOUT = 0x51
+    FLASH_FINALISATION_FAILED = 0x52
+    FLASH_FINALISATION_TIMEOUT = 0x53
+    RESULT_TRANSFER_FAILED = 0x54
+    RESULT_DISPOSITION_FAILED = 0x55
+    FLASH_MANAGER_FAILED = 0x56
+    HOST_RESPONSE_BLOCKED = 0x60
+    INSTRUCTION_UPLOAD_TIMEOUT = 0x61
+    USB_INITIALISATION_FAILED = 0x62
+    CODEC_INITIALISATION_FAILED = 0x63
+    TRANSPORT_INITIALISATION_FAILED = 0x64
+    HOST_INTERFACE_FAILED = 0x65
+    INTERNAL_FAILURE = 0x70
 
 
 class ResponseScope(IntEnum):
@@ -917,6 +983,65 @@ class ArbitraryData:
             _exact("test_id", self.test_id, TestId)
 
 
+class StatusOrigin(IntEnum):
+    """Whether this snapshot completes GET_STATUS or is an unsolicited notification."""
+
+    INVALID = 0
+    QUERY_RESPONSE = 1
+    NOTIFICATION = 2
+
+
+class RigState(IntEnum):
+    """Stable public states; endpoints map their lifecycle states explicitly."""
+
+    INVALID = 0
+    INITIALISING = 1
+    IDLE = 2
+    UPLOADING = 3
+    CONFIGURING = 4
+    ARMED = 5
+    RUNNING = 6
+    FINALISING = 7
+    RESULTS_READY = 8
+    TRANSFERRING = 9
+    RECOVERING = 10
+    FAULT = 11
+
+
+class RigStatusFlag(IntEnum):
+    """Snapshot bits; combine these into the integer flags field."""
+
+    READY_FOR_NEW_TEST = 0x01
+    TRANSITION_PENDING = 0x02
+    RESET_PERMITTED = 0x04
+    EXECUTION_ACTIVE = 0x08
+
+
+@dataclass(frozen=True, slots=True)
+class RigStatus:
+    """Captured readiness/failure fields, with an optional active transaction ID."""
+
+    origin: StatusOrigin
+    state: RigState
+    flags: int = 0
+    test_id: TestId | None = None
+    schema_version: int = 1
+    failure_source: FailureSource = FailureSource.NONE
+    failure_stage: FailureStage = FailureStage.NONE
+    failure_reason: FailureReason = FailureReason.NONE
+
+    def __post_init__(self) -> None:
+        _exact("origin", self.origin, StatusOrigin)
+        _exact("state", self.state, RigState)
+        _validate_integer("flags", self.flags, 0, _UINT32_MAX)
+        if self.test_id is not None:
+            _exact("test_id", self.test_id, TestId)
+        _validate_integer("schema_version", self.schema_version, 0, _UINT16_MAX)
+        _exact("failure_source", self.failure_source, FailureSource)
+        _exact("failure_stage", self.failure_stage, FailureStage)
+        _exact("failure_reason", self.failure_reason, FailureReason)
+
+
 type ApplicationMessage = (
     SystemInfoRequest
     | SystemInfoResponse
@@ -932,10 +1057,18 @@ type ApplicationMessage = (
     | ApplicationErrorMessage
     | ArbitraryControl
     | ArbitraryData
+    | RigStatus
 )
 
 
 __all__ = [
+    "RigStatus",
+    "StatusOrigin",
+    "RigState",
+    "RigStatusFlag",
+    "FailureSource",
+    "FailureStage",
+    "FailureReason",
     "ArbitraryControl",
     "ArbitraryData",
     "PeripheralType",

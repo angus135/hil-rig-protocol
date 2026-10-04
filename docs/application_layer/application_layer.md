@@ -93,7 +93,8 @@ This foundation deliberately does not complete every message family. The current
 | Test Configuration | Fully supported by the codec: typed validation, body sizing, encode/decode, decode-storage scanning, fixed Digital/Analogue/PWM/CAN/SPI/UART/I2C arrays, and the length-delimited extension are implemented. The extension has a 255-byte wire maximum and is additionally bounded by `context->config.max_variable_data_size`. |
 | Test Instruction | Fully supported fixed codec family: 50-byte payload / 73-byte complete message, fixed sizing, encode/decode, zero decode storage, Digital/PWM/tick structural validation, and encoded-message validation are implemented. |
 | Execution Control | Fully supported fixed 5-byte START/ABORT body, including zero reserved flags and required Test ID. |
-| Global Control | Fully supported fixed 5-byte RESET_APPLICATION body, including zero reserved flags and forbidden Test ID. |
+| Global Control | Fixed 5-byte RESET_APPLICATION or GET_STATUS body, zero reserved flags, forbidden Test ID. |
+| Rig Status | Fixed 12-byte schema-1 body; optional active Test ID, readiness/failure validation, no decode storage. |
 | Test Result | Fully supported fixed codec family: 39-byte payload / 62-byte complete message, fixed sizing, encode/decode, zero decode storage, Digital/PWM/tick/condition structural validation, and encoded-message validation are implemented. |
 | Update Instruction | Fully supported bounded variable-length chunk family: Type 21 operation records, chunk flags, per-message duplicate checks, sizing, encode/decode, and decode-storage scanning are implemented. |
 | Variable Test Result | Fully supported bounded variable-length chunk family: Type 34 captured records, chunk flags, per-message duplicate checks, sizing, encode/decode, and decode-storage scanning are implemented. |
@@ -406,7 +407,8 @@ specific reason applies. Semantic rejection is not a codec or Transport failure.
 
 For configuration, tick, and Complete Test scopes, successful Responses use
 `ACCEPTED`. For Execution Control and Global Control scopes, successful
-Responses use `COMPLETED`. The codec can eventually validate permitted
+Responses use `COMPLETED`, except GET_STATUS succeeds with a QUERY_RESPONSE
+Rig Status and no success Response. The codec can eventually validate permitted
 scope/outcome/correlation combinations, but only integration decides the real
 outcome.
 

@@ -13,6 +13,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/** Encoded status width; unrelated to the native struct size. */
+#define HIL_APPLICATION_RIG_STATUS_PAYLOAD_SIZE 12u
+
 #include "hil_rig_protocol/application/application_message.h"
 #include "hil_rig_protocol/application/application_status.h"
 

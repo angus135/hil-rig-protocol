@@ -115,7 +115,7 @@ HIL_APPLICATION_Execution_Control_validate( const HIL_Application_Context_T*    
 
 /**
  * @brief Validate a Global Control body.
- * @details RESET_APPLICATION is the only current command and reserved flags
+ * @details RESET_APPLICATION and GET_STATUS are supported; reserved flags
  * must be zero.
  * @param[in] context Initialized Application context.
  * @param[in] data    Typed Global Control body.
@@ -168,6 +168,16 @@ HIL_APPLICATION_Response_validate( const HIL_Application_Context_T*  context,
 /** Validate the structural fields of an Application Error body. */
 HIL_Application_Status_T HIL_APPLICATION_Error_validate( const HIL_Application_Context_T* context,
                                                          const HIL_Application_Error_T*   data );
+
+/** Validate stable failure source/stage/reason combinations. */
+HIL_Application_Status_T
+HIL_APPLICATION_Failure_validate( HIL_Application_Failure_Source_T source,
+                                  HIL_Application_Failure_Stage_T  stage,
+                                  HIL_Application_Failure_Reason_T reason );
+/** Validate schema, enums, flags and local readiness combinations. */
+HIL_Application_Status_T
+HIL_APPLICATION_Rig_Status_validate( const HIL_Application_Context_T*    context,
+                                     const HIL_Application_Rig_Status_T* data );
 
 #ifdef __cplusplus
 }

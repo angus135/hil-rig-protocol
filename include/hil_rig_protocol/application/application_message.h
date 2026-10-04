@@ -23,6 +23,7 @@
 #include "hil_rig_protocol/application/application_instruction.h"
 #include "hil_rig_protocol/application/application_response.h"
 #include "hil_rig_protocol/application/application_result.h"
+#include "hil_rig_protocol/application/application_rig_status.h"
 #include "hil_rig_protocol/application/application_system_info.h"
 #include "hil_rig_protocol/application/application_test_config.h"
 
@@ -116,6 +117,8 @@ typedef enum
     HIL_APPLICATION_MESSAGE_TYPE_RESPONSE = 48,
     /** Firmware-to-Python broader Application fault report. */
     HIL_APPLICATION_MESSAGE_TYPE_ERROR = 49,
+    /** Firmware-to-host captured readiness or query reply. */
+    HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS = 50,
     /** Either direction: endpoint-defined u32 control ID and value. */
     HIL_APPLICATION_MESSAGE_TYPE_ARBITRARY_CONTROL = 64,
     /** Either direction: endpoint-defined u32 data ID and opaque bytes. */
@@ -149,7 +152,7 @@ typedef enum
  *
  * has_test_id is zero for System Information and Global Control, one for Test
  * Configuration, Test Instruction, Update Instruction, Execution Control, Test
- * Result, and Variable Test Result, optional for Error and both Arbitrary
+ * Result, and Variable Test Result, optional for Error, Rig Status and both Arbitrary
  * families, and scope-dependent for
  * Response. A Global Control Response has no Test ID; all test-scoped Responses
  * require one. test_id bytes are ignored when has_test_id is zero; no byte
@@ -197,6 +200,8 @@ typedef struct
         HIL_Application_Response_T response;
         /** Body for ERROR. */
         HIL_Application_Error_T error;
+        /** Body for RIG_STATUS; optional active Test ID, absent when ready. */
+        HIL_Application_Rig_Status_T rig_status;
         /** Body for ARBITRARY_CONTROL. */
         HIL_Application_Arbitrary_Control_T arbitrary_control;
         /** Body for ARBITRARY_DATA. */

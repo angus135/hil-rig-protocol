@@ -203,6 +203,11 @@ HIL_Application_Status_T HIL_APPLICATION_Error_size( const HIL_Application_Conte
                                                      const HIL_Application_Error_T*   data,
                                                      size_t* encoded_size );
 
+/** Validate and size the fixed 12-byte status payload. */
+HIL_Application_Status_T HIL_APPLICATION_Rig_Status_size( const HIL_Application_Context_T* context,
+                                                          const HIL_Application_Rig_Status_T* data,
+                                                          size_t* encoded_size );
+
 #ifdef __cplusplus
 }
 #endif

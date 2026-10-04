@@ -290,6 +290,27 @@ deliberately reaches C and raises a decode error with `TRUNCATED_MESSAGE`.
 Returned records and spans are entirely Python-owned and remain valid after input
 mutation, another decode or codec destruction.
 
+## Readiness queries
+
+```python
+from hil_rig_protocol import GlobalControl, GlobalControlCommand, RigStatus, RigState, StatusOrigin
+
+query = GlobalControl(GlobalControlCommand.GET_STATUS)
+assert len(codec.encode(query)) == 28
+snapshot = RigStatus(StatusOrigin.QUERY_RESPONSE, RigState.IDLE, flags=5)
+assert len(codec.encode(snapshot)) == 35
+assert codec.decode(codec.encode(snapshot)) == snapshot
+```
+
+`RigStatus` has an optional active `TestId` and defaults to schema 1. Its flags
+are integer combinations of `RigStatusFlag` values. `FailureSource`, `FailureStage`
+and `FailureReason` preserve stable protocol provenance shared with run reports.
+Unknown schema versions and invalid semantic combinations are rejected by C.
+Query success is one `QUERY_RESPONSE` snapshot; failure is an `ApplicationResponse`
+with Global Control scope echoing GET_STATUS. `NOTIFICATION` snapshots do not
+complete queries. The consuming host serializes standard pending operations.
+Readiness requires endpoint hardware, cleanup and output checks beyond this codec.
+
 ## Explicit Transport composition
 
 For a connected and serviced Transport, submission and reception remain separate

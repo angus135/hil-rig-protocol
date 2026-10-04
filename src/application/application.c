@@ -28,6 +28,9 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Size( const HIL_Application
 {
     switch ( message->type )
     {
+        case HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS:
+            return HIL_APPLICATION_Rig_Status_size( context, &message->body.rig_status,
+                                                    payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
             return HIL_APPLICATION_System_Info_Request_size(
                 context, &message->subtype, message->test_id, &message->body.system_info_request,
@@ -92,6 +95,9 @@ HIL_APPLICATION_Body_Encode( const HIL_Application_Context_T* context,
 {
     switch ( message->type )
     {
+        case HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS:
+            return HIL_APPLICATION_Rig_Status_encode( context, &message->body.rig_status,
+                                                      payload_capacity, payload, payload_size );
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
             return HIL_APPLICATION_System_Info_Request_encode(
                 context, &message->subtype, message->test_id, &message->body.system_info_request,
@@ -158,6 +164,10 @@ static HIL_Application_Status_T HIL_APPLICATION_Body_Decode(
 {
     switch ( message->type )
     {
+        case HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS:
+            return HIL_APPLICATION_Rig_Status_decode( &message->body.rig_status, payload,
+                                                      payload_size, consumed_payload_size,
+                                                      used_decoded_size );
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
             return HIL_APPLICATION_System_Info_Request_decode(
                 context, &message->subtype, message->test_id, &message->body.system_info_request,
@@ -571,6 +581,7 @@ HIL_APPLICATION_Decode_Storage_Size( const HIL_Application_Context_T* context,
             }
             return HIL_APPLICATION_Validate_Discovery_Storage_Envelope(
                 &envelope, &encoded_message[HIL_APPLICATION_HEADER_SIZE_BYTES], payload_size );
+        case HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS:
         case HIL_APPLICATION_MESSAGE_TYPE_TEST_INSTRUCTION:
         case HIL_APPLICATION_MESSAGE_TYPE_EXECUTION_CONTROL:
         case HIL_APPLICATION_MESSAGE_TYPE_GLOBAL_CONTROL:
@@ -737,6 +748,8 @@ HIL_APPLICATION_Validate_Message( const HIL_Application_Context_T* context,
 
     switch ( message->type )
     {
+        case HIL_APPLICATION_MESSAGE_TYPE_RIG_STATUS:
+            return HIL_APPLICATION_Rig_Status_validate( context, &message->body.rig_status );
         case HIL_APPLICATION_MESSAGE_TYPE_SYSTEM_INFO_REQUEST:
             return HIL_APPLICATION_System_Info_Request_validate(
                 context, &message->body.system_info_request );
