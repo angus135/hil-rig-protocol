@@ -171,7 +171,7 @@ TEST_F( ApplicationRunReport, TerminalAndSamplingRelationships )
     EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
 }
 
-/** Rejected starts are explicit terminal reports and cannot contain execution output. */
+/** Terminal rejection of the matching finalised test cannot contain execution output. */
 TEST_F( ApplicationRunReport, RejectedStartRelationships )
 {
     auto& report                = message.body.run_report;

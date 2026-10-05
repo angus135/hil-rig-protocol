@@ -490,9 +490,11 @@ not mean an invalid section. The opaque `extension_data` is immutable bytes of
 length 0..255 and decodes as a detached copy. Unknown extension content is preserved.
 
 Wait for RUN_REPORT to close the stream, including failures or aborts with fewer
-than N ticks and rejected starts with none. `RunOutcome.REJECTED` is paired with
-`ExecutionOutcome.NOT_STARTED`, `RunResultStatus.UNAVAILABLE`, zero emitted
-ticks, only the terminal section valid, and nonzero failure provenance.
+than N ticks and terminal rejection of the matching armed test with none.
+Invalid, wrong-ID, and premature START requests create no report; a duplicate
+creates no additional report. `RunOutcome.REJECTED` is paired with `ExecutionOutcome.NOT_STARTED`,
+`RunResultStatus.UNAVAILABLE`, zero emitted ticks, only the terminal section
+valid, and nonzero failure provenance.
 Distinguish the report's run result status from each tick's capture
 condition. Persist the report with the dataset and trust a PARTIAL stream only
 as a contiguous completed prefix; UNAVAILABLE results are diagnostic data.

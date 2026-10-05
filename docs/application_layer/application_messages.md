@@ -97,7 +97,7 @@ Presence rules:
 | Variable Test Result | required |
 | Application Response | required for test scopes; forbidden for Global Control scope |
 | Rig Status | optional active transaction ID; forbidden when READY_FOR_NEW_TEST |
-| Run Report | required resolved START Test ID |
+| Run Report | required matching finalised-test ID |
 | Application Error | optional: present for a test-specific fault, absent for a global fault |
 | Arbitrary Control/Data | optional endpoint-defined context |
 
@@ -119,7 +119,7 @@ do not retain a transaction and therefore do not enforce it.
 | Global Control RESET_APPLICATION | Python | Firmware | No Test ID | None | `COMPLETED` clears active Application transaction data/conditions; Transport unchanged |
 | Test Result | Firmware | Python | Accepted Test ID and tick | START completed; execution completed or stopped early and result set is available | Increasing complete ticks; RUN_REPORT closes the stream; no per-result Response |
 | Variable Test Result | Firmware | Python | Accepted Test ID and tick | START completed; execution completed or stopped early and sparse records produced | Sent in tick order; no per-result Response |
-| Run Report | Firmware | Python | Resolved START Test ID | START was completed, failed after admission, aborted, or rejected | Closes the stream, including a rejected START with no result messages |
+| Run Report | Firmware | Python | Matching finalised-test ID | START for the matching armed test was completed, failed after admission, aborted, or terminally rejected | Closes the stream, including terminal rejection with no result messages; invalid, wrong-ID, and premature START requests create no report, while a duplicate creates no additional report |
 | Application Response | Firmware | Python | Scope-dependent | A correlated request/data acceptance decision | Carries semantic outcome and transaction effect |
 | Application Error | Firmware | Python | Optional Test ID/tick | Broader fault rather than one request rejection | Integration-dependent recovery |
 | Arbitrary Control | Either | Either | Optional Test ID | Feature-specific handler | No implicit Response or lifecycle effect |
@@ -882,6 +882,10 @@ Firmware -> Python: Response(Execution Control START, REJECTED,
 Firmware -> Python: Run Report(B, REJECTED, execution NOT_STARTED,
                                results UNAVAILABLE, failure provenance)
 No codec or Transport failure is implied
+
+Invalid, wrong-ID, and premature START requests receive their applicable
+Response but do not produce a Run Report; a duplicate produces no additional
+report
 ```
 
 ### ABORT
@@ -1030,17 +1034,20 @@ bookkeeping. This repository does not claim to implement those integrations.
 
 ## Run Report
 
-RUN_REPORT (type 35, subtype NONE, required resolved START Test ID) closes one run's
-result stream. Schema 1 encodes 177 + E payload bytes, 200 + E complete bytes,
-and uses only E decode-storage bytes, E=0..255. Fixed statistics always occupy
-their wire slots; validity bits determine whether they are meaningful. All
-invalid sections and an invalid last boundary contain zero fields. Totals retain
-all 64 bits. Unknown extension bytes round-trip without interpretation.
+RUN_REPORT (type 35, subtype NONE, required matching finalised-test ID) closes
+one test's result stream. Schema 1 encodes 177 + E payload bytes, 200 + E
+complete bytes, and uses only E decode-storage bytes, E=0..255. Fixed statistics
+always occupy their wire slots; validity bits determine whether they are
+meaningful. All invalid sections and an invalid last boundary contain zero
+fields. Totals retain all 64 bits. Unknown extension bytes round-trip without
+interpretation.
 
-A rejected START produces REJECTED/NOT_STARTED/UNAVAILABLE with only the
-terminal section valid and no emitted ticks. An admitted START followed by
-preparation failure produces FAILED/NOT_STARTED/UNAVAILABLE with the same lack
-of execution measurements or emitted ticks.
+Terminal rejection of START for the matching armed test produces
+REJECTED/NOT_STARTED/UNAVAILABLE with only the terminal section valid and no
+emitted ticks. Invalid, wrong-ID, and premature START requests create no report;
+a duplicate creates no additional report. An admitted START followed by preparation failure produces
+FAILED/NOT_STARTED/UNAVAILABLE with the same lack of execution measurements or
+emitted ticks.
 One logical terminal report follows the last result on a live connection, with
 no later results for that run. Errors are diagnostics and never replace it.
 Report construction uses the admitted generation's ID, N and nominal period;
@@ -1065,10 +1072,11 @@ See the wire table for sampling windows and endpoint provenance mapping.
 ## Endpoint lifecycle and recovery
 
 These conversations specify firmware/host integration, not operations performed
-by the stateless codec. On a live connection, every resolved START owes exactly
-one logical Run Report, including a rejected START. Preserve its Test ID and
-metadata until the report has been retained for output. No result may follow
-that report.
+by the stateless codec. On a live connection, START for the matching armed test
+owes exactly one logical Run Report when it reaches a terminal outcome,
+including terminal rejection. Invalid, wrong-ID, and premature START requests
+owe no report; a duplicate owes no additional report. Preserve the finalised test's ID and metadata until the
+report has been retained for output. No result may follow that report.
 Failure after it may produce Error/status with readiness false, never a second
 report. No durable replay or application-level report acknowledgement is added;
 physical loss can prevent delivery. Reconnect requires discovery, status/recovery
@@ -1078,7 +1086,9 @@ and a fresh upload/ID; do not infer retained data from Transport recovery.
 
 | Scenario | Required rig output and action order |
 | --- | --- |
-| START rejection | START REJECTED → REJECTED/NOT_STARTED/UNAVAILABLE report with only the terminal section valid → cleanup or applicable fault status. |
+| Terminal rejection of the matching armed test | START REJECTED → REJECTED/NOT_STARTED/UNAVAILABLE report with only the terminal section valid → cleanup or applicable fault status. |
+| Invalid, wrong-ID, or premature START request | Applicable START rejection Response; no Run Report. |
+| Duplicate START request | Applicable START rejection Response; no additional Run Report. |
 | Success | START COMPLETED → ordered results → SUCCESS/COMPLETE Run Report → discard/cleanup → ready NOTIFICATION. |
 | Failure after START admission during preparation | START FAILED → optional Error → FAILED/NOT_STARTED/UNAVAILABLE report with execution sections invalid → fault status. |
 | Execution failure | Any usable prefix results → optional Error → FAILED report with FAILED execution → fault status. |
@@ -1087,10 +1097,12 @@ and a fresh upload/ID; do not infer retained data from Transport recovery.
 | Reset during result transfer | Stop admitting new results; preserve in-flight output → owed terminal report → cleanup → RESET COMPLETED → ready NOTIFICATION. |
 
 Normal START admission is distinct from preparation succeeding. Configuration
-rejection, incomplete upload, or a rejected START must not reuse an earlier
-sealed snapshot. The rejected START report uses the rejected test's metadata.
-Abandoning an upload/armed test without resolving a START owes no Run Report.
-The first relevant failure source/reason/stage remains stable;
+rejection, incomplete upload, or a terminally rejected START must not reuse an
+earlier sealed snapshot. A rejection report uses the matching finalised test's
+metadata. Invalid, wrong-ID, and premature START requests, and abandoning an
+upload/armed test without a terminal START outcome, owe no Run Report. A
+duplicate request owes no additional report. The first relevant failure
+source/reason/stage remains stable;
 subsequent errors do not replace it.
 
 ### Reset admission and completion

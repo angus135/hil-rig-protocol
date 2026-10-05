@@ -734,7 +734,7 @@ The generic RSM EXTERNAL_REQUEST value does not prove that a Python host sent AB
 
 ### Purpose and size
 
-One report closes one resolved START, including rejection before execution. It describes execution, result delivery by the rig, and the measurements associated with an admitted execution. It is not a per-tick result or a receipt proving that Python stored the data.
+One report closes the START operation for one matching finalised test when that operation reaches a terminal outcome, including terminal rejection before execution. Invalid, wrong-ID, and premature START requests create no report; a duplicate creates no additional report. The report describes execution, result delivery by the rig, and the measurements associated with an admitted execution. It is not a per-tick result or a receipt proving that Python stored the data.
 
 The payload consists of a 32-byte header, 144 bytes of fixed statistic fields, and a one-byte extension length followed by 0–255 bytes. Statistic fields are always physically present; validity flags determine whether they mean anything.
 
@@ -772,7 +772,7 @@ Enums use these explicit values:
 | `ExecutionOutcome` | INVALID=0, NOT_STARTED=1, COMPLETE=2, FAILED=3, ABORTED=4 |
 | `RunResultStatus` | INVALID=0, COMPLETE=1, PARTIAL=2, UNAVAILABLE=3 |
 
-There is no wire PENDING outcome. A rejected START creates a `REJECTED/NOT_STARTED/UNAVAILABLE` report so the persisted report is sufficient to identify rejection. A START admitted by the RSM that subsequently fails during preparation instead creates a `FAILED/NOT_STARTED/UNAVAILABLE` report.
+There is no wire PENDING outcome. Terminal rejection of START for the matching armed test creates a `REJECTED/NOT_STARTED/UNAVAILABLE` report so the persisted report is sufficient to identify rejection. Invalid, wrong-ID, and premature START requests create no report; a duplicate creates no additional report. A START admitted by the RSM that subsequently fails during preparation instead creates a `FAILED/NOT_STARTED/UNAVAILABLE` report.
 
 Validate `1 <= expected_tick_count <= HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT`, `result_ticks_emitted <= expected_tick_count`, and a nominal period from the existing supported protocol period set. A valid last boundary must be at most N and must equal N when execution is COMPLETE. NOT_STARTED forbids measurement/last-boundary validity and requires zero emitted ticks. The codec checks widths and these explicit relationships; it does not attempt to prove physical consistency between independently supplied statistics, such as recomputing total cycles from a minimum and maximum.
 

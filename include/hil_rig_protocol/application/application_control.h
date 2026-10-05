@@ -37,10 +37,11 @@ typedef enum
     /**
      * Request execution of a previously accepted complete test.
      *
-     * Admission establishes one attempt owing a terminal RUN_REPORT, even if
-     * preparation fails before execution. A COMPLETED Response means firmware
-     * performed the start request. A rejected START does not establish an
-     * execution attempt, but still owes a REJECTED terminal RUN_REPORT.
+     * For the matching armed test, admission establishes one attempt owing a
+     * terminal RUN_REPORT, even if preparation fails before execution. A
+     * terminal rejection of that test also owes a REJECTED report after its
+     * Response. Invalid, wrong-ID, and premature requests owe no report; a
+     * duplicate request owes no additional report.
      */
     HIL_APPLICATION_CONTROL_START = 1,
     /**
