@@ -114,7 +114,7 @@ typedef enum
     HIL_APPLICATION_MESSAGE_TYPE_TEST_RESULT = 32,
     /** Firmware-to-Python variable-length captured result for one tick. */
     HIL_APPLICATION_MESSAGE_TYPE_VARIABLE_TEST_RESULT = 34,
-    /** Firmware-to-host terminal report closing one admitted run's result stream. */
+    /** Firmware-to-host terminal report closing one resolved START. */
     HIL_APPLICATION_MESSAGE_TYPE_RUN_REPORT = 35,
     /** Firmware-to-Python acceptance/rejection/completion outcome. */
     HIL_APPLICATION_MESSAGE_TYPE_RESPONSE = 48,

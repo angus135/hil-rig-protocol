@@ -66,6 +66,15 @@ def preparation_failure() -> p.RunReport:
     )
 
 
+def rejected_start() -> p.RunReport:
+    return replace(
+        preparation_failure(),
+        run_outcome=p.RunOutcome.REJECTED,
+        failure_source=p.FailureSource.EXECUTION_MANAGER,
+        failure_reason=p.FailureReason.INVALID_LIFECYCLE_STATE,
+    )
+
+
 def test_independent_reference_layout(codec: p.ApplicationCodec) -> None:
     value = success(b"\x00\xffv1")
     body = (
@@ -180,6 +189,33 @@ def test_not_started_and_failed_transfer(codec: p.ApplicationCodec) -> None:
         failure_reason=p.FailureReason.RESULT_TRANSFER_FAILED,
     )
     assert codec.decode(codec.encode(transfer_failure)) == transfer_failure
+
+
+def test_rejected_start_round_trip(codec: p.ApplicationCodec) -> None:
+    value = rejected_start()
+    wire = codec.encode(value)
+    assert wire[25] == p.RunOutcome.REJECTED
+    assert codec.decode(wire) == value
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"execution_outcome": p.ExecutionOutcome.FAILED},
+        {"result_status": p.RunResultStatus.PARTIAL},
+        {"valid_sections": 3},
+        {"result_ticks_emitted": 1},
+        {"failure_reason": p.FailureReason.NONE},
+        {"failure_source": p.FailureSource.NONE},
+        {"failure_stage": p.FailureStage.NONE},
+    ],
+)
+def test_rejected_start_relationships(
+    codec: p.ApplicationCodec, changes: dict[str, object]
+) -> None:
+    with pytest.raises(p.ApplicationEncodeError) as caught:
+        codec.encode(replace(rejected_start(), **changes))
+    assert caught.value.status is p.ApplicationStatus.VALIDATION_FAILED
 
 
 @pytest.mark.parametrize(

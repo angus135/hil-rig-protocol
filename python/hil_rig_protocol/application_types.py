@@ -991,6 +991,7 @@ class RunOutcome(IntEnum):
     SUCCESS = 0x1
     FAILED = 0x2
     ABORTED = 0x3
+    REJECTED = 0x4
 
 
 class ExecutionOutcome(IntEnum):

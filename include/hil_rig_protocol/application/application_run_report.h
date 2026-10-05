@@ -1,10 +1,11 @@
 /**
  * @file application_run_report.h
- * @brief Terminal outcome and diagnostic measurements for one admitted run.
+ * @brief Terminal outcome and diagnostic measurements for one resolved START.
  * @details Schema 1 has 177 + E payload bytes and 200 + E complete bytes,
  * E=0..255. Native struct sizes/alignments are not wire sizes. Only extensions
- * require caller decode storage. One report follows the final result and closes
- * the stream; Errors do not replace it. Endpoint ordering remains caller-owned.
+ * require caller decode storage. One report follows any emitted results and
+ * closes the stream; Errors do not replace it. Endpoint ordering remains
+ * caller-owned.
  */
 #ifndef HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_RUN_REPORT_H
 #define HIL_RIG_PROTOCOL_APPLICATION_APPLICATION_RUN_REPORT_H
@@ -15,10 +16,11 @@
 /** Stable schema-1 RunOutcome assignments. */
 typedef enum
 {
-    HIL_APPLICATION_RUN_OUTCOME_INVALID = 0x0,
-    HIL_APPLICATION_RUN_OUTCOME_SUCCESS = 0x1,
-    HIL_APPLICATION_RUN_OUTCOME_FAILED  = 0x2,
-    HIL_APPLICATION_RUN_OUTCOME_ABORTED = 0x3,
+    HIL_APPLICATION_RUN_OUTCOME_INVALID  = 0x0,
+    HIL_APPLICATION_RUN_OUTCOME_SUCCESS  = 0x1,
+    HIL_APPLICATION_RUN_OUTCOME_FAILED   = 0x2,
+    HIL_APPLICATION_RUN_OUTCOME_ABORTED  = 0x3,
+    HIL_APPLICATION_RUN_OUTCOME_REJECTED = 0x4,
 } HIL_Application_Run_Outcome_T;
 
 /** Stable schema-1 ExecutionOutcome assignments. */
@@ -108,7 +110,7 @@ typedef struct
     uint32_t refill_drain_contention_count;
 } HIL_Application_Run_Flash_Statistics_T;
 
-/** Terminal payload for the envelope Test ID, taken from the admitted generation. */
+/** Terminal payload for the envelope Test ID and its resolved START metadata. */
 typedef struct
 {
     /** Exactly 1. */

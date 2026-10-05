@@ -734,7 +734,7 @@ The generic RSM EXTERNAL_REQUEST value does not prove that a Python host sent AB
 
 ### Purpose and size
 
-One report closes the result stream of one admitted execution. It describes execution, result delivery by the rig, and the measurements associated with that execution. It is not a per-tick result or a receipt proving that Python stored the data.
+One report closes one resolved START, including rejection before execution. It describes execution, result delivery by the rig, and the measurements associated with an admitted execution. It is not a per-tick result or a receipt proving that Python stored the data.
 
 The payload consists of a 32-byte header, 144 bytes of fixed statistic fields, and a one-byte extension length followed by 0–255 bytes. Statistic fields are always physically present; validity flags determine whether they mean anything.
 
@@ -768,15 +768,15 @@ Enums use these explicit values:
 
 | Enum | Values |
 |---|---|
-| `RunOutcome` | INVALID=0, SUCCESS=1, FAILED=2, ABORTED=3 |
+| `RunOutcome` | INVALID=0, SUCCESS=1, FAILED=2, ABORTED=3, REJECTED=4 |
 | `ExecutionOutcome` | INVALID=0, NOT_STARTED=1, COMPLETE=2, FAILED=3, ABORTED=4 |
 | `RunResultStatus` | INVALID=0, COMPLETE=1, PARTIAL=2, UNAVAILABLE=3 |
 
-There is no wire PENDING outcome. A rejected START creates no report. A START admitted by the RSM that subsequently fails during preparation does create a report with `execution_outcome=NOT_STARTED`.
+There is no wire PENDING outcome. A rejected START creates a `REJECTED/NOT_STARTED/UNAVAILABLE` report so the persisted report is sufficient to identify rejection. A START admitted by the RSM that subsequently fails during preparation instead creates a `FAILED/NOT_STARTED/UNAVAILABLE` report.
 
 Validate `1 <= expected_tick_count <= HIL_APPLICATION_ABSOLUTE_MAX_TICK_COUNT`, `result_ticks_emitted <= expected_tick_count`, and a nominal period from the existing supported protocol period set. A valid last boundary must be at most N and must equal N when execution is COMPLETE. NOT_STARTED forbids measurement/last-boundary validity and requires zero emitted ticks. The codec checks widths and these explicit relationships; it does not attempt to prove physical consistency between independently supplied statistics, such as recomputing total cycles from a minimum and maximum.
 
-`SUCCESS` requires execution COMPLETE, result status COMPLETE, `result_ticks_emitted=N`, and no failure. A non-success report carries a nonzero source, stage and reason. An intentional host abort/reset uses the cancellation reason, unless an earlier actual fault already determines the run outcome.
+`SUCCESS` requires execution COMPLETE, result status COMPLETE, `result_ticks_emitted=N`, and no failure. `REJECTED` requires execution NOT_STARTED, result status UNAVAILABLE, zero emitted ticks, and only the terminal section valid. A non-success report carries a nonzero source, stage and reason; the rejection's specific reason remains available and need not be `OPERATION_REJECTED`. An intentional host abort/reset uses the cancellation reason, unless an earlier actual fault already determines the run outcome.
 
 `result_status` describes the usable stream preceding this report:
 

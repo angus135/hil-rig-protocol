@@ -39,7 +39,8 @@ typedef enum
      *
      * Admission establishes one attempt owing a terminal RUN_REPORT, even if
      * preparation fails before execution. A COMPLETED Response means firmware
-     * performed the start request; rejected START does not establish an attempt.
+     * performed the start request. A rejected START does not establish an
+     * execution attempt, but still owes a REJECTED terminal RUN_REPORT.
      */
     HIL_APPLICATION_CONTROL_START = 1,
     /**

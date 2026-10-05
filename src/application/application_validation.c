@@ -1072,7 +1072,7 @@ HIL_APPLICATION_Run_Report_validate( const HIL_Application_Context_T*    context
         return HIL_APPLICATION_STATUS_UNSUPPORTED_MESSAGE;
     }
     if ( data->run_outcome < HIL_APPLICATION_RUN_OUTCOME_SUCCESS
-         || data->run_outcome > HIL_APPLICATION_RUN_OUTCOME_ABORTED
+         || data->run_outcome > HIL_APPLICATION_RUN_OUTCOME_REJECTED
          || data->execution_outcome < HIL_APPLICATION_EXECUTION_OUTCOME_NOT_STARTED
          || data->execution_outcome > HIL_APPLICATION_EXECUTION_OUTCOME_ABORTED
          || data->result_status < HIL_APPLICATION_RUN_RESULT_STATUS_COMPLETE
@@ -1116,6 +1116,14 @@ HIL_APPLICATION_Run_Report_validate( const HIL_Application_Context_T*    context
         }
     }
     else if ( data->failure_reason == HIL_APPLICATION_FAILURE_REASON_NONE )
+    {
+        return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
+    }
+    if ( data->run_outcome == HIL_APPLICATION_RUN_OUTCOME_REJECTED
+         && ( data->execution_outcome != HIL_APPLICATION_EXECUTION_OUTCOME_NOT_STARTED
+              || data->result_status != HIL_APPLICATION_RUN_RESULT_STATUS_UNAVAILABLE
+              || data->valid_sections != HIL_APPLICATION_RUN_REPORT_VALID_TERMINAL
+              || data->result_ticks_emitted != 0u ) )
     {
         return HIL_APPLICATION_STATUS_VALIDATION_FAILED;
     }

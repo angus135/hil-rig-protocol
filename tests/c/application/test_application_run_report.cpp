@@ -171,4 +171,48 @@ TEST_F( ApplicationRunReport, TerminalAndSamplingRelationships )
     EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
 }
 
+/** Rejected starts are explicit terminal reports and cannot contain execution output. */
+TEST_F( ApplicationRunReport, RejectedStartRelationships )
+{
+    auto& report                = message.body.run_report;
+    report.run_outcome          = HIL_APPLICATION_RUN_OUTCOME_REJECTED;
+    report.execution_outcome    = HIL_APPLICATION_EXECUTION_OUTCOME_NOT_STARTED;
+    report.result_status        = HIL_APPLICATION_RUN_RESULT_STATUS_UNAVAILABLE;
+    report.result_ticks_emitted = 0u;
+    report.failure_source       = HIL_APPLICATION_FAILURE_SOURCE_EXECUTION_MANAGER;
+    report.failure_stage        = HIL_APPLICATION_FAILURE_STAGE_PREPARATION;
+    report.failure_reason       = HIL_APPLICATION_FAILURE_REASON_INVALID_LIFECYCLE_STATE;
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ), HIL_APPLICATION_STATUS_OK );
+
+    std::array<uint8_t, 200> wire{};
+    size_t                   size = 0u;
+    ASSERT_EQ(
+        HIL_APPLICATION_Encode_Message( &context, &message, wire.data(), wire.size(), &size ),
+        HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( wire[25], 0x04u );
+    HIL_Application_Message_T decoded{};
+    size_t                    used = 99u;
+    ASSERT_EQ(
+        HIL_APPLICATION_Decode_Message( &context, wire.data(), size, &decoded, nullptr, 0u, &used ),
+        HIL_APPLICATION_STATUS_OK );
+    EXPECT_EQ( used, 0u );
+    EXPECT_EQ( decoded.body.run_report.run_outcome, HIL_APPLICATION_RUN_OUTCOME_REJECTED );
+
+    report.execution_outcome = HIL_APPLICATION_EXECUTION_OUTCOME_FAILED;
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+    report.execution_outcome = HIL_APPLICATION_EXECUTION_OUTCOME_NOT_STARTED;
+    report.result_status     = HIL_APPLICATION_RUN_RESULT_STATUS_PARTIAL;
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+    report.result_status = HIL_APPLICATION_RUN_RESULT_STATUS_UNAVAILABLE;
+    report.valid_sections |= HIL_APPLICATION_RUN_REPORT_VALID_ISR_TIMING;
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+    report.valid_sections       = HIL_APPLICATION_RUN_REPORT_VALID_TERMINAL;
+    report.result_ticks_emitted = 1u;
+    EXPECT_EQ( HIL_APPLICATION_Validate_Message( &context, &message ),
+               HIL_APPLICATION_STATUS_VALIDATION_FAILED );
+}
+
 }  // namespace
